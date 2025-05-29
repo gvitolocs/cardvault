@@ -17,7 +17,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   late Future<List<CardModel>> _cardsFuture;
   List<CardModel> _filteredCards = [];
-  TextEditingController _searchController = TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
@@ -26,12 +26,16 @@ class _HomePageState extends State<HomePage> {
   }
 
   // Funzione per filtrare le carte in base alla ricerca
-  void _filterCards(String query) {
+  void _filterCards(String query, List<CardModel> allCards) {
     setState(() {
-      _filteredCards = _filteredCards
-          .where(
-              (card) => card.name.toLowerCase().contains(query.toLowerCase()))
-          .toList();
+      if (query.isEmpty) {
+        _filteredCards = allCards;
+      } else {
+        _filteredCards = allCards
+            .where(
+                (card) => card.name.toLowerCase().contains(query.toLowerCase()))
+            .toList();
+      }
     });
   }
 
@@ -41,7 +45,8 @@ class _HomePageState extends State<HomePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Pokecoin'),
+        title: Text(
+            'Pokecoin (${cart.items.length})'), // Mostra quante carte ci sono nel carrello
         actions: [
           // Icona carrello
           IconButton(
@@ -55,13 +60,11 @@ class _HomePageState extends State<HomePage> {
           ),
           // Icona profilo
           IconButton(
-            icon: const Icon(Icons.account_circle), // Icona profilo
+            icon: const Icon(Icons.account_circle),
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                    builder: (context) =>
-                        LoginPage()), // Navigazione alla pagina di login
+                MaterialPageRoute(builder: (context) => const LoginPage()),
               );
             },
           ),
@@ -72,14 +75,30 @@ class _HomePageState extends State<HomePage> {
           // Barra di ricerca
           Padding(
             padding: const EdgeInsets.all(16.0),
-            child: TextField(
-              controller: _searchController,
-              decoration: const InputDecoration(
-                hintText: 'Cerca carta...',
-                prefixIcon: Icon(Icons.search),
-                border: OutlineInputBorder(),
-              ),
-              onChanged: _filterCards,
+            child: FutureBuilder<List<CardModel>>(
+              future: _cardsFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                } else if (snapshot.hasError) {
+                  return Center(child: Text('Errore: ${snapshot.error}'));
+                } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return const Center(child: Text('Nessuna carta trovata.'));
+                }
+
+                final allCards = snapshot.data!;
+
+                // Applica filtro quando cambia il testo di ricerca
+                return TextField(
+                  controller: _searchController,
+                  decoration: const InputDecoration(
+                    hintText: 'Cerca carta...',
+                    prefixIcon: Icon(Icons.search),
+                    border: OutlineInputBorder(),
+                  ),
+                  onChanged: (value) => _filterCards(value, allCards),
+                );
+              },
             ),
           ),
           // Corpo della pagina con le carte
@@ -95,27 +114,17 @@ class _HomePageState extends State<HomePage> {
                   return const Center(child: Text('Nessuna carta trovata.'));
                 }
 
-                final cards = snapshot.data!;
-
-                // Se la ricerca è attiva, filtra le carte
-                if (_filteredCards.isEmpty &&
-                    _searchController.text.isNotEmpty) {
-                  _filteredCards = cards
-                      .where((card) => card.name
-                          .toLowerCase()
-                          .contains(_searchController.text.toLowerCase()))
-                      .toList();
-                } else {
-                  _filteredCards = cards;
+                if (_filteredCards.isEmpty && _searchController.text.isEmpty) {
+                  _filteredCards = snapshot.data!;
                 }
 
                 return GridView.builder(
                   padding: const EdgeInsets.all(8),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3, // Più carte per riga
-                    crossAxisSpacing: 8, // Distanza tra le carte
-                    mainAxisSpacing: 8, // Distanza tra le righe
-                    childAspectRatio: 0.7, // Cambia la proporzione delle carte
+                    crossAxisCount: 3,
+                    crossAxisSpacing: 8,
+                    mainAxisSpacing: 8,
+                    childAspectRatio: 0.7,
                   ),
                   itemCount: _filteredCards.length,
                   itemBuilder: (context, index) {
@@ -134,12 +143,36 @@ class _HomePageState extends State<HomePage> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.network(
-                            card.imageUrl,
-                            fit: BoxFit.cover,
-                          ),
+                        child: Stack(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.network(
+                                card.imageUrl,
+                                fit: BoxFit.cover,
+                                width: double.infinity,
+                                height: double.infinity,
+                              ),
+                            ),
+                            Positioned(
+                              bottom: 4,
+                              right: 4,
+                              child: IconButton(
+                                icon: const Icon(Icons.add_shopping_cart,
+                                    color: Colors.white),
+                                onPressed: () {
+                                  cart.addItem(card);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                          '${card.name} aggiunta al carrello'),
+                                      duration: const Duration(seconds: 1),
+                                    ),
+                                  );
+                                },
+                              ),
+                            )
+                          ],
                         ),
                       ),
                     );
