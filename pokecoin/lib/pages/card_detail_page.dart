@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:provider/provider.dart';
 import '../models/card_model.dart';
+import '../models/cart.dart';
 
 class CardDetailPage extends StatelessWidget {
   final CardModel card;
@@ -17,17 +19,40 @@ class CardDetailPage extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Center(child: Image.network(card.imageUrl, height: 200)),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             Text(
               card.name,
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text('Prezzo: \$${card.price.toStringAsFixed(2)}'),
-            SizedBox(height: 24),
-            Text('Andamento prezzo (simulato):',
-                style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 24),
+            const Text(
+              'Andamento prezzo (simulato):',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             SizedBox(height: 200, child: _buildChart()),
+            const SizedBox(height: 24),
+
+            // 🔽 Bottone per aggiungere al carrello
+            Center(
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Provider.of<Cart>(context, listen: false).addItem(card);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                        content: Text('${card.name} aggiunta al carrello')),
+                  );
+                },
+                icon: const Icon(Icons.add_shopping_cart),
+                label: const Text('Aggiungi al carrello'),
+                style: ElevatedButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  textStyle: const TextStyle(fontSize: 16),
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -54,7 +79,7 @@ class CardDetailPage extends StatelessWidget {
           ),
         ],
         gridData: FlGridData(show: false),
-        titlesData: FlTitlesData(show: false),
+        titlesData: const FlTitlesData(show: false),
         borderData: FlBorderData(show: false),
       ),
     );
