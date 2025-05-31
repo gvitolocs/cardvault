@@ -1,0 +1,20 @@
+.dart_tool/
+.packages
+.pub-cache/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.flutter-versions
+
+# VS Code
+.vscode/
+
+# IntelliJ
+.idea/
+*.iml
+
+# Android
+android/local.properties
+
+# iOS
+ios/Flutter/Generated.xcconfig
