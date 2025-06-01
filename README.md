@@ -1,4 +1,4 @@
 # cardvault
 
 
-Scemo chi legge
+読む阿呆
