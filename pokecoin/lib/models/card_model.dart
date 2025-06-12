@@ -23,4 +23,6 @@ class CardModel {
       set: json['set']?['name'] ?? 'Unknown', // ✔️ corregge il tipo
     );
   }
+
+  get priceHistory => null;
 }

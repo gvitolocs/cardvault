@@ -6,6 +6,8 @@ import 'package:provider/provider.dart';
 import '../models/cart.dart';
 
 class CardsListPage extends StatefulWidget {
+  const CardsListPage({super.key});
+
   @override
   _CardsListPageState createState() => _CardsListPageState();
 }
@@ -25,12 +27,13 @@ class _CardsListPageState extends State<CardsListPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Carte Pokémon'),
+        title: const Text('Carte Pokémon'),
         actions: [
           IconButton(
-            icon: Icon(Icons.shopping_cart),
+            icon: const Icon(Icons.shopping_cart),
             onPressed: () {
-              Navigator.pushNamed(context, '/cart');
+              Navigator.pushNamed(context,
+                  '/cart'); // Assicurati che la rotta /cart sia definita
             },
           ),
         ],
@@ -39,11 +42,11 @@ class _CardsListPageState extends State<CardsListPage> {
         future: futureCards,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
+            return const Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
             return Center(child: Text('Errore: ${snapshot.error}'));
           } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return Center(child: Text('Nessuna carta trovata.'));
+            return const Center(child: Text('Nessuna carta trovata.'));
           }
 
           final cards = snapshot.data!;
@@ -57,9 +60,14 @@ class _CardsListPageState extends State<CardsListPage> {
                   title: Text(card.name),
                   subtitle: Text('Prezzo: \$${card.price.toStringAsFixed(2)}'),
                   trailing: IconButton(
-                    icon: Icon(Icons.add_shopping_cart),
+                    icon: const Icon(Icons.add_shopping_cart),
                     onPressed: () {
-                      cart.addItem(card);
+                      // Qui devi passare anche condition ed expansion, qui per esempio valori fissi
+                      cart.addItem(card, 'Near Mint', 'Base Set');
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                            content: Text('${card.name} aggiunta al carrello')),
+                      );
                     },
                   ),
                   onTap: () {
