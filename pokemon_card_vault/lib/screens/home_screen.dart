@@ -23,6 +23,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     'https://images.pokemontcg.io/base1/4_hires.png',
     'https://images.pokemontcg.io/base1/58_hires.png',
     'https://images.pokemontcg.io/base1/25_hires.png',
+    'https://images.pokemontcg.io/base1/17_hires.png',
+    'https://images.pokemontcg.io/base1/16_hires.png',
   ];
 
   @override
