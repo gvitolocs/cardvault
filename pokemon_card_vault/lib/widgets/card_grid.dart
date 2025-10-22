@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
 import '../models/pokemon_card.dart';
 import '../providers/cart_provider.dart';
+import '../providers/favorites_provider.dart';
 import '../constants/app_colors.dart';
 
 class CardGrid extends StatelessWidget {
@@ -67,8 +68,10 @@ class CardItem extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cartState = ref.watch(cartProvider);
+    final favoritesState = ref.watch(favoritesProvider);
     final isInCart = cartState.isInCart(card.id);
     final quantity = cartState.getQuantity(card.id);
+    final isFavorite = favoritesState.isFavorite(card.id);
 
     return Container(
       decoration: BoxDecoration(
@@ -170,6 +173,47 @@ class CardItem extends ConsumerWidget {
                       ),
                     ),
                   ),
+                
+                // Favorite Button
+                Positioned(
+                  top: 8,
+                  right: card.stock <= 5 ? 80 : 8,
+                  child: GestureDetector(
+                    onTap: () {
+                      ref.read(favoritesProvider.notifier).toggleFavorite(card.id);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            isFavorite 
+                                ? '${card.name} removed from favorites' 
+                                : '${card.name} added to favorites'
+                          ),
+                          backgroundColor: AppColors.primary,
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.9),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        isFavorite ? Icons.favorite : Icons.favorite_border,
+                        size: 16,
+                        color: isFavorite ? Colors.red : Colors.grey[600],
+                      ),
+                    ),
+                  ),
+                ),
                 
                 // Special Effects
                 if (card.isHolo)

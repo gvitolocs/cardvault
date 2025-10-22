@@ -11,6 +11,7 @@ import 'screens/card_detail_screen.dart';
 import 'screens/checkout_screen.dart';
 import 'screens/orders_screen.dart';
 import 'screens/auth_screen.dart';
+import 'providers/favorites_provider.dart';
 import 'constants/app_colors.dart';
 
 void main() async {

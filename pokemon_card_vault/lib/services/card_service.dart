@@ -26,11 +26,13 @@ class CardService {
         return box.values.toList();
       }
       
-      // If no local data, fetch from API
-      return await _fetchCardsFromAPI();
+      // If no local data, use sample cards directly
+      final sampleCards = _getSampleCards();
+      await _saveCardsToLocal(sampleCards);
+      return sampleCards;
     } catch (e) {
       print('Error getting cards: $e');
-      return [];
+      return _getSampleCards();
     }
   }
 
