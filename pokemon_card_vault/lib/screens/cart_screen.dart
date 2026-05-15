@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/cart_provider.dart';
 import '../constants/app_colors.dart';
+import '../utils/price_format.dart';
 
 class CartScreen extends ConsumerWidget {
   const CartScreen({super.key});
@@ -10,7 +11,7 @@ class CartScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cartState = ref.watch(cartProvider);
-    
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Shopping Cart'),
@@ -58,7 +59,7 @@ class CartScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            'Add some Pokemon cards to get started!',
+            'Cards are listed in PKN but currently unavailable.',
             style: TextStyle(
               fontSize: 16,
               color: Colors.grey[500],
@@ -68,7 +69,7 @@ class CartScreen extends ConsumerWidget {
           ElevatedButton.icon(
             onPressed: () => context.go('/'),
             icon: const Icon(Icons.shopping_bag),
-            label: const Text('Start Shopping'),
+            label: const Text('Browse cards'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
@@ -80,7 +81,8 @@ class CartScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildCartContent(BuildContext context, WidgetRef ref, CartState cartState) {
+  Widget _buildCartContent(
+      BuildContext context, WidgetRef ref, CartState cartState) {
     return Column(
       children: [
         Expanded(
@@ -93,9 +95,9 @@ class CartScreen extends ConsumerWidget {
                 item: item,
                 onQuantityChanged: (quantity) {
                   ref.read(cartProvider.notifier).updateQuantity(
-                    item.card.id,
-                    quantity,
-                  );
+                        item.card.id,
+                        quantity,
+                      );
                 },
                 onRemove: () {
                   ref.read(cartProvider.notifier).removeFromCart(item.card.id);
@@ -108,7 +110,8 @@ class CartScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildCheckoutBar(BuildContext context, WidgetRef ref, CartState cartState) {
+  Widget _buildCheckoutBar(
+      BuildContext context, WidgetRef ref, CartState cartState) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -128,14 +131,14 @@ class CartScreen extends ConsumerWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Subtotal: \$${cartState.subtotal.toStringAsFixed(2)}',
+                'Subtotal: ${formatPkn(cartState.subtotal)}',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
                 ),
               ),
               Text(
-                'Total: \$${cartState.total.toStringAsFixed(2)}',
+                'Total: ${formatPkn(cartState.total)}',
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -176,7 +179,8 @@ class CartScreen extends ConsumerWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Clear Cart'),
-        content: const Text('Are you sure you want to remove all items from your cart?'),
+        content: const Text(
+            'Are you sure you want to remove all items from your cart?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -254,7 +258,7 @@ class _CartItem extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 16),
-          
+
           // Card Info
           Expanded(
             child: Column(
@@ -280,7 +284,7 @@ class _CartItem extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '\$${item.card.price.toStringAsFixed(2)}',
+                  formatPkn(item.card.price),
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -290,7 +294,7 @@ class _CartItem extends StatelessWidget {
               ],
             ),
           ),
-          
+
           // Quantity Controls
           Column(
             children: [
@@ -328,7 +332,7 @@ class _CartItem extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                '\$${item.totalPrice.toStringAsFixed(2)}',
+                formatPkn(item.totalPrice),
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
@@ -337,7 +341,7 @@ class _CartItem extends StatelessWidget {
               ),
             ],
           ),
-          
+
           // Remove Button
           IconButton(
             onPressed: onRemove,

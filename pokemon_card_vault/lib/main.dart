@@ -4,6 +4,9 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'screens/home_screen.dart';
+import 'screens/landing_screen.dart';
+import 'screens/health_screen.dart';
+import 'screens/scan_screen.dart';
 import 'screens/cart_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/favorites_screen.dart';
@@ -11,15 +14,14 @@ import 'screens/card_detail_screen.dart';
 import 'screens/checkout_screen.dart';
 import 'screens/orders_screen.dart';
 import 'screens/auth_screen.dart';
-import 'providers/favorites_provider.dart';
 import 'constants/app_colors.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Initialize Hive
   await Hive.initFlutter();
-  
+
   runApp(
     ScreenUtilInit(
       designSize: const Size(375, 812),
@@ -40,7 +42,7 @@ class PokemonCardVaultApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
-      title: 'Pokemon Card Vault',
+      title: 'CardVault',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         primarySwatch: Colors.green,
@@ -51,7 +53,7 @@ class PokemonCardVaultApp extends StatelessWidget {
           foregroundColor: Colors.white,
           elevation: 0,
         ),
-        cardTheme: CardTheme(
+        cardTheme: CardThemeData(
           color: AppColors.surface,
           elevation: 2,
           shape: RoundedRectangleBorder(
@@ -86,13 +88,25 @@ class PokemonCardVaultApp extends StatelessWidget {
 final GoRouter _router = GoRouter(
   initialLocation: '/',
   routes: [
+    GoRoute(
+      path: '/',
+      builder: (context, state) => const LandingScreen(),
+    ),
+    GoRoute(
+      path: '/health',
+      builder: (context, state) => const HealthScreen(),
+    ),
+    GoRoute(
+      path: '/scan',
+      builder: (context, state) => const ScanScreen(),
+    ),
     ShellRoute(
       builder: (context, state, child) {
-        return MainNavigationWrapper(child: child);
+        return child;
       },
       routes: [
         GoRoute(
-          path: '/',
+          path: '/marketplace',
           builder: (context, state) => const HomeScreen(),
         ),
         GoRoute(
@@ -130,71 +144,3 @@ final GoRouter _router = GoRouter(
     ),
   ],
 );
-
-class MainNavigationWrapper extends StatefulWidget {
-  final Widget child;
-
-  const MainNavigationWrapper({
-    super.key,
-    required this.child,
-  });
-
-  @override
-  State<MainNavigationWrapper> createState() => _MainNavigationWrapperState();
-}
-
-class _MainNavigationWrapperState extends State<MainNavigationWrapper> {
-  int _currentIndex = 0;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: widget.child,
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-          
-          switch (index) {
-            case 0:
-              context.go('/');
-              break;
-            case 1:
-              context.go('/cart');
-              break;
-            case 2:
-              context.go('/favorites');
-              break;
-            case 3:
-              context.go('/profile');
-              break;
-          }
-        },
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: Colors.white,
-        selectedItemColor: AppColors.primary,
-        unselectedItemColor: Colors.grey,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.shopping_cart),
-            label: 'Cart',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.favorite),
-            label: 'Favorites',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-        ],
-      ),
-    );
-  }
-}

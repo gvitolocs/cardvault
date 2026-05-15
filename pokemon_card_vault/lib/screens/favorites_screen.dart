@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../models/pokemon_card.dart';
 import '../providers/favorites_provider.dart';
 import '../providers/card_provider.dart';
 import '../widgets/card_grid.dart';
@@ -68,9 +69,9 @@ class FavoritesScreen extends ConsumerWidget {
           const SizedBox(height: 8),
           Text(
             'Add some Pokémon cards to your favorites\nby tapping the heart icon on any card.',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.textSecondary,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 32),
@@ -92,7 +93,10 @@ class FavoritesScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildFavoritesContent(BuildContext context, List favoriteCards) {
+  Widget _buildFavoritesContent(
+    BuildContext context,
+    List<PokemonCard> favoriteCards,
+  ) {
     return Column(
       children: [
         // Header with count
@@ -110,11 +114,7 @@ class FavoritesScreen extends ConsumerWidget {
           ),
           child: Row(
             children: [
-              Icon(
-                Icons.favorite,
-                color: AppColors.primary,
-                size: 24,
-              ),
+              Icon(Icons.favorite, color: AppColors.primary, size: 24),
               const SizedBox(width: 8),
               Text(
                 '${favoriteCards.length} Favorite${favoriteCards.length == 1 ? '' : 's'}',
@@ -126,14 +126,14 @@ class FavoritesScreen extends ConsumerWidget {
               const Spacer(),
               Text(
                 'Tap heart to remove',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
               ),
             ],
           ),
         ),
-        
+
         // Cards Grid
         Expanded(
           child: Padding(

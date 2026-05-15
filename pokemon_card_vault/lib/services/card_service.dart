@@ -5,11 +5,12 @@ import '../models/pokemon_card.dart';
 
 class CardService {
   static const String _baseUrl = 'https://api.pokemontcg.io/v2';
-  static const String _apiKey = 'your-api-key-here'; // Replace with actual API key
-  
+  static const String _apiKey =
+      'your-api-key-here'; // Replace with actual API key
+
   // Local storage
   static const String _cardsBoxName = 'pokemon_cards';
-  
+
   Future<void> _initHive() async {
     if (!Hive.isAdapterRegistered(0)) {
       Hive.registerAdapter(PokemonCardAdapter());
@@ -18,14 +19,16 @@ class CardService {
 
   Future<List<PokemonCard>> getAllCards() async {
     await _initHive();
-    
+
     try {
       // Try to get from local storage first
       final box = await Hive.openBox<PokemonCard>(_cardsBoxName);
       if (box.isNotEmpty) {
-        return box.values.toList();
+        final cards = _markUnavailable(box.values.toList());
+        await _saveCardsToLocal(cards);
+        return cards;
       }
-      
+
       // If no local data, use sample cards directly
       final sampleCards = _getSampleCards();
       await _saveCardsToLocal(sampleCards);
@@ -49,29 +52,36 @@ class CardService {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final List<dynamic> cardsData = data['data'] ?? [];
-        
+
         List<PokemonCard> cards = cardsData.map((cardData) {
           return PokemonCard.fromJson({
             'id': cardData['id'] ?? '',
             'name': cardData['name'] ?? '',
-            'imageUrl': cardData['images']?['large'] ?? cardData['images']?['small'] ?? '',
+            'imageUrl': cardData['images']?['large'] ??
+                cardData['images']?['small'] ??
+                '',
             'rarity': cardData['rarity'] ?? 'Common',
-            'type': cardData['types']?.isNotEmpty == true ? cardData['types'][0] : 'Colorless',
+            'type': cardData['types']?.isNotEmpty == true
+                ? cardData['types'][0]
+                : 'Colorless',
             'hp': int.tryParse(cardData['hp']?.toString() ?? '0') ?? 0,
             'attacks': (cardData['attacks'] as List<dynamic>?)
-                ?.map((attack) => attack['name']?.toString() ?? '')
-                .toList() ?? [],
+                    ?.map((attack) => attack['name']?.toString() ?? '')
+                    .toList() ??
+                [],
             'price': _generatePrice(cardData),
             'description': cardData['flavorText'] ?? '',
             'set': cardData['set']?['name'] ?? '',
             'number': cardData['number'] ?? '',
             'artist': cardData['artist'] ?? '',
-            'stock': _generateStock(),
+            'stock': 0,
             'rating': _generateRating(),
             'reviewCount': _generateReviewCount(),
             'isFoil': cardData['tcgplayer']?['prices']?['holofoil'] != null,
             'isHolo': cardData['tcgplayer']?['prices']?['holofoil'] != null,
-            'releaseDate': DateTime.tryParse(cardData['set']?['releaseDate'] ?? '') ?? DateTime.now(),
+            'releaseDate':
+                DateTime.tryParse(cardData['set']?['releaseDate'] ?? '') ??
+                    DateTime.now(),
             'tags': _generateTags(cardData),
             'condition': 'NM',
             'isGraded': false,
@@ -102,6 +112,10 @@ class CardService {
     }
   }
 
+  List<PokemonCard> _markUnavailable(List<PokemonCard> cards) {
+    return cards.map((card) => card.copyWith(stock: 0)).toList();
+  }
+
   Future<PokemonCard?> getCardById(String id) async {
     try {
       final box = await Hive.openBox<PokemonCard>(_cardsBoxName);
@@ -115,11 +129,13 @@ class CardService {
   Future<List<PokemonCard>> searchCards(String query) async {
     try {
       final allCards = await getAllCards();
-      return allCards.where((card) =>
-          card.name.toLowerCase().contains(query.toLowerCase()) ||
-          card.description.toLowerCase().contains(query.toLowerCase()) ||
-          card.tags.any((tag) => tag.toLowerCase().contains(query.toLowerCase()))
-      ).toList();
+      return allCards
+          .where((card) =>
+              card.name.toLowerCase().contains(query.toLowerCase()) ||
+              card.description.toLowerCase().contains(query.toLowerCase()) ||
+              card.tags.any(
+                  (tag) => tag.toLowerCase().contains(query.toLowerCase())))
+          .toList();
     } catch (e) {
       print('Error searching cards: $e');
       return [];
@@ -169,7 +185,8 @@ class CardService {
   Future<void> updateCard(PokemonCard card) async {
     try {
       final box = await Hive.openBox<PokemonCard>(_cardsBoxName);
-      final key = box.keys.firstWhere((key) => box.get(key)?.id == card.id, orElse: () => -1);
+      final key = box.keys
+          .firstWhere((key) => box.get(key)?.id == card.id, orElse: () => -1);
       if (key != -1) {
         await box.put(key, card);
       }
@@ -182,7 +199,8 @@ class CardService {
   Future<void> deleteCard(String cardId) async {
     try {
       final box = await Hive.openBox<PokemonCard>(_cardsBoxName);
-      final key = box.keys.firstWhere((key) => box.get(key)?.id == cardId, orElse: () => -1);
+      final key = box.keys
+          .firstWhere((key) => box.get(key)?.id == cardId, orElse: () => -1);
       if (key != -1) {
         await box.delete(key);
       }
@@ -248,7 +266,7 @@ class CardService {
         set: 'Base Set',
         number: '58',
         artist: 'Atsuko Nishida',
-        stock: 15,
+        stock: 0,
         rating: 4.5,
         reviewCount: 23,
         isFoil: false,
@@ -271,7 +289,7 @@ class CardService {
         set: 'Base Set',
         number: '4',
         artist: 'Mitsuhiro Arita',
-        stock: 3,
+        stock: 0,
         rating: 4.9,
         reviewCount: 156,
         isFoil: true,
@@ -294,7 +312,7 @@ class CardService {
         set: 'Base Set',
         number: '2',
         artist: 'Mitsuhiro Arita',
-        stock: 5,
+        stock: 0,
         rating: 4.7,
         reviewCount: 89,
         isFoil: true,
@@ -317,7 +335,7 @@ class CardService {
         set: 'Base Set',
         number: '15',
         artist: 'Mitsuhiro Arita',
-        stock: 7,
+        stock: 0,
         rating: 4.6,
         reviewCount: 67,
         isFoil: true,
@@ -340,7 +358,7 @@ class CardService {
         set: 'Base Set',
         number: '1',
         artist: 'Mitsuhiro Arita',
-        stock: 12,
+        stock: 0,
         rating: 4.4,
         reviewCount: 45,
         isFoil: true,
@@ -363,7 +381,7 @@ class CardService {
         set: 'Base Set',
         number: '8',
         artist: 'Mitsuhiro Arita',
-        stock: 8,
+        stock: 0,
         rating: 4.3,
         reviewCount: 34,
         isFoil: true,

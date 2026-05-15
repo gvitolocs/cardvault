@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../providers/card_provider.dart';
 import '../providers/cart_provider.dart';
 import '../constants/app_colors.dart';
+import '../utils/price_format.dart';
 
 class CardDetailScreen extends ConsumerWidget {
   final String cardId;
@@ -19,15 +20,14 @@ class CardDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final cardState = ref.watch(cardProvider);
     final cartState = ref.watch(cartProvider);
-    
+
     // Find the card by ID
     final card = cardState.cards.firstWhere(
       (c) => c.id == cardId,
       orElse: () => throw Exception('Card not found'),
     );
-    
+
     final isInCart = cartState.isInCart(card.id);
-    final quantity = cartState.getQuantity(card.id);
 
     return Scaffold(
       body: CustomScrollView(
@@ -90,7 +90,7 @@ class CardDetailScreen extends ConsumerWidget {
               ),
             ],
           ),
-          
+
           // Card Details
           SliverToBoxAdapter(
             child: Container(
@@ -113,7 +113,7 @@ class CardDetailScreen extends ConsumerWidget {
                         ),
                       ),
                       Text(
-                        '\$${card.price.toStringAsFixed(2)}',
+                        formatPkn(card.price),
                         style: const TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
@@ -123,37 +123,40 @@ class CardDetailScreen extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // Card Info Row
                   Row(
                     children: [
-                      _buildInfoChip('Type', card.type, _getTypeColor(card.type)),
+                      _buildInfoChip(
+                          'Type', card.type, _getTypeColor(card.type)),
                       const SizedBox(width: 8),
-                      _buildInfoChip('Rarity', card.rarity, _getRarityColor(card.rarity)),
+                      _buildInfoChip(
+                          'Rarity', card.rarity, _getRarityColor(card.rarity)),
                       const SizedBox(width: 8),
                       if (card.hp > 0)
                         _buildInfoChip('HP', '${card.hp}', AppColors.primary),
                     ],
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // Stock Status
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: card.stock > 0 ? Colors.green[100] : Colors.red[100],
+                      color: Colors.red[100],
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Text(
-                      card.stock > 0 ? 'In Stock (${card.stock})' : 'Out of Stock',
+                      'Unavailable',
                       style: TextStyle(
-                        color: card.stock > 0 ? Colors.green[800] : Colors.red[800],
+                        color: Colors.red[800],
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
                   const SizedBox(height: 24),
-                  
+
                   // Description
                   const Text(
                     'Description',
@@ -165,8 +168,8 @@ class CardDetailScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    card.description.isNotEmpty 
-                        ? card.description 
+                    card.description.isNotEmpty
+                        ? card.description
                         : 'No description available for this card.',
                     style: const TextStyle(
                       fontSize: 16,
@@ -175,7 +178,7 @@ class CardDetailScreen extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  
+
                   // Attacks
                   if (card.attacks.isNotEmpty) ...[
                     const Text(
@@ -188,42 +191,43 @@ class CardDetailScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 8),
                     ...card.attacks.map((attack) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.flash_on,
-                            size: 16,
-                            color: AppColors.accent,
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.flash_on,
+                                size: 16,
+                                color: AppColors.accent,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                attack,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 8),
-                          Text(
-                            attack,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    )),
+                        )),
                     const SizedBox(height: 24),
                   ],
-                  
+
                   // Card Details
                   _buildDetailSection('Set', card.set),
                   _buildDetailSection('Number', card.number),
                   _buildDetailSection('Artist', card.artist),
-                  _buildDetailSection('Release Date', 
-                    '${card.releaseDate.day}/${card.releaseDate.month}/${card.releaseDate.year}'),
-                  
+                  _buildDetailSection('Release Date',
+                      '${card.releaseDate.day}/${card.releaseDate.month}/${card.releaseDate.year}'),
+
                   if (card.isGraded) ...[
                     _buildDetailSection('Grade', card.grade ?? 'N/A'),
-                    _buildDetailSection('Grading Company', card.gradingCompany ?? 'N/A'),
+                    _buildDetailSection(
+                        'Grading Company', card.gradingCompany ?? 'N/A'),
                   ],
-                  
+
                   const SizedBox(height: 24),
-                  
+
                   // Rating
                   Row(
                     children: [
@@ -271,7 +275,7 @@ class CardDetailScreen extends ConsumerWidget {
                     );
                   },
                   icon: const Icon(Icons.remove_shopping_cart),
-                  label: Text('Remove ($quantity)'),
+                  label: const Text('Remove unavailable item'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.red[400],
                     foregroundColor: Colors.white,
@@ -282,21 +286,11 @@ class CardDetailScreen extends ConsumerWidget {
             ] else ...[
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: card.stock > 0
-                      ? () {
-                          ref.read(cartProvider.notifier).addToCart(card);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('${card.name} added to cart'),
-                              backgroundColor: AppColors.primary,
-                            ),
-                          );
-                        }
-                      : null,
+                  onPressed: null,
                   icon: const Icon(Icons.add_shopping_cart),
-                  label: Text(card.stock > 0 ? 'Add to Cart' : 'Out of Stock'),
+                  label: const Text('Unavailable'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: card.stock > 0 ? AppColors.primary : Colors.grey,
+                    backgroundColor: Colors.grey,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
@@ -305,13 +299,14 @@ class CardDetailScreen extends ConsumerWidget {
             ],
             const SizedBox(width: 16),
             ElevatedButton.icon(
-              onPressed: () => context.go('/checkout'),
+              onPressed: null,
               icon: const Icon(Icons.shopping_cart),
-              label: const Text('Buy Now'),
+              label: const Text('Unavailable'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.accent,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+                padding:
+                    const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
               ),
             ),
           ],

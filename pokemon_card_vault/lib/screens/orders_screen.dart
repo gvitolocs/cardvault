@@ -9,7 +9,7 @@ class OrdersScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // TODO: Implement orders provider
     final orders = <Map<String, dynamic>>[]; // Placeholder for now
-    
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Orders'),
@@ -24,9 +24,7 @@ class OrdersScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: orders.isEmpty
-          ? _buildEmptyOrders()
-          : _buildOrdersList(orders),
+      body: orders.isEmpty ? _buildEmptyOrders() : _buildOrdersList(orders),
     );
   }
 
@@ -75,7 +73,7 @@ class OrdersScreen extends ConsumerWidget {
               leading: Icon(Icons.shopping_bag),
               title: Text('Order #12345'),
               subtitle: Text('Placed on Jan 1, 2024'),
-              trailing: Text('\$99.99'),
+              trailing: Text('99.99 PKN'),
             ),
           ),
         );

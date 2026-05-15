@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/cart_provider.dart';
 import '../constants/app_colors.dart';
+import '../widgets/shop_chain_account_card.dart';
+import '../utils/price_format.dart';
 
 class CheckoutScreen extends ConsumerWidget {
   const CheckoutScreen({super.key});
@@ -10,7 +12,7 @@ class CheckoutScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cartState = ref.watch(cartProvider);
-    
+
     if (cartState.items.isEmpty) {
       return Scaffold(
         appBar: AppBar(
@@ -38,23 +40,25 @@ class CheckoutScreen extends ConsumerWidget {
             // Order Summary
             _buildOrderSummary(cartState),
             const SizedBox(height: 24),
-            
+
             // Shipping Address
-            _buildShippingAddress(),
+            _buildShippingAddress(context),
             const SizedBox(height: 24),
-            
+
             // Payment Method
-            _buildPaymentMethod(),
+            _buildPaymentMethod(context),
             const SizedBox(height: 24),
-            
+            const ShopChainAccountCard(compact: true),
+            const SizedBox(height: 24),
+
             // Order Notes
             _buildOrderNotes(),
             const SizedBox(height: 24),
-            
+
             // Total
             _buildTotal(cartState),
             const SizedBox(height: 32),
-            
+
             // Place Order Button
             SizedBox(
               width: double.infinity,
@@ -112,80 +116,80 @@ class CheckoutScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           ...cartState.items.map((item) => Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Row(
-              children: [
-                Container(
-                  width: 50,
-                  height: 70,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: _getTypeColors(item.card.type),
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 50,
+                      height: 70,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: _getTypeColors(item.card.type),
+                        ),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          item.card.imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              color: Colors.grey[200],
+                              child: const Icon(
+                                Icons.image,
+                                color: Colors.grey,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
                     ),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
-                      item.card.imageUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          color: Colors.grey[200],
-                          child: const Icon(
-                            Icons.image,
-                            color: Colors.grey,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.card.name,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textPrimary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                        );
-                      },
+                          const SizedBox(height: 4),
+                          Text(
+                            'Qty: ${item.quantity}',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item.card.name,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                    Text(
+                      formatPkn(item.totalPrice),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Qty: ${item.quantity}',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                Text(
-                  '\$${item.totalPrice.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primary,
-                  ),
-                ),
-              ],
-            ),
-          )),
+              )),
         ],
       ),
     );
   }
 
-  Widget _buildShippingAddress() {
+  Widget _buildShippingAddress(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -223,7 +227,7 @@ class CheckoutScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           const Text(
-            'John Doe\n123 Main Street\nNew York, NY 10001\nUnited States',
+            'Shipping address not configured yet.\nCards are currently unavailable, so checkout remains disabled.',
             style: TextStyle(
               fontSize: 16,
               color: AppColors.textSecondary,
@@ -235,7 +239,7 @@ class CheckoutScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildPaymentMethod() {
+  Widget _buildPaymentMethod(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -350,7 +354,7 @@ class CheckoutScreen extends ConsumerWidget {
                 style: TextStyle(fontSize: 16),
               ),
               Text(
-                '\$${cartState.subtotal.toStringAsFixed(2)}',
+                formatPkn(cartState.subtotal),
                 style: const TextStyle(fontSize: 16),
               ),
             ],
@@ -364,7 +368,7 @@ class CheckoutScreen extends ConsumerWidget {
                 style: TextStyle(fontSize: 16),
               ),
               Text(
-                '\$${cartState.tax.toStringAsFixed(2)}',
+                formatPkn(cartState.tax),
                 style: const TextStyle(fontSize: 16),
               ),
             ],
@@ -378,7 +382,9 @@ class CheckoutScreen extends ConsumerWidget {
                 style: TextStyle(fontSize: 16),
               ),
               Text(
-                cartState.shipping == 0 ? 'FREE' : '\$${cartState.shipping.toStringAsFixed(2)}',
+                cartState.shipping == 0
+                    ? 'FREE'
+                    : formatPkn(cartState.shipping),
                 style: const TextStyle(fontSize: 16),
               ),
             ],
@@ -395,7 +401,7 @@ class CheckoutScreen extends ConsumerWidget {
                 ),
               ),
               Text(
-                '\$${cartState.total.toStringAsFixed(2)}',
+                formatPkn(cartState.total),
                 style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
@@ -474,7 +480,7 @@ class CheckoutScreen extends ConsumerWidget {
                 labelText: 'Full Name',
                 border: OutlineInputBorder(),
               ),
-              controller: TextEditingController(text: 'John Doe'),
+              controller: TextEditingController(text: 'CardVault Shop'),
             ),
             const SizedBox(height: 16),
             TextField(

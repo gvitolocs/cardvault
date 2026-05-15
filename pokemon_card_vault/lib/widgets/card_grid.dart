@@ -6,6 +6,7 @@ import '../models/pokemon_card.dart';
 import '../providers/cart_provider.dart';
 import '../providers/favorites_provider.dart';
 import '../constants/app_colors.dart';
+import '../utils/price_format.dart';
 
 class CardGrid extends StatelessWidget {
   final List<PokemonCard> cards;
@@ -130,13 +131,14 @@ class CardItem extends ConsumerWidget {
                     ),
                   ),
                 ),
-                
+
                 // Rarity Badge
                 Positioned(
                   top: 8,
                   left: 8,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: _getRarityColor(card.rarity),
                       borderRadius: BorderRadius.circular(12),
@@ -151,43 +153,43 @@ class CardItem extends ConsumerWidget {
                     ),
                   ),
                 ),
-                
+
                 // Stock Badge
-                if (card.stock <= 5)
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: card.stock == 0 ? Colors.red : Colors.orange,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        card.stock == 0 ? 'SOLD OUT' : 'LOW STOCK',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 8,
-                          fontWeight: FontWeight.bold,
-                        ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      'UNAVAILABLE',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 8,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
-                
+                ),
+
                 // Favorite Button
                 Positioned(
                   top: 8,
-                  right: card.stock <= 5 ? 80 : 8,
+                  right: 104,
                   child: GestureDetector(
                     onTap: () {
-                      ref.read(favoritesProvider.notifier).toggleFavorite(card.id);
+                      ref
+                          .read(favoritesProvider.notifier)
+                          .toggleFavorite(card.id);
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text(
-                            isFavorite 
-                                ? '${card.name} removed from favorites' 
-                                : '${card.name} added to favorites'
-                          ),
+                          content: Text(isFavorite
+                              ? '${card.name} removed from favorites'
+                              : '${card.name} added to favorites'),
                           backgroundColor: AppColors.primary,
                           duration: const Duration(seconds: 2),
                         ),
@@ -214,7 +216,7 @@ class CardItem extends ConsumerWidget {
                     ),
                   ),
                 ),
-                
+
                 // Special Effects
                 if (card.isHolo)
                   Positioned.fill(
@@ -238,7 +240,7 @@ class CardItem extends ConsumerWidget {
               ],
             ),
           ),
-          
+
           // Card Info
           Expanded(
             flex: 2,
@@ -259,12 +261,13 @@ class CardItem extends ConsumerWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
-                  
+
                   // Card Type and HP
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
                           color: _getTypeColor(card.type),
                           borderRadius: BorderRadius.circular(8),
@@ -290,13 +293,13 @@ class CardItem extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  
+
                   // Price and Rating
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        '\$${card.price.toStringAsFixed(2)}',
+                        formatPkn(card.price),
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -322,9 +325,9 @@ class CardItem extends ConsumerWidget {
                       ),
                     ],
                   ),
-                  
+
                   const Spacer(),
-                  
+
                   // Add to Cart Button
                   SizedBox(
                     width: double.infinity,
@@ -334,35 +337,28 @@ class CardItem extends ConsumerWidget {
                               Expanded(
                                 child: ElevatedButton.icon(
                                   onPressed: () {
-                                    ref.read(cartProvider.notifier).removeFromCart(card.id);
+                                    ref
+                                        .read(cartProvider.notifier)
+                                        .removeFromCart(card.id);
                                   },
                                   icon: const Icon(Icons.remove, size: 16),
                                   label: Text('Remove ($quantity)'),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.red[400],
                                     foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                    padding:
+                                        const EdgeInsets.symmetric(vertical: 8),
                                   ),
                                 ),
                               ),
                             ],
                           )
                         : ElevatedButton.icon(
-                            onPressed: card.stock > 0
-                                ? () {
-                                    ref.read(cartProvider.notifier).addToCart(card);
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text('${card.name} added to cart'),
-                                        backgroundColor: AppColors.primary,
-                                      ),
-                                    );
-                                  }
-                                : null,
+                            onPressed: null,
                             icon: const Icon(Icons.add_shopping_cart, size: 16),
-                            label: Text(card.stock > 0 ? 'Add to Cart' : 'Sold Out'),
+                            label: const Text('Unavailable'),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: card.stock > 0 ? AppColors.primary : Colors.grey,
+                              backgroundColor: Colors.grey,
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 8),
                             ),

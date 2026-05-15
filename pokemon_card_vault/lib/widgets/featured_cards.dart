@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
 import '../providers/card_provider.dart';
 import '../constants/app_colors.dart';
+import '../utils/price_format.dart';
 
 class FeaturedCards extends ConsumerWidget {
   const FeaturedCards({super.key});
@@ -11,21 +12,21 @@ class FeaturedCards extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cardState = ref.watch(cardProvider);
-    
+
     if (cardState.isLoading) {
       return _buildShimmerList();
     }
-    
+
     // Get featured cards (high-rated or rare cards)
     final featuredCards = cardState.cards
         .where((card) => card.rating >= 4.0 || card.rarity == 'Rare Holo')
         .take(5)
         .toList();
-    
+
     if (featuredCards.isEmpty) {
       return const SizedBox.shrink();
     }
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -160,7 +161,7 @@ class _FeaturedCardItem extends StatelessWidget {
               ),
             ),
           ),
-          
+
           // Card Info
           Expanded(
             flex: 2,
@@ -180,11 +181,11 @@ class _FeaturedCardItem extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
-                  
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 4, vertical: 2),
                         decoration: BoxDecoration(
                           color: _getTypeColor(card.type),
                           borderRadius: BorderRadius.circular(6),
@@ -200,7 +201,7 @@ class _FeaturedCardItem extends StatelessWidget {
                       ),
                       const Spacer(),
                       Text(
-                        '\$${card.price.toStringAsFixed(0)}',
+                        formatPkn(card.price, decimals: 0),
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,

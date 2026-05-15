@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import '../models/pokemon_card.dart';
 
 class FavoritesState {
   final List<String> favoriteCardIds;
@@ -40,26 +39,20 @@ class FavoritesNotifier extends StateNotifier<FavoritesState> {
   Future<void> _loadFavorites() async {
     try {
       state = state.copyWith(isLoading: true);
-      
+
       final box = await Hive.openBox<String>(_favoritesBoxName);
       final favoriteIds = box.values.toList();
-      
-      state = state.copyWith(
-        favoriteCardIds: favoriteIds,
-        isLoading: false,
-      );
+
+      state = state.copyWith(favoriteCardIds: favoriteIds, isLoading: false);
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
   Future<void> toggleFavorite(String cardId) async {
     try {
       final box = await Hive.openBox<String>(_favoritesBoxName);
-      
+
       if (state.isFavorite(cardId)) {
         // Remove from favorites
         final key = box.keys.firstWhere(
@@ -73,7 +66,7 @@ class FavoritesNotifier extends StateNotifier<FavoritesState> {
         // Add to favorites
         await box.add(cardId);
       }
-      
+
       // Reload favorites
       await _loadFavorites();
     } catch (e) {
@@ -104,6 +97,7 @@ class FavoritesNotifier extends StateNotifier<FavoritesState> {
   }
 }
 
-final favoritesProvider = StateNotifierProvider<FavoritesNotifier, FavoritesState>((ref) {
+final favoritesProvider =
+    StateNotifierProvider<FavoritesNotifier, FavoritesState>((ref) {
   return FavoritesNotifier();
 });

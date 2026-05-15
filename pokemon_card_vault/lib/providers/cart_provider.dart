@@ -40,15 +40,15 @@ class CartState {
   });
 
   double get subtotal => items.fold(0.0, (sum, item) => sum + item.totalPrice);
-  
+
   double get tax => subtotal * 0.08; // 8% tax
-  
-  double get shipping => subtotal > 50 ? 0 : 5.99; // Free shipping over $50
-  
+
+  double get shipping => subtotal > 50 ? 0 : 5.99; // Free shipping over 50 PKN
+
   double get total => subtotal + tax + shipping;
-  
+
   int get itemCount => items.fold(0, (sum, item) => sum + item.quantity);
-  
+
   bool isInCart(String cardId) {
     return items.any((item) => item.card.id == cardId);
   }
@@ -107,8 +107,8 @@ class CartNotifier extends StateNotifier<CartState> {
   Future<void> _loadCart() async {
     try {
       final box = await Hive.openBox<CartItem>('cart');
-      final items = box.values.toList();
-      state = state.copyWith(items: items);
+      await box.clear();
+      state = state.copyWith(items: []);
     } catch (e) {
       state = state.copyWith(error: e.toString());
     }
@@ -128,8 +128,13 @@ class CartNotifier extends StateNotifier<CartState> {
 
   Future<void> addToCart(PokemonCard card, {int quantity = 1}) async {
     try {
+      if (card.stock <= 0) {
+        state = state.copyWith(error: '${card.name} is currently unavailable');
+        return;
+      }
+
       state = state.copyWith(isLoading: true);
-      
+
       final existingItemIndex = state.items.indexWhere(
         (item) => item.card.id == card.id,
       );
@@ -151,7 +156,7 @@ class CartNotifier extends StateNotifier<CartState> {
         items: newItems,
         isLoading: false,
       );
-      
+
       await _saveCart();
     } catch (e) {
       state = state.copyWith(
@@ -164,16 +169,18 @@ class CartNotifier extends StateNotifier<CartState> {
   Future<void> removeFromCart(String cardId) async {
     try {
       state = state.copyWith(isLoading: true);
-      
-      final newItems = state.items.where(
-        (item) => item.card.id != cardId,
-      ).toList();
+
+      final newItems = state.items
+          .where(
+            (item) => item.card.id != cardId,
+          )
+          .toList();
 
       state = state.copyWith(
         items: newItems,
         isLoading: false,
       );
-      
+
       await _saveCart();
     } catch (e) {
       state = state.copyWith(
@@ -191,7 +198,7 @@ class CartNotifier extends StateNotifier<CartState> {
       }
 
       state = state.copyWith(isLoading: true);
-      
+
       final itemIndex = state.items.indexWhere(
         (item) => item.card.id == cardId,
       );
@@ -199,12 +206,12 @@ class CartNotifier extends StateNotifier<CartState> {
       if (itemIndex != -1) {
         List<CartItem> newItems = List.from(state.items);
         newItems[itemIndex] = newItems[itemIndex].copyWith(quantity: quantity);
-        
+
         state = state.copyWith(
           items: newItems,
           isLoading: false,
         );
-        
+
         await _saveCart();
       }
     } catch (e) {
@@ -218,10 +225,10 @@ class CartNotifier extends StateNotifier<CartState> {
   Future<void> clearCart() async {
     try {
       state = state.copyWith(isLoading: true);
-      
+
       final box = await Hive.openBox<CartItem>('cart');
       await box.clear();
-      
+
       state = state.copyWith(
         items: [],
         isLoading: false,
@@ -241,29 +248,31 @@ class CartNotifier extends StateNotifier<CartState> {
   int getQuantity(String cardId) {
     final item = state.items.firstWhere(
       (item) => item.card.id == cardId,
-      orElse: () => CartItem(card: PokemonCard(
-        id: '',
-        name: '',
-        imageUrl: '',
-        rarity: '',
-        type: '',
-        hp: 0,
-        attacks: [],
-        price: 0,
-        description: '',
-        set: '',
-        number: '',
-        artist: '',
-        stock: 0,
-        rating: 0,
-        reviewCount: 0,
-        isFoil: false,
-        isHolo: false,
-        releaseDate: DateTime.now(),
-        tags: [],
-        condition: '',
-        isGraded: false,
-      ), quantity: 0),
+      orElse: () => CartItem(
+          card: PokemonCard(
+            id: '',
+            name: '',
+            imageUrl: '',
+            rarity: '',
+            type: '',
+            hp: 0,
+            attacks: [],
+            price: 0,
+            description: '',
+            set: '',
+            number: '',
+            artist: '',
+            stock: 0,
+            rating: 0,
+            reviewCount: 0,
+            isFoil: false,
+            isHolo: false,
+            releaseDate: DateTime.now(),
+            tags: [],
+            condition: '',
+            isGraded: false,
+          ),
+          quantity: 0),
     );
     return item.quantity;
   }
