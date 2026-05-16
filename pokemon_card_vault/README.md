@@ -1,17 +1,34 @@
-# 🎴 Pokemon Card Vault - Ecommerce Flutter App
+# CardVault - Pokoin Marketplace And Wallet
 
-A complete Pokemon card ecommerce application built with Flutter, featuring advanced functionality for buying, selling, and managing Pokemon cards.
+CardVault is a Flutter web app for the Pokoin ecosystem. It combines a crypto-native Pokemon card marketplace with the Pokoin Wallet in one deployed web application.
+
+## Live App
+
+- Main site: `https://pokoin.com/`
+- Wallet route: `https://pokoin.com/wallet`
+- PokoinPoS RPC: `https://rpc.pokoin.com/rpc`
+- Explorer: `https://explorer.pokoin.com`
+
+The site and wallet are no longer separate Vercel apps or separate Flutter deployments. Vercel serves one Flutter SPA, and `/wallet` is handled by the same router and bundle as the main CardVault site.
 
 ## ✨ Features
 
-### 🛍️ E-commerce Core
+### E-Commerce Core
 - **Card Catalog**: Browse thousands of Pokemon cards with advanced filtering
 - **Shopping Cart**: Add/remove items, quantity management, persistent storage
 - **Checkout Process**: Complete order flow with address and payment management
 - **Order Management**: Track orders, view history, order status updates
-- **User Authentication**: Secure login/signup with social authentication
+- **User Authentication**: Firebase email/password and Google login on the main site
 
-### 🎯 Advanced Features
+### Pokoin Wallet
+- **Integrated Route**: Wallet is served from `/wallet` in the same Flutter app
+- **PokoinPoS Network**: Chain ID `26062026` (`0x18dacca`), currency `PKN`
+- **MetaMask Bridge**: Add/switch to the PokoinPoS network from the browser
+- **Live Balance**: Read native PKN balances from the public RPC
+- **Send Flow**: Submit wallet transactions through a browser wallet
+- **wPKN Link**: Shortcut to the PancakeSwap wPKN market
+
+### Advanced Features
 - **Smart Search**: Real-time search with filters by type, rarity, set, price
 - **Wishlist**: Save favorite cards for later purchase
 - **Card Grading**: Support for graded cards with grading company info
@@ -20,7 +37,7 @@ A complete Pokemon card ecommerce application built with Flutter, featuring adva
 - **Price Tracking**: Historical price data and trends
 - **Ratings & Reviews**: User reviews and rating system
 
-### 🎨 UI/UX Features
+### UI/UX Features
 - **Material Design 3**: Modern, beautiful interface
 - **Responsive Design**: Works on phones, tablets, and web
 - **Dark/Light Theme**: User preference support
@@ -28,10 +45,12 @@ A complete Pokemon card ecommerce application built with Flutter, featuring adva
 - **Image Optimization**: Cached network images with placeholders
 - **Shimmer Loading**: Beautiful loading states
 
-### 🔧 Technical Features
+### Technical Features
 - **State Management**: Riverpod for reactive state management
 - **Local Storage**: Hive for offline data persistence
 - **API Integration**: RESTful API with Pokemon TCG API
+- **Firebase Backend**: Auth, Firestore profiles, balances, orders, and withdraw requests
+- **Vercel SPA Routing**: Direct URLs like `/wallet`, `/profile`, and `/orders` route into the same app
 - **Offline Support**: Works without internet connection
 - **Push Notifications**: Order updates and promotions
 - **Analytics**: User behavior tracking
@@ -117,21 +136,19 @@ lib/
 - **HTTP**: API communication with Pokemon TCG API
 - **Caching**: Smart caching for images and data
 
-## 🔧 Configuration
-
-### API Keys
-Create a `.env` file in the root directory:
-```env
-POKEMON_TCG_API_KEY=your_api_key_here
-FIREBASE_API_KEY=your_firebase_key_here
-STRIPE_PUBLISHABLE_KEY=your_stripe_key_here
-```
+## Configuration
 
 ### Firebase Setup
-1. Create a Firebase project
-2. Enable Authentication, Firestore, and Storage
-3. Download `google-services.json` (Android) and `GoogleService-Info.plist` (iOS)
-4. Place them in the appropriate directories
+The app is configured for the `pokoin` Firebase project.
+
+Required Firebase services:
+
+1. Authentication with Email/Password enabled.
+2. Authentication with Google enabled for the main site.
+3. Cloud Firestore.
+4. Firestore rules from `firestore.rules` deployed.
+
+Data model details are documented in `docs/firebase-data-model.md`.
 
 ## 📦 Dependencies
 
@@ -196,10 +213,23 @@ theme: ThemeData(
    ```
 
 ### Web
-1. Build for web:
-   ```bash
-   flutter build web --release
-   ```
+Build and deploy the single app:
+
+```bash
+flutter build web --release --pwa-strategy=none
+vercel deploy build/web --prod
+```
+
+Vercel uses `web/vercel.json` to rewrite all app routes back to `index.html`.
+
+After deploy:
+
+```bash
+curl -I https://pokoin.com/
+curl -I https://pokoin.com/wallet
+```
+
+Both routes should return `200`.
 
 ## 🤝 Contributing
 
@@ -219,13 +249,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Flutter team for the amazing framework
 - Material Design for UI guidelines
 - Open source community for inspiration
-
-## 📞 Support
-
-If you have any questions or need help, please:
-- Open an issue on GitHub
-- Contact us at support@pokemoncardvault.com
-- Join our Discord community
 
 ## 🔮 Future Features
 
