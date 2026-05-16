@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../constants/project_links.dart';
 import '../models/pokemon_card.dart';
+import '../providers/auth_provider.dart';
 import '../providers/card_provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/favorites_provider.dart';
@@ -27,7 +28,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     _MarketFilter(label: 'Lightning', type: 'Lightning'),
     _MarketFilter(label: 'Fire icons', type: 'Fire'),
     _MarketFilter(label: 'Under 100 PKN', maxPrice: 100),
-    _MarketFilter(label: 'Unavailable'),
+    _MarketFilter(label: 'Unavailable', inStock: true),
   ];
 
   @override
@@ -49,6 +50,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final cardState = ref.watch(cardProvider);
     final cartState = ref.watch(cartProvider);
+    final balance = ref.watch(pknBalanceProvider).valueOrNull ?? 0;
     final cards = cardState.filteredCards;
     final featured = cards.isNotEmpty
         ? cards.take(3).toList()
@@ -69,6 +71,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               TextButton(
                   onPressed: () => context.go('/scan'),
                   child: const Text('Scan')),
+              _WalletBalanceButton(
+                balance: balance,
+                onTap: () => context.go('/wallet'),
+              ),
+              const SizedBox(width: 8),
               Padding(
                 padding: const EdgeInsets.only(right: 12),
                 child: FilledButton.icon(
@@ -96,7 +103,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         onOpenWallet: _openWallet,
                       ),
                       const SizedBox(height: 24),
-                      _TrustStrip(),
+                      const _TrustStrip(),
                       const SizedBox(height: 24),
                       _SearchAndControls(
                         controller: _searchController,
@@ -184,6 +191,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     await launchUrl(
       Uri.parse('${ProjectLinks.website}/wallet'),
       webOnlyWindowName: '_self',
+    );
+  }
+}
+
+class _WalletBalanceButton extends StatelessWidget {
+  const _WalletBalanceButton({
+    required this.balance,
+    required this.onTap,
+  });
+
+  final int balance;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton.icon(
+      onPressed: onTap,
+      icon: const Icon(Icons.account_balance_wallet_outlined, size: 18),
+      label: Text(formatPkn(balance, decimals: 0)),
+      style: TextButton.styleFrom(
+        foregroundColor: const Color(0xFFFACC15),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        textStyle: const TextStyle(fontWeight: FontWeight.w800),
+      ),
     );
   }
 }

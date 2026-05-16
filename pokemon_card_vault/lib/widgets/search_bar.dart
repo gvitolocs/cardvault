@@ -32,7 +32,7 @@ class _PokemonSearchBarState extends ConsumerState<PokemonSearchBar> {
   @override
   Widget build(BuildContext context) {
     final cardState = ref.watch(cardProvider);
-    
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,

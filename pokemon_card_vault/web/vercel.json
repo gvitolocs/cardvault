@@ -1,0 +1,135 @@
+{
+  "headers": [
+    {
+      "source": "/index.html",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, no-cache, must-revalidate, proxy-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/flutter_bootstrap.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, no-cache, must-revalidate, proxy-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/main.dart.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, no-cache, must-revalidate, proxy-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/flutter_service_worker.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, no-cache, must-revalidate, proxy-revalidate"
+        }
+      ]
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "wallet.pokoin.com"
+        }
+      ],
+      "destination": "https://pokoin.com/wallet",
+      "permanent": true
+    },
+    {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "forum.pokoin.com"
+        }
+      ],
+      "destination": "https://pokoin.com/forum",
+      "permanent": true
+    },
+    {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "cards.pokoin.com"
+        }
+      ],
+      "destination": "https://pokoin.com/marketplace",
+      "permanent": true
+    },
+    {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "cardvault.pokoin.com"
+        }
+      ],
+      "destination": "https://pokoin.com/marketplace",
+      "permanent": true
+    },
+    {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "cardcaveau.pokoin.com"
+        }
+      ],
+      "destination": "https://pokoin.com/marketplace",
+      "permanent": true
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/robots.txt",
+      "destination": "/robots.txt"
+    },
+    {
+      "source": "/sitemap.xml",
+      "destination": "/sitemap.xml"
+    },
+    {
+      "source": "/pokoin-crypto.html",
+      "destination": "/pokoin-crypto.html"
+    },
+    {
+      "source": "/wpkn/logo.png",
+      "destination": "/wpkn/logo.png"
+    },
+    {
+      "source": "/wpkn-reserve.json",
+      "destination": "/wpkn-reserve.json"
+    },
+    {
+      "source": "/tx/:path*",
+      "destination": "/scan"
+    },
+    {
+      "source": "/address/:path*",
+      "destination": "/scan"
+    },
+    {
+      "source": "/block/:path*",
+      "destination": "/scan"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

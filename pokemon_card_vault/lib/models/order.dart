@@ -7,49 +7,49 @@ part 'order.g.dart';
 class Order extends HiveObject {
   @HiveField(0)
   final String id;
-  
+
   @HiveField(1)
   final String userId;
-  
+
   @HiveField(2)
   final List<OrderItem> items;
-  
+
   @HiveField(3)
   final double subtotal;
-  
+
   @HiveField(4)
   final double tax;
-  
+
   @HiveField(5)
   final double shipping;
-  
+
   @HiveField(6)
   final double total;
-  
+
   @HiveField(7)
   final OrderStatus status;
-  
+
   @HiveField(8)
   final DateTime orderDate;
-  
+
   @HiveField(9)
   final DateTime? shippedDate;
-  
+
   @HiveField(10)
   final DateTime? deliveredDate;
-  
+
   @HiveField(11)
   final Address shippingAddress;
-  
+
   @HiveField(12)
   final PaymentMethod paymentMethod;
-  
+
   @HiveField(13)
   final String trackingNumber;
-  
+
   @HiveField(14)
   final String notes;
-  
+
   @HiveField(15)
   final List<OrderStatusHistory> statusHistory;
 
@@ -77,8 +77,9 @@ class Order extends HiveObject {
       id: json['id'] ?? '',
       userId: json['userId'] ?? '',
       items: (json['items'] as List<dynamic>?)
-          ?.map((item) => OrderItem.fromJson(item))
-          .toList() ?? [],
+              ?.map((item) => OrderItem.fromJson(item))
+              .toList() ??
+          [],
       subtotal: (json['subtotal'] ?? 0.0).toDouble(),
       tax: (json['tax'] ?? 0.0).toDouble(),
       shipping: (json['shipping'] ?? 0.0).toDouble(),
@@ -87,20 +88,22 @@ class Order extends HiveObject {
         (e) => e.toString() == 'OrderStatus.${json['status']}',
         orElse: () => OrderStatus.pending,
       ),
-      orderDate: DateTime.parse(json['orderDate'] ?? DateTime.now().toIso8601String()),
-      shippedDate: json['shippedDate'] != null 
-          ? DateTime.parse(json['shippedDate']) 
+      orderDate:
+          DateTime.parse(json['orderDate'] ?? DateTime.now().toIso8601String()),
+      shippedDate: json['shippedDate'] != null
+          ? DateTime.parse(json['shippedDate'])
           : null,
-      deliveredDate: json['deliveredDate'] != null 
-          ? DateTime.parse(json['deliveredDate']) 
+      deliveredDate: json['deliveredDate'] != null
+          ? DateTime.parse(json['deliveredDate'])
           : null,
       shippingAddress: Address.fromJson(json['shippingAddress'] ?? {}),
       paymentMethod: PaymentMethod.fromJson(json['paymentMethod'] ?? {}),
       trackingNumber: json['trackingNumber'] ?? '',
       notes: json['notes'] ?? '',
       statusHistory: (json['statusHistory'] as List<dynamic>?)
-          ?.map((status) => OrderStatusHistory.fromJson(status))
-          .toList() ?? [],
+              ?.map((status) => OrderStatusHistory.fromJson(status))
+              .toList() ??
+          [],
     );
   }
 
@@ -130,19 +133,19 @@ class Order extends HiveObject {
 class OrderItem extends HiveObject {
   @HiveField(0)
   final String cardId;
-  
+
   @HiveField(1)
   final String cardName;
-  
+
   @HiveField(2)
   final String cardImage;
-  
+
   @HiveField(3)
   final int quantity;
-  
+
   @HiveField(4)
   final double unitPrice;
-  
+
   @HiveField(5)
   final double totalPrice;
 
@@ -182,10 +185,10 @@ class OrderItem extends HiveObject {
 class OrderStatusHistory extends HiveObject {
   @HiveField(0)
   final OrderStatus status;
-  
+
   @HiveField(1)
   final DateTime timestamp;
-  
+
   @HiveField(2)
   final String note;
 
@@ -201,7 +204,8 @@ class OrderStatusHistory extends HiveObject {
         (e) => e.toString() == 'OrderStatus.${json['status']}',
         orElse: () => OrderStatus.pending,
       ),
-      timestamp: DateTime.parse(json['timestamp'] ?? DateTime.now().toIso8601String()),
+      timestamp:
+          DateTime.parse(json['timestamp'] ?? DateTime.now().toIso8601String()),
       note: json['note'] ?? '',
     );
   }

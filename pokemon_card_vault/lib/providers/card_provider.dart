@@ -79,7 +79,7 @@ class CardNotifier extends StateNotifier<CardState> {
 
   Future<void> _loadCards() async {
     state = state.copyWith(isLoading: true, error: null);
-    
+
     try {
       final cards = await _cardService.getAllCards();
       state = state.copyWith(
@@ -139,32 +139,43 @@ class CardNotifier extends StateNotifier<CardState> {
 
     // Search filter
     if (state.searchQuery.isNotEmpty) {
-      filtered = filtered.where((card) =>
-          card.name.toLowerCase().contains(state.searchQuery.toLowerCase()) ||
-          card.description.toLowerCase().contains(state.searchQuery.toLowerCase()) ||
-          card.tags.any((tag) => tag.toLowerCase().contains(state.searchQuery.toLowerCase()))
-      ).toList();
+      filtered = filtered
+          .where((card) =>
+              card.name
+                  .toLowerCase()
+                  .contains(state.searchQuery.toLowerCase()) ||
+              card.description
+                  .toLowerCase()
+                  .contains(state.searchQuery.toLowerCase()) ||
+              card.tags.any((tag) =>
+                  tag.toLowerCase().contains(state.searchQuery.toLowerCase())))
+          .toList();
     }
 
     // Rarity filter
     if (state.selectedRarity.isNotEmpty) {
-      filtered = filtered.where((card) => card.rarity == state.selectedRarity).toList();
+      filtered = filtered
+          .where((card) => card.rarity == state.selectedRarity)
+          .toList();
     }
 
     // Type filter
     if (state.selectedType.isNotEmpty) {
-      filtered = filtered.where((card) => card.type == state.selectedType).toList();
+      filtered =
+          filtered.where((card) => card.type == state.selectedType).toList();
     }
 
     // Set filter
     if (state.selectedSet.isNotEmpty) {
-      filtered = filtered.where((card) => card.set == state.selectedSet).toList();
+      filtered =
+          filtered.where((card) => card.set == state.selectedSet).toList();
     }
 
     // Price filter
-    filtered = filtered.where((card) =>
-        card.price >= state.minPrice && card.price <= state.maxPrice
-    ).toList();
+    filtered = filtered
+        .where((card) =>
+            card.price >= state.minPrice && card.price <= state.maxPrice)
+        .toList();
 
     // Stock filter
     if (state.showOnlyInStock) {

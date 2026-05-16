@@ -71,7 +71,9 @@ class CategorySection extends ConsumerWidget {
                 child: _CategoryItem(
                   category: categories[index],
                   onTap: () {
-                    ref.read(cardProvider.notifier).filterByType(categories[index].type);
+                    ref
+                        .read(cardProvider.notifier)
+                        .filterByType(categories[index].type);
                   },
                 ),
               );

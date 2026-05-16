@@ -1,0 +1,129 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function owns(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    match /users/{uid} {
+      allow read, create, update: if owns(uid);
+      allow delete: if false;
+    }
+
+    match /wallet_addresses/{address} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.address == address
+        && request.resource.data.email is string;
+      allow update: if signedIn()
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.address == address;
+      allow delete: if false;
+    }
+
+    match /email_wallets/{email} {
+      allow read: if signedIn();
+      allow create, update: if signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email == email
+        && request.resource.data.address is string
+        && request.resource.data.address.matches('^0x[a-f0-9]{40}$');
+      allow delete: if false;
+    }
+
+    match /balances/{uid} {
+      allow read: if owns(uid);
+      allow create: if owns(uid)
+        && request.resource.data.availablePkn == 0
+        && request.resource.data.lockedPkn == 0;
+      allow update, delete: if false;
+    }
+
+    match /ledger_entries/{entryId} {
+      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /pkn_purchases/{purchaseId} {
+      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /orders/{orderId} {
+      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /withdraw_requests/{requestId} {
+      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.amountPkn is int
+        && request.resource.data.amountPkn > 0
+        && request.resource.data.toAddress is string
+        && request.resource.data.toAddress.matches('^0x[a-fA-F0-9]{40}$');
+      allow update, delete: if false;
+    }
+
+    match /forum_categories/{categoryId} {
+      allow read: if true;
+      allow create: if signedIn()
+        && categoryId in ['general', 'cards', 'pkn', 'validators']
+        && request.resource.data.title is string
+        && request.resource.data.description is string
+        && request.resource.data.iconName is string
+        && request.resource.data.order is int
+        && request.resource.data.topicCount == 1
+        && request.resource.data.postCount == 1;
+      allow update: if signedIn()
+        && resource.id in ['general', 'cards', 'pkn', 'validators']
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['topicCount', 'postCount', 'updatedAt'])
+        && request.resource.data.topicCount >= resource.data.topicCount
+        && request.resource.data.postCount >= resource.data.postCount;
+      allow delete: if false;
+    }
+
+    match /forum_topics/{topicId} {
+      allow read: if resource.data.status == 'open';
+      allow create: if signedIn()
+        && request.resource.data.authorUid == request.auth.uid
+        && request.resource.data.categoryId in ['general', 'cards', 'pkn', 'validators']
+        && request.resource.data.title is string
+        && request.resource.data.title.size() >= 6
+        && request.resource.data.title.size() <= 120
+        && request.resource.data.body is string
+        && request.resource.data.body.size() >= 12
+        && request.resource.data.body.size() <= 5000
+        && request.resource.data.replyCount == 0
+        && request.resource.data.status == 'open';
+      allow update: if signedIn()
+        && resource.data.status == 'open'
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['replyCount', 'updatedAt'])
+        && request.resource.data.replyCount == resource.data.replyCount + 1;
+      allow delete: if false;
+    }
+
+    match /forum_posts/{postId} {
+      allow read: if true;
+      allow create: if signedIn()
+        && request.resource.data.authorUid == request.auth.uid
+        && request.resource.data.topicId is string
+        && request.resource.data.categoryId in ['general', 'cards', 'pkn', 'validators']
+        && request.resource.data.body is string
+        && request.resource.data.body.size() >= 3
+        && request.resource.data.body.size() <= 5000;
+      allow update, delete: if false;
+    }
+  }
+}

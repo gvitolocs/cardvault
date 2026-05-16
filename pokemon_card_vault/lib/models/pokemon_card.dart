@@ -6,70 +6,70 @@ part 'pokemon_card.g.dart';
 class PokemonCard extends HiveObject {
   @HiveField(0)
   final String id;
-  
+
   @HiveField(1)
   final String name;
-  
+
   @HiveField(2)
   final String imageUrl;
-  
+
   @HiveField(3)
   final String rarity;
-  
+
   @HiveField(4)
   final String type;
-  
+
   @HiveField(5)
   final int hp;
-  
+
   @HiveField(6)
   final List<String> attacks;
-  
+
   @HiveField(7)
   final double price;
-  
+
   @HiveField(8)
   final String description;
-  
+
   @HiveField(9)
   final String set;
-  
+
   @HiveField(10)
   final String number;
-  
+
   @HiveField(11)
   final String artist;
-  
+
   @HiveField(12)
   final int stock;
-  
+
   @HiveField(13)
   final double rating;
-  
+
   @HiveField(14)
   final int reviewCount;
-  
+
   @HiveField(15)
   final bool isFoil;
-  
+
   @HiveField(16)
   final bool isHolo;
-  
+
   @HiveField(17)
   final DateTime releaseDate;
-  
+
   @HiveField(18)
   final List<String> tags;
-  
+
   @HiveField(19)
   final String condition;
-  
+
   @HiveField(20)
   final bool isGraded;
-  
+
   @HiveField(21)
   final String? grade;
-  
+
   @HiveField(22)
   final String? gradingCompany;
 
@@ -118,7 +118,8 @@ class PokemonCard extends HiveObject {
       reviewCount: json['reviewCount'] ?? 0,
       isFoil: json['isFoil'] ?? false,
       isHolo: json['isHolo'] ?? false,
-      releaseDate: DateTime.parse(json['releaseDate'] ?? DateTime.now().toIso8601String()),
+      releaseDate: DateTime.parse(
+          json['releaseDate'] ?? DateTime.now().toIso8601String()),
       tags: List<String>.from(json['tags'] ?? []),
       condition: json['condition'] ?? 'NM',
       isGraded: json['isGraded'] ?? false,

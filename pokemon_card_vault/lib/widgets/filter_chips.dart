@@ -9,7 +9,7 @@ class FilterChips extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cardState = ref.watch(cardProvider);
-    
+
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
@@ -24,14 +24,16 @@ class FilterChips extends ConsumerWidget {
           _buildFilterChip(
             label: 'Common',
             isSelected: cardState.selectedRarity == 'Common',
-            onTap: () => ref.read(cardProvider.notifier).filterByRarity('Common'),
+            onTap: () =>
+                ref.read(cardProvider.notifier).filterByRarity('Common'),
             color: AppColors.common,
           ),
           const SizedBox(width: 8),
           _buildFilterChip(
             label: 'Uncommon',
             isSelected: cardState.selectedRarity == 'Uncommon',
-            onTap: () => ref.read(cardProvider.notifier).filterByRarity('Uncommon'),
+            onTap: () =>
+                ref.read(cardProvider.notifier).filterByRarity('Uncommon'),
             color: AppColors.uncommon,
           ),
           const SizedBox(width: 8),
@@ -45,11 +47,12 @@ class FilterChips extends ConsumerWidget {
           _buildFilterChip(
             label: 'Rare Holo',
             isSelected: cardState.selectedRarity == 'Rare Holo',
-            onTap: () => ref.read(cardProvider.notifier).filterByRarity('Rare Holo'),
+            onTap: () =>
+                ref.read(cardProvider.notifier).filterByRarity('Rare Holo'),
             color: AppColors.rareHolo,
           ),
           const SizedBox(width: 16),
-          
+
           // Type Filter
           _buildFilterChip(
             label: 'All Types',
@@ -74,7 +77,8 @@ class FilterChips extends ConsumerWidget {
           _buildFilterChip(
             label: 'Lightning',
             isSelected: cardState.selectedType == 'Lightning',
-            onTap: () => ref.read(cardProvider.notifier).filterByType('Lightning'),
+            onTap: () =>
+                ref.read(cardProvider.notifier).filterByType('Lightning'),
             color: AppColors.lightning,
           ),
           const SizedBox(width: 8),
@@ -85,7 +89,7 @@ class FilterChips extends ConsumerWidget {
             color: AppColors.grass,
           ),
           const SizedBox(width: 16),
-          
+
           // Special Filters
           _buildFilterChip(
             label: 'In Stock',
@@ -127,14 +131,11 @@ class FilterChips extends ConsumerWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected 
-              ? (color ?? AppColors.primary)
-              : Colors.white,
+          color: isSelected ? (color ?? AppColors.primary) : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected 
-                ? (color ?? AppColors.primary)
-                : Colors.grey[300]!,
+            color:
+                isSelected ? (color ?? AppColors.primary) : Colors.grey[300]!,
             width: 1,
           ),
           boxShadow: isSelected

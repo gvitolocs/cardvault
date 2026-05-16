@@ -2,39 +2,30 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../constants/project_links.dart';
+import '../widgets/site_footer.dart';
 
 class LandingScreen extends StatelessWidget {
   const LandingScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF050816),
+    return const Scaffold(
+      backgroundColor: Color(0xFF050816),
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
             pinned: true,
-            backgroundColor: const Color(0xE60A1026),
-            title: const Text('CardVault'),
-            actions: [
-              _NavAction(label: 'Marketplace', path: '/marketplace'),
-              _NavAction(label: 'Scan', path: '/scan'),
-              _NavAction(label: 'Health', path: '/health'),
-              Padding(
-                padding: const EdgeInsets.only(right: 16),
-                child: OutlinedButton(
-                  onPressed: () => _open(ProjectLinks.pancakeSwap),
-                  child: const Text('Trade wPKN'),
-                ),
-              ),
-            ],
+            toolbarHeight: 76,
+            backgroundColor: Color(0xF2050816),
+            elevation: 0,
+            flexibleSpace: _TopBar(),
           ),
           SliverToBoxAdapter(
             child: _PageShell(
               children: [
-                const _HeroSection(),
-                const _MetricStrip(),
-                const _SectionTitle(
+                _HeroSection(),
+                _MetricStrip(),
+                _SectionTitle(
                   eyebrow: 'Marketplace thesis',
                   title:
                       'Instant international liquidity for collectible cards.',
@@ -44,7 +35,7 @@ class LandingScreen extends StatelessWidget {
                 Wrap(
                   spacing: 18,
                   runSpacing: 18,
-                  children: const [
+                  children: [
                     _FeatureCard(
                       icon: Icons.style,
                       title: 'Global card market',
@@ -65,9 +56,10 @@ class LandingScreen extends StatelessWidget {
                     ),
                   ],
                 ),
-                const _TokenPanel(),
-                const _RoadmapSection(),
-                const _CtaSection(),
+                _TokenPanel(),
+                _RoadmapSection(),
+                _CtaSection(),
+                SiteFooter(),
               ],
             ),
           ),
@@ -84,14 +76,210 @@ class LandingScreen extends StatelessWidget {
 class _NavAction extends StatelessWidget {
   final String label;
   final String path;
+  final IconData icon;
 
-  const _NavAction({required this.label, required this.path});
+  const _NavAction({
+    required this.label,
+    required this.path,
+    required this.icon,
+  });
 
   @override
   Widget build(BuildContext context) {
     return TextButton(
       onPressed: () => context.go(path),
-      child: Text(label),
+      style: TextButton.styleFrom(
+        foregroundColor: const Color(0xFFE2E8F0),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 17, color: const Color(0xFFFACC15)),
+          const SizedBox(width: 7),
+          Text(
+            label,
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TopBar extends StatelessWidget {
+  const _TopBar();
+
+  @override
+  Widget build(BuildContext context) {
+    final compact = MediaQuery.sizeOf(context).width < 820;
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xF2050816),
+        border: Border(
+          bottom: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        boxShadow: const [
+          BoxShadow(color: Color(0x66000000), blurRadius: 24, offset: Offset(0, 10)),
+        ],
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1180),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              child: SizedBox(
+                height: 68,
+                child: Row(
+                  children: [
+                    InkWell(
+                      onTap: () => context.go('/'),
+                      borderRadius: BorderRadius.circular(20),
+                      child: const _BrandMark(),
+                    ),
+                    const Spacer(),
+                    if (!compact) ...[
+                      const _NavPill(),
+                      const SizedBox(width: 12),
+                    ],
+                    _TopBarCta(
+                      label: 'Buy PKN',
+                      icon: Icons.add_card_outlined,
+                      primary: false,
+                      onPressed: () => context.go('/wallet'),
+                    ),
+                    const SizedBox(width: 10),
+                    _TopBarCta(
+                      label: 'Trade wPKN',
+                      icon: Icons.swap_horiz,
+                      primary: true,
+                      onPressed: () => LandingScreen._open(ProjectLinks.pancakeSwap),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BrandMark extends StatelessWidget {
+  const _BrandMark();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: const Color(0xFF111936),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(11),
+            child: Image.network(
+              ProjectLinks.logo,
+              filterQuality: FilterQuality.none,
+              fit: BoxFit.contain,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        const Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Pokoin',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                letterSpacing: -0.2,
+              ),
+            ),
+            SizedBox(height: 2),
+            Text(
+              'CardVault crypto rails',
+              style: TextStyle(
+                color: Color(0xFF93A4C8),
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _NavPill extends StatelessWidget {
+  const _NavPill();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xCC0B1020),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _NavAction(label: 'Marketplace', path: '/marketplace', icon: Icons.storefront),
+          _NavAction(label: 'Wallet', path: '/wallet', icon: Icons.account_balance_wallet_outlined),
+          _NavAction(label: 'Scan', path: '/scan', icon: Icons.query_stats),
+          _NavAction(label: 'Health', path: '/health', icon: Icons.health_and_safety_outlined),
+        ],
+      ),
+    );
+  }
+}
+
+class _TopBarCta extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool primary;
+  final VoidCallback onPressed;
+
+  const _TopBarCta({
+    required this.label,
+    required this.icon,
+    required this.primary,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return FilledButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon, size: 18),
+      label: Text(label),
+      style: FilledButton.styleFrom(
+        backgroundColor: primary ? const Color(0xFFFACC15) : const Color(0xFF111936),
+        foregroundColor: primary ? const Color(0xFF111827) : const Color(0xFFE2E8F0),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        textStyle: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(999),
+          side: BorderSide(
+            color: primary ? Colors.transparent : Colors.white.withValues(alpha: 0.10),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -207,7 +395,7 @@ class _HeroTokenCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xCC0B1024),
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
         boxShadow: const [
           BoxShadow(
               color: Color(0x33000000), blurRadius: 40, offset: Offset(0, 24)),
@@ -215,22 +403,27 @@ class _HeroTokenCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          ClipOval(
-            child: Image.network(
-              ProjectLinks.logo,
-              width: 116,
-              height: 116,
-              errorBuilder: (context, error, stackTrace) => Container(
-                width: 116,
-                height: 116,
-                color: const Color(0xFFFACC15),
-                alignment: Alignment.center,
-                child: const Text(
-                  'PKN',
-                  style: TextStyle(
-                    color: Color(0xFF111827),
-                    fontSize: 28,
-                    fontWeight: FontWeight.w900,
+          SizedBox(
+            width: 150,
+            height: 150,
+            child: Center(
+              child: Image.network(
+                ProjectLinks.logoLarge,
+                width: 132,
+                height: 132,
+                filterQuality: FilterQuality.none,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  width: 132,
+                  height: 132,
+                  color: const Color(0xFFFACC15),
+                  alignment: Alignment.center,
+                  child: const Text(
+                    'PKN',
+                    style: TextStyle(
+                      color: Color(0xFF111827),
+                      fontSize: 28,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ),
               ),
@@ -263,10 +456,10 @@ class _MetricStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
+    return const Wrap(
       spacing: 14,
       runSpacing: 14,
-      children: const [
+      children: [
         _Metric(label: 'Native chain', value: 'PokoinPoS'),
         _Metric(label: 'Chain ID', value: '26062026'),
         _Metric(label: 'wPKN chain', value: 'BNB Chain'),
@@ -324,7 +517,7 @@ class _FeatureCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: const Color(0xB30B1024),
           borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: Colors.white.withOpacity(0.08)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -357,18 +550,18 @@ class _TokenPanel extends StatelessWidget {
         gradient: const LinearGradient(
             colors: [Color(0xFF111B3F), Color(0xFF0B1020)]),
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
-      child: Column(
+      child: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionTitle(
+          _SectionTitle(
             eyebrow: 'Token rails',
             title: 'PKN at the core. wPKN where liquidity lives.',
             body:
                 'Native PKN powers the PokoinPoS network. wPKN mirrors the reserve on BNB Chain so collectors and traders can access PancakeSwap liquidity while the backing remains publicly documented.',
           ),
-          const SizedBox(height: 22),
+          SizedBox(height: 22),
           Wrap(
             spacing: 12,
             runSpacing: 12,
@@ -381,8 +574,8 @@ class _TokenPanel extends StatelessWidget {
                   label: 'PancakeSwap pool', url: ProjectLinks.pancakePair),
             ],
           ),
-          const SizedBox(height: 20),
-          const SelectableText(
+          SizedBox(height: 20),
+          SelectableText(
             'wPKN contract: ${ProjectLinks.wpknContract}',
             style: TextStyle(color: Color(0xFFCBD5E1), fontFamily: 'monospace'),
           ),
@@ -397,33 +590,27 @@ class _RoadmapSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
+    return const Wrap(
       spacing: 18,
       runSpacing: 18,
-      children: const [
+      children: [
         _FeatureCard(
-          icon: Icons.verified,
-          title: 'Now live',
+          icon: Icons.swap_horiz,
+          title: 'wPKN trades live',
           body:
-              'wPKN contract verified on BscScan with a published reserve manifest and initial PancakeSwap liquidity.',
+              'Collectors and crypto users access wPKN on BNB Chain with a verified contract, reserve proof, and PancakeSwap liquidity.',
         ),
         _FeatureCard(
           icon: Icons.query_stats,
-          title: 'Pokoin Scan',
+          title: 'Live chain transparency',
           body:
-              'A public scan page at pokoin.com/scan summarizes chain data, wallet setup, RPC details, reserve links, and wPKN references.',
+              'PokoinScan shows blocks, transactions, validators, RPC status, reserve links, and wallet setup in one public dashboard.',
         ),
         _FeatureCard(
-          icon: Icons.mail,
-          title: 'Profile approvals',
+          icon: Icons.style,
+          title: 'Collector commerce',
           body:
-              'BscScan token profile, token-list metadata, and public contact channels are being prepared for discoverability.',
-        ),
-        _FeatureCard(
-          icon: Icons.storefront,
-          title: 'Marketplace expansion',
-          body:
-              'The CardVault commerce app will connect inventory, seller flows, and crypto settlement into one collector experience.',
+              'CardVault connects premium card discovery with Pokoin profiles, PKN balances, wallet linking, and crypto settlement rails.',
         ),
       ],
     );
@@ -504,7 +691,7 @@ class _Metric extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0x990B1024),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

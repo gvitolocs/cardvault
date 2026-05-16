@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <!--
     If you are serving your web app in a path other than the root, change the
@@ -18,20 +18,76 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="CardVault is a crypto-native Pokemon card marketplace powered by PokoinPoS, PKN, and wPKN on BNB Chain.">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Pokoin is a crypto project for Pokémon card collectors: CardVault marketplace, PokoinPoS blockchain, native PKN coin, wPKN on BNB Chain, PancakeSwap liquidity, and live Pokoin Scan explorer.">
+  <meta name="keywords" content="Pokoin crypto, Pokeon crypto, Pokemon crypto, PKN crypto, wPKN, PokoinPoS, CardVault, Pokemon card marketplace, BNB Chain token, PancakeSwap wPKN">
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+  <meta name="googlebot" content="index, follow">
+  <meta name="author" content="Pokoin">
+  <meta name="application-name" content="Pokoin">
+  <meta name="theme-color" content="#050816">
+  <link rel="canonical" href="https://pokoin.com/">
+  <link rel="sitemap" type="application/xml" href="/sitemap.xml">
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Pokoin">
+  <meta property="og:title" content="Pokoin Crypto (PKN) - Pokémon Card Marketplace, PokoinPoS and wPKN">
+  <meta property="og:description" content="Discover Pokoin crypto: native PKN on PokoinPoS, wrapped wPKN on BNB Chain, PancakeSwap liquidity, reserve proof, live explorer, wallet, and CardVault marketplace for Pokémon card collectors.">
+  <meta property="og:url" content="https://pokoin.com/">
+  <meta property="og:image" content="https://pokoin.com/pokoin-1024.png">
+  <meta property="og:image:alt" content="Pokoin PKN crypto logo">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Pokoin Crypto (PKN) - Pokémon Card Marketplace and wPKN">
+  <meta name="twitter:description" content="Pokoin crypto powers CardVault with native PKN, PokoinPoS, wPKN on BNB Chain, PancakeSwap liquidity, and a live blockchain explorer.">
+  <meta name="twitter:image" content="https://pokoin.com/pokoin-1024.png">
 
   <!-- iOS meta tags & icons -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="CardVault">
-  <link rel="apple-touch-icon" href="pokoin.svg">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 
   <!-- Favicon -->
-  <link rel="icon" type="image/svg+xml" href="pokoin.svg"/>
-  <link rel="shortcut icon" href="pokoin.svg"/>
+  <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png"/>
+  <link rel="icon" type="image/png" sizes="512x512" href="favicon.png"/>
+  <link rel="icon" type="image/png" sizes="192x192" href="pokoin-192.png"/>
+  <link rel="shortcut icon" href="favicon.ico"/>
 
-  <title>CardVault - PKN & wPKN Marketplace</title>
+  <title>Pokoin Crypto (PKN) - CardVault Pokémon Marketplace, PokoinPoS & wPKN</title>
   <link rel="manifest" href="manifest.json">
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "Pokoin",
+      "alternateName": ["PKN", "wPKN", "Pokoin Crypto", "Pokeon Crypto", "CardVault"],
+      "url": "https://pokoin.com/",
+      "logo": "https://pokoin.com/pokoin-1024.png",
+      "sameAs": [
+        "https://explorer.pokoin.com",
+        "https://bscscan.com/token/0x91A17E2bddfF839078BD395482B38e4AC15276f4",
+        "https://pancakeswap.finance/swap?outputCurrency=0x91A17E2bddfF839078BD395482B38e4AC15276f4&chain=bsc"
+      ],
+      "description": "Pokoin is a crypto ecosystem for Pokémon card collectors, combining the CardVault marketplace, the PokoinPoS blockchain, native PKN, wrapped wPKN on BNB Chain, and a live blockchain explorer."
+    }
+  </script>
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Pokoin",
+      "alternateName": "Pokoin Crypto",
+      "url": "https://pokoin.com/",
+      "description": "Pokoin crypto website for PKN, wPKN, CardVault marketplace, wallet, Pokoin Scan explorer, and network health.",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://pokoin.com/scan?q={search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
+    }
+  </script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then((registrations) => {
@@ -39,8 +95,80 @@
       });
     }
   </script>
+  <script>
+    window.pokoinWallet = {
+      hasProvider: function () {
+        return typeof window.ethereum !== 'undefined';
+      },
+      requestAccounts: function () {
+        if (!window.ethereum) {
+          return Promise.reject('MetaMask or another EVM wallet is not available');
+        }
+        return window.ethereum.request({ method: 'eth_requestAccounts' });
+      },
+      addNetwork: function () {
+        if (!window.ethereum) {
+          return Promise.reject('MetaMask or another EVM wallet is not available');
+        }
+        return window.ethereum.request({
+          method: 'wallet_addEthereumChain',
+          params: [{
+            chainId: '0x18dacca',
+            chainName: 'PokoinPoS',
+            nativeCurrency: {
+              name: 'Pokoin',
+              symbol: 'PKN',
+              decimals: 18
+            },
+            rpcUrls: ['https://rpc.pokoin.com/rpc'],
+            blockExplorerUrls: ['https://explorer.pokoin.com']
+          }]
+        });
+      },
+      switchNetwork: function () {
+        if (!window.ethereum) {
+          return Promise.reject('MetaMask or another EVM wallet is not available');
+        }
+        return window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: '0x18dacca' }]
+        });
+      },
+      sendTransaction: function (from, to, valueHex) {
+        if (!window.ethereum) {
+          return Promise.reject('MetaMask or another EVM wallet is not available');
+        }
+        return window.ethereum.request({
+          method: 'eth_sendTransaction',
+          params: [{ from: from, to: to, value: valueHex }]
+        });
+      }
+    };
+  </script>
 </head>
 <body>
+  <noscript>
+    <main>
+      <h1>Pokoin Crypto (PKN) - CardVault Pokémon Marketplace and wPKN</h1>
+      <p>
+        Pokoin is a crypto ecosystem for Pokémon card collectors. It combines
+        CardVault, the PokoinPoS blockchain, native PKN coin transfers, wrapped
+        wPKN on BNB Chain, PancakeSwap liquidity, reserve proof, and a public
+        Pokoin Scan blockchain explorer.
+      </p>
+      <p>
+        If you searched for Pokoin crypto, PKN crypto, wPKN, Pokémon crypto, or
+        Pokeon crypto, this is the official Pokoin website.
+      </p>
+      <nav>
+        <a href="/scan">Pokoin Scan explorer</a>
+        <a href="/wallet">Pokoin Wallet</a>
+        <a href="/health">Network health</a>
+        <a href="https://explorer.pokoin.com/wpkn-reserve.json">wPKN reserve proof</a>
+        <a href="https://bscscan.com/token/0x91A17E2bddfF839078BD395482B38e4AC15276f4">wPKN on BscScan</a>
+      </nav>
+    </main>
+  </noscript>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

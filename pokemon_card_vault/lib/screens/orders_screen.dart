@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/marketplace_account_provider.dart';
 import '../constants/app_colors.dart';
+import '../utils/price_format.dart';
 
 class OrdersScreen extends ConsumerWidget {
   const OrdersScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // TODO: Implement orders provider
-    final orders = <Map<String, dynamic>>[]; // Placeholder for now
+    final orders = ref.watch(userOrdersProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -24,7 +25,12 @@ class OrdersScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: orders.isEmpty ? _buildEmptyOrders() : _buildOrdersList(orders),
+      body: orders.when(
+        data: (items) =>
+            items.isEmpty ? _buildEmptyOrders() : _buildOrdersList(items),
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, _) => Center(child: Text(error.toString())),
+      ),
     );
   }
 
@@ -66,14 +72,17 @@ class OrdersScreen extends ConsumerWidget {
       padding: const EdgeInsets.all(16),
       itemCount: orders.length,
       itemBuilder: (context, index) {
+        final order = orders[index];
+        final total = order['totalPkn'] ?? order['total'] ?? 0;
+        final status = order['status'] ?? 'pending';
         return Container(
           margin: const EdgeInsets.only(bottom: 16),
-          child: const Card(
+          child: Card(
             child: ListTile(
-              leading: Icon(Icons.shopping_bag),
-              title: Text('Order #12345'),
-              subtitle: Text('Placed on Jan 1, 2024'),
-              trailing: Text('99.99 PKN'),
+              leading: const Icon(Icons.shopping_bag),
+              title: Text('Order #${order['id']}'),
+              subtitle: Text('Status: $status'),
+              trailing: Text(formatPkn(total is num ? total : 0)),
             ),
           ),
         );
