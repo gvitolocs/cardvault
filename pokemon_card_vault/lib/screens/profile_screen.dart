@@ -2,21 +2,123 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:crop_your_image/crop_your_image.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:typed_data';
 
 import '../constants/project_links.dart';
 import '../providers/auth_provider.dart';
 import '../providers/marketplace_account_provider.dart';
 import '../utils/price_format.dart';
+import '../wallet/wallet_bridge_stub.dart';
 import '../widgets/site_footer.dart';
 
-class ProfileScreen extends ConsumerWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  late final bridge = createWalletBridge();
+  bool _walletListenerAttached = false;
+  bool _switchingWalletAccount = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _attachWalletAccountListener();
+  }
+
+  void _attachWalletAccountListener() {
+    if (_walletListenerAttached || !bridge.hasProvider) {
+      return;
+    }
+    _walletListenerAttached = true;
+    bridge.onAccountsChanged((address) {
+      if (!mounted) {
+        return;
+      }
+      _switchToWalletAccount(address);
+    });
+  }
+
+  Future<void> _switchToWalletAccount(String? address) async {
+    final normalized = address?.trim().toLowerCase();
+    if (normalized == null || normalized.isEmpty) {
+      await ref.read(authServiceProvider).signOut();
+      ref.invalidate(userProfileProvider);
+      ref.invalidate(pknBalanceProvider);
+      ref.invalidate(linkedWalletBalanceProvider);
+      ref.invalidate(userOrdersProvider);
+      ref.invalidate(withdrawRequestsProvider);
+      if (mounted) {
+        context.go('/wallet');
+      }
+      return;
+    }
+    if (_switchingWalletAccount) {
+      return;
+    }
+
+    final currentProfile = ref.read(userProfileProvider).valueOrNull;
+    if (currentProfile?.walletAddress?.trim().toLowerCase() == normalized) {
+      ref.invalidate(linkedWalletBalanceProvider);
+      return;
+    }
+
+    setState(() => _switchingWalletAccount = true);
+    try {
+      await _signInWithWalletAddress(normalized);
+      ref.invalidate(userProfileProvider);
+      ref.invalidate(pknBalanceProvider);
+      ref.invalidate(linkedWalletBalanceProvider);
+      ref.invalidate(userOrdersProvider);
+      ref.invalidate(withdrawRequestsProvider);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Wallet account switch failed: $error'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _switchingWalletAccount = false);
+      }
+    }
+  }
+
+  Future<void> _signInWithWalletAddress(String address) async {
+    final auth = ref.read(authServiceProvider);
+    final nonce = await auth.requestWalletNonce(address);
+    final message = nonce['message'] as String? ?? '';
+    if (message.isEmpty) {
+      throw StateError('Wallet sign-in nonce was empty.');
+    }
+    final signature =
+        await bridge.signMessage(address: address, message: message);
+    final result = await auth.verifyWalletSignature(
+      address: address,
+      signature: signature,
+    );
+    final token = result['customToken'] as String? ?? '';
+    if (token.isEmpty) {
+      throw StateError('Wallet sign-in token was empty.');
+    }
+    await auth.signInWithCustomToken(token);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final user = ref.watch(authStateProvider).valueOrNull;
     final profile = ref.watch(userProfileProvider);
     final balanceState = ref.watch(pknBalanceProvider);
+    final walletBalanceState = ref.watch(linkedWalletBalanceProvider);
     final ordersState = ref.watch(userOrdersProvider);
     final withdrawState = ref.watch(withdrawRequestsProvider);
     final balance = balanceState.valueOrNull ?? 0;
@@ -58,9 +160,12 @@ class ProfileScreen extends ConsumerWidget {
                       displayName: profile?.displayName ??
                           user?.displayName ??
                           'Pokoin user',
+                      username: profile?.username ?? '',
                       photoUrl: profile?.photoUrl ?? user?.photoURL,
                       walletAddress: profile?.walletAddress,
                       balance: balance,
+                      walletBalance: walletBalanceState.valueOrNull,
+                      walletBalanceLoading: walletBalanceState.isLoading,
                       ordersCount: orders.length,
                       pendingWithdraws: withdraws
                           .where((item) => item['status'] == 'pending')
@@ -83,14 +188,13 @@ class ProfileScreen extends ConsumerWidget {
                                 user.uid,
                                 profile?.photoUrl ?? user.photoURL,
                               ),
-                      onEditWallet: user == null
+                      onConnectWallet: user == null
                           ? null
-                          : () => _showWalletDialog(
+                          : () => _connectMetaMaskWallet(
                                 context,
                                 ref,
-                                user.uid,
-                                profile?.walletAddress,
                               ),
+                      switchingWalletAccount: _switchingWalletAccount,
                     ),
                     loading: () => const _LoadingPanel(),
                     error: (error, _) => _ErrorPanel(message: error.toString()),
@@ -193,56 +297,91 @@ class ProfileScreen extends ConsumerWidget {
     });
   }
 
-  void _showWalletDialog(
-    BuildContext context,
-    WidgetRef ref,
-    String uid,
-    String? currentAddress,
-  ) {
-    final controller = TextEditingController(text: currentAddress ?? '');
-    showDialog<void>(
-      context: context,
-      builder: (context) => _ProfileDialog(
-        title: 'Linked payout wallet',
-        body: _ProfileTextField(
-          controller: controller,
-          label: '0x wallet address',
-          helperText: 'Leave empty to unlink the wallet.',
-          icon: Icons.account_balance_wallet_outlined,
+  Future<void> _connectMetaMaskWallet(
+      BuildContext context, WidgetRef ref) async {
+    final bridge = createWalletBridge();
+    if (!bridge.hasProvider) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content:
+              Text('Install MetaMask or another EVM browser wallet first.'),
+          backgroundColor: Colors.red,
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+      );
+      return;
+    }
+
+    try {
+      final account = await bridge.requestAccount();
+      if (account == null) {
+        throw StateError('No wallet account selected.');
+      }
+      final currentProfile = ref.read(userProfileProvider).valueOrNull;
+      final linked = currentProfile?.walletAddress?.trim().toLowerCase();
+      if (linked != null &&
+          linked.isNotEmpty &&
+          linked != account.trim().toLowerCase()) {
+        await _signInWithWalletAddress(account.trim().toLowerCase());
+        ref.invalidate(userProfileProvider);
+        ref.invalidate(pknBalanceProvider);
+        ref.invalidate(linkedWalletBalanceProvider);
+        ref.invalidate(userOrdersProvider);
+        ref.invalidate(withdrawRequestsProvider);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Switched to the selected MetaMask account.'),
+              backgroundColor: Color(0xFFFACC15),
+            ),
+          );
+        }
+        return;
+      }
+      final nonce =
+          await ref.read(authServiceProvider).requestWalletNonce(account);
+      final message = nonce['message'] as String? ?? '';
+      if (message.isEmpty) {
+        throw StateError('Wallet sign-in nonce was empty.');
+      }
+      final signature =
+          await bridge.signMessage(address: account, message: message);
+      final result = await ref.read(authServiceProvider).linkSignedWallet(
+            address: account,
+            signature: signature,
+          );
+      ref.invalidate(userProfileProvider);
+      ref.invalidate(pknBalanceProvider);
+      ref.invalidate(linkedWalletBalanceProvider);
+      final converted = _readInt(result['convertedPkn']);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              converted > 0
+                  ? 'Wallet connected. $converted PKN queued for payout to your wallet.'
+                  : 'Wallet connected. Your profile now shows on-chain wallet balance.',
+            ),
+            backgroundColor: const Color(0xFFFACC15),
           ),
-          FilledButton(
-            onPressed: () async {
-              try {
-                await ref.read(authServiceProvider).updateWalletAddress(
-                      uid: uid,
-                      walletAddress: controller.text,
-                    );
-                if (context.mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Wallet updated.')),
-                  );
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                        content: Text(e.toString()),
-                        backgroundColor: Colors.red),
-                  );
-                }
-              }
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    ).whenComplete(controller.dispose);
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  static int _readInt(Object? value) {
+    if (value is int) {
+      return value;
+    }
+    if (value is num) {
+      return value.toInt();
+    }
+    return int.tryParse(value?.toString() ?? '') ?? 0;
   }
 
   void _showDisplayNameDialog(
@@ -302,83 +441,20 @@ class ProfileScreen extends ConsumerWidget {
     String uid,
     String? currentPhotoUrl,
   ) {
-    final controller = TextEditingController(text: currentPhotoUrl ?? '');
     showDialog<void>(
       context: context,
-      builder: (context) => _ProfileDialog(
-        title: 'Profile picture',
-        body: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _ProfileAvatar(photoUrl: currentPhotoUrl, onTap: null, size: 72),
-            const SizedBox(height: 16),
-            _ProfileTextField(
-              controller: controller,
-              label: 'Image URL',
-              helperText: 'Paste an https image URL. Leave empty to remove it.',
-              icon: Icons.image_outlined,
-              keyboardType: TextInputType.url,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              try {
-                await ref.read(authServiceProvider).updatePhotoUrl(
-                      uid: uid,
-                      photoUrl: '',
-                    );
-                if (context.mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Profile picture removed.')),
-                  );
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                        content: Text(e.toString()),
-                        backgroundColor: Colors.red),
-                  );
-                }
-              }
-            },
-            child: const Text('Remove'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              try {
-                await ref.read(authServiceProvider).updatePhotoUrl(
-                      uid: uid,
-                      photoUrl: controller.text,
-                    );
-                if (context.mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Profile picture updated.')),
-                  );
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                        content: Text(e.toString()),
-                        backgroundColor: Colors.red),
-                  );
-                }
-              }
-            },
-            child: const Text('Save'),
-          ),
-        ],
+      builder: (context) => _ProfilePictureDialog(
+        currentPhotoUrl: currentPhotoUrl,
+        onRemove: () async {
+          await ref.read(authServiceProvider).removeProfilePicture();
+        },
+        onSave: (bytes) async {
+          await ref.read(authServiceProvider).uploadProfilePicture(
+                imageBytes: bytes,
+              );
+        },
       ),
-    ).whenComplete(controller.dispose);
+    );
   }
 }
 
@@ -449,14 +525,12 @@ class _ProfileTextField extends StatelessWidget {
     required this.controller,
     required this.label,
     required this.icon,
-    this.helperText,
     this.keyboardType,
   });
 
   final TextEditingController controller;
   final String label;
   final IconData icon;
-  final String? helperText;
   final TextInputType? keyboardType;
 
   @override
@@ -467,9 +541,7 @@ class _ProfileTextField extends StatelessWidget {
       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
       decoration: InputDecoration(
         labelText: label,
-        helperText: helperText,
         labelStyle: const TextStyle(color: Color(0xFF93A4C8)),
-        helperStyle: const TextStyle(color: Color(0xFF64748B)),
         prefixIcon: Icon(icon, color: const Color(0xFFFACC15)),
         filled: true,
         fillColor: const Color(0xFF111936),
@@ -706,31 +778,43 @@ class _UserHeader extends StatelessWidget {
   final String? uid;
   final String email;
   final String displayName;
+  final String username;
   final String? photoUrl;
   final String? walletAddress;
   final int balance;
+  final String? walletBalance;
+  final bool walletBalanceLoading;
   final int ordersCount;
   final int pendingWithdraws;
   final VoidCallback? onEditName;
   final VoidCallback? onEditPhoto;
-  final VoidCallback? onEditWallet;
+  final VoidCallback? onConnectWallet;
+  final bool switchingWalletAccount;
 
   const _UserHeader({
     required this.uid,
     required this.email,
     required this.displayName,
+    required this.username,
     required this.photoUrl,
     required this.walletAddress,
     required this.balance,
+    required this.walletBalance,
+    required this.walletBalanceLoading,
     required this.ordersCount,
     required this.pendingWithdraws,
     required this.onEditName,
     required this.onEditPhoto,
-    required this.onEditWallet,
+    required this.onConnectWallet,
+    required this.switchingWalletAccount,
   });
 
   @override
   Widget build(BuildContext context) {
+    final linkedWalletAddress = walletAddress?.trim();
+    final hasLinkedWallet =
+        linkedWalletAddress != null && linkedWalletAddress.isNotEmpty;
+
     return Container(
       padding: const EdgeInsets.all(26),
       decoration: BoxDecoration(
@@ -783,12 +867,40 @@ class _UserHeader extends StatelessWidget {
                       email.isEmpty ? 'Signed in account' : email,
                       style: const TextStyle(color: Color(0xFFB8C4E6)),
                     ),
+                    if (username.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        '@$username',
+                        style: const TextStyle(
+                          color: Color(0xFFFACC15),
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
                     if (uid != null) ...[
                       const SizedBox(height: 6),
                       Text(
                         'User ID ${_short(uid!)}',
                         style: const TextStyle(
                             color: Color(0xFF64748B), fontSize: 12),
+                      ),
+                    ],
+                    if (switchingWalletAccount) ...[
+                      const SizedBox(height: 8),
+                      const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'Switching to selected MetaMask wallet...',
+                            style: TextStyle(color: Color(0xFFB8C4E6)),
+                          ),
+                        ],
                       ),
                     ],
                   ],
@@ -802,15 +914,19 @@ class _UserHeader extends StatelessWidget {
             runSpacing: 12,
             children: [
               _MetricChip(
-                label: 'Marketplace balance',
-                value: formatPkn(balance, decimals: 0),
+                label:
+                    hasLinkedWallet ? 'Wallet balance' : 'Marketplace balance',
+                value: hasLinkedWallet
+                    ? walletBalanceLoading
+                        ? 'Loading...'
+                        : '${walletBalance ?? '0.00'} PKN'
+                    : formatPkn(balance, decimals: 0),
               ),
               _MetricChip(
                 label: 'Linked wallet',
-                value:
-                    walletAddress == null ? 'Not linked yet' : walletAddress!,
-                actionLabel: walletAddress == null ? 'Link wallet' : 'Edit',
-                onTap: onEditWallet,
+                value: hasLinkedWallet ? linkedWalletAddress : 'Not linked yet',
+                actionLabel: hasLinkedWallet ? 'Reconnect' : 'Connect MetaMask',
+                onTap: onConnectWallet,
               ),
               _MetricChip(
                 label: 'Orders',
@@ -823,9 +939,11 @@ class _UserHeader extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          const Text(
-            'Your site balance is a marketplace credit. The wallet remains optional and can be used for on-chain PKN withdrawals later.',
-            style: TextStyle(color: Color(0xFFB8C4E6), height: 1.5),
+          Text(
+            hasLinkedWallet
+                ? 'Wallet connected. Your visible PKN balance is the on-chain balance of this wallet; any remaining site credit is only pending treasury payout.'
+                : 'Your site balance is a marketplace credit. Connect MetaMask to move that credit to your wallet and use the wallet balance as your main PKN balance.',
+            style: const TextStyle(color: Color(0xFFB8C4E6), height: 1.5),
           ),
         ],
       ),
@@ -1000,8 +1118,9 @@ class _QuickActions extends StatelessWidget {
         ),
         _ProfileAction(
           icon: Icons.payments_outlined,
-          title: 'Request withdraw',
-          subtitle: 'Move marketplace PKN credit to your 0x wallet.',
+          title: 'Manual payout request',
+          subtitle:
+              'Use only if you need to move remaining site credit manually.',
           onTap: onWithdraw ?? () {},
           disabled: onWithdraw == null,
         ),
@@ -1305,6 +1424,233 @@ class _InlineError extends StatelessWidget {
     return Text(
       message,
       style: const TextStyle(color: Colors.redAccent),
+    );
+  }
+}
+
+class _ProfilePictureDialog extends StatefulWidget {
+  const _ProfilePictureDialog({
+    required this.currentPhotoUrl,
+    required this.onRemove,
+    required this.onSave,
+  });
+
+  final String? currentPhotoUrl;
+  final Future<void> Function() onRemove;
+  final Future<void> Function(Uint8List bytes) onSave;
+
+  @override
+  State<_ProfilePictureDialog> createState() => _ProfilePictureDialogState();
+}
+
+class _PlainProfileActionButton extends StatelessWidget {
+  const _PlainProfileActionButton({
+    required this.onPressed,
+    required this.icon,
+    required this.label,
+  });
+
+  final VoidCallback? onPressed;
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onPressed != null;
+    final foreground =
+        enabled ? const Color(0xFF8B5CF6) : const Color(0xFF64748B);
+    return Center(
+      child: GestureDetector(
+        onTap: onPressed,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: foreground.withValues(alpha: 0.75)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, color: foreground, size: 22),
+                const SizedBox(width: 10),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: foreground,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    decoration: TextDecoration.none,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfilePictureDialogState extends State<_ProfilePictureDialog> {
+  final _cropController = CropController();
+  Uint8List? _imageBytes;
+  bool _busy = false;
+
+  Future<void> _pickImage() async {
+    final picked = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 2400,
+      imageQuality: 92,
+    );
+    if (picked == null) {
+      return;
+    }
+    final bytes = await picked.readAsBytes();
+    if (!mounted) {
+      return;
+    }
+    setState(() => _imageBytes = bytes);
+  }
+
+  Future<void> _remove() async {
+    setState(() => _busy = true);
+    try {
+      await widget.onRemove();
+      if (!mounted) {
+        return;
+      }
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile picture removed.')),
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() => _busy = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  void _save() {
+    if (_imageBytes == null || _busy) {
+      return;
+    }
+    setState(() => _busy = true);
+    _cropController.crop();
+  }
+
+  Future<void> _handleCropped(CropResult result) async {
+    switch (result) {
+      case CropSuccess(:final croppedImage):
+        try {
+          await widget.onSave(croppedImage);
+          if (!mounted) {
+            return;
+          }
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Profile picture updated.')),
+          );
+        } catch (e) {
+          if (mounted) {
+            setState(() => _busy = false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                  content: Text(e.toString()), backgroundColor: Colors.red),
+            );
+          }
+        }
+      case CropFailure(:final cause):
+        if (mounted) {
+          setState(() => _busy = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text(cause.toString()), backgroundColor: Colors.red),
+          );
+        }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _ProfileDialog(
+      title: 'Profile picture',
+      body: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_imageBytes == null) ...[
+            _ProfileAvatar(
+                photoUrl: widget.currentPhotoUrl, onTap: null, size: 86),
+            const SizedBox(height: 16),
+            const Text(
+              'Upload a photo, crop it to a square, and we will save it as a clean 256 x 256 avatar.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Color(0xFFB8C4E6), height: 1.45),
+            ),
+            const SizedBox(height: 18),
+            _PlainProfileActionButton(
+              onPressed: _busy ? null : _pickImage,
+              icon: Icons.upload_file_outlined,
+              label: 'Choose image',
+            ),
+          ] else ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(22),
+              child: SizedBox(
+                height: 320,
+                child: Crop(
+                  image: _imageBytes!,
+                  controller: _cropController,
+                  aspectRatio: 1,
+                  withCircleUi: true,
+                  interactive: true,
+                  baseColor: const Color(0xFF0B1020),
+                  maskColor: Colors.black.withValues(alpha: 0.55),
+                  radius: 22,
+                  onCropped: _handleCropped,
+                  progressIndicator: const Center(
+                    child: CircularProgressIndicator(),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Drag and zoom to frame your avatar. The server stores the final image at 256 x 256.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Color(0xFF93A4C8), height: 1.4),
+            ),
+          ],
+          if (_busy) ...[
+            const SizedBox(height: 16),
+            const LinearProgressIndicator(minHeight: 3),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: _busy ? null : () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: _busy ? null : _remove,
+          child: const Text('Remove'),
+        ),
+        if (_imageBytes == null)
+          FilledButton(
+            onPressed: _busy ? null : _pickImage,
+            child: const Text('Upload'),
+          )
+        else
+          FilledButton(
+            onPressed: _busy ? null : _save,
+            child: const Text('Save'),
+          ),
+      ],
     );
   }
 }

@@ -28,6 +28,14 @@ class _BuyPknScreenState extends ConsumerState<BuyPknScreen> {
 
   _BuyPackage _selected = _packages[1];
   bool _loading = false;
+  bool _verifyingPayment = false;
+  String? _paymentMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _verifyReturnPayment());
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -60,6 +68,8 @@ class _BuyPknScreenState extends ConsumerState<BuyPknScreen> {
                     signedIn: user != null,
                     walletAddress: wallet,
                     siteBalance: balance,
+                    paymentMessage: _paymentMessage,
+                    verifyingPayment: _verifyingPayment,
                   ),
                   const SizedBox(height: 22),
                   _BuyPanel(
@@ -166,6 +176,53 @@ class _BuyPknScreenState extends ConsumerState<BuyPknScreen> {
       }
     }
   }
+
+  Future<void> _verifyReturnPayment() async {
+    final user = ref.read(authStateProvider).valueOrNull;
+    final params = Uri.base.queryParameters;
+    final sessionId = params['session_id'];
+    if (user == null || sessionId == null || sessionId.isEmpty) {
+      return;
+    }
+
+    setState(() {
+      _verifyingPayment = true;
+      _paymentMessage = 'Confirming Stripe payment...';
+    });
+    try {
+      final token = await user.getIdToken();
+      final response = await http.post(
+        Uri.base.resolve('/api/create-pkn-checkout-session'),
+        headers: {
+          'content-type': 'application/json',
+          'authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'checkoutSessionId': sessionId}),
+      );
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode != 200) {
+        throw StateError(
+            data['error'] as String? ?? 'Payment confirmation failed.');
+      }
+      final amount = data['amountPkn']?.toString() ?? 'PKN';
+      final target = data['fulfillmentTarget'] as String? ?? '';
+      setState(() {
+        _paymentMessage = target == 'site_credit'
+            ? 'Payment confirmed. $amount PKN added to your site balance.'
+            : 'Payment confirmed. $amount PKN queued for on-chain delivery.';
+      });
+      ref.invalidate(pknBalanceProvider);
+      ref.invalidate(userProfileProvider);
+    } catch (error) {
+      if (mounted) {
+        setState(() => _paymentMessage = error.toString());
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _verifyingPayment = false);
+      }
+    }
+  }
 }
 
 class _BuyPackage {
@@ -182,16 +239,59 @@ class _BuyPackage {
   String get fiatLabel => '€${(fiatCents / 100).toStringAsFixed(2)}';
 }
 
+class _PaymentStatusBanner extends StatelessWidget {
+  const _PaymentStatusBanner({required this.message, required this.loading});
+
+  final String message;
+  final bool loading;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111936),
+        borderRadius: BorderRadius.circular(18),
+        border:
+            Border.all(color: const Color(0xFFFACC15).withValues(alpha: 0.32)),
+      ),
+      child: Row(
+        children: [
+          if (loading)
+            const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          else
+            const Icon(Icons.verified_outlined, color: Color(0xFFFACC15)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(color: Color(0xFFE2E8F0), height: 1.35),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _BuyHero extends StatelessWidget {
   const _BuyHero({
     required this.signedIn,
     required this.walletAddress,
     required this.siteBalance,
+    required this.paymentMessage,
+    required this.verifyingPayment,
   });
 
   final bool signedIn;
   final String? walletAddress;
   final int siteBalance;
+  final String? paymentMessage;
+  final bool verifyingPayment;
 
   @override
   Widget build(BuildContext context) {
@@ -209,6 +309,13 @@ class _BuyHero extends StatelessWidget {
         alignment: WrapAlignment.spaceBetween,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
+          if (paymentMessage != null) ...[
+            _PaymentStatusBanner(
+              message: paymentMessage!,
+              loading: verifyingPayment,
+            ),
+            const SizedBox(height: 18),
+          ],
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 620),
             child: const Column(

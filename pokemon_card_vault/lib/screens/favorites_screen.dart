@@ -56,7 +56,7 @@ class FavoritesScreen extends ConsumerWidget {
           Icon(
             Icons.favorite_border,
             size: 100,
-            color: AppColors.textSecondary.withOpacity(0.5),
+            color: AppColors.textSecondary.withValues(alpha: 0.5),
           ),
           const SizedBox(height: 16),
           Text(
@@ -104,17 +104,17 @@ class FavoritesScreen extends ConsumerWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppColors.primary.withOpacity(0.1),
+            color: AppColors.primary.withValues(alpha: 0.1),
             border: Border(
               bottom: BorderSide(
-                color: AppColors.primary.withOpacity(0.2),
+                color: AppColors.primary.withValues(alpha: 0.2),
                 width: 1,
               ),
             ),
           ),
           child: Row(
             children: [
-              Icon(Icons.favorite, color: AppColors.primary, size: 24),
+              const Icon(Icons.favorite, color: AppColors.primary, size: 24),
               const SizedBox(width: 8),
               Text(
                 '${favoriteCards.length} Favorite${favoriteCards.length == 1 ? '' : 's'}',

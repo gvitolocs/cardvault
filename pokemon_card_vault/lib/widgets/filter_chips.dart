@@ -141,7 +141,7 @@ class FilterChips extends ConsumerWidget {
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: (color ?? AppColors.primary).withOpacity(0.3),
+                    color: (color ?? AppColors.primary).withValues(alpha: 0.3),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   ),

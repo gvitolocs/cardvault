@@ -68,7 +68,9 @@
       "sameAs": [
         "https://explorer.pokoin.com",
         "https://bscscan.com/token/0x91A17E2bddfF839078BD395482B38e4AC15276f4",
-        "https://pancakeswap.finance/swap?outputCurrency=0x91A17E2bddfF839078BD395482B38e4AC15276f4&chain=bsc"
+        "https://pancakeswap.finance/swap?outputCurrency=0x91A17E2bddfF839078BD395482B38e4AC15276f4&chain=bsc",
+        "https://coinmarketcap.com/",
+        "https://coinmarketcap.com/dexscan/bsc/0x86294c008542c2707b9f67e3e4ba2d03b7bf7451/"
       ],
       "description": "Pokoin is a crypto ecosystem for Pokémon card collectors, combining the CardVault marketplace, the PokoinPoS blockchain, native PKN, wrapped wPKN on BNB Chain, and a live blockchain explorer."
     }
@@ -89,11 +91,16 @@
     }
   </script>
   <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then((registrations) => {
-        registrations.forEach((registration) => registration.unregister());
-      });
-    }
+    window.pokoinClearFlutterCache = async function () {
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map((registration) => registration.unregister()));
+      }
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map((cacheName) => caches.delete(cacheName)));
+      }
+    };
   </script>
   <script>
     window.pokoinWallet = {
@@ -105,6 +112,33 @@
           return Promise.reject('MetaMask or another EVM wallet is not available');
         }
         return window.ethereum.request({ method: 'eth_requestAccounts' });
+      },
+      getAccounts: function () {
+        if (!window.ethereum) {
+          return Promise.resolve([]);
+        }
+        return window.ethereum.request({ method: 'eth_accounts' });
+      },
+      onAccountsChanged: function (callback) {
+        if (!window.ethereum || !window.ethereum.on) {
+          return;
+        }
+        window.ethereum.on('accountsChanged', callback);
+      },
+      onChainChanged: function (callback) {
+        if (!window.ethereum || !window.ethereum.on) {
+          return;
+        }
+        window.ethereum.on('chainChanged', callback);
+      },
+      signMessage: function (address, message) {
+        if (!window.ethereum) {
+          return Promise.reject('MetaMask or another EVM wallet is not available');
+        }
+        return window.ethereum.request({
+          method: 'personal_sign',
+          params: [message, address]
+        }).catch((error) => Promise.reject(window.pokoinWallet._walletError(error)));
       },
       addNetwork: function () {
         if (!window.ethereum) {
@@ -134,14 +168,32 @@
           params: [{ chainId: '0x18dacca' }]
         });
       },
+      _walletError: function (error) {
+        if (!error) {
+          return new Error('Wallet request failed');
+        }
+        if (typeof error === 'string') {
+          return new Error(error);
+        }
+        const message = error.message || error.reason || error.data?.message || 'Wallet request failed';
+        const code = error.code !== undefined ? ` (${error.code})` : '';
+        return new Error(`${message}${code}`);
+      },
       sendTransaction: function (from, to, valueHex) {
         if (!window.ethereum) {
           return Promise.reject('MetaMask or another EVM wallet is not available');
         }
         return window.ethereum.request({
           method: 'eth_sendTransaction',
-          params: [{ from: from, to: to, value: valueHex }]
-        });
+          params: [{
+            from: from,
+            to: to,
+            value: valueHex,
+            chainId: '0x18dacca',
+            gas: '0x5208',
+            gasPrice: '0x3b9aca00'
+          }]
+        }).catch((error) => Promise.reject(window.pokoinWallet._walletError(error)));
       }
     };
   </script>
@@ -166,9 +218,20 @@
         <a href="/health">Network health</a>
         <a href="https://explorer.pokoin.com/wpkn-reserve.json">wPKN reserve proof</a>
         <a href="https://bscscan.com/token/0x91A17E2bddfF839078BD395482B38e4AC15276f4">wPKN on BscScan</a>
+        <a href="https://coinmarketcap.com/">CoinMarketCap</a>
+        <a href="https://coinmarketcap.com/dexscan/bsc/0x86294c008542c2707b9f67e3e4ba2d03b7bf7451/">wPKN pair on CoinMarketCap DexScan</a>
       </nav>
     </main>
   </noscript>
-  <script src="flutter_bootstrap.js" async></script>
+  <script>
+    window.pokoinClearFlutterCache()
+      .catch(() => {})
+      .finally(() => {
+        const script = document.createElement('script');
+        script.src = `flutter_bootstrap.js?v=${Date.now()}`;
+        script.async = true;
+        document.body.appendChild(script);
+      });
+  </script>
 </body>
 </html>

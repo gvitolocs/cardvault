@@ -9,7 +9,9 @@ import '../constants/project_links.dart';
 import '../widgets/site_footer.dart';
 
 class ScanScreen extends StatefulWidget {
-  const ScanScreen({super.key});
+  final String? initialQuery;
+
+  const ScanScreen({super.key, this.initialQuery});
 
   @override
   State<ScanScreen> createState() => _ScanScreenState();
@@ -24,6 +26,15 @@ class _ScanScreenState extends State<ScanScreen> {
   void initState() {
     super.initState();
     _snapshot = ExplorerSnapshot.load();
+    _applyInitialQuery();
+  }
+
+  @override
+  void didUpdateWidget(covariant ScanScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialQuery != widget.initialQuery) {
+      _applyInitialQuery();
+    }
   }
 
   @override
@@ -36,6 +47,15 @@ class _ScanScreenState extends State<ScanScreen> {
     setState(() {
       _snapshot = ExplorerSnapshot.load();
     });
+  }
+
+  void _applyInitialQuery() {
+    final query = widget.initialQuery?.trim();
+    if (query == null || query.isEmpty) {
+      return;
+    }
+    _searchController.text = query;
+    _search = SearchResult.search(query);
   }
 
   void _runSearch() {
@@ -120,7 +140,10 @@ class ExplorerSnapshot {
   final List<ExplorerBlock> blocks;
   final List<ExplorerTransaction> transactions;
   final List<ValidatorInfo> validators;
+  final Map<String, dynamic>? bootstrapRegistry;
   final Map<String, dynamic>? reserve;
+  final int totalSupply;
+  final int circulatingSupply;
   final DateTime refreshedAt;
 
   const ExplorerSnapshot({
@@ -128,7 +151,10 @@ class ExplorerSnapshot {
     required this.blocks,
     required this.transactions,
     required this.validators,
+    required this.bootstrapRegistry,
     required this.reserve,
+    required this.totalSupply,
+    required this.circulatingSupply,
     required this.refreshedAt,
   });
 
@@ -138,7 +164,10 @@ class ExplorerSnapshot {
       _getJson('${ProjectLinks.rpcBase}/explorer/blocks?limit=12'),
       _getJson('${ProjectLinks.rpcBase}/chain/validators'),
       _getJson('${ProjectLinks.rpcBase}/explorer/address/${ProjectLinks.nativeTreasury}'),
+      _getJson(ProjectLinks.bootstrapPeers),
       _getJson(ProjectLinks.reserve),
+      _getText('${ProjectLinks.rpcBase}/chain/supply/total.txt'),
+      _getText('${ProjectLinks.rpcBase}/chain/supply/circulating.txt'),
     ]);
 
     final status = responses[0] as Map<String, dynamic>? ?? const <String, dynamic>{};
@@ -164,7 +193,10 @@ class ExplorerSnapshot {
       blocks: blocks,
       transactions: transactions,
       validators: validators,
-      reserve: responses[4] as Map<String, dynamic>?,
+      bootstrapRegistry: responses[4] as Map<String, dynamic>?,
+      reserve: responses[5] as Map<String, dynamic>?,
+      totalSupply: int.tryParse((responses[6] as String? ?? '').trim()) ?? 0,
+      circulatingSupply: int.tryParse((responses[7] as String? ?? '').trim()) ?? 0,
       refreshedAt: DateTime.now(),
     );
   }
@@ -175,6 +207,14 @@ class ExplorerSnapshot {
       return null;
     }
     return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  static Future<String?> _getText(String url) async {
+    final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      return null;
+    }
+    return response.body;
   }
 }
 
@@ -533,93 +573,38 @@ class _HeroSearch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final compact = MediaQuery.sizeOf(context).width < 760;
     return Container(
-      padding: EdgeInsets.all(compact ? 22 : 30),
+      padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF0F172A), Color(0xFF111827), Color(0xFF312E81)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: const Color(0xCC0B1020),
         borderRadius: BorderRadius.circular(28),
         border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                decoration: BoxDecoration(
-                  color: const Color(0x3322C55E),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      loading ? Icons.sync : Icons.circle,
-                      color: const Color(0xFF22C55E),
-                      size: loading ? 16 : 10,
-                    ),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'Live PokoinPoS Explorer',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
-                    ),
-                  ],
-                ),
-              ),
-              const Spacer(),
-              TextButton.icon(
-                onPressed: () => _open(ProjectLinks.explorer),
-                icon: const Icon(Icons.open_in_new),
-                label: const Text('Full explorer'),
-              ),
-            ],
+      child: TextField(
+        controller: controller,
+        onSubmitted: (_) => onSearch(),
+        style: const TextStyle(color: Colors.white),
+        decoration: InputDecoration(
+          filled: true,
+          fillColor: const Color(0xEE050816),
+          hintText: 'Search block number, tx hash, block hash, or 0x address',
+          hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+          prefixIcon: Icon(
+            loading ? Icons.sync : Icons.search,
+            color: const Color(0xFFFACC15),
           ),
-          const SizedBox(height: 20),
-          Text(
-            'Search PKN blocks, transactions and addresses',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: compact ? 32 : 46,
-              fontWeight: FontWeight.w900,
-              height: 1.02,
+          suffixIcon: Padding(
+            padding: const EdgeInsets.all(6),
+            child: FilledButton(
+              onPressed: onSearch,
+              child: const Text('Search'),
             ),
           ),
-          const SizedBox(height: 12),
-          const Text(
-            'Native PokoinPoS scan dashboard with validator visibility, lottery metrics, recent treasury activity and wPKN reserve links.',
-            style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 16, height: 1.45),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(22),
+            borderSide: BorderSide.none,
           ),
-          const SizedBox(height: 22),
-          TextField(
-            controller: controller,
-            onSubmitted: (_) => onSearch(),
-            style: const TextStyle(color: Colors.white),
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: const Color(0xEE050816),
-              hintText: 'Search block number, tx hash, block hash, or 0x address',
-              hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
-              prefixIcon: const Icon(Icons.search, color: Color(0xFFFACC15)),
-              suffixIcon: Padding(
-                padding: const EdgeInsets.all(6),
-                child: FilledButton(
-                  onPressed: onSearch,
-                  child: const Text('Search'),
-                ),
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(18),
-                borderSide: BorderSide.none,
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -634,11 +619,19 @@ class _StatsGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     final status = snapshot?.status ?? const <String, dynamic>{};
     final validators = snapshot?.validators ?? const <ValidatorInfo>[];
+    final registryNodes = _bootstrapNodes(snapshot?.bootstrapRegistry);
+    final matureValidators = registryNodes
+        .where((node) => _nodeStatus(node) == 'bootstrap')
+        .length;
+    final vettingNodes =
+        registryNodes.where((node) => _nodeStatus(node) == 'vetting').length;
     final reserve = snapshot?.reserve;
     final latestHeight = _asInt(status['height']);
     final treasuryTxCount = snapshot?.transactions.length ?? 0;
     final reserveAmount =
         _formatWholeNumber(reserve?['reservedNativeAmount'] ?? 2000000);
+    final totalSupply = snapshot?.totalSupply ?? 0;
+    final circulatingSupply = snapshot?.circulatingSupply ?? 0;
     return Wrap(
       spacing: 14,
       runSpacing: 14,
@@ -656,15 +649,23 @@ class _StatsGrid extends StatelessWidget {
           icon: Icons.swap_horiz,
         ),
         _StatCard(
-          label: 'PKN Supply',
-          value: '${_formatWholeNumber(status['validatorStake'] ?? 0)} PKN',
-          note: 'Spendable validator balance',
+          label: 'Total Supply',
+          value: totalSupply == 0 ? '...' : '${_formatWholeNumber(totalSupply)} PKN',
+          note: 'Live native PKN in existence',
           icon: Icons.toll_outlined,
         ),
         _StatCard(
+          label: 'Circulating',
+          value: circulatingSupply == 0
+              ? '...'
+              : '${_formatWholeNumber(circulatingSupply)} PKN',
+          note: 'Total minus reserved native PKN',
+          icon: Icons.public,
+        ),
+        _StatCard(
           label: 'Network',
-          value: '${validators.where((v) => v.authorized).length} validators',
-          note: '${validators.where((v) => v.connected).length} connected peer',
+          value: '${matureValidators == 0 ? validators.where((v) => v.authorized).length : matureValidators} validators',
+          note: '$vettingNodes nodes in vetting',
           icon: Icons.verified_user_outlined,
         ),
         _StatCard(
@@ -786,7 +787,7 @@ class _TransactionsPanel extends StatelessWidget {
               title: '${_formatAmount(tx.amount)} PKN · block ${tx.blockNumber}',
               subtitle: '${_short(tx.from)} → ${_short(tx.to)}',
               trailing: tx.finalized ? 'Final' : 'Pending',
-              onTap: () => _open('${ProjectLinks.rpcBase}/explorer/tx/${tx.hash}'),
+              onTap: () => context.go('/tx/${tx.hash}'),
             ),
           if (transactions.isEmpty) const _EmptyLine('No recent treasury transactions loaded.'),
         ],
@@ -1212,6 +1213,23 @@ String _formatWholeNumber(Object? value) {
   final number = _asInt(value);
   if (number == 0 && value == null) return '...';
   return _formatAmount(number);
+}
+
+List<Map<String, dynamic>> _bootstrapNodes(Map<String, dynamic>? registry) {
+  final candidates = registry?['candidates'];
+  if (candidates is List && candidates.isNotEmpty) {
+    return candidates.whereType<Map<String, dynamic>>().toList(growable: false);
+  }
+  final peers = registry?['peers'];
+  if (peers is List) {
+    return peers.whereType<Map<String, dynamic>>().toList(growable: false);
+  }
+  return const <Map<String, dynamic>>[];
+}
+
+String _nodeStatus(Map<String, dynamic> node) {
+  final status = node['status'];
+  return status is String ? status.toLowerCase() : 'peer';
 }
 
 String _short(String value, {int head = 10, int tail = 8}) {

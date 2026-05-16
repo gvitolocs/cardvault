@@ -31,15 +31,13 @@ class _PokemonSearchBarState extends ConsumerState<PokemonSearchBar> {
 
   @override
   Widget build(BuildContext context) {
-    final cardState = ref.watch(cardProvider);
-
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -54,7 +52,7 @@ class _PokemonSearchBarState extends ConsumerState<PokemonSearchBar> {
             color: Colors.grey[400],
             fontSize: 16,
           ),
-          prefixIcon: Icon(
+          prefixIcon: const Icon(
             Icons.search,
             color: AppColors.primary,
           ),

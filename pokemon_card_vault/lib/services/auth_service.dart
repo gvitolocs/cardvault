@@ -3,6 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 import '../models/app_user_profile.dart';
 
@@ -181,7 +183,29 @@ class AuthService {
         });
       }
     });
+    await ensureUsername();
   }
+
+  Future<String?> ensureUsername() async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      return null;
+    }
+    final token = await user.getIdToken();
+    final response = await http.post(
+      Uri.parse('/api/ensure-username'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+    );
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError(payload['error'] as String? ?? 'Username setup failed.');
+    }
+    return payload['username'] as String?;
+  }
+
 
   Future<void> requestWithdraw({
     required String uid,
@@ -204,6 +228,73 @@ class AuthService {
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     });
+  }
+
+  Future<Map<String, dynamic>> requestWalletNonce(String address) async {
+    final response = await http.post(
+      Uri.parse('/api/wallet-auth/nonce'),
+      headers: const {'Content-Type': 'application/json'},
+      body: jsonEncode({'address': address.trim().toLowerCase()}),
+    );
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError(payload['error'] as String? ?? 'Wallet nonce failed.');
+    }
+    return payload;
+  }
+
+  Future<Map<String, dynamic>> verifyWalletSignature({
+    required String address,
+    required String signature,
+  }) async {
+    final response = await http.post(
+      Uri.parse('/api/wallet-auth/verify'),
+      headers: const {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'address': address.trim().toLowerCase(),
+        'signature': signature,
+      }),
+    );
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError(
+        payload['error'] as String? ?? 'Wallet verification failed.',
+      );
+    }
+    return payload;
+  }
+
+  Future<void> signInWithCustomToken(String customToken) async {
+    final credential = await _auth.signInWithCustomToken(customToken);
+    await ensureUserProfile(credential.user);
+    await _markFreshLogin(credential.user);
+  }
+
+  Future<Map<String, dynamic>> linkSignedWallet({
+    required String address,
+    required String signature,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw StateError('Log in before connecting a wallet.');
+    }
+    final token = await user.getIdToken();
+    final response = await http.post(
+      Uri.parse('/api/wallet-link'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'address': address.trim().toLowerCase(),
+        'signature': signature,
+      }),
+    );
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError(payload['error'] as String? ?? 'Wallet link failed.');
+    }
+    return payload;
   }
 
   Future<void> updateWalletAddress({
@@ -258,26 +349,48 @@ class AuthService {
     );
   }
 
-  Future<void> updatePhotoUrl({
-    required String uid,
-    required String photoUrl,
+  Future<String> uploadProfilePicture({
+    required Uint8List imageBytes,
   }) async {
-    final url = photoUrl.trim();
-    if (url.isNotEmpty) {
-      final uri = Uri.tryParse(url);
-      if (uri == null || !uri.hasAbsolutePath || !uri.isScheme('https')) {
-        throw ArgumentError('Enter a valid https image URL.');
-      }
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw StateError('Sign in before updating your profile picture.');
     }
-
-    await _auth.currentUser?.updatePhotoURL(url.isEmpty ? null : url);
-    await _firestore.collection('users').doc(uid).set(
-      {
-        'photoUrl': url.isEmpty ? null : url,
-        'updatedAt': FieldValue.serverTimestamp(),
+    final token = await user.getIdToken();
+    final response = await http.post(
+      Uri.parse('/api/upload-profile-picture'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
       },
-      SetOptions(merge: true),
+      body: jsonEncode({'imageBase64': base64Encode(imageBytes)}),
     );
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError(payload['error'] as String? ?? 'Profile picture upload failed.');
+    }
+    final photoUrl = payload['photoUrl'] as String? ?? '';
+    await user.updatePhotoURL(photoUrl);
+    await user.reload();
+    return photoUrl;
+  }
+
+  Future<void> removeProfilePicture() async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw StateError('Sign in before updating your profile picture.');
+    }
+    final token = await user.getIdToken();
+    final response = await http.post(
+      Uri.parse('/api/remove-profile-picture'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final payload = jsonDecode(response.body) as Map<String, dynamic>;
+      throw StateError(payload['error'] as String? ?? 'Profile picture removal failed.');
+    }
+    await user.updatePhotoURL(null);
+    await user.reload();
   }
 
   Future<bool> _isInactivePastLimit(String uid) async {

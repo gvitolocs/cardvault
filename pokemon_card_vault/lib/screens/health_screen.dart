@@ -218,9 +218,17 @@ class _HealthScreenState extends State<HealthScreen> {
                       if (loading)
                         const _LoadingPanel()
                       else ...[
-                        _PeerPieCard(
-                          status: report?.chainStatus,
-                          bootstrap: report?.bootstrapRegistry,
+                        _HealthGraphRow(
+                          children: [
+                            _PeerPieCard(
+                              status: report?.chainStatus,
+                              bootstrap: report?.bootstrapRegistry,
+                            ),
+                            _NodeVersionCard(
+                              status: report?.chainStatus,
+                              bootstrap: report?.bootstrapRegistry,
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 14),
                         for (final check in checks) _HealthTile(check: check),
@@ -293,7 +301,8 @@ class _HealthTopBar extends StatelessWidget implements PreferredSizeWidget {
           bottom: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
         ),
         boxShadow: const [
-          BoxShadow(color: Color(0x66000000), blurRadius: 24, offset: Offset(0, 10)),
+          BoxShadow(
+              color: Color(0x66000000), blurRadius: 24, offset: Offset(0, 10)),
         ],
       ),
       child: SafeArea(
@@ -405,8 +414,12 @@ class _HealthNavPill extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           _HealthNavAction(label: 'Home', path: '/', icon: Icons.home_outlined),
-          _HealthNavAction(label: 'Scan', path: '/scan', icon: Icons.query_stats),
-          _HealthNavAction(label: 'Wallet', path: '/wallet', icon: Icons.account_balance_wallet_outlined),
+          _HealthNavAction(
+              label: 'Scan', path: '/scan', icon: Icons.query_stats),
+          _HealthNavAction(
+              label: 'Wallet',
+              path: '/wallet',
+              icon: Icons.account_balance_wallet_outlined),
         ],
       ),
     );
@@ -468,7 +481,8 @@ class _HealthCta extends StatelessWidget {
       icon: Icon(icon, size: 18),
       label: Text(label),
       style: FilledButton.styleFrom(
-        backgroundColor: primary ? const Color(0xFFFACC15) : const Color(0xFF111936),
+        backgroundColor:
+            primary ? const Color(0xFFFACC15) : const Color(0xFF111936),
         foregroundColor: primary ? const Color(0xFF111827) : Colors.white,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
@@ -517,7 +531,8 @@ class _StatusHero extends StatelessWidget {
         borderRadius: BorderRadius.circular(30),
         border: Border.all(color: const Color(0x33FACC15)),
         boxShadow: const [
-          BoxShadow(color: Color(0x55000000), blurRadius: 34, offset: Offset(0, 18)),
+          BoxShadow(
+              color: Color(0x55000000), blurRadius: 34, offset: Offset(0, 18)),
         ],
       ),
       child: Wrap(
@@ -726,10 +741,45 @@ class _LoadingPanel extends StatelessWidget {
           SizedBox(height: 16),
           Text(
             'Running live health checks...',
-            style: TextStyle(color: Color(0xFFCBD5E1), fontWeight: FontWeight.w700),
+            style: TextStyle(
+                color: Color(0xFFCBD5E1), fontWeight: FontWeight.w700),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _HealthGraphRow extends StatelessWidget {
+  const _HealthGraphRow({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 980) {
+          return Column(
+            children: [
+              for (var index = 0; index < children.length; index++) ...[
+                children[index],
+                if (index != children.length - 1) const SizedBox(height: 14),
+              ],
+            ],
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (var index = 0; index < children.length; index++) ...[
+              Expanded(child: children[index]),
+              if (index != children.length - 1) const SizedBox(width: 14),
+            ],
+          ],
+        );
+      },
     );
   }
 }
@@ -742,143 +792,115 @@ class _PeerPieCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final peerCount = _intValue('peerCount');
+    final peerCount = _intValue(status?['peerCount']);
     final remotePeers = math.max(peerCount, 0);
     final candidates = _listValue(bootstrap?['candidates']);
     final manifestPeers = _listValue(bootstrap?['peers']);
     final registryNodes = candidates.isNotEmpty ? candidates : manifestPeers;
-    final vettingNodes = registryNodes.where((node) => _statusOf(node) == 'vetting').length;
-    final bootstrapNodes = registryNodes.where((node) => _statusOf(node) == 'bootstrap').length;
+    final vettingNodes =
+        registryNodes.where((node) => _statusOf(node) == 'vetting').length;
+    final bootstrapNodes =
+        registryNodes.where((node) => _statusOf(node) == 'bootstrap').length;
     final peerNodes = registryNodes
-        .where((node) => _statusOf(node) == 'peer' || _statusOf(node) == 'candidate')
+        .where((node) =>
+            _statusOf(node) == 'peer' || _statusOf(node) == 'candidate')
         .length;
     final totalNodes = math.max(registryNodes.length, remotePeers);
-    final height = _intValue('height');
-    final committedHeight = _intValue('committedHeight');
-    final mempoolDepth = _intValue('mempoolDepth');
-    final finalityDepth = _intValue('finalityDepth');
-    final uptimeSeconds = _intValue('uptimeSeconds');
 
-    return Container(
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: const Color(0xCC111936),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final compact = constraints.maxWidth < 720;
-          final chart = SizedBox(
-            width: compact ? 190 : 220,
-            height: compact ? 190 : 220,
-            child: CustomPaint(
-              painter: _PeerPiePainter(
-                vettingNodes: vettingNodes,
-                peerNodes: peerNodes,
-                bootstrapNodes: bootstrapNodes,
-              ),
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      '$totalNodes',
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 34,
-                          fontWeight: FontWeight.w900),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text('network nodes',
-                        style: TextStyle(
-                            color: Color(0xFF93A4C8),
-                            fontWeight: FontWeight.w700)),
-                  ],
+    return DefaultTextStyle.merge(
+      style: const TextStyle(decoration: TextDecoration.none),
+      child: Container(
+        padding: const EdgeInsets.all(22),
+        decoration: BoxDecoration(
+          color: const Color(0xCC111936),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 640;
+            final chart = SizedBox(
+              width: compact ? 176 : 188,
+              height: compact ? 176 : 188,
+              child: CustomPaint(
+                painter: _PeerPiePainter(
+                  vettingNodes: vettingNodes,
+                  peerNodes: peerNodes,
+                  bootstrapNodes: bootstrapNodes,
+                ),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '$totalNodes',
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 34,
+                            fontWeight: FontWeight.w900),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text('network nodes',
+                          style: TextStyle(
+                              color: Color(0xFF93A4C8),
+                              fontWeight: FontWeight.w700)),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          );
+            );
 
-          final details = Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Peer topology',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900)),
-              const SizedBox(height: 8),
-              const Text(
-                'Network registry view: vetting nodes, regular peers and bootstrap peers. The RPC peer count is the live P2P connections seen by the gateway.',
-                style: TextStyle(color: Color(0xFFB8C4E6), height: 1.45),
-              ),
-              const SizedBox(height: 18),
-              _LegendRow(
-                  color: const Color(0xFFFDE68A),
-                  label: 'Vetting nodes',
-                  value: '$vettingNodes online candidates'),
-              const SizedBox(height: 10),
-              _LegendRow(
-                  color: const Color(0xFF38BDF8),
-                  label: 'Regular peers',
-                  value: '$peerNodes peer nodes'),
-              const SizedBox(height: 10),
-              _LegendRow(
-                  color: const Color(0xFF22C55E),
-                  label: 'Bootstrap peers',
-                  value: '$bootstrapNodes mature nodes'),
-              const SizedBox(height: 18),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  _PeerMetric(
-                      label: 'Tip height', value: height < 0 ? '-' : '$height'),
-                  _PeerMetric(
-                      label: 'Committed',
-                      value: committedHeight < 0 ? '-' : '$committedHeight'),
-                  _PeerMetric(
-                      label: 'Finality depth',
-                      value: finalityDepth < 0 ? '-' : '$finalityDepth'),
-                  _PeerMetric(
-                      label: 'Mempool',
-                      value: mempoolDepth < 0 ? '-' : '$mempoolDepth'),
-                  _PeerMetric(
-                      label: 'Uptime',
-                      value: uptimeSeconds < 0
-                          ? '-'
-                          : _formatDuration(uptimeSeconds)),
-                ],
-              ),
-            ],
-          );
-
-          if (compact) {
-            return Column(
+            final details = Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Center(child: chart),
-                const SizedBox(height: 20),
-                details,
+                const Text('Peer topology',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900)),
+                const SizedBox(height: 14),
+                _LegendRow(
+                    color: const Color(0xFFFDE68A),
+                    label: 'Vetting nodes',
+                    value: '$vettingNodes online candidates'),
+                const SizedBox(height: 10),
+                _LegendRow(
+                    color: const Color(0xFF38BDF8),
+                    label: 'Regular peers',
+                    value: '$peerNodes peer nodes'),
+                const SizedBox(height: 10),
+                _LegendRow(
+                    color: const Color(0xFF22C55E),
+                    label: 'Bootstrap peers',
+                    value: '$bootstrapNodes mature nodes'),
               ],
             );
-          }
 
-          return Row(
-            children: [
-              chart,
-              const SizedBox(width: 26),
-              Expanded(child: details),
-            ],
-          );
-        },
+            if (compact) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(child: chart),
+                  const SizedBox(height: 20),
+                  details,
+                ],
+              );
+            }
+
+            return Row(
+              children: [
+                chart,
+                const SizedBox(width: 26),
+                Expanded(child: details),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
 
-  int _intValue(String key) {
-    final value = status?[key];
+  int _intValue(Object? value) {
     if (value is int) {
       return value;
     }
@@ -901,20 +923,6 @@ class _PeerPieCard extends StatelessWidget {
   String _statusOf(Map<String, dynamic> node) {
     final value = node['status'];
     return value is String ? value.toLowerCase() : 'peer';
-  }
-
-  static String _formatDuration(int seconds) {
-    final duration = Duration(seconds: seconds);
-    final days = duration.inDays;
-    final hours = duration.inHours.remainder(24);
-    final minutes = duration.inMinutes.remainder(60);
-    if (days > 0) {
-      return '${days}d ${hours}h';
-    }
-    if (hours > 0) {
-      return '${hours}h ${minutes}m';
-    }
-    return '${math.max(minutes, 1)}m';
   }
 }
 
@@ -974,6 +982,204 @@ class _PeerPiePainter extends CustomPainter {
   }
 }
 
+class _NodeVersionCard extends StatelessWidget {
+  final Map<String, dynamic>? status;
+  final Map<String, dynamic>? bootstrap;
+
+  const _NodeVersionCard({required this.status, required this.bootstrap});
+
+  @override
+  Widget build(BuildContext context) {
+    final currentVersion = _stringValue(status?['version']);
+    final candidates = _listValue(bootstrap?['candidates']);
+    final manifestPeers = _listValue(bootstrap?['peers']);
+    final registryNodes = candidates.isNotEmpty ? candidates : manifestPeers;
+    final versions = registryNodes
+        .map((node) => _stringValue(node['version']))
+        .where((version) => version.isNotEmpty)
+        .toList(growable: false);
+    final totalNodes = registryNodes.length;
+    final currentNodes = currentVersion.isEmpty
+        ? 0
+        : versions.where((version) => version == currentVersion).length;
+    final outdatedNodes = currentVersion.isEmpty
+        ? 0
+        : versions.where((version) => version != currentVersion).length;
+    final unknownNodes = math.max(totalNodes - versions.length, 0);
+
+    return DefaultTextStyle.merge(
+      style: const TextStyle(decoration: TextDecoration.none),
+      child: Container(
+        padding: const EdgeInsets.all(22),
+        decoration: BoxDecoration(
+          color: const Color(0xCC111936),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 640;
+            final chart = SizedBox(
+              width: compact ? 176 : 188,
+              height: compact ? 176 : 188,
+              child: CustomPaint(
+                painter: _NodeVersionPiePainter(
+                  currentNodes: currentNodes,
+                  outdatedNodes: outdatedNodes,
+                  unknownNodes: unknownNodes,
+                ),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        currentVersion.isEmpty ? '-' : currentVersion,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'gateway version',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Color(0xFF93A4C8),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+
+            final details = Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Node versions',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                _LegendRow(
+                  color: const Color(0xFF22C55E),
+                  label: 'Current version',
+                  value: '$currentNodes nodes',
+                ),
+                const SizedBox(height: 10),
+                _LegendRow(
+                  color: const Color(0xFFF97316),
+                  label: 'Different version',
+                  value: '$outdatedNodes nodes',
+                ),
+                const SizedBox(height: 10),
+                _LegendRow(
+                  color: const Color(0xFF64748B),
+                  label: 'Version unknown',
+                  value: '$unknownNodes nodes',
+                ),
+              ],
+            );
+
+            if (compact) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(child: chart),
+                  const SizedBox(height: 20),
+                  details,
+                ],
+              );
+            }
+
+            return Row(
+              children: [
+                chart,
+                const SizedBox(width: 26),
+                Expanded(child: details),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  List<Map<String, dynamic>> _listValue(Object? value) {
+    if (value is! List) {
+      return const <Map<String, dynamic>>[];
+    }
+    return value.whereType<Map<String, dynamic>>().toList(growable: false);
+  }
+
+  static String _stringValue(Object? value) {
+    return value is String ? value.trim() : '';
+  }
+}
+
+class _NodeVersionPiePainter extends CustomPainter {
+  final int currentNodes;
+  final int outdatedNodes;
+  final int unknownNodes;
+
+  const _NodeVersionPiePainter({
+    required this.currentNodes,
+    required this.outdatedNodes,
+    required this.unknownNodes,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final center = rect.center;
+    final radius = math.min(size.width, size.height) / 2;
+    final strokeWidth = radius * 0.2;
+    final chartRect =
+        Rect.fromCircle(center: center, radius: radius - strokeWidth / 2);
+    final backgroundPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round
+      ..color = const Color(0xFF1E293B);
+
+    canvas.drawCircle(center, radius - strokeWidth / 2, backgroundPaint);
+
+    final total = math.max(currentNodes + outdatedNodes + unknownNodes, 1);
+    var start = -math.pi / 2;
+    for (final segment in [
+      _PieSegment(currentNodes.toDouble(), const Color(0xFF22C55E)),
+      _PieSegment(outdatedNodes.toDouble(), const Color(0xFFF97316)),
+      _PieSegment(unknownNodes.toDouble(), const Color(0xFF64748B)),
+    ]) {
+      if (segment.value <= 0) {
+        continue;
+      }
+      final sweep = (segment.value / total) * math.pi * 2;
+      final paint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth
+        ..strokeCap = StrokeCap.round
+        ..color = segment.color;
+      canvas.drawArc(chartRect, start, sweep, false, paint);
+      start += sweep;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _NodeVersionPiePainter oldDelegate) {
+    return oldDelegate.currentNodes != currentNodes ||
+        oldDelegate.outdatedNodes != outdatedNodes ||
+        oldDelegate.unknownNodes != unknownNodes;
+  }
+}
+
 class _PieSegment {
   final double value;
   final Color color;
@@ -1005,42 +1211,6 @@ class _LegendRow extends StatelessWidget {
                     color: Colors.white, fontWeight: FontWeight.w700))),
         Text(value, style: const TextStyle(color: Color(0xFFB8C4E6))),
       ],
-    );
-  }
-}
-
-class _PeerMetric extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _PeerMetric({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: const Color(0x99050816),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(label,
-              style: const TextStyle(
-                  color: Color(0xFF93A4C8),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700)),
-          const SizedBox(height: 5),
-          Text(value,
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900)),
-        ],
-      ),
     );
   }
 }
@@ -1086,12 +1256,14 @@ class _HealthTile extends StatelessWidget {
               children: [
                 Text(
                   check.label,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+                  style: const TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.w900),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   detail,
-                  style: const TextStyle(color: Color(0xFFB8C4E6), height: 1.35),
+                  style:
+                      const TextStyle(color: Color(0xFFB8C4E6), height: 1.35),
                 ),
                 const SizedBox(height: 6),
                 SelectableText(
@@ -1173,4 +1345,3 @@ class _ReferencePanel extends StatelessWidget {
     );
   }
 }
-

@@ -59,14 +59,11 @@ class SiteFooter extends StatelessWidget {
               _FooterColumn(
                 title: 'Network',
                 links: [
-                  _FooterLink(
-                      'RPC endpoint', () => _openExternal(ProjectLinks.rpc)),
-                  _FooterLink('Reserve proof',
-                      () => _openExternal(ProjectLinks.reserve)),
-                  _FooterLink('wPKN contract',
-                      () => _openExternal(ProjectLinks.bscContract)),
-                  _FooterLink('PancakeSwap',
-                      () => _openExternal(ProjectLinks.pancakeSwap)),
+                  _FooterLink('RPC endpoint', () => _openExternal(ProjectLinks.rpc)),
+                  _FooterLink('Reserve proof', () => _openExternal(ProjectLinks.reserve)),
+                  _FooterLink('wPKN contract', () => _openExternal(ProjectLinks.bscContract)),
+                  _FooterLink('PancakeSwap', () => _openExternal(ProjectLinks.pancakeSwap)),
+                  _FooterLink('CoinMarketCap', () => _openExternal(ProjectLinks.coinMarketCap)),
                 ],
               ),
               const _FooterSignal(),
@@ -86,10 +83,7 @@ class SiteFooter extends StatelessWidget {
               ),
               const Text(
                 'Built for transparent collectible commerce and on-chain settlement.',
-                style: TextStyle(
-                    color: Color(0xFFFDE68A),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700),
+                style: TextStyle(color: Color(0xFFFDE68A), fontSize: 12, fontWeight: FontWeight.w700),
               ),
             ],
           ),
@@ -226,8 +220,7 @@ class _FooterSignal extends StatelessWidget {
           SizedBox(height: 12),
           Text(
             'Public by design',
-            style: TextStyle(
-                color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900),
+            style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900),
           ),
           SizedBox(height: 8),
           Text(

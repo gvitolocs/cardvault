@@ -249,6 +249,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.1.2"
+  crop_your_image:
+    dependency: "direct main"
+    description:
+      name: crop_your_image
+      sha256: "14c8977b11a009dc5e73e0f6522970f93363e38183f1b2ffefe1676dc9c3f49d"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.0.0"
   cross_file:
     dependency: transitive
     description:
@@ -800,6 +808,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.0.2"
+  image:
+    dependency: transitive
+    description:
+      name: image
+      sha256: f31d52537dc417fdcde36088fdf11d191026fd5e4fae742491ebd40e5a8bea7d
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.3.0"
   image_picker:
     dependency: "direct main"
     description:
@@ -1128,13 +1144,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.8"
-  pokoin_wallet:
-    dependency: "direct main"
-    description:
-      path: "../../pokoinwallet"
-      relative: true
-    source: path
-    version: "1.0.0+1"
   pool:
     dependency: transitive
     description:
@@ -1653,5 +1662,5 @@ packages:
     source: hosted
     version: "3.1.3"
 sdks:
-  dart: ">=3.10.3 <4.0.0"
+  dart: ">=3.10.0 <4.0.0"
   flutter: ">=3.38.1"

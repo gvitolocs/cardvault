@@ -119,22 +119,16 @@ class _GuidePanel extends StatelessWidget {
             eyebrow: 'Important values',
             title: 'Minimal peer configuration',
             body:
-                'Use a unique peer name and ports. POKOINPOS_ADVERTISE_HOST must be reachable by other peers. Nodes try the public bootstrap manifest first and keep the grandfathered Oracle bootstrap peers as the local fallback.',
+                'Use a unique peer name and ports. POKOINPOS_ADVERTISE_HOST must be reachable by other peers. Join host, bootstrap peers, refresh interval, EVM chain ID and network ID are supplied by the public bootstrap manifest.',
           ),
           _CodeBlock(
             text:
                 'PEER_NAME=pokoinpos-my-peer\n'
                 'POKOINPOS_LISTEN_PORT=43001\n'
-                'POKOINPOS_ADVERTISE_HOST=node2.example.com\n'
+                'POKOINPOS_ADVERTISE_HOST=example.duckdns.com\n'
                 'POKOINPOS_OPS_PORT=8081\n'
                 'POKOINPOS_BOOTSTRAP_MANIFEST_URL=https://pokoin.com/bootstrap-peers.json\n'
-                'POKOINPOS_BOOTSTRAP_REFRESH_INTERVAL_HOURS=24\n'
-                'POKOINPOS_BOOTSTRAP_PEERS=92.5.153.117:43000,130.162.242.213:43001\n'
-                'POKOINPOS_JOIN_HOST=92.5.153.117\n'
-                'POKOINPOS_JOIN_PORT=43000\n'
-                'POKOINPOS_OPERATOR_TOKEN=\n'
-                'POKOINPOS_EVM_CHAIN_ID=26062026\n'
-                'POKOINPOS_EVM_NETWORK_ID=26062026',
+                'POKOINPOS_OPERATOR_TOKEN=',
           ),
           _DocSection(
             eyebrow: 'Step 2',

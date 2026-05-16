@@ -18,6 +18,9 @@ class ProjectLinks {
       'https://pancakeswap.finance/swap?outputCurrency=0x91A17E2bddfF839078BD395482B38e4AC15276f4&chain=bsc';
   static const pancakePair =
       'https://bscscan.com/address/0x86294c008542C2707B9f67e3E4BA2d03B7bF7451';
+  static const coinMarketCap = 'https://coinmarketcap.com/';
+  static const coinMarketCapDexScan =
+      'https://coinmarketcap.com/dexscan/bsc/0x86294c008542c2707b9f67e3e4ba2d03b7bf7451/';
 
   static const nativeTreasury = '0x74466c3a204429b22ce8558f3f18f3c59f67fcb3';
   static const wpknContract = '0x91A17E2bddfF839078BD395482B38e4AC15276f4';

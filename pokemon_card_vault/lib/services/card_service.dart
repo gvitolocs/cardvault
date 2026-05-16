@@ -1,13 +1,8 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/pokemon_card.dart';
 
 class CardService {
-  static const String _baseUrl = 'https://api.pokemontcg.io/v2';
-  static const String _apiKey =
-      'your-api-key-here'; // Replace with actual API key
-
   // Local storage
   static const String _cardsBoxName = 'pokemon_cards';
 
@@ -34,69 +29,8 @@ class CardService {
       await _saveCardsToLocal(sampleCards);
       return sampleCards;
     } catch (e) {
-      print('Error getting cards: $e');
+      debugPrint('Error getting cards: $e');
       return _getSampleCards();
-    }
-  }
-
-  Future<List<PokemonCard>> _fetchCardsFromAPI() async {
-    try {
-      final response = await http.get(
-        Uri.parse('$_baseUrl/cards'),
-        headers: {
-          'X-Api-Key': _apiKey,
-          'Content-Type': 'application/json',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final List<dynamic> cardsData = data['data'] ?? [];
-
-        List<PokemonCard> cards = cardsData.map((cardData) {
-          return PokemonCard.fromJson({
-            'id': cardData['id'] ?? '',
-            'name': cardData['name'] ?? '',
-            'imageUrl': cardData['images']?['large'] ??
-                cardData['images']?['small'] ??
-                '',
-            'rarity': cardData['rarity'] ?? 'Common',
-            'type': cardData['types']?.isNotEmpty == true
-                ? cardData['types'][0]
-                : 'Colorless',
-            'hp': int.tryParse(cardData['hp']?.toString() ?? '0') ?? 0,
-            'attacks': (cardData['attacks'] as List<dynamic>?)
-                    ?.map((attack) => attack['name']?.toString() ?? '')
-                    .toList() ??
-                [],
-            'price': _generatePrice(cardData),
-            'description': cardData['flavorText'] ?? '',
-            'set': cardData['set']?['name'] ?? '',
-            'number': cardData['number'] ?? '',
-            'artist': cardData['artist'] ?? '',
-            'stock': 0,
-            'rating': _generateRating(),
-            'reviewCount': _generateReviewCount(),
-            'isFoil': cardData['tcgplayer']?['prices']?['holofoil'] != null,
-            'isHolo': cardData['tcgplayer']?['prices']?['holofoil'] != null,
-            'releaseDate':
-                DateTime.tryParse(cardData['set']?['releaseDate'] ?? '') ??
-                    DateTime.now(),
-            'tags': _generateTags(cardData),
-            'condition': 'NM',
-            'isGraded': false,
-          });
-        }).toList();
-
-        // Save to local storage
-        await _saveCardsToLocal(cards);
-        return cards;
-      } else {
-        throw Exception('Failed to load cards: ${response.statusCode}');
-      }
-    } catch (e) {
-      print('Error fetching cards from API: $e');
-      return _getSampleCards(); // Return sample data if API fails
     }
   }
 
@@ -108,7 +42,7 @@ class CardService {
         await box.put(i, cards[i]);
       }
     } catch (e) {
-      print('Error saving cards to local storage: $e');
+      debugPrint('Error saving cards to local storage: $e');
     }
   }
 
@@ -121,7 +55,7 @@ class CardService {
       final box = await Hive.openBox<PokemonCard>(_cardsBoxName);
       return box.values.firstWhere((card) => card.id == id);
     } catch (e) {
-      print('Error getting card by ID: $e');
+      debugPrint('Error getting card by ID: $e');
       return null;
     }
   }
@@ -137,7 +71,7 @@ class CardService {
                   (tag) => tag.toLowerCase().contains(query.toLowerCase())))
           .toList();
     } catch (e) {
-      print('Error searching cards: $e');
+      debugPrint('Error searching cards: $e');
       return [];
     }
   }
@@ -147,7 +81,7 @@ class CardService {
       final allCards = await getAllCards();
       return allCards.where((card) => card.rarity == rarity).toList();
     } catch (e) {
-      print('Error getting cards by rarity: $e');
+      debugPrint('Error getting cards by rarity: $e');
       return [];
     }
   }
@@ -157,7 +91,7 @@ class CardService {
       final allCards = await getAllCards();
       return allCards.where((card) => card.type == type).toList();
     } catch (e) {
-      print('Error getting cards by type: $e');
+      debugPrint('Error getting cards by type: $e');
       return [];
     }
   }
@@ -167,7 +101,7 @@ class CardService {
       final allCards = await getAllCards();
       return allCards.where((card) => card.set == setName).toList();
     } catch (e) {
-      print('Error getting cards by set: $e');
+      debugPrint('Error getting cards by set: $e');
       return [];
     }
   }
@@ -177,8 +111,8 @@ class CardService {
       final box = await Hive.openBox<PokemonCard>(_cardsBoxName);
       await box.add(card);
     } catch (e) {
-      print('Error adding card: $e');
-      throw e;
+      debugPrint('Error adding card: $e');
+      rethrow;
     }
   }
 
@@ -191,8 +125,8 @@ class CardService {
         await box.put(key, card);
       }
     } catch (e) {
-      print('Error updating card: $e');
-      throw e;
+      debugPrint('Error updating card: $e');
+      rethrow;
     }
   }
 
@@ -205,50 +139,9 @@ class CardService {
         await box.delete(key);
       }
     } catch (e) {
-      print('Error deleting card: $e');
-      throw e;
+      debugPrint('Error deleting card: $e');
+      rethrow;
     }
-  }
-
-  // Helper methods for generating sample data
-  double _generatePrice(Map<String, dynamic> cardData) {
-    final rarity = cardData['rarity']?.toString().toLowerCase() ?? 'common';
-    switch (rarity) {
-      case 'rare holo':
-        return 5.0 + (DateTime.now().millisecondsSinceEpoch % 50);
-      case 'rare':
-        return 2.0 + (DateTime.now().millisecondsSinceEpoch % 20);
-      case 'uncommon':
-        return 0.5 + (DateTime.now().millisecondsSinceEpoch % 5);
-      default:
-        return 0.1 + (DateTime.now().millisecondsSinceEpoch % 2);
-    }
-  }
-
-  int _generateStock() {
-    return 1 + (DateTime.now().millisecondsSinceEpoch % 20);
-  }
-
-  double _generateRating() {
-    return 3.0 + (DateTime.now().millisecondsSinceEpoch % 20) / 10;
-  }
-
-  int _generateReviewCount() {
-    return DateTime.now().millisecondsSinceEpoch % 100;
-  }
-
-  List<String> _generateTags(Map<String, dynamic> cardData) {
-    List<String> tags = [];
-    if (cardData['types'] != null) {
-      tags.addAll((cardData['types'] as List).cast<String>());
-    }
-    if (cardData['rarity'] != null) {
-      tags.add(cardData['rarity']);
-    }
-    if (cardData['set']?['name'] != null) {
-      tags.add(cardData['set']['name']);
-    }
-    return tags;
   }
 
   List<PokemonCard> _getSampleCards() {

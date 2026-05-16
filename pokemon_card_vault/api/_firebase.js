@@ -8,6 +8,7 @@ function getFirebaseAdmin() {
   const projectId = process.env.FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
   const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+  const storageBucket = process.env.FIREBASE_STORAGE_BUCKET;
 
   if (!projectId || !clientEmail || !privateKey) {
     throw new Error('Firebase Admin env vars are missing.');
@@ -19,6 +20,7 @@ function getFirebaseAdmin() {
       clientEmail,
       privateKey,
     }),
+    storageBucket,
   });
 
   return admin;

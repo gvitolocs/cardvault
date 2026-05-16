@@ -92,6 +92,16 @@
       ],
       "destination": "https://pokoin.com/marketplace",
       "permanent": true
+    },
+    {
+      "source": "/total-supply.txt",
+      "destination": "https://rpc.pokoin.com/chain/supply/total.txt",
+      "permanent": false
+    },
+    {
+      "source": "/circulating-supply.txt",
+      "destination": "https://rpc.pokoin.com/chain/supply/circulating.txt",
+      "permanent": false
     }
   ],
   "rewrites": [
@@ -108,8 +118,68 @@
       "destination": "/pokoin-crypto.html"
     },
     {
+      "source": "/api/supply/total.txt",
+      "destination": "/api/supply/total.txt"
+    },
+    {
+      "source": "/api/supply/circulating.txt",
+      "destination": "/api/supply/circulating.txt"
+    },
+    {
+      "source": "/api/total-supply",
+      "destination": "/api/total-supply.js"
+    },
+    {
+      "source": "/api/circulating-supply",
+      "destination": "/api/circulating-supply.js"
+    },
+    {
+      "source": "/api/transfer-account-balance",
+      "destination": "/api/transfer-account-balance.js"
+    },
+    {
+      "source": "/api/request-pkn-withdraw",
+      "destination": "/api/request-pkn-withdraw.js"
+    },
+    {
+      "source": "/api/search-recipient-emails",
+      "destination": "/api/search-recipient-emails.js"
+    },
+    {
+      "source": "/api/wallet-auth/nonce",
+      "destination": "/api/wallet-auth-nonce.js"
+    },
+    {
+      "source": "/api/wallet-auth/verify",
+      "destination": "/api/wallet-auth-verify.js"
+    },
+    {
+      "source": "/api/wallet-link",
+      "destination": "/api/wallet-link.js"
+    },
+    {
+      "source": "/api/create-pkn-checkout-session",
+      "destination": "/api/create-pkn-checkout-session.js"
+    },
+    {
+      "source": "/api/stripe-webhook",
+      "destination": "/api/stripe-webhook.js"
+    },
+    {
+      "source": "/api/upload-profile-picture",
+      "destination": "/api/upload-profile-picture.js"
+    },
+    {
+      "source": "/api/remove-profile-picture",
+      "destination": "/api/remove-profile-picture.js"
+    },
+    {
       "source": "/wpkn/logo.png",
-      "destination": "/wpkn/logo.png"
+      "destination": "/pokoin-200.png"
+    },
+    {
+      "source": "/wpkn/logo200.png",
+      "destination": "/pokoin-200.png"
     },
     {
       "source": "/wpkn-reserve.json",

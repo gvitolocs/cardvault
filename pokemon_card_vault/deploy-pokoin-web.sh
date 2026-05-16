@@ -9,13 +9,25 @@ cd "$ROOT_DIR"
 
 flutter build web --release --pwa-strategy=none
 
-cp -R "$ROOT_DIR/api" "$ROOT_DIR/build/web/api"
+rm -rf "$ROOT_DIR/build/web/api"
+mkdir -p "$ROOT_DIR/build/web/api"
+cp "$ROOT_DIR"/api/*.js "$ROOT_DIR/build/web/api/"
 cp "$ROOT_DIR/package.json" "$ROOT_DIR/build/web/package.json"
+cp "$ROOT_DIR/vercel.json" "$ROOT_DIR/build/web/vercel.json"
 if [[ -f "/Users/giuseppe/pokoinpos/deploy/bootstrap/bootstrap-peers.json" ]]; then
   cp "/Users/giuseppe/pokoinpos/deploy/bootstrap/bootstrap-peers.json" "$ROOT_DIR/build/web/bootstrap-peers.json"
 fi
 if [[ -f "$ROOT_DIR/package-lock.json" ]]; then
   cp "$ROOT_DIR/package-lock.json" "$ROOT_DIR/build/web/package-lock.json"
+fi
+
+if ! grep -q '/api/wallet-auth/nonce' "$ROOT_DIR/build/web/main.dart.js"; then
+  echo "ERROR: wallet auth endpoint missing from compiled Flutter bundle." >&2
+  exit 1
+fi
+if [[ ! -f "$ROOT_DIR/build/web/api/wallet-auth-nonce.js" || ! -f "$ROOT_DIR/build/web/api/wallet-auth-verify.js" ]]; then
+  echo "ERROR: wallet auth API files missing from Vercel build output." >&2
+  exit 1
 fi
 
 mkdir -p "$ROOT_DIR/.vercel" "$ROOT_DIR/build/web/.vercel"

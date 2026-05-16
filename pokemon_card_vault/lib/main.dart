@@ -6,9 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:go_router/go_router.dart';
-import 'package:pokoin_wallet/main.dart' show WalletScreen;
 import 'firebase_options.dart';
 import 'providers/auth_provider.dart';
+import 'wallet/main.dart' show WalletScreen;
 import 'screens/home_screen.dart';
 import 'screens/landing_screen.dart';
 import 'screens/health_screen.dart';
@@ -24,6 +24,7 @@ import 'screens/buy_pkn_screen.dart';
 import 'screens/docs_screen.dart';
 import 'screens/forum_screen.dart';
 import 'constants/app_colors.dart';
+import 'constants/project_links.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -157,6 +158,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
       return null;
     },
+    errorBuilder: (context, state) => PokoinNotFoundScreen(
+      location: state.uri.toString(),
+    ),
     routes: [
       GoRoute(
         path: '/',
@@ -178,6 +182,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/scan',
         builder: (context, state) => const ScanScreen(),
+      ),
+      GoRoute(
+        path: '/tx/:hash',
+        builder: (context, state) => ScanScreen(
+          initialQuery: state.pathParameters['hash'],
+        ),
       ),
       GoRoute(
         path: '/docs',
@@ -271,6 +281,121 @@ final routerProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
+
+class PokoinNotFoundScreen extends StatelessWidget {
+  const PokoinNotFoundScreen({super.key, required this.location});
+
+  final String location;
+
+  @override
+  Widget build(BuildContext context) {
+    final isExplorer = Uri.base.host == 'explorer.pokoin.com';
+    return Scaffold(
+      backgroundColor: const Color(0xFF050816),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: Padding(
+            padding: const EdgeInsets.all(28),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: const Color(0xFF0B1020),
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: const Color(0x33FACC15)),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x66000000),
+                    blurRadius: 40,
+                    offset: Offset(0, 24),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(18),
+                      child: Image.network(
+                        ProjectLinks.logo,
+                        width: 72,
+                        height: 72,
+                        fit: BoxFit.contain,
+                        filterQuality: FilterQuality.none,
+                        errorBuilder: (_, __, ___) => const Icon(
+                          Icons.toll,
+                          size: 56,
+                          color: Color(0xFFFACC15),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 22),
+                    const Text(
+                      'Page not found',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 34,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.8,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      location.isEmpty
+                          ? 'This Pokoin page does not exist.'
+                          : 'No Pokoin route exists for $location.',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Color(0xFFCBD5E1),
+                        fontSize: 16,
+                        height: 1.45,
+                      ),
+                    ),
+                    const SizedBox(height: 26),
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: [
+                        FilledButton(
+                          onPressed: () => context.go(isExplorer ? '/' : '/'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFFFACC15),
+                            foregroundColor: const Color(0xFF111827),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 22,
+                              vertical: 16,
+                            ),
+                          ),
+                          child:
+                              Text(isExplorer ? 'Open PokoinScan' : 'Go home'),
+                        ),
+                        OutlinedButton(
+                          onPressed: () => context.go('/health'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            side: const BorderSide(color: Color(0xFF38BDF8)),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 22,
+                              vertical: 16,
+                            ),
+                          ),
+                          child: const Text('Network health'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class GoRouterRefreshStream extends ChangeNotifier {
   GoRouterRefreshStream(Stream<dynamic> stream) {

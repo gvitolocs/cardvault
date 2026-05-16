@@ -97,7 +97,7 @@ class CheckoutScreen extends ConsumerWidget {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -197,7 +197,7 @@ class CheckoutScreen extends ConsumerWidget {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -247,7 +247,7 @@ class CheckoutScreen extends ConsumerWidget {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -276,15 +276,15 @@ class CheckoutScreen extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 16),
-          Row(
+          const Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.credit_card,
                 color: AppColors.primary,
                 size: 24,
               ),
-              const SizedBox(width: 12),
-              const Text(
+              SizedBox(width: 12),
+              Text(
                 '**** **** **** 1234',
                 style: TextStyle(
                   fontSize: 16,
@@ -306,16 +306,16 @@ class CheckoutScreen extends ConsumerWidget {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: Column(
+      child: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Order Notes (Optional)',
             style: TextStyle(
               fontSize: 18,
@@ -323,9 +323,9 @@ class CheckoutScreen extends ConsumerWidget {
               color: AppColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           TextField(
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               hintText: 'Add any special instructions...',
               border: OutlineInputBorder(),
             ),
@@ -340,9 +340,9 @@ class CheckoutScreen extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(0.1),
+        color: AppColors.primary.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [
@@ -567,52 +567,52 @@ class CheckoutScreen extends ConsumerWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Change Payment Method'),
-        content: Column(
+        content: const Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
+            Text(
               'Current Payment Method:',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             Row(
               children: [
-                const Icon(Icons.credit_card, color: AppColors.primary),
-                const SizedBox(width: 8),
-                const Text('**** **** **** 1234'),
+                Icon(Icons.credit_card, color: AppColors.primary),
+                SizedBox(width: 8),
+                Text('**** **** **** 1234'),
               ],
             ),
-            const SizedBox(height: 16),
-            const Divider(),
-            const SizedBox(height: 16),
-            const Text(
+            SizedBox(height: 16),
+            Divider(),
+            SizedBox(height: 16),
+            Text(
               'Add New Payment Method:',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             TextField(
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Card Number',
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.credit_card),
               ),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             Row(
               children: [
                 Expanded(
                   child: TextField(
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Expiry Date',
                       border: OutlineInputBorder(),
                       hintText: 'MM/YY',
                     ),
                   ),
                 ),
-                const SizedBox(width: 16),
+                SizedBox(width: 16),
                 Expanded(
                   child: TextField(
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'CVV',
                       border: OutlineInputBorder(),
                       hintText: '123',
@@ -621,9 +621,9 @@ class CheckoutScreen extends ConsumerWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             TextField(
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Cardholder Name',
                 border: OutlineInputBorder(),
               ),

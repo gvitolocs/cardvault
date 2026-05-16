@@ -1,0 +1,133 @@
+import 'dart:async';
+import 'dart:js_interop';
+
+@JS('window.pokoinWallet.hasProvider')
+external bool _hasProvider();
+
+@JS('window.pokoinWallet.requestAccounts')
+external JSPromise<JSArray<JSString>> _requestAccounts();
+
+@JS('window.pokoinWallet.getAccounts')
+external JSPromise<JSArray<JSString>> _getAccounts();
+
+@JS('window.pokoinWallet.onAccountsChanged')
+external void _onAccountsChanged(JSFunction callback);
+
+@JS('window.pokoinWallet.onChainChanged')
+external void _onChainChanged(JSFunction callback);
+
+@JS('window.pokoinWallet.signMessage')
+external JSPromise<JSString> _signMessage(JSString address, JSString message);
+
+@JS('window.pokoinWallet.addNetwork')
+external JSPromise<JSAny?> _addNetwork();
+
+@JS('window.pokoinWallet.switchNetwork')
+external JSPromise<JSAny?> _switchNetwork();
+
+@JS('window.pokoinWallet.sendTransaction')
+external JSPromise<JSString> _sendTransaction(
+  JSString from,
+  JSString to,
+  JSString valueHex,
+);
+
+@JS('window.pokoinAuth.signInWithGoogle')
+external JSPromise<JSObject> _signInWithGoogle();
+
+@JS('window.pokoinAuth.signOut')
+external JSPromise<JSAny?> _signOut();
+
+@JS()
+@staticInterop
+class _GoogleUserPayload {}
+
+extension _GoogleUserPayloadExtension on _GoogleUserPayload {
+  external JSString get uid;
+  external JSString get email;
+  external JSString get displayName;
+  external JSString get idToken;
+}
+
+class WalletBridge {
+  bool get hasProvider {
+    try {
+      return _hasProvider();
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<String?> currentAccount() async {
+    final accounts = await _getAccounts().toDart;
+    if (accounts.length == 0) {
+      return null;
+    }
+    return accounts[0].toDart;
+  }
+
+  void onAccountsChanged(void Function(String? address) callback) {
+    _onAccountsChanged(
+      ((JSArray<JSString> accounts) {
+        callback(accounts.length == 0 ? null : accounts[0].toDart);
+      }).toJS,
+    );
+  }
+
+  void onChainChanged(void Function() callback) {
+    _onChainChanged((() => callback()).toJS);
+  }
+
+  Future<String?> requestAccount() async {
+    final accounts = await _requestAccounts().toDart;
+    if (accounts.length == 0) {
+      return null;
+    }
+    return accounts[0].toDart;
+  }
+
+  Future<void> addNetwork() async {
+    await _addNetwork().toDart;
+  }
+
+  Future<String> signMessage({
+    required String address,
+    required String message,
+  }) async {
+    final signature = await _signMessage(address.toJS, message.toJS).toDart;
+    return signature.toDart;
+  }
+
+  Future<void> switchNetwork() async {
+    await _switchNetwork().toDart;
+  }
+
+  Future<String> sendTransaction({
+    required String from,
+    required String to,
+    required BigInt valueWei,
+  }) async {
+    final hash = await _sendTransaction(
+      from.toJS,
+      to.toJS,
+      '0x${valueWei.toRadixString(16)}'.toJS,
+    ).toDart;
+    return hash.toDart;
+  }
+
+  Future<Map<String, String>> signInWithGoogle() async {
+    final payload = (await _signInWithGoogle().toDart) as _GoogleUserPayload;
+    return <String, String>{
+      'uid': payload.uid.toDart,
+      'email': payload.email.toDart,
+      'displayName': payload.displayName.toDart,
+      'idToken': payload.idToken.toDart,
+    };
+  }
+
+  Future<void> signOut() async {
+    await _signOut().toDart;
+  }
+}
+
+WalletBridge createWalletBridge() => WalletBridge();
