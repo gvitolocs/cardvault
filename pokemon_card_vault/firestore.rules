@@ -64,6 +64,16 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /wallet_activity/{entryId} {
+      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.title is string
+        && request.resource.data.detail is string
+        && request.resource.data.kind in ['inbound', 'outbound'];
+      allow update, delete: if false;
+    }
+
     match /pkn_purchases/{purchaseId} {
       allow read: if signedIn() && resource.data.uid == request.auth.uid;
       allow write: if false;

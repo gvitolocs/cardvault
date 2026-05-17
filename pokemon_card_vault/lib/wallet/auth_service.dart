@@ -343,6 +343,48 @@ class WalletAuthService {
     return rows.take(limit).toList(growable: false);
   }
 
+  Future<List<Map<String, dynamic>>> walletActivity({int limit = 12}) async {
+    if (Firebase.apps.isEmpty) {
+      return const <Map<String, dynamic>>[];
+    }
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+    if (firebaseUser == null) {
+      return const <Map<String, dynamic>>[];
+    }
+    final snapshot = await FirebaseFirestore.instance
+        .collection('wallet_activity')
+        .where('uid', isEqualTo: firebaseUser.uid)
+        .get();
+    final rows = snapshot.docs
+        .map((doc) => <String, dynamic>{'id': doc.id, ...doc.data()})
+        .toList(growable: false);
+    rows.sort((a, b) => _readTimestamp(b['createdAt']).compareTo(
+          _readTimestamp(a['createdAt']),
+        ));
+    return rows.take(limit).toList(growable: false);
+  }
+
+  Future<void> recordWalletActivity({
+    required String title,
+    required String detail,
+    required String kind,
+  }) async {
+    if (Firebase.apps.isEmpty) {
+      return;
+    }
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+    if (firebaseUser == null) {
+      return;
+    }
+    await FirebaseFirestore.instance.collection('wallet_activity').add({
+      'uid': firebaseUser.uid,
+      'title': title,
+      'detail': detail,
+      'kind': kind,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
   static DateTime _readTimestamp(Object? value) {
     if (value is Timestamp) {
       return value.toDate();

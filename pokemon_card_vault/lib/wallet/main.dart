@@ -167,7 +167,8 @@ class _WalletScreenState extends State<WalletScreen> {
         return;
       }
       setState(() => _address = normalized);
-      _record('Switched wallet account', normalized, ActivityKind.inbound);
+      await _record(
+          'Switched wallet account', normalized, ActivityKind.inbound);
       _showMessage('Switched to the selected MetaMask account.');
       await _loadActivity();
     } catch (error) {
@@ -244,7 +245,7 @@ class _WalletScreenState extends State<WalletScreen> {
       setState(() {
         _address = account;
       });
-      _record('Wallet signed in', account, ActivityKind.inbound);
+      await _record('Wallet signed in', account, ActivityKind.inbound);
     });
   }
 
@@ -523,7 +524,7 @@ class _WalletScreenState extends State<WalletScreen> {
         await _rememberRecipient(recipient);
         _toController.clear();
         _amountController.clear();
-        _record(
+        await _record(
           'Sent $accountAmount PKN to account',
           recipient,
           ActivityKind.outbound,
@@ -551,7 +552,7 @@ class _WalletScreenState extends State<WalletScreen> {
         await _loadBalance(from);
         _toController.clear();
         _amountController.clear();
-        _record(
+        await _record(
           'Sent $accountAmount PKN on-chain',
           hash,
           ActivityKind.outbound,
@@ -575,7 +576,7 @@ class _WalletScreenState extends State<WalletScreen> {
       await _rememberRecipient(recipient);
       _toController.clear();
       _amountController.clear();
-      _record(
+      await _record(
         'Requested $accountAmount PKN withdraw',
         recipient,
         ActivityKind.outbound,
@@ -797,6 +798,7 @@ class _WalletScreenState extends State<WalletScreen> {
     final address = _address?.trim();
     final results = await Future.wait<List<ActivityItem>>([
       _loadLedgerActivityItems(),
+      _loadPersistentWalletActivityItems(),
       if (address != null && address.isNotEmpty)
         _loadOnChainActivityItems(address)
       else
@@ -822,12 +824,29 @@ class _WalletScreenState extends State<WalletScreen> {
     return rows.map(_activityFromLedger).toList(growable: false);
   }
 
+  Future<List<ActivityItem>> _loadPersistentWalletActivityItems() async {
+    final rows = await _auth.walletActivity();
+    return rows.map(_activityFromWalletActivity).toList(growable: false);
+  }
+
   Future<List<ActivityItem>> _loadOnChainActivityItems(String address) async {
     final rows = await _auth.onChainActivity(address: address);
     final normalized = address.trim().toLowerCase();
     return rows.map((row) => _activityFromChain(row, normalized)).toList(
           growable: false,
         );
+  }
+
+  ActivityItem _activityFromWalletActivity(Map<String, dynamic> row) {
+    final kindText = (row['kind'] as String? ?? '').trim();
+    return ActivityItem(
+      key: 'wallet_activity:${row['id'] ?? row['detail'] ?? ''}',
+      title: row['title'] as String? ?? 'Wallet activity',
+      detail: row['detail'] as String? ?? '',
+      kind:
+          kindText == 'inbound' ? ActivityKind.inbound : ActivityKind.outbound,
+      at: _readDate(row['createdAt']),
+    );
   }
 
   ActivityItem _activityFromLedger(Map<String, dynamic> row) {
@@ -1019,7 +1038,12 @@ class _WalletScreenState extends State<WalletScreen> {
         .replaceFirst('Invalid argument(s): ', '');
   }
 
-  void _record(String title, String detail, ActivityKind kind) {
+  Future<void> _record(String title, String detail, ActivityKind kind) async {
+    await _auth.recordWalletActivity(
+      title: title,
+      detail: detail,
+      kind: kind == ActivityKind.inbound ? 'inbound' : 'outbound',
+    );
     setState(() {
       _activity.insert(
         0,
