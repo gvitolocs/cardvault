@@ -453,14 +453,11 @@ class _BestDealPanel extends ConsumerWidget {
               const _SelectorLike(label: 'NM · Near Mint'),
               const SizedBox(height: 14),
               FilledButton.icon(
-                onPressed: card.stock > 0
-                    ? () => ref.read(cartProvider.notifier).addToCart(card)
-                    : null,
+                onPressed: () =>
+                    ref.read(cartProvider.notifier).addToCart(card),
                 icon: Icon(
                     isInCart ? Icons.shopping_bag : Icons.add_shopping_cart),
-                label: Text(card.stock > 0
-                    ? (isInCart ? 'In cart' : 'Add to cart')
-                    : 'Preview order book'),
+                label: Text(isInCart ? 'In cart' : 'Add to cart'),
                 style: FilledButton.styleFrom(
                   minimumSize: const Size.fromHeight(48),
                   backgroundColor: const Color(0xFFFACC15),

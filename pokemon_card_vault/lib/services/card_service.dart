@@ -58,7 +58,7 @@ class CardService {
     return cards
         .map(
           (card) => card.copyWith(
-            stock: 0,
+            stock: 1 + (int.tryParse(card.id) ?? 0) % 7,
             price: _pknPrices[card.id] ?? card.price,
           ),
         )

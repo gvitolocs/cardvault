@@ -1,5 +1,9 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+
 import '../models/pokemon_card.dart';
 
 final cartProvider = StateNotifierProvider<CartNotifier, CartState>((ref) {
@@ -26,6 +30,21 @@ class CartItem {
       quantity: quantity ?? this.quantity,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'card': card.toJson(),
+      'quantity': quantity,
+    };
+  }
+
+  factory CartItem.fromJson(Map<String, dynamic> json) {
+    return CartItem(
+      card: PokemonCard.fromJson(
+          Map<String, dynamic>.from(json['card'] as Map? ?? {})),
+      quantity: (json['quantity'] as num?)?.toInt() ?? 1,
+    );
+  }
 }
 
 class CartState {
@@ -39,51 +58,26 @@ class CartState {
     this.error,
   });
 
-  double get subtotal => items.fold(0.0, (sum, item) => sum + item.totalPrice);
+  double get subtotal =>
+      items.fold(0.0, (total, item) => total + item.totalPrice);
 
-  double get tax => subtotal * 0.08; // 8% tax
+  double get tax => subtotal * 0.08;
 
-  double get shipping => subtotal > 50 ? 0 : 5.99; // Free shipping over 50 PKN
+  double get shipping => subtotal > 50 ? 0 : 5.99;
 
   double get total => subtotal + tax + shipping;
 
-  int get itemCount => items.fold(0, (sum, item) => sum + item.quantity);
+  int get itemCount => items.fold(0, (total, item) => total + item.quantity);
 
-  bool isInCart(String cardId) {
-    return items.any((item) => item.card.id == cardId);
-  }
+  bool isInCart(String cardId) => items.any((item) => item.card.id == cardId);
 
   int getQuantity(String cardId) {
-    final item = items.firstWhere(
-      (item) => item.card.id == cardId,
-      orElse: () => CartItem(
-        card: PokemonCard(
-          id: '',
-          name: '',
-          imageUrl: '',
-          rarity: '',
-          type: '',
-          hp: 0,
-          attacks: [],
-          price: 0,
-          description: '',
-          set: '',
-          number: '',
-          artist: '',
-          stock: 0,
-          rating: 0,
-          reviewCount: 0,
-          isFoil: false,
-          isHolo: false,
-          releaseDate: DateTime.now(),
-          tags: [],
-          condition: '',
-          isGraded: false,
-        ),
-        quantity: 0,
-      ),
-    );
-    return item.quantity;
+    for (final item in items) {
+      if (item.card.id == cardId) {
+        return item.quantity;
+      }
+    }
+    return 0;
   }
 
   CartState copyWith({
@@ -94,186 +88,184 @@ class CartState {
     return CartState(
       items: items ?? this.items,
       isLoading: isLoading ?? this.isLoading,
-      error: error ?? this.error,
+      error: error,
     );
   }
 }
 
 class CartNotifier extends StateNotifier<CartState> {
   CartNotifier() : super(CartState()) {
+    _authSubscription = Firebase.apps.isEmpty
+        ? null
+        : FirebaseAuth.instance.authStateChanges().listen((_) {
+            _loadCart();
+          });
     _loadCart();
   }
 
-  Future<void> _loadCart() async {
-    try {
-      final box = await Hive.openBox<CartItem>('cart');
-      await box.clear();
-      state = state.copyWith(items: []);
-    } catch (e) {
-      state = state.copyWith(error: e.toString());
-    }
+  static const String _cartBoxName = 'cart_items';
+  dynamic _authSubscription;
+
+  FirebaseFirestore get _firestore => FirebaseFirestore.instance;
+  User? get _user =>
+      Firebase.apps.isEmpty ? null : FirebaseAuth.instance.currentUser;
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
   }
 
-  Future<void> _saveCart() async {
+  Future<void> _loadCart() async {
+    state = state.copyWith(isLoading: true, error: null);
     try {
-      final box = await Hive.openBox<CartItem>('cart');
-      await box.clear();
-      for (int i = 0; i < state.items.length; i++) {
-        await box.put(i, state.items[i]);
+      final localItems = await _loadLocalItems();
+      final user = _user;
+      if (user == null) {
+        state =
+            state.copyWith(items: localItems, isLoading: false, error: null);
+        return;
       }
-    } catch (e) {
-      state = state.copyWith(error: e.toString());
+
+      final doc = await _cartDoc(user.uid).get();
+      final remoteItems = _itemsFromData(doc.data());
+      final merged = _mergeItems(remoteItems, localItems);
+      if (!_sameItems(merged, remoteItems)) {
+        await _saveRemote(user.uid, merged);
+      }
+      await _saveLocalItems(merged);
+      state = state.copyWith(items: merged, isLoading: false, error: null);
+    } catch (error) {
+      state = state.copyWith(isLoading: false, error: error.toString());
     }
   }
 
   Future<void> addToCart(PokemonCard card, {int quantity = 1}) async {
-    try {
-      if (card.stock <= 0) {
-        state = state.copyWith(error: '${card.name} is currently unavailable');
-        return;
-      }
-
-      state = state.copyWith(isLoading: true);
-
-      final existingItemIndex = state.items.indexWhere(
-        (item) => item.card.id == card.id,
-      );
-
-      List<CartItem> newItems = List.from(state.items);
-
-      if (existingItemIndex != -1) {
-        // Update existing item
-        final existingItem = newItems[existingItemIndex];
-        newItems[existingItemIndex] = existingItem.copyWith(
-          quantity: existingItem.quantity + quantity,
-        );
-      } else {
-        // Add new item
-        newItems.add(CartItem(card: card, quantity: quantity));
-      }
-
-      state = state.copyWith(
-        items: newItems,
-        isLoading: false,
-      );
-
-      await _saveCart();
-    } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
+    if (card.stock <= 0) {
+      state = state.copyWith(error: '${card.name} is currently unavailable');
+      return;
+    }
+    final items = [...state.items];
+    final index = items.indexWhere((item) => item.card.id == card.id);
+    if (index == -1) {
+      items.add(CartItem(card: card, quantity: quantity.clamp(1, card.stock)));
+    } else {
+      final existing = items[index];
+      items[index] = existing.copyWith(
+        card: card,
+        quantity: (existing.quantity + quantity).clamp(1, card.stock),
       );
     }
+    await _persist(items);
   }
 
   Future<void> removeFromCart(String cardId) async {
-    try {
-      state = state.copyWith(isLoading: true);
-
-      final newItems = state.items
-          .where(
-            (item) => item.card.id != cardId,
-          )
-          .toList();
-
-      state = state.copyWith(
-        items: newItems,
-        isLoading: false,
-      );
-
-      await _saveCart();
-    } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
-    }
+    await _persist(
+        state.items.where((item) => item.card.id != cardId).toList());
   }
 
   Future<void> updateQuantity(String cardId, int quantity) async {
-    try {
-      if (quantity <= 0) {
-        await removeFromCart(cardId);
-        return;
-      }
-
-      state = state.copyWith(isLoading: true);
-
-      final itemIndex = state.items.indexWhere(
-        (item) => item.card.id == cardId,
-      );
-
-      if (itemIndex != -1) {
-        List<CartItem> newItems = List.from(state.items);
-        newItems[itemIndex] = newItems[itemIndex].copyWith(quantity: quantity);
-
-        state = state.copyWith(
-          items: newItems,
-          isLoading: false,
-        );
-
-        await _saveCart();
-      }
-    } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+    if (quantity <= 0) {
+      await removeFromCart(cardId);
+      return;
     }
+    final items = state.items.map((item) {
+      if (item.card.id != cardId) {
+        return item;
+      }
+      return item.copyWith(quantity: quantity.clamp(1, item.card.stock));
+    }).toList();
+    await _persist(items);
   }
 
   Future<void> clearCart() async {
+    await _persist(const []);
+  }
+
+  bool isInCart(String cardId) => state.isInCart(cardId);
+
+  int getQuantity(String cardId) => state.getQuantity(cardId);
+
+  Future<void> _persist(List<CartItem> items) async {
+    state = state.copyWith(items: items, isLoading: true, error: null);
     try {
-      state = state.copyWith(isLoading: true);
-
-      final box = await Hive.openBox<CartItem>('cart');
-      await box.clear();
-
-      state = state.copyWith(
-        items: [],
-        isLoading: false,
-      );
-    } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      await _saveLocalItems(items);
+      final user = _user;
+      if (user != null) {
+        await _saveRemote(user.uid, items);
+      }
+      state = state.copyWith(items: items, isLoading: false, error: null);
+    } catch (error) {
+      state = state.copyWith(isLoading: false, error: error.toString());
     }
   }
 
-  bool isInCart(String cardId) {
-    return state.items.any((item) => item.card.id == cardId);
+  DocumentReference<Map<String, dynamic>> _cartDoc(String uid) {
+    return _firestore.collection('user_carts').doc(uid);
   }
 
-  int getQuantity(String cardId) {
-    final item = state.items.firstWhere(
-      (item) => item.card.id == cardId,
-      orElse: () => CartItem(
-          card: PokemonCard(
-            id: '',
-            name: '',
-            imageUrl: '',
-            rarity: '',
-            type: '',
-            hp: 0,
-            attacks: [],
-            price: 0,
-            description: '',
-            set: '',
-            number: '',
-            artist: '',
-            stock: 0,
-            rating: 0,
-            reviewCount: 0,
-            isFoil: false,
-            isHolo: false,
-            releaseDate: DateTime.now(),
-            tags: [],
-            condition: '',
-            isGraded: false,
-          ),
-          quantity: 0),
-    );
-    return item.quantity;
+  Future<List<CartItem>> _loadLocalItems() async {
+    final box = await Hive.openBox<Map>(_cartBoxName);
+    return box.values
+        .map((value) => CartItem.fromJson(Map<String, dynamic>.from(value)))
+        .where((item) => item.card.id.isNotEmpty)
+        .toList();
+  }
+
+  Future<void> _saveLocalItems(List<CartItem> items) async {
+    final box = await Hive.openBox<Map>(_cartBoxName);
+    await box.clear();
+    for (final item in items) {
+      await box.put(item.card.id, item.toJson());
+    }
+  }
+
+  Future<void> _saveRemote(String uid, List<CartItem> items) async {
+    await _cartDoc(uid).set({
+      'items': items.map((item) => item.toJson()).toList(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  List<CartItem> _itemsFromData(Map<String, dynamic>? data) {
+    return (data?['items'] as List<dynamic>? ?? const [])
+        .whereType<Map>()
+        .map((value) => CartItem.fromJson(Map<String, dynamic>.from(value)))
+        .where((item) => item.card.id.isNotEmpty)
+        .toList();
+  }
+
+  List<CartItem> _mergeItems(List<CartItem> remote, List<CartItem> local) {
+    final byId = <String, CartItem>{
+      for (final item in remote) item.card.id: item,
+    };
+    for (final item in local) {
+      final existing = byId[item.card.id];
+      if (existing == null) {
+        byId[item.card.id] = item;
+      } else {
+        byId[item.card.id] = existing.copyWith(
+          quantity:
+              (existing.quantity + item.quantity).clamp(1, existing.card.stock),
+        );
+      }
+    }
+    return byId.values.toList()
+      ..sort((a, b) => a.card.name.compareTo(b.card.name));
+  }
+
+  bool _sameItems(List<CartItem> a, List<CartItem> b) {
+    if (a.length != b.length) {
+      return false;
+    }
+    final aSorted = [...a]..sort((x, y) => x.card.id.compareTo(y.card.id));
+    final bSorted = [...b]..sort((x, y) => x.card.id.compareTo(y.card.id));
+    for (var index = 0; index < aSorted.length; index++) {
+      if (aSorted[index].card.id != bSorted[index].card.id ||
+          aSorted[index].quantity != bSorted[index].quantity) {
+        return false;
+      }
+    }
+    return true;
   }
 }

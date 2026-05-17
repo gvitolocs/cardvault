@@ -656,7 +656,9 @@ class _MarketCard extends ConsumerWidget {
                       _MiniSignal(
                           icon: Icons.star,
                           text: card.rating.toStringAsFixed(1)),
-                      const _MiniSignal(icon: Icons.block, text: 'Unavailable'),
+                      _MiniSignal(
+                          icon: Icons.inventory_2_outlined,
+                          text: '${card.stock} live'),
                       if (card.isHolo)
                         const _MiniSignal(
                             icon: Icons.auto_awesome, text: 'Holo'),
@@ -675,8 +677,9 @@ class _MarketCard extends ConsumerWidget {
                         ),
                       ),
                       FilledButton(
-                        onPressed: null,
-                        child: Text(isInCart ? 'Unavailable' : 'Unavailable'),
+                        onPressed: () =>
+                            ref.read(cartProvider.notifier).addToCart(card),
+                        child: Text(isInCart ? 'In cart' : 'Add'),
                       ),
                     ],
                   ),
