@@ -58,6 +58,8 @@ class _WalletScreenState extends State<WalletScreen> {
   static const rpcUrl = 'https://rpc.pokoin.com/rpc';
   static const nativeSymbol = 'PKN';
   static const recentRecipientLimit = 5;
+  static const wpknSettlementAddress =
+      '0x74466c3a204429B22CE8558F3F18f3C59F67fCB3';
 
   final WalletAuthService _auth = WalletAuthService();
   final WalletBridge _wallet = createWalletBridge();
@@ -654,11 +656,6 @@ class _WalletScreenState extends State<WalletScreen> {
                             fontWeight: FontWeight.w900,
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Market rate, not fixed 1:1. Quotes include spread, slippage and reserve adjustment.',
-                          style: TextStyle(color: Color(0xFFB8C4E6)),
-                        ),
                         const SizedBox(height: 16),
                         SegmentedButton<String>(
                           segments: const <ButtonSegment<String>>[
@@ -707,11 +704,24 @@ class _WalletScreenState extends State<WalletScreen> {
                         ),
                         if (direction == 'wpkn_to_pkn') ...<Widget>[
                           const SizedBox(height: 12),
+                          const Text(
+                            'Send wPKN on BNB Chain to this settlement wallet, then paste the transaction hash below.',
+                            style: TextStyle(color: Color(0xFFB8C4E6)),
+                          ),
+                          const SizedBox(height: 6),
+                          const SelectableText(
+                            wpknSettlementAddress,
+                            style: TextStyle(
+                              color: Color(0xFFFACC15),
+                              fontFamily: 'monospace',
+                            ),
+                          ),
+                          const SizedBox(height: 12),
                           TextField(
                             controller: _exchangeDepositTxController,
                             keyboardType: TextInputType.text,
                             decoration: const InputDecoration(
-                              labelText: 'wPKN deposit tx hash',
+                              labelText: 'BSC transaction hash',
                               prefixIcon: Icon(Icons.receipt_long_outlined),
                             ),
                           ),
