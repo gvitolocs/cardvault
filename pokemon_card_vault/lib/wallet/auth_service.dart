@@ -258,7 +258,6 @@ class WalletAuthService {
     required String quoteId,
     required String direction,
     required String toAddress,
-    String? depositTxHash,
   }) async {
     final firebaseUser = FirebaseAuth.instance.currentUser;
     if (firebaseUser == null) {
@@ -275,8 +274,6 @@ class WalletAuthService {
         'quoteId': quoteId,
         'direction': direction,
         'toAddress': toAddress.trim(),
-        if (depositTxHash != null && depositTxHash.trim().isNotEmpty)
-          'depositTxHash': depositTxHash.trim(),
       }),
     );
     final payload = jsonDecode(response.body) as Map<String, dynamic>;

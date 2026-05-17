@@ -288,6 +288,67 @@ async function verifyWpknDeposit({ txHash, expectedAmountWpkn }) {
   };
 }
 
+async function findWpknDeposit({ fromAddress, expectedAmountWpkn, usedTxHashes = [] }) {
+  if (!process.env.BNB_RPC_URL || !process.env.WPKN_CONTRACT_ADDRESS) {
+    const error = new Error('BNB RPC or wPKN contract env vars are missing.');
+    error.statusCode = 500;
+    throw error;
+  }
+  const settlementAddress = normalizeAddress(
+    process.env.WPKN_SETTLEMENT_ADDRESS,
+    'wPKN settlement address is not configured.',
+  );
+  const normalizedFrom = normalizeAddress(
+    fromAddress,
+    'Link the BSC wallet that sent the wPKN deposit before requesting payout.',
+  );
+  const provider = new ethers.JsonRpcProvider(process.env.BNB_RPC_URL);
+  const contract = new ethers.Contract(process.env.WPKN_CONTRACT_ADDRESS, ERC20_ABI, provider);
+  const decimals = Number(await contract.decimals().catch(() => WPKN_DECIMALS));
+  const required = ethers.parseUnits(String(expectedAmountWpkn), decimals);
+  const latestBlock = await provider.getBlockNumber();
+  const lookbackBlocks = intEnv('WPKN_EXCHANGE_DEPOSIT_LOOKBACK_BLOCKS', 120000);
+  const fromBlock = Math.max(0, latestBlock - lookbackBlocks);
+  const logs = await provider.getLogs({
+    address: process.env.WPKN_CONTRACT_ADDRESS,
+    fromBlock,
+    toBlock: 'latest',
+    topics: [
+      ERC20_INTERFACE.getEvent('Transfer').topicHash,
+      ethers.zeroPadValue(normalizedFrom, 32),
+      ethers.zeroPadValue(settlementAddress, 32),
+    ],
+  });
+  const used = new Set(usedTxHashes.map((hash) => String(hash || '').toLowerCase()));
+
+  for (const log of logs.reverse()) {
+    const txHash = String(log.transactionHash || '').toLowerCase();
+    if (used.has(txHash)) {
+      continue;
+    }
+    const parsed = ERC20_INTERFACE.parseLog(log);
+    const value = BigInt(parsed.args.value.toString());
+    if (value < required) {
+      continue;
+    }
+    const receipt = await provider.getTransactionReceipt(txHash);
+    if (!receipt || receipt.status !== 1) {
+      continue;
+    }
+    return {
+      txHash,
+      fromAddress: normalizedFrom,
+      amountWpkn: Number(ethers.formatUnits(value, decimals)),
+    };
+  }
+
+  const error = new Error(
+    'No matching wPKN deposit was found yet. Send wPKN to the settlement wallet, wait for confirmation, then try again.',
+  );
+  error.statusCode = 404;
+  throw error;
+}
+
 function publicQuote(quoteId, quote) {
   return {
     quoteId,
@@ -309,6 +370,7 @@ function publicQuote(quoteId, quote) {
 
 module.exports = {
   calculateQuote,
+  findWpknDeposit,
   maybeSendWpkn,
   normalizeAddress,
   normalizeAmount,

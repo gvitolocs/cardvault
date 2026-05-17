@@ -1,6 +1,7 @@
 const { getFirebaseAdmin, verifyBearerToken } = require('../server/_firebase');
 const {
   calculateQuote,
+  findWpknDeposit,
   maybeSendWpkn,
   normalizeAddress,
   normalizeDirection,
@@ -8,7 +9,6 @@ const {
   publicQuote,
   reserveSnapshot,
   settlementMode,
-  verifyWpknDeposit,
 } = require('../server/_wpkn_exchange');
 
 function serialize(doc) {
@@ -106,18 +106,9 @@ async function handleRequest(req, res, decoded, admin, firestore) {
       ? 'Enter a valid BSC payout address.'
       : 'Enter a valid PKN payout address.',
   );
-  const depositTxHash = String(req.body?.depositTxHash || '').trim().toLowerCase();
 
   if (!quoteId) {
     return res.status(400).json({ error: 'Quote id is required.' });
-  }
-  if (direction === 'wpkn_to_pkn' && !depositTxHash) {
-    return res.status(400).json({
-      error: 'Enter the BSC wPKN deposit tx hash before requesting PKN payout.',
-    });
-  }
-  if (direction === 'wpkn_to_pkn' && !/^0x[a-f0-9]{64}$/.test(depositTxHash)) {
-    return res.status(400).json({ error: 'Enter a valid wPKN deposit tx hash.' });
   }
 
   const quoteRef = firestore.collection('wpkn_exchange_quotes').doc(quoteId);
@@ -125,17 +116,8 @@ async function handleRequest(req, res, decoded, admin, firestore) {
   const balanceRef = firestore.collection('balances').doc(decoded.uid);
   const userRef = firestore.collection('users').doc(decoded.uid);
   const ledgerRef = firestore.collection('ledger_entries').doc();
-  const depositRef =
-    direction === 'wpkn_to_pkn'
-      ? firestore.collection('wpkn_exchange_deposits').doc(depositTxHash)
-      : null;
-  const verifiedDeposit =
-    direction === 'wpkn_to_pkn'
-      ? await verifyWpknDeposit({
-          txHash: depositTxHash,
-          expectedAmountWpkn: req.body?.amountIn || 0,
-        })
-      : null;
+  let depositRef = null;
+  let verifiedDeposit = null;
   let requestPayload = null;
 
   await firestore.runTransaction(async (transaction) => {
@@ -183,12 +165,15 @@ async function handleRequest(req, res, decoded, admin, firestore) {
           { statusCode: 400 },
         );
       }
-      if (linkedWallet !== verifiedDeposit.fromAddress) {
-        throw Object.assign(
-          new Error('The wPKN deposit must be sent from your linked wallet.'),
-          { statusCode: 403 },
-        );
-      }
+      const usedDeposits = await transaction.get(
+        firestore.collection('wpkn_exchange_deposits').where('fromAddress', '==', linkedWallet).limit(50),
+      );
+      verifiedDeposit = await findWpknDeposit({
+        fromAddress: linkedWallet,
+        expectedAmountWpkn: Number(quote.amountIn || 0),
+        usedTxHashes: usedDeposits.docs.map((doc) => doc.id),
+      });
+      depositRef = firestore.collection('wpkn_exchange_deposits').doc(verifiedDeposit.txHash);
     }
     const now = admin.firestore.FieldValue.serverTimestamp();
     const baseRequest = {
@@ -203,7 +188,7 @@ async function handleRequest(req, res, decoded, admin, firestore) {
       fromAsset: quote.fromAsset,
       toAsset: quote.toAsset,
       toAddress: payoutAddress,
-      depositTxHash: direction === 'wpkn_to_pkn' ? depositTxHash || null : null,
+      depositTxHash: direction === 'wpkn_to_pkn' ? verifiedDeposit.txHash : null,
       payoutTxHash: null,
       settlementMode: settlementMode(),
       status: direction === 'pkn_to_wpkn' ? 'locked' : 'pending_deposit_or_lock',
@@ -257,7 +242,7 @@ async function handleRequest(req, res, decoded, admin, firestore) {
       transaction.set(depositRef, {
         uid: decoded.uid,
         requestId: requestRef.id,
-        txHash: depositTxHash,
+        txHash: verifiedDeposit.txHash,
         fromAddress: verifiedDeposit.fromAddress,
         amountWpkn: verifiedDeposit.amountWpkn,
         createdAt: now,
@@ -267,7 +252,7 @@ async function handleRequest(req, res, decoded, admin, firestore) {
         type: 'wpkn_exchange_pkn_credited',
         amountPkn: baseRequest.amountOutQuoted,
         wpknExchangeRequestId: requestRef.id,
-        depositTxHash,
+        depositTxHash: verifiedDeposit.txHash,
         fromAddress: verifiedDeposit.fromAddress,
         createdAt: now,
       });
@@ -284,7 +269,7 @@ async function handleRequest(req, res, decoded, admin, firestore) {
 
   let settlement = {
     mode: requestPayload.settlementMode,
-    txHash: direction === 'wpkn_to_pkn' ? depositTxHash : null,
+    txHash: direction === 'wpkn_to_pkn' ? verifiedDeposit.txHash : null,
   };
   if (direction === 'pkn_to_wpkn') {
     try {

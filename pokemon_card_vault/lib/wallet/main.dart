@@ -71,8 +71,6 @@ class _WalletScreenState extends State<WalletScreen> {
       TextEditingController();
   final TextEditingController _exchangeAddressController =
       TextEditingController();
-  final TextEditingController _exchangeDepositTxController =
-      TextEditingController();
   final List<ActivityItem> _activity = <ActivityItem>[];
   final List<String> _recipientSuggestions = <String>[];
 
@@ -97,7 +95,6 @@ class _WalletScreenState extends State<WalletScreen> {
     _passwordController.dispose();
     _exchangeAmountController.dispose();
     _exchangeAddressController.dispose();
-    _exchangeDepositTxController.dispose();
     super.dispose();
   }
 
@@ -601,7 +598,6 @@ class _WalletScreenState extends State<WalletScreen> {
     List<Map<String, dynamic>> requests = const <Map<String, dynamic>>[];
     _exchangeAmountController.clear();
     _exchangeAddressController.text = _address ?? '';
-    _exchangeDepositTxController.clear();
 
     Future<void> loadRequests(
         void Function(VoidCallback fn) setDialogState) async {
@@ -705,7 +701,7 @@ class _WalletScreenState extends State<WalletScreen> {
                         if (direction == 'wpkn_to_pkn') ...<Widget>[
                           const SizedBox(height: 12),
                           const Text(
-                            'Send wPKN on BNB Chain to this settlement wallet, then paste the transaction hash below.',
+                            'Send wPKN on BNB Chain from your linked wallet to this settlement wallet, then click Request exchange after confirmation.',
                             style: TextStyle(color: Color(0xFFB8C4E6)),
                           ),
                           const SizedBox(height: 6),
@@ -714,15 +710,6 @@ class _WalletScreenState extends State<WalletScreen> {
                             style: TextStyle(
                               color: Color(0xFFFACC15),
                               fontFamily: 'monospace',
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          TextField(
-                            controller: _exchangeDepositTxController,
-                            keyboardType: TextInputType.text,
-                            decoration: const InputDecoration(
-                              labelText: 'BSC transaction hash',
-                              prefixIcon: Icon(Icons.receipt_long_outlined),
                             ),
                           ),
                         ],
@@ -768,17 +755,11 @@ class _WalletScreenState extends State<WalletScreen> {
                                           direction: direction,
                                           toAddress:
                                               _exchangeAddressController.text,
-                                          depositTxHash:
-                                              direction == 'wpkn_to_pkn'
-                                                  ? _exchangeDepositTxController
-                                                      .text
-                                                  : null,
                                         );
                                         requests =
                                             await _auth.wpknExchangeRequests();
                                         quote = null;
                                         _exchangeAmountController.clear();
-                                        _exchangeDepositTxController.clear();
                                         setDialogState(() {});
                                         _showMessage(
                                           response['settlementMode'] ==
