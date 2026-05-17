@@ -58,6 +58,8 @@ class _WalletScreenState extends State<WalletScreen> {
   static const rpcUrl = 'https://rpc.pokoin.com/rpc';
   static const nativeSymbol = 'PKN';
   static const recentRecipientLimit = 5;
+  static const nativeTreasuryAddress =
+      '0x74466c3a204429b22ce8558f3f18f3c59f67fcb3';
   static const wpknSettlementAddress =
       '0x74466c3a204429B22CE8558F3F18f3C59F67fCB3';
 
@@ -517,19 +519,44 @@ class _WalletScreenState extends State<WalletScreen> {
         return;
       }
       await _runTask(() async {
-        await _auth.transferAccountBalance(
-          recipientUsername: recipient,
-          amountPkn: accountAmount,
-        );
+        String? fundingTxHash;
+        try {
+          await _auth.transferAccountBalance(
+            recipientUsername: recipient,
+            amountPkn: accountAmount,
+          );
+        } catch (error) {
+          final from = _address?.trim();
+          if (!_isLowBalanceError(error) || from == null || from.isEmpty) {
+            rethrow;
+          }
+          fundingTxHash = await _wallet.sendTransaction(
+            from: from,
+            to: nativeTreasuryAddress,
+            valueWei: BigInt.from(accountAmount) * BigInt.from(10).pow(18),
+          );
+          await _auth.transferAccountBalance(
+            recipientUsername: recipient,
+            amountPkn: accountAmount,
+            fundingTxHash: fundingTxHash,
+          );
+          await _loadBalance(from);
+        }
         await _rememberRecipient(recipient);
         _toController.clear();
         _amountController.clear();
         await _record(
-          'Sent $accountAmount PKN to account',
-          recipient,
+          fundingTxHash == null
+              ? 'Sent $accountAmount PKN to account'
+              : 'Funded and sent $accountAmount PKN',
+          fundingTxHash ?? recipient,
           ActivityKind.outbound,
         );
-        _showMessage('Account balance transfer sent.');
+        _showMessage(
+          fundingTxHash == null
+              ? 'Account balance transfer sent.'
+              : 'Wallet funded the transfer and PKN was sent.',
+        );
         await _loadActivity();
       });
       return;
@@ -1036,6 +1063,13 @@ class _WalletScreenState extends State<WalletScreen> {
         .replaceFirst('Exception: ', '')
         .replaceFirst('Bad state: ', '')
         .replaceFirst('Invalid argument(s): ', '');
+  }
+
+  static bool _isLowBalanceError(Object error) {
+    return error
+        .toString()
+        .toLowerCase()
+        .contains('account balance is too low');
   }
 
   Future<void> _record(String title, String detail, ActivityKind kind) async {

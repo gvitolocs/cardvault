@@ -170,6 +170,7 @@ class WalletAuthService {
   Future<void> transferAccountBalance({
     required String recipientUsername,
     required int amountPkn,
+    String? fundingTxHash,
   }) async {
     final firebaseUser = FirebaseAuth.instance.currentUser;
     if (firebaseUser == null) {
@@ -188,6 +189,8 @@ class WalletAuthService {
       body: jsonEncode({
         'recipientUsername': recipientUsername.trim().toLowerCase(),
         'amountPkn': amountPkn,
+        if (fundingTxHash != null && fundingTxHash.trim().isNotEmpty)
+          'fundingTxHash': fundingTxHash.trim(),
       }),
     );
     final payload = jsonDecode(response.body) as Map<String, dynamic>;

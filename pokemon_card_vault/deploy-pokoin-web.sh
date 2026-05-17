@@ -12,7 +12,7 @@ flutter build web --release --pwa-strategy=none
 rm -rf "$ROOT_DIR/build/web/api"
 mkdir -p "$ROOT_DIR/build/web/api"
 mkdir -p "$ROOT_DIR/build/web/server"
-for helper in _firebase _pkn_purchase _r2 _username _wpkn_exchange; do
+for helper in _firebase _native_pkn _pkn_purchase _r2 _username _wpkn_exchange; do
   cp "$ROOT_DIR/api/${helper}.js" "$ROOT_DIR/build/web/server/${helper}.js"
 done
 for endpoint in \
