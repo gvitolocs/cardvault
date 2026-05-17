@@ -59,7 +59,7 @@ class _CartContent extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final wide = MediaQuery.sizeOf(context).width > 900;
-    final package = _ZeroPackage(
+    final package = _ReservePackage(
       items: cartState.items,
       onQuantityChanged: (item, quantity) => ref
           .read(cartProvider.notifier)
@@ -111,7 +111,8 @@ class _CartContent extends ConsumerWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Empty all carts'),
-        content: const Text('Remove all cards from your Pokoin Zero cart?'),
+        content:
+            const Text('Remove all cards from your Pokoin Card Reserve cart?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -130,8 +131,8 @@ class _CartContent extends ConsumerWidget {
   }
 }
 
-class _ZeroPackage extends StatelessWidget {
-  const _ZeroPackage({
+class _ReservePackage extends StatelessWidget {
+  const _ReservePackage({
     required this.items,
     required this.onQuantityChanged,
     required this.onRemove,
@@ -169,7 +170,7 @@ class _ZeroPackage extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const _ZeroLogo(),
+                const _ReserveLogo(),
                 const Spacer(),
                 TextButton(
                   onPressed: () {},
@@ -210,7 +211,7 @@ class _ZeroPackage extends StatelessWidget {
             ),
           ),
           for (final item in items)
-            _ZeroCartRow(
+            _ReserveCartRow(
               item: item,
               onQuantityChanged: (quantity) =>
                   onQuantityChanged(item, quantity),
@@ -248,8 +249,8 @@ class _ZeroPackage extends StatelessWidget {
   }
 }
 
-class _ZeroCartRow extends StatelessWidget {
-  const _ZeroCartRow({
+class _ReserveCartRow extends StatelessWidget {
+  const _ReserveCartRow({
     required this.item,
     required this.onQuantityChanged,
     required this.onRemove,
@@ -544,7 +545,7 @@ class _OptimizerCard extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           const Text(
-            'Pokoin Zero groups sellers before checkout.',
+            'Pokoin Card Reserve groups sellers before checkout.',
             style: TextStyle(color: Color(0xFF64748B)),
           ),
         ],
@@ -581,7 +582,7 @@ class _EmptyCart extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           const Text(
-            'Add listings from the marketplace to build a Pokoin Zero shipment.',
+            'Add listings from the marketplace to build a Pokoin Card Reserve shipment.',
             textAlign: TextAlign.center,
             style: TextStyle(color: Color(0xFF64748B)),
           ),
@@ -681,8 +682,8 @@ class _SummaryLine extends StatelessWidget {
   }
 }
 
-class _ZeroLogo extends StatelessWidget {
-  const _ZeroLogo();
+class _ReserveLogo extends StatelessWidget {
+  const _ReserveLogo();
 
   @override
   Widget build(BuildContext context) {
@@ -699,7 +700,7 @@ class _ZeroLogo extends StatelessWidget {
           ),
         ),
         Text(
-          'ZERO',
+          'RESERVE',
           style: TextStyle(
             color: Colors.white,
             fontSize: 27,

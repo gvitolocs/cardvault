@@ -483,7 +483,7 @@ class _BestDealPanel extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('POKOIN ZERO',
+              Text('POKOIN CARD RESERVE',
                   style: TextStyle(
                       color: Color(0xFFFACC15),
                       fontWeight: FontWeight.w900,
@@ -639,7 +639,7 @@ class _ListingFilters extends StatelessWidget {
               _CheckGhost(text: 'Signed'),
               _CheckGhost(text: 'Altered/misprint'),
               _CheckGhost(text: 'Graded'),
-              _CheckGhost(text: 'Pokoin Zero', checked: true),
+              _CheckGhost(text: 'Pokoin Card Reserve', checked: true),
             ],
           ),
           const SizedBox(height: 18),
@@ -675,7 +675,7 @@ class _ListingsTable extends StatelessWidget {
                 Expanded(flex: 3, child: _HeaderText('Product')),
                 Expanded(flex: 2, child: _HeaderText('Price')),
                 Expanded(child: _HeaderText('Qty')),
-                SizedBox(width: 126, child: _HeaderText('ZERO')),
+                SizedBox(width: 126, child: _HeaderText('RESERVE')),
               ],
             ),
           ),
@@ -736,7 +736,7 @@ class _ListingRow extends StatelessWidget {
                 _TinyBadge(text: listing.condition),
                 _TinyBadge(text: listing.language),
                 if (listing.signed) const _TinyBadge(text: 'Signed'),
-                if (listing.zero) const _TinyBadge(text: 'Zero'),
+                if (listing.reserve) const _TinyBadge(text: 'Reserve'),
               ],
             ),
           ),
@@ -758,7 +758,7 @@ class _ListingRow extends StatelessWidget {
             width: 126,
             child: Row(
               children: [
-                if (listing.zero)
+                if (listing.reserve)
                   Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
@@ -766,7 +766,7 @@ class _ListingRow extends StatelessWidget {
                       color: const Color(0xFFFACC15),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Text('ZERO',
+                    child: const Text('RESERVE',
                         style: TextStyle(
                             color: Color(0xFF111827),
                             fontSize: 11,
@@ -804,7 +804,7 @@ class _Fundamentals extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Card fundamentals',
+          const Text('Card metadata',
               style: TextStyle(
                   color: Colors.white,
                   fontSize: 20,
@@ -816,22 +816,21 @@ class _Fundamentals extends StatelessWidget {
             children: [
               _Fundamental(label: 'Set', value: card.set),
               _Fundamental(label: 'Number', value: card.number),
-              _Fundamental(
-                  label: 'Artist',
-                  value: card.artist.isEmpty ? 'Unknown' : card.artist),
-              _Fundamental(label: 'Type', value: card.type),
               _Fundamental(label: 'Rarity', value: card.rarity),
-              _Fundamental(label: 'Release', value: '${card.releaseDate.year}'),
-              _Fundamental(label: 'Watchlists', value: '${market.watchlists}'),
-              _Fundamental(label: 'Asset ID', value: 'PKN-CARD-${card.id}'),
+              const _Fundamental(label: 'Game', value: 'Pokémon'),
+              _Fundamental(label: 'Blueprint ID', value: card.id),
+              const _Fundamental(
+                  label: 'Condition model', value: 'NM / SP / MP / PL / Poor'),
+              const _Fundamental(
+                  label: 'Languages', value: 'EN, IT, FR, DE, ES +'),
+              _Fundamental(
+                  label: 'Reserve asset', value: 'PKN-RESERVE-${card.id}'),
             ],
           ),
           const SizedBox(height: 16),
-          Text(
-            card.description.isEmpty
-                ? 'No card text is available yet. Market metadata is ready for scanner-style listing data.'
-                : card.description,
-            style: const TextStyle(color: Color(0xFFB8C4E6), height: 1.55),
+          const Text(
+            'This panel only shows metadata available from the imported CardTrader blueprint catalog. Artist, release date, card text and social watchlist metrics are intentionally omitted until a verified source is connected.',
+            style: TextStyle(color: Color(0xFFB8C4E6), height: 1.55),
           ),
         ],
       ),
@@ -901,7 +900,6 @@ class _CardMarketData {
     required this.bestBid,
     required this.volume24h,
     required this.marketCap,
-    required this.watchlists,
     required this.chart,
     required this.listings,
   });
@@ -912,7 +910,6 @@ class _CardMarketData {
   final double bestBid;
   final double volume24h;
   final double marketCap;
-  final int watchlists;
   final List<double> chart;
   final List<_Listing> listings;
 
@@ -940,7 +937,6 @@ class _CardMarketData {
       bestBid: floor * 0.964,
       volume24h: market * (7 + seed % 11),
       marketCap: market * (850 + seed % 400),
-      watchlists: 900 + seed % 12000,
       chart: _buildChart(market, seed),
       listings: listings,
     );
@@ -981,7 +977,7 @@ class _CardMarketData {
         language: ['EN', 'IT', 'FR', 'DE'][index % 4],
         price: base * (1 + index * 0.018 + (seed % 5) / 1000),
         quantity: 1 + (index % 2),
-        zero: index % 3 != 2,
+        reserve: index % 3 != 2,
         signed: index == 4,
       );
     });
@@ -997,7 +993,7 @@ class _Listing {
     required this.language,
     required this.price,
     required this.quantity,
-    required this.zero,
+    required this.reserve,
     required this.signed,
   });
 
@@ -1008,7 +1004,7 @@ class _Listing {
   final String language;
   final double price;
   final int quantity;
-  final bool zero;
+  final bool reserve;
   final bool signed;
 }
 
