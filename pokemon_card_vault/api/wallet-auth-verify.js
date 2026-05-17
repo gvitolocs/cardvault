@@ -1,5 +1,6 @@
 const { ethers } = require('ethers');
 const { getFirebaseAdmin } = require('../server/_firebase');
+const { sendSignupNotificationOnce } = require('../server/_email');
 const { ensureUniqueUsername } = require('../server/_username');
 
 module.exports = async function handler(req, res) {
@@ -42,6 +43,7 @@ module.exports = async function handler(req, res) {
     const walletRegistry = await walletRegistryRef.get();
     const existingOwner = walletRegistry.data()?.uid;
     const uid = existingOwner || `wallet:${normalized}`;
+    const isNewWalletAccount = !existingOwner;
     let email = `${normalized.slice(2)}@wallet.pokoin.local`;
     let displayName = `${normalized.slice(0, 6)}...${normalized.slice(-4)}`;
 
@@ -128,6 +130,20 @@ module.exports = async function handler(req, res) {
       walletAddress: normalized,
       provider: 'metamask',
     });
+    if (isNewWalletAccount) {
+      await sendSignupNotificationOnce({
+        admin,
+        firestore,
+        uid,
+        provider: 'crypto_wallet',
+        email,
+        username,
+        walletAddress: normalized,
+        emailVerified: true,
+      }).catch((error) => {
+        console.error('wallet signup notification failed', error);
+      });
+    }
 
     return res.status(200).json({
       customToken,

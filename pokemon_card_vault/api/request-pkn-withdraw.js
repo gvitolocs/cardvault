@@ -1,4 +1,5 @@
 const { getFirebaseAdmin, verifyBearerToken } = require('../server/_firebase');
+const { sendBankPkn } = require('../server/_native_pkn');
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -24,6 +25,7 @@ module.exports = async function handler(req, res) {
     const balanceRef = firestore.collection('balances').doc(decoded.uid);
     const requestRef = firestore.collection('withdraw_requests').doc();
     const ledgerRef = firestore.collection('ledger_entries').doc();
+    let withdrawRequestId = requestRef.id;
 
     await firestore.runTransaction(async (transaction) => {
       const balanceDoc = await transaction.get(balanceRef);
@@ -62,7 +64,65 @@ module.exports = async function handler(req, res) {
       });
     });
 
-    return res.status(200).json({ ok: true, requestId: requestRef.id });
+    try {
+      const payout = await sendBankPkn({ toAddress: address, amountPkn: amount });
+      if (payout.txHash) {
+        await firestore.runTransaction(async (transaction) => {
+          const now = admin.firestore.FieldValue.serverTimestamp();
+          transaction.set(
+            balanceRef,
+            {
+              lockedPkn: admin.firestore.FieldValue.increment(-amount),
+              updatedAt: now,
+            },
+            { merge: true },
+          );
+          transaction.set(
+            requestRef,
+            {
+              status: 'completed',
+              payoutMode: payout.mode,
+              payoutTxHash: payout.txHash,
+              completedAt: now,
+              updatedAt: now,
+            },
+            { merge: true },
+          );
+          transaction.set(firestore.collection('ledger_entries').doc(), {
+            uid: decoded.uid,
+            type: 'withdraw_paid',
+            amountPkn: amount,
+            toAddress: address,
+            withdrawRequestId,
+            payoutTxHash: payout.txHash,
+            createdAt: now,
+          });
+        });
+      }
+      return res.status(200).json({
+        ok: true,
+        requestId: withdrawRequestId,
+        status: payout.txHash ? 'completed' : 'pending',
+        payoutTxHash: payout.txHash || null,
+      });
+    } catch (payoutError) {
+      await requestRef.set(
+        {
+          status: 'pending',
+          payoutMode: 'manual_pending',
+          payoutError: payoutError.message || String(payoutError),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+      return res.status(200).json({
+        ok: true,
+        requestId: withdrawRequestId,
+        status: 'pending',
+        payoutTxHash: null,
+        warning: 'Withdraw request created, but automatic bank payout is pending manual review.',
+      });
+    }
   } catch (error) {
     console.error('request-pkn-withdraw failed', error);
     return res.status(error.statusCode || 500).json({

@@ -18,7 +18,6 @@ module.exports = async function handler(req, res) {
       await deleteProfilePictureFromR2(storagePath).catch(() => {});
     }
 
-    await admin.auth().updateUser(decoded.uid, { photoURL: null });
     await userRef.set(
       {
         photoUrl: null,

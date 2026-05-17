@@ -1,0 +1,18 @@
+{
+  "source": "cardtrader",
+  "apiBase": "https://api.cardtrader.com/api/v2",
+  "downloadedAt": "2026-05-17T18:42:38Z",
+  "game": {
+    "id": 5,
+    "display_name": "Pokémon",
+    "name": "Pokémon"
+  },
+  "categoryCount": 18,
+  "expansionCount": 832,
+  "blueprintCount": 71215,
+  "failedExpansionCount": 0,
+  "files": {
+    "blueprints": "data/cardtrader/pokemon-blueprints.jsonl",
+    "errors": "data/cardtrader/pokemon-blueprint-errors.jsonl"
+  }
+}

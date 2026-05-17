@@ -40,18 +40,23 @@ module.exports = async function handler(req, res) {
       key: storagePath,
       body: avatarBuffer,
     });
-    const photoUrl = uploaded?.url || `data:image/webp;base64,${avatarBuffer.toString('base64')}`;
+    if (!uploaded?.url) {
+      return res.status(500).json({
+        error:
+          'Cloudflare R2 profile picture storage is not configured. Add R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY.',
+      });
+    }
+    const photoUrl = uploaded.url;
 
     if (uploaded && typeof previousStoragePath === 'string' && previousStoragePath !== storagePath) {
       await deleteProfilePictureFromR2(previousStoragePath).catch(() => {});
     }
 
-    await admin.auth().updateUser(decoded.uid, { photoURL: photoUrl });
     await userRef.set(
       {
         photoUrl,
-        photoStoragePath: uploaded?.key || null,
-        photoInlineId: uploaded ? null : avatarId,
+        photoStoragePath: uploaded.key,
+        photoInlineId: null,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       },
       { merge: true },

@@ -1,0 +1,17 @@
+---
+description: Required workflows and operational guardrails for Pokoin/CardVault
+alwaysApply: true
+---
+
+# Pokoin/CardVault Workflows
+
+- Read `workflows/README.md` before deploy, Supabase/CardTrader import, or domain redirect work.
+- Do not deploy the web app with plain `vercel deploy`. Use `workflows/deploy-web.sh` or `deploy-pokoin-web.sh`.
+- Keep account/auth/wallet/profile/checkout/orders canonical on `https://pokoin.com`; alternate subdomains must redirect protected routes there.
+- Never print `.env.local` secrets. Read env names/shape only, or pass values directly to commands.
+- Use CardTrader scripts for blueprint refresh:
+  - `workflows/download-cardtrader-pokemon-blueprints.sh`
+  - `workflows/upload-cardtrader-blueprints-to-supabase.sh`
+  - `workflows/verify-supabase-cardtrader-blueprints.sh`
+- The old Supabase project `msngrrrihwudtnyjatlo` is unrecoverable/inactive; use the active project from `.env.local`.
+- Cloudflare Worker routes need proxied DNS records. Deploying a Worker route alone does not make an unresolved domain work.

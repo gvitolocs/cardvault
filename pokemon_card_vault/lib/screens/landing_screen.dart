@@ -115,14 +115,8 @@ class _TopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final compact = MediaQuery.sizeOf(context).width < 820;
     return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xF2050816),
-        border: Border(
-          bottom: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
-        ),
-        boxShadow: const [
-          BoxShadow(color: Color(0x66000000), blurRadius: 24, offset: Offset(0, 10)),
-        ],
+      decoration: const BoxDecoration(
+        color: Color(0xF2050816),
       ),
       child: SafeArea(
         bottom: false,
@@ -195,29 +189,14 @@ class _BrandMark extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 12),
-        const Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Pokoin',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-                letterSpacing: -0.2,
-              ),
-            ),
-            SizedBox(height: 2),
-            Text(
-              'CardVault crypto rails',
-              style: TextStyle(
-                color: Color(0xFF93A4C8),
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
+        const Text(
+          'Pokoin',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.w900,
+            letterSpacing: -0.2,
+          ),
         ),
       ],
     );

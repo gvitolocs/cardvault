@@ -4,7 +4,9 @@ import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 class WalletUser {
   final String uid;
@@ -67,6 +69,9 @@ class WalletAuthService {
     if (Firebase.apps.isEmpty) {
       throw StateError('Firebase is not initialized yet.');
     }
+    if (kIsWeb) {
+      await FirebaseAuth.instance.setPersistence(Persistence.LOCAL);
+    }
     final provider = GoogleAuthProvider()
       ..setCustomParameters(<String, String>{'prompt': 'select_account'});
     final credential = await FirebaseAuth.instance.signInWithPopup(provider);
@@ -83,6 +88,9 @@ class WalletAuthService {
   Future<void> signInWithCustomToken(String customToken) async {
     if (Firebase.apps.isEmpty) {
       throw StateError('Firebase is not initialized yet.');
+    }
+    if (kIsWeb) {
+      await FirebaseAuth.instance.setPersistence(Persistence.LOCAL);
     }
     final credential = await FirebaseAuth.instance.signInWithCustomToken(
       customToken,
@@ -139,6 +147,32 @@ class WalletAuthService {
     };
   }
 
+  Future<void> linkSignedWallet({
+    required String address,
+    required String signature,
+  }) async {
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+    if (firebaseUser == null) {
+      throw StateError('Log in before connecting a wallet.');
+    }
+    final token = await firebaseUser.getIdToken();
+    final response = await http.post(
+      Uri.parse('/api/wallet-link'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'address': address.trim().toLowerCase(),
+        'signature': signature,
+      }),
+    );
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError(payload['error'] as String? ?? 'Wallet link failed.');
+    }
+  }
+
   Future<void> signOut() async {
     if (Firebase.apps.isNotEmpty) {
       await FirebaseAuth.instance.signOut();
@@ -170,7 +204,6 @@ class WalletAuthService {
   Future<void> transferAccountBalance({
     required String recipientUsername,
     required int amountPkn,
-    String? fundingTxHash,
   }) async {
     final firebaseUser = FirebaseAuth.instance.currentUser;
     if (firebaseUser == null) {
@@ -189,19 +222,56 @@ class WalletAuthService {
       body: jsonEncode({
         'recipientUsername': recipientUsername.trim().toLowerCase(),
         'amountPkn': amountPkn,
-        if (fundingTxHash != null && fundingTxHash.trim().isNotEmpty)
-          'fundingTxHash': fundingTxHash.trim(),
       }),
     );
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw StateError(
-        payload['error'] as String? ?? 'Account transfer failed.',
-      );
+      throw StateError(payload['error'] as String? ?? 'Account transfer failed.');
     }
   }
 
-  Future<void> requestPknWithdraw({
+  Future<void> topUpAccountBalance({
+    required int amountPkn,
+    required String fundingTxHash,
+  }) async {
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+    if (firebaseUser == null) {
+      throw StateError('Sign in before topping up your account balance.');
+    }
+    if (amountPkn <= 0) {
+      throw ArgumentError('Enter a whole PKN amount greater than zero.');
+    }
+    final normalizedFundingHash = fundingTxHash.trim();
+    final attempts = normalizedFundingHash.isEmpty ? 1 : 8;
+    for (var attempt = 0; attempt < attempts; attempt += 1) {
+      final token = await firebaseUser.getIdToken();
+      final response = await http.post(
+        Uri.parse('/api/top-up-account-balance'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'amountPkn': amountPkn,
+          'fundingTxHash': normalizedFundingHash,
+        }),
+      );
+      final payload = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return;
+      }
+      final message = payload['error'] as String? ?? 'Account top-up failed.';
+      final shouldRetryFundingLookup = response.statusCode == 404 &&
+          message.toLowerCase().contains('not found yet') &&
+          attempt < attempts - 1;
+      if (!shouldRetryFundingLookup) {
+        throw StateError(message);
+      }
+      await Future<void>.delayed(const Duration(seconds: 2));
+    }
+  }
+
+  Future<Map<String, dynamic>> requestPknWithdraw({
     required String toAddress,
     required int amountPkn,
   }) async {
@@ -231,6 +301,7 @@ class WalletAuthService {
         payload['error'] as String? ?? 'Withdraw request failed.',
       );
     }
+    return payload;
   }
 
   Future<Map<String, dynamic>> quoteWpknExchange({
@@ -324,6 +395,39 @@ class WalletAuthService {
     final address = (doc.data()?['walletAddress'] as String?)?.trim();
     return address == null || address.isEmpty ? null : address;
   }
+
+  Future<int> accountBalance() async {
+    if (Firebase.apps.isEmpty) {
+      return 0;
+    }
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+    if (firebaseUser == null) {
+      return 0;
+    }
+    final doc = await FirebaseFirestore.instance
+        .collection('balances')
+        .doc(firebaseUser.uid)
+        .get();
+    final balance = (doc.data()?['availablePkn'] as num?)?.toInt() ?? 0;
+    await cacheAccountBalance(firebaseUser.uid, balance);
+    return balance;
+  }
+
+  Future<int?> cachedAccountBalance([String? uid]) async {
+    final userId = uid ?? FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null || userId.isEmpty) {
+      return null;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt(_balanceCacheKey(userId));
+  }
+
+  Future<void> cacheAccountBalance(String uid, int balance) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_balanceCacheKey(uid), balance);
+  }
+
+  String _balanceCacheKey(String uid) => 'pokoin_account_balance:$uid';
 
   Future<List<Map<String, dynamic>>> ledgerActivity({int limit = 12}) async {
     if (Firebase.apps.isEmpty) {

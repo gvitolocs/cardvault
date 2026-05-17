@@ -5,6 +5,14 @@ import '../models/pokemon_card.dart';
 class CardService {
   // Local storage
   static const String _cardsBoxName = 'pokemon_cards';
+  static const Map<String, double> _pknPrices = <String, double>{
+    '1': 495,
+    '2': 149995,
+    '3': 99995,
+    '4': 74995,
+    '5': 44995,
+    '6': 39995,
+  };
 
   Future<void> _initHive() async {
     if (!Hive.isAdapterRegistered(0)) {
@@ -19,7 +27,7 @@ class CardService {
       // Try to get from local storage first
       final box = await Hive.openBox<PokemonCard>(_cardsBoxName);
       if (box.isNotEmpty) {
-        final cards = _markUnavailable(box.values.toList());
+        final cards = _normalizeCards(box.values.toList());
         await _saveCardsToLocal(cards);
         return cards;
       }
@@ -46,8 +54,15 @@ class CardService {
     }
   }
 
-  List<PokemonCard> _markUnavailable(List<PokemonCard> cards) {
-    return cards.map((card) => card.copyWith(stock: 0)).toList();
+  List<PokemonCard> _normalizeCards(List<PokemonCard> cards) {
+    return cards
+        .map(
+          (card) => card.copyWith(
+            stock: 0,
+            price: _pknPrices[card.id] ?? card.price,
+          ),
+        )
+        .toList();
   }
 
   Future<PokemonCard?> getCardById(String id) async {
@@ -154,7 +169,7 @@ class CardService {
         type: 'Lightning',
         hp: 40,
         attacks: ['Thunder Shock', 'Thunder'],
-        price: 0.99,
+        price: _pknPrices['1']!,
         description: 'A cute electric mouse Pokémon.',
         set: 'Base Set',
         number: '58',
@@ -177,7 +192,7 @@ class CardService {
         type: 'Fire',
         hp: 120,
         attacks: ['Fire Spin', 'Flamethrower'],
-        price: 299.99,
+        price: _pknPrices['2']!,
         description: 'A powerful dragon Pokémon.',
         set: 'Base Set',
         number: '4',
@@ -200,7 +215,7 @@ class CardService {
         type: 'Water',
         hp: 100,
         attacks: ['Hydro Pump', 'Rain Dance'],
-        price: 199.99,
+        price: _pknPrices['3']!,
         description: 'A powerful water turtle Pokémon.',
         set: 'Base Set',
         number: '2',
@@ -223,7 +238,7 @@ class CardService {
         type: 'Grass',
         hp: 100,
         attacks: ['Solar Beam', 'Razor Leaf'],
-        price: 149.99,
+        price: _pknPrices['4']!,
         description: 'A powerful grass dinosaur Pokémon.',
         set: 'Base Set',
         number: '15',
@@ -246,7 +261,7 @@ class CardService {
         type: 'Psychic',
         hp: 80,
         attacks: ['Confuse Ray', 'Psybeam'],
-        price: 89.99,
+        price: _pknPrices['5']!,
         description: 'A powerful psychic Pokémon.',
         set: 'Base Set',
         number: '1',
@@ -269,7 +284,7 @@ class CardService {
         type: 'Fighting',
         hp: 100,
         attacks: ['Karate Chop', 'Submission'],
-        price: 79.99,
+        price: _pknPrices['6']!,
         description: 'A powerful fighting Pokémon.',
         set: 'Base Set',
         number: '8',

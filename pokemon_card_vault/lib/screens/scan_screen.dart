@@ -187,6 +187,13 @@ class ExplorerSnapshot {
         .whereType<Map<String, dynamic>>()
         .map(ExplorerTransaction.fromJson)
         .toList();
+    transactions.sort((a, b) {
+      final blockCompare = b.blockNumber.compareTo(a.blockNumber);
+      if (blockCompare != 0) {
+        return blockCompare;
+      }
+      return b.transactionIndex.compareTo(a.transactionIndex);
+    });
 
     return ExplorerSnapshot(
       status: status,
@@ -230,14 +237,8 @@ class _ExplorerTopBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     final compact = MediaQuery.sizeOf(context).width < 860;
     return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xF2050816),
-        border: Border(
-          bottom: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
-        ),
-        boxShadow: const [
-          BoxShadow(color: Color(0x66000000), blurRadius: 24, offset: Offset(0, 10)),
-        ],
+      decoration: const BoxDecoration(
+        color: Color(0xF2050816),
       ),
       child: SafeArea(
         bottom: false,
@@ -625,62 +626,68 @@ class _StatsGrid extends StatelessWidget {
         .length;
     final vettingNodes =
         registryNodes.where((node) => _nodeStatus(node) == 'vetting').length;
+    final authorizedValidators = validators.where((v) => v.authorized).length;
+    final connectedValidators =
+        matureValidators == 0 ? authorizedValidators : matureValidators;
+    final totalNetworkNodes = connectedValidators + vettingNodes;
     final reserve = snapshot?.reserve;
     final latestHeight = _asInt(status['height']);
-    final treasuryTxCount = snapshot?.transactions.length ?? 0;
     final reserveAmount =
         _formatWholeNumber(reserve?['reservedNativeAmount'] ?? 2000000);
     final totalSupply = snapshot?.totalSupply ?? 0;
     final circulatingSupply = snapshot?.circulatingSupply ?? 0;
-    return Wrap(
-      spacing: 14,
-      runSpacing: 14,
-      children: [
-        _StatCard(
-          label: 'Chain Height',
-          value: latestHeight == 0 ? '...' : '#${_formatWholeNumber(latestHeight)}',
-          note: 'Latest canonical PKN block',
-          icon: Icons.view_in_ar,
-        ),
-        _StatCard(
-          label: 'PKN Transfers',
-          value: _formatWholeNumber(status['txCount'] ?? 0),
-          note: 'Native ledger activity',
-          icon: Icons.swap_horiz,
-        ),
-        _StatCard(
-          label: 'Total Supply',
-          value: totalSupply == 0 ? '...' : '${_formatWholeNumber(totalSupply)} PKN',
-          note: 'Live native PKN in existence',
-          icon: Icons.toll_outlined,
-        ),
-        _StatCard(
-          label: 'Circulating',
-          value: circulatingSupply == 0
-              ? '...'
-              : '${_formatWholeNumber(circulatingSupply)} PKN',
-          note: 'Total minus reserved native PKN',
-          icon: Icons.public,
-        ),
-        _StatCard(
-          label: 'Network',
-          value: '${matureValidators == 0 ? validators.where((v) => v.authorized).length : matureValidators} validators',
-          note: '$vettingNodes nodes in vetting',
-          icon: Icons.verified_user_outlined,
-        ),
-        _StatCard(
-          label: 'Reserve Address',
-          value: '$treasuryTxCount txs',
-          note: 'Recent treasury history shown below',
-          icon: Icons.account_balance_wallet_outlined,
-        ),
-        _StatCard(
-          label: 'wPKN Backing',
-          value: '$reserveAmount PKN',
-          note: 'Native reserve for wrapped PKN',
-          icon: Icons.account_balance,
-        ),
-      ],
+    final cards = [
+      _StatCard(
+        label: 'Chain Height',
+        value: latestHeight == 0 ? '...' : '#${_formatWholeNumber(latestHeight)}',
+        icon: Icons.view_in_ar,
+      ),
+      _StatCard(
+        label: 'PKN Transfers',
+        value: _formatWholeNumber(status['txCount'] ?? 0),
+        icon: Icons.swap_horiz,
+      ),
+      _StatCard(
+        label: 'Total Supply',
+        value: totalSupply == 0 ? '...' : '${_formatWholeNumber(totalSupply)} PKN',
+        icon: Icons.toll_outlined,
+      ),
+      _StatCard(
+        label: 'Circulating',
+        value: circulatingSupply == 0
+            ? '...'
+            : '${_formatWholeNumber(circulatingSupply)} PKN',
+        icon: Icons.public,
+      ),
+      _StatCard(
+        label: 'Network',
+        value: '${_formatWholeNumber(totalNetworkNodes)} nodes',
+        icon: Icons.verified_user_outlined,
+      ),
+      _StatCard(
+        label: 'wPKN Backing',
+        value: '$reserveAmount PKN',
+        icon: Icons.account_balance,
+      ),
+    ];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final columns = width < 700
+            ? 2
+            : width < 980
+                ? 3
+                : 6;
+        const gap = 14.0;
+        final cardWidth = (width - (gap * (columns - 1))) / columns;
+        return Wrap(
+          spacing: gap,
+          runSpacing: gap,
+          children: [
+            for (final card in cards) SizedBox(width: cardWidth, child: card),
+          ],
+        );
+      },
     );
   }
 }
@@ -688,45 +695,44 @@ class _StatsGrid extends StatelessWidget {
 class _StatCard extends StatelessWidget {
   final String label;
   final String value;
-  final String note;
   final IconData icon;
 
   const _StatCard({
     required this.label,
     required this.value,
-    required this.note,
     required this.icon,
   });
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 198,
-      child: _Panel(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: const Color(0xFFFACC15)),
-            const SizedBox(height: 12),
-            Text(label, style: const TextStyle(color: Color(0xFF94A3B8))),
-            const SizedBox(height: 8),
-            FittedBox(
-              alignment: Alignment.centerLeft,
-              fit: BoxFit.scaleDown,
-              child: SelectableText(
-                value.replaceAll(' PKN', '\u00A0PKN'),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w900,
-                ),
+    return Container(
+      constraints: const BoxConstraints(minHeight: 172),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xDD0B1020),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: const Color(0xFFFACC15)),
+          const SizedBox(height: 12),
+          Text(label, style: const TextStyle(color: Color(0xFF94A3B8))),
+          const SizedBox(height: 8),
+          FittedBox(
+            alignment: Alignment.centerLeft,
+            fit: BoxFit.scaleDown,
+            child: SelectableText(
+              value.replaceAll(' PKN', '\u00A0PKN'),
+              style: const TextStyle(
+                color: Colors.white,
+                decoration: TextDecoration.none,
+                fontSize: 24,
+                fontWeight: FontWeight.w900,
               ),
             ),
-            const SizedBox(height: 6),
-            Text(note, style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 12)),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -818,9 +824,11 @@ class _ValidatorsPanel extends StatelessWidget {
               leading: validator.peerId,
               title: '${validator.stake} PKN stake',
               subtitle: _short(validator.validator, head: 22, tail: 14),
-              trailing: validator.local
-                  ? 'Local'
-                  : (validator.connected ? 'Connected' : 'Known'),
+              trailing:
+                  validator.connected || validator.local ? 'Connected' : 'Offline',
+              trailingColor: validator.connected || validator.local
+                  ? const Color(0xFF22C55E)
+                  : const Color(0xFFEF4444),
             ),
           if (validators.isEmpty) const _EmptyLine('No validator data loaded.'),
         ],
@@ -972,22 +980,17 @@ class _ResponsiveColumns extends StatelessWidget {
 
 class _Panel extends StatelessWidget {
   final Widget child;
-  final EdgeInsetsGeometry padding;
 
-  const _Panel({required this.child, this.padding = const EdgeInsets.all(20)});
+  const _Panel({required this.child});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: padding,
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: const Color(0xDD0B1020),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-        boxShadow: const [
-          BoxShadow(color: Color(0x66000000), blurRadius: 30, offset: Offset(0, 18)),
-        ],
       ),
       child: child,
     );
@@ -1031,6 +1034,7 @@ class _ListRow extends StatelessWidget {
   final String title;
   final String subtitle;
   final String trailing;
+  final Color trailingColor;
   final VoidCallback? onTap;
 
   const _ListRow({
@@ -1038,6 +1042,7 @@ class _ListRow extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.trailing,
+    this.trailingColor = const Color(0xFF22C55E),
     this.onTap,
   });
 
@@ -1052,7 +1057,6 @@ class _ListRow extends StatelessWidget {
         decoration: BoxDecoration(
           color: const Color(0xFF111827),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
         ),
         child: Row(
           children: [
@@ -1084,7 +1088,7 @@ class _ListRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 10),
-            Text(trailing, style: const TextStyle(color: Color(0xFF22C55E), fontSize: 12)),
+            Text(trailing, style: TextStyle(color: trailingColor, fontSize: 12)),
           ],
         ),
       ),
@@ -1106,7 +1110,6 @@ class _InfoBox extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFF111827),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

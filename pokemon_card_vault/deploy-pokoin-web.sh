@@ -12,17 +12,21 @@ flutter build web --release --pwa-strategy=none
 rm -rf "$ROOT_DIR/build/web/api"
 mkdir -p "$ROOT_DIR/build/web/api"
 mkdir -p "$ROOT_DIR/build/web/server"
-for helper in _firebase _native_pkn _pkn_purchase _r2 _username _wpkn_exchange; do
+for helper in _email _firebase _native_pkn _pending_signup _pkn_purchase _r2 _username _wpkn_exchange; do
   cp "$ROOT_DIR/api/${helper}.js" "$ROOT_DIR/build/web/server/${helper}.js"
 done
 for endpoint in \
   create-pkn-checkout-session \
+  register-email \
   remove-profile-picture \
   request-pkn-withdraw \
   search-recipient-emails \
+  signup-notification \
   stripe-webhook \
+  top-up-account-balance \
   transfer-account-balance \
   upload-profile-picture \
+  verify-email-signup \
   wallet-auth-nonce \
   wallet-auth-verify \
   wallet-link \

@@ -1,4 +1,11 @@
 {
+  "functions": {
+    "api/*.js": {
+      "regions": [
+        "fra1"
+      ]
+    }
+  },
   "headers": [
     {
       "source": "/index.html",
@@ -38,6 +45,83 @@
     }
   ],
   "redirects": [
+    {
+      "source": "/:protected(wallet|auth|profile|checkout|orders)",
+      "has": [
+        {
+          "type": "host",
+          "value": "explorer.pokoin.com"
+        }
+      ],
+      "destination": "https://pokoin.com/:protected",
+      "permanent": true
+    },
+    {
+      "source": "/:protected(wallet|auth|profile|checkout|orders)",
+      "has": [
+        {
+          "type": "host",
+          "value": "wallet.pokoin.com"
+        }
+      ],
+      "destination": "https://pokoin.com/:protected",
+      "permanent": true
+    },
+    {
+      "source": "/:protected(wallet|auth|profile|checkout|orders)",
+      "has": [
+        {
+          "type": "host",
+          "value": "forum.pokoin.com"
+        }
+      ],
+      "destination": "https://pokoin.com/:protected",
+      "permanent": true
+    },
+    {
+      "source": "/:protected(wallet|auth|profile|checkout|orders)",
+      "has": [
+        {
+          "type": "host",
+          "value": "cards.pokoin.com"
+        }
+      ],
+      "destination": "https://pokoin.com/:protected",
+      "permanent": true
+    },
+    {
+      "source": "/:protected(wallet|auth|profile|checkout|orders)",
+      "has": [
+        {
+          "type": "host",
+          "value": "cardvault.pokoin.com"
+        }
+      ],
+      "destination": "https://pokoin.com/:protected",
+      "permanent": true
+    },
+    {
+      "source": "/:protected(wallet|auth|profile|checkout|orders)",
+      "has": [
+        {
+          "type": "host",
+          "value": "cardcaveau.pokoin.com"
+        }
+      ],
+      "destination": "https://pokoin.com/:protected",
+      "permanent": true
+    },
+    {
+      "source": "/:protected(wallet|auth|profile|checkout|orders)",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.pokoin.com"
+        }
+      ],
+      "destination": "https://pokoin.com/:protected",
+      "permanent": true
+    },
     {
       "source": "/(.*)",
       "has": [
@@ -138,6 +222,10 @@
       "destination": "/api/transfer-account-balance.js"
     },
     {
+      "source": "/api/top-up-account-balance",
+      "destination": "/api/top-up-account-balance.js"
+    },
+    {
       "source": "/api/request-pkn-withdraw",
       "destination": "/api/request-pkn-withdraw.js"
     },
@@ -152,6 +240,18 @@
     {
       "source": "/api/ensure-username",
       "destination": "/api/search-recipient-emails.js"
+    },
+    {
+      "source": "/api/register-email",
+      "destination": "/api/register-email.js"
+    },
+    {
+      "source": "/api/verify-email-signup",
+      "destination": "/api/verify-email-signup.js"
+    },
+    {
+      "source": "/api/signup-notification",
+      "destination": "/api/signup-notification.js"
     },
     {
       "source": "/api/wallet-auth/nonce",
@@ -195,15 +295,15 @@
     },
     {
       "source": "/tx/:path*",
-      "destination": "/scan"
+      "destination": "/index.html"
     },
     {
       "source": "/address/:path*",
-      "destination": "/scan"
+      "destination": "/index.html"
     },
     {
       "source": "/block/:path*",
-      "destination": "/scan"
+      "destination": "/index.html"
     },
     {
       "source": "/(.*)",

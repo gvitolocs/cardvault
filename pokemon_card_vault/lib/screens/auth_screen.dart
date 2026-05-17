@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../constants/project_links.dart';
 import '../providers/auth_provider.dart';
+import '../wallet/wallet_bridge_stub.dart';
 import '../widgets/site_footer.dart';
 
 class AuthScreen extends ConsumerStatefulWidget {
@@ -17,10 +18,16 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _nameController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  final _usernameController = TextEditingController();
+  final _wallet = createWalletBridge();
   bool _isLogin = true;
   bool _isLoading = false;
   bool _isGoogleLoading = false;
+  bool _isWalletLoading = false;
+  bool _hasConnectedMetaMask = false;
+  bool _autoWalletSignInStarted = false;
+  bool _isVerifyingSignup = false;
 
   String get _returnPath {
     final from = GoRouterState.of(context).uri.queryParameters['from'];
@@ -34,7 +41,12 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_hasSignupVerificationToken) {
+        _handleSignupVerificationLink();
+        return;
+      }
       _redirectIfAlreadyLoggedIn();
+      _refreshConnectedMetaMask();
     });
   }
 
@@ -42,7 +54,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
-    _nameController.dispose();
+    _confirmPasswordController.dispose();
+    _usernameController.dispose();
     super.dispose();
   }
 
@@ -53,15 +66,64 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     }
   }
 
+  bool get _hasSignupVerificationToken {
+    final signupToken =
+        GoRouterState.of(context).uri.queryParameters['signupToken'];
+    return signupToken != null && signupToken.isNotEmpty;
+  }
+
+  Future<void> _handleSignupVerificationLink() async {
+    final signupToken =
+        GoRouterState.of(context).uri.queryParameters['signupToken'];
+    if (signupToken == null || signupToken.isEmpty || _isVerifyingSignup) {
+      return;
+    }
+    setState(() => _isVerifyingSignup = true);
+    try {
+      final redirectPath =
+          await ref.read(authServiceProvider).verifyEmailSignupToken(signupToken);
+      ref.invalidate(authStateProvider);
+      ref.invalidate(userProfileProvider);
+      ref.invalidate(pknBalanceProvider);
+      if (mounted) {
+        context.go(redirectPath == '/wallet' ? '/wallet' : '/');
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Email verification failed: $error'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isVerifyingSignup = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen(authStateProvider, (previous, next) {
+      if (_isVerifyingSignup || _hasSignupVerificationToken) {
+        return;
+      }
       final user = next.valueOrNull;
       if (user != null && mounted) {
         context.go(_returnPath);
+      } else if (user == null && mounted) {
+        _startAutoWalletSignIn();
       }
     });
 
+    if (_isVerifyingSignup) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF050816),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
     final compact = MediaQuery.sizeOf(context).width < 860;
     return Scaffold(
       backgroundColor: const Color(0xFF050816),
@@ -89,17 +151,21 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                           flex: compact ? 0 : 1,
                           child: const _AuthStoryPanel(),
                         ),
-                        SizedBox(width: compact ? 0 : 28, height: compact ? 24 : 0),
+                        SizedBox(
+                            width: compact ? 0 : 28, height: compact ? 24 : 0),
                         Expanded(
                           flex: compact ? 0 : 1,
                           child: _AuthFormPanel(
                             formKey: _formKey,
                             emailController: _emailController,
                             passwordController: _passwordController,
-                            nameController: _nameController,
+                            confirmPasswordController: _confirmPasswordController,
+                            usernameController: _usernameController,
                             isLogin: _isLogin,
                             isLoading: _isLoading,
                             isGoogleLoading: _isGoogleLoading,
+                            isWalletLoading: _isWalletLoading,
+                            hasConnectedMetaMask: _hasConnectedMetaMask,
                             onSubmit: _handleSubmit,
                             onGoogle: _handleGoogleSignIn,
                             onCryptoWallet: _handleCryptoWallet,
@@ -143,10 +209,19 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         await authService.registerWithEmail(
           email: _emailController.text,
           password: _passwordController.text,
-          displayName: _nameController.text,
+          username: _usernameController.text,
+          redirectPath: _returnPath == '/wallet' ? '/wallet' : '/',
         );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Check your email to verify your account.'),
+            ),
+          );
+        }
+        return;
       }
-      
+
       if (mounted) {
         context.go(_returnPath);
       }
@@ -169,6 +244,21 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   }
 
   Future<void> _handleGoogleSignIn() async {
+    if (await _connectedMetaMaskAccount() != null) {
+      if (mounted) {
+        setState(() => _hasConnectedMetaMask = true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Disconnect MetaMask or switch to the wallet account flow before using Google.',
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
     setState(() {
       _isGoogleLoading = true;
     });
@@ -196,8 +286,127 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     }
   }
 
-  void _handleCryptoWallet() {
-    context.go('/wallet');
+  Future<void> _handleCryptoWallet() async {
+    await _signInWithWallet(requestAccount: true);
+  }
+
+  Future<void> _signInWithWallet({required bool requestAccount}) async {
+    if (!_wallet.hasProvider) {
+      if (_wallet.openMetaMaskDapp()) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Opening this page in MetaMask...'),
+            backgroundColor: Color(0xFFFACC15),
+          ),
+        );
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content:
+              Text('Install MetaMask or another EVM browser wallet first.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isWalletLoading = true;
+    });
+
+    try {
+      await WalletSignInCoordinator.run(() async {
+        final account =
+            requestAccount ? await _wallet.requestAccount() : await _wallet.currentAccount();
+        final address = account?.trim().toLowerCase();
+        if (address == null || address.isEmpty) {
+          throw StateError('No wallet account selected.');
+        }
+        if (mounted) {
+          setState(() => _hasConnectedMetaMask = true);
+        }
+
+        final auth = ref.read(authServiceProvider);
+        final nonce = await auth.requestWalletNonce(address);
+        final message = nonce['message'] as String? ?? '';
+        if (message.isEmpty) {
+          throw StateError('Wallet sign-in nonce was empty.');
+        }
+        final signature = await _wallet.signMessage(
+          address: address,
+          message: message,
+        );
+        final result = await auth.verifyWalletSignature(
+          address: address,
+          signature: signature,
+        );
+        final token = result['customToken'] as String? ?? '';
+        if (token.isEmpty) {
+          throw StateError('Wallet sign-in token was empty.');
+        }
+        await auth.signInWithCustomToken(token);
+        ref.invalidate(authStateProvider);
+        ref.invalidate(userProfileProvider);
+        ref.invalidate(pknBalanceProvider);
+        if (mounted) {
+          context.go(_returnPath);
+        }
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _hasConnectedMetaMask = false;
+          _autoWalletSignInStarted = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Wallet sign-in failed: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isWalletLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _refreshConnectedMetaMask() async {
+    final account = await _connectedMetaMaskAccount();
+    if (mounted) {
+      setState(() => _hasConnectedMetaMask = account != null);
+    }
+    if (account != null) {
+      await _startAutoWalletSignIn(account);
+    }
+  }
+
+  Future<void> _startAutoWalletSignIn([String? connectedAccount]) async {
+    if (_autoWalletSignInStarted ||
+        _isWalletLoading ||
+        WalletSignInCoordinator.isSigning ||
+        ref.read(authStateProvider).valueOrNull != null) {
+      return;
+    }
+    final account = connectedAccount ?? await _connectedMetaMaskAccount();
+    if (account == null) {
+      return;
+    }
+    _autoWalletSignInStarted = true;
+    await _signInWithWallet(requestAccount: false);
+  }
+
+  Future<String?> _connectedMetaMaskAccount() async {
+    if (!_wallet.hasProvider) {
+      return null;
+    }
+    final account = await _wallet.currentAccount();
+    final normalized = account?.trim().toLowerCase();
+    return normalized == null || normalized.isEmpty ? null : normalized;
   }
 }
 
@@ -224,9 +433,11 @@ class _AuthStoryPanel extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: const Color(0xFF111936),
                   borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                  border:
+                      Border.all(color: Colors.white.withValues(alpha: 0.08)),
                 ),
-                child: const Icon(Icons.style, color: Color(0xFFFACC15), size: 30),
+                child:
+                    const Icon(Icons.style, color: Color(0xFFFACC15), size: 30),
               ),
               const SizedBox(width: 14),
               const Column(
@@ -242,7 +453,8 @@ class _AuthStoryPanel extends StatelessWidget {
                   ),
                   Text(
                     'Collector account + PKN wallet',
-                    style: TextStyle(color: Color(0xFF93A4C8), fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                        color: Color(0xFF93A4C8), fontWeight: FontWeight.w600),
                   ),
                 ],
               ),
@@ -259,7 +471,10 @@ class _AuthStoryPanel extends StatelessWidget {
                 borderRadius: BorderRadius.circular(42),
                 border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
                 boxShadow: const [
-                  BoxShadow(color: Color(0x66000000), blurRadius: 30, offset: Offset(0, 18)),
+                  BoxShadow(
+                      color: Color(0x66000000),
+                      blurRadius: 30,
+                      offset: Offset(0, 18)),
                 ],
               ),
               child: Image.network(
@@ -283,7 +498,8 @@ class _AuthStoryPanel extends StatelessWidget {
           const SizedBox(height: 16),
           const Text(
             'Your account unlocks CardVault marketplace features, persistent wallet access, PKN withdraw requests and PokoinScan activity from the same session.',
-            style: TextStyle(color: Color(0xFFB8C4E6), fontSize: 15, height: 1.55),
+            style:
+                TextStyle(color: Color(0xFFB8C4E6), fontSize: 15, height: 1.55),
           ),
           const SizedBox(height: 22),
           const Wrap(
@@ -291,7 +507,9 @@ class _AuthStoryPanel extends StatelessWidget {
             runSpacing: 10,
             children: [
               _TrustPill(icon: Icons.lock_outline, label: 'Persistent login'),
-              _TrustPill(icon: Icons.account_balance_wallet_outlined, label: 'PKN wallet'),
+              _TrustPill(
+                  icon: Icons.account_balance_wallet_outlined,
+                  label: 'PKN wallet'),
               _TrustPill(icon: Icons.query_stats, label: 'PokoinScan'),
             ],
           ),
@@ -305,10 +523,13 @@ class _AuthFormPanel extends StatelessWidget {
   final GlobalKey<FormState> formKey;
   final TextEditingController emailController;
   final TextEditingController passwordController;
-  final TextEditingController nameController;
+  final TextEditingController confirmPasswordController;
+  final TextEditingController usernameController;
   final bool isLogin;
   final bool isLoading;
   final bool isGoogleLoading;
+  final bool isWalletLoading;
+  final bool hasConnectedMetaMask;
   final VoidCallback onSubmit;
   final VoidCallback onGoogle;
   final VoidCallback onCryptoWallet;
@@ -318,10 +539,13 @@ class _AuthFormPanel extends StatelessWidget {
     required this.formKey,
     required this.emailController,
     required this.passwordController,
-    required this.nameController,
+    required this.confirmPasswordController,
+    required this.usernameController,
     required this.isLogin,
     required this.isLoading,
     required this.isGoogleLoading,
+    required this.isWalletLoading,
+    required this.hasConnectedMetaMask,
     required this.onSubmit,
     required this.onGoogle,
     required this.onCryptoWallet,
@@ -337,7 +561,8 @@ class _AuthFormPanel extends StatelessWidget {
         borderRadius: BorderRadius.circular(28),
         border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
         boxShadow: const [
-          BoxShadow(color: Color(0x66000000), blurRadius: 34, offset: Offset(0, 20)),
+          BoxShadow(
+              color: Color(0x66000000), blurRadius: 34, offset: Offset(0, 20)),
         ],
       ),
       child: Form(
@@ -364,28 +589,39 @@ class _AuthFormPanel extends StatelessWidget {
             ),
             const SizedBox(height: 24),
             FilledButton.icon(
-              onPressed: isGoogleLoading ? null : onGoogle,
+              onPressed:
+                  isGoogleLoading || hasConnectedMetaMask ? null : onGoogle,
               icon: const Icon(Icons.g_mobiledata, size: 28),
-              label: Text(isGoogleLoading ? 'Opening Google...' : 'Continue with Google'),
+              label: Text(isGoogleLoading
+                  ? 'Opening Google...'
+                  : hasConnectedMetaMask
+                      ? 'Google disabled while MetaMask is connected'
+                      : 'Continue with Google'),
               style: FilledButton.styleFrom(
                 backgroundColor: const Color(0xFFFACC15),
                 foregroundColor: const Color(0xFF111827),
                 padding: const EdgeInsets.symmetric(vertical: 15),
                 textStyle: const TextStyle(fontWeight: FontWeight.w900),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
               ),
             ),
             const SizedBox(height: 12),
             OutlinedButton.icon(
-              onPressed: onCryptoWallet,
+              onPressed: isWalletLoading ? null : onCryptoWallet,
               icon: const Icon(Icons.account_balance_wallet_outlined),
-              label: const Text('Continue with crypto wallet'),
+              label: Text(
+                isWalletLoading
+                    ? 'Opening MetaMask...'
+                    : 'Continue with MetaMask or EVM wallet',
+              ),
               style: OutlinedButton.styleFrom(
                 foregroundColor: const Color(0xFFFACC15),
                 side: const BorderSide(color: Color(0x66FACC15)),
                 padding: const EdgeInsets.symmetric(vertical: 15),
                 textStyle: const TextStyle(fontWeight: FontWeight.w900),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
               ),
             ),
             const SizedBox(height: 18),
@@ -394,7 +630,8 @@ class _AuthFormPanel extends StatelessWidget {
                 Expanded(child: Divider(color: Color(0xFF1E293B))),
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: 12),
-                  child: Text('or use email', style: TextStyle(color: Color(0xFF64748B))),
+                  child: Text('or use email',
+                      style: TextStyle(color: Color(0xFF64748B))),
                 ),
                 Expanded(child: Divider(color: Color(0xFF1E293B))),
               ],
@@ -402,12 +639,16 @@ class _AuthFormPanel extends StatelessWidget {
             const SizedBox(height: 18),
             if (!isLogin) ...[
               _DarkTextField(
-                controller: nameController,
-                label: 'Full name',
+                controller: usernameController,
+                label: 'Username',
                 icon: Icons.person_outline,
                 validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Please enter your name';
+                  final clean = value?.trim().toLowerCase() ?? '';
+                  if (clean.isEmpty) {
+                    return 'Please choose a username';
+                  }
+                  if (!RegExp(r'^[a-z0-9]{3,32}$').hasMatch(clean)) {
+                    return 'Use 3-32 lowercase letters or numbers';
                   }
                   return null;
                 },
@@ -445,6 +686,24 @@ class _AuthFormPanel extends StatelessWidget {
                 return null;
               },
             ),
+            if (!isLogin) ...[
+              const SizedBox(height: 14),
+              _DarkTextField(
+                controller: confirmPasswordController,
+                label: 'Retype password',
+                icon: Icons.lock_reset_outlined,
+                obscureText: true,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please retype your password';
+                  }
+                  if (value != passwordController.text) {
+                    return 'Passwords do not match';
+                  }
+                  return null;
+                },
+              ),
+            ],
             const SizedBox(height: 22),
             FilledButton(
               onPressed: isLoading ? null : onSubmit,
@@ -452,14 +711,17 @@ class _AuthFormPanel extends StatelessWidget {
                 backgroundColor: const Color(0xFF7C3AED),
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                textStyle:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
               ),
               child: isLoading
                   ? const SizedBox(
                       width: 20,
                       height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
                     )
                   : Text(isLogin ? 'Sign in' : 'Create account'),
             ),
@@ -468,7 +730,9 @@ class _AuthFormPanel extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  isLogin ? "Don't have an account?" : 'Already have an account?',
+                  isLogin
+                      ? "Don't have an account?"
+                      : 'Already have an account?',
                   style: const TextStyle(color: Color(0xFF93A4C8)),
                 ),
                 TextButton(

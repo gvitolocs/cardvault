@@ -32,7 +32,7 @@ final withdrawRequestsProvider =
 
 final linkedWalletBalanceProvider =
     FutureProvider.autoDispose<String?>((ref) async {
-  final profile = ref.watch(userProfileProvider).valueOrNull;
+  final profile = await ref.watch(userProfileProvider.future);
   final address = profile?.walletAddress?.trim();
   if (address == null || address.isEmpty) {
     return null;

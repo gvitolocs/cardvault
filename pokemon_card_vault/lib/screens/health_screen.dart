@@ -295,15 +295,8 @@ class _HealthTopBar extends StatelessWidget implements PreferredSizeWidget {
     final compact = MediaQuery.sizeOf(context).width < 820;
 
     return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xF2050816),
-        border: Border(
-          bottom: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
-        ),
-        boxShadow: const [
-          BoxShadow(
-              color: Color(0x66000000), blurRadius: 24, offset: Offset(0, 10)),
-        ],
+      decoration: const BoxDecoration(
+        color: Color(0xF2050816),
       ),
       child: SafeArea(
         bottom: false,
@@ -1081,8 +1074,8 @@ class _NodeVersionCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 _LegendRow(
-                  color: const Color(0xFF64748B),
-                  label: 'Version unknown',
+                  color: const Color(0xFFEF4444),
+                  label: 'Quarantine nodes',
                   value: '$unknownNodes nodes',
                 ),
               ],
@@ -1156,7 +1149,7 @@ class _NodeVersionPiePainter extends CustomPainter {
     for (final segment in [
       _PieSegment(currentNodes.toDouble(), const Color(0xFF22C55E)),
       _PieSegment(outdatedNodes.toDouble(), const Color(0xFFF97316)),
-      _PieSegment(unknownNodes.toDouble(), const Color(0xFF64748B)),
+      _PieSegment(unknownNodes.toDouble(), const Color(0xFFEF4444)),
     ]) {
       if (segment.value <= 0) {
         continue;

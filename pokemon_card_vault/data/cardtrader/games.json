@@ -1,0 +1,72 @@
+[
+  {
+    "id": 1,
+    "display_name": "Magic: the Gathering",
+    "name": "Magic"
+  },
+  {
+    "id": 4,
+    "display_name": "Yu-Gi-Oh!",
+    "name": "Yu-Gi-Oh!"
+  },
+  {
+    "id": 5,
+    "display_name": "Pokémon",
+    "name": "Pokémon"
+  },
+  {
+    "id": 6,
+    "display_name": "Flesh and Blood",
+    "name": "Flesh and Blood"
+  },
+  {
+    "id": 8,
+    "display_name": "Digimon",
+    "name": "Digimon"
+  },
+  {
+    "id": 9,
+    "display_name": "Dragon Ball Super",
+    "name": "Dragon Ball Super"
+  },
+  {
+    "id": 10,
+    "display_name": "Cardfight!! Vanguard",
+    "name": "Vanguard"
+  },
+  {
+    "id": 15,
+    "display_name": "One Piece",
+    "name": "One Piece"
+  },
+  {
+    "id": 18,
+    "display_name": "Disney Lorcana",
+    "name": "Lorcana"
+  },
+  {
+    "id": 20,
+    "display_name": "Star Wars Unlimited",
+    "name": "Star Wars"
+  },
+  {
+    "id": 21,
+    "display_name": "Union Arena",
+    "name": "Union Arena"
+  },
+  {
+    "id": 22,
+    "display_name": "Riftbound | League of Legends",
+    "name": "Riftbound"
+  },
+  {
+    "id": 23,
+    "display_name": "Gundam",
+    "name": "Gundam"
+  },
+  {
+    "id": 24,
+    "display_name": "Sorcery: Contested Realm",
+    "name": "Sorcery"
+  }
+]

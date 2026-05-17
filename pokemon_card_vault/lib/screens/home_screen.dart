@@ -27,7 +27,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     _MarketFilter(label: 'Holo grails', rarity: 'Rare Holo'),
     _MarketFilter(label: 'Lightning', type: 'Lightning'),
     _MarketFilter(label: 'Fire icons', type: 'Fire'),
-    _MarketFilter(label: 'Under 100 PKN', maxPrice: 100),
+    _MarketFilter(label: 'Under 50k PKN', maxPrice: 50000),
     _MarketFilter(label: 'Unavailable', inStock: true),
   ];
 
@@ -50,7 +50,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final cardState = ref.watch(cardProvider);
     final cartState = ref.watch(cartProvider);
-    final balance = ref.watch(pknBalanceProvider).valueOrNull ?? 0;
+    final cachedBalance = ref.watch(cachedPknBalanceProvider).valueOrNull;
+    final balance =
+        ref.watch(pknBalanceProvider).valueOrNull ?? cachedBalance ?? 0;
     final cards = cardState.filteredCards;
     final featured = cards.isNotEmpty
         ? cards.take(3).toList()
@@ -582,101 +584,107 @@ class _MarketCard extends ConsumerWidget {
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: ClipRRect(
-                    borderRadius:
-                        const BorderRadius.vertical(top: Radius.circular(24)),
-                    child: Container(
-                      color: const Color(0xFF111936),
-                      child: CachedNetworkImage(
-                        imageUrl: card.imageUrl,
-                        fit: BoxFit.contain,
-                        errorWidget: (_, __, ___) => const Icon(Icons.style,
-                            color: Color(0xFFFACC15), size: 54),
+      child: InkWell(
+        onTap: () => context.go('/card/${card.id}'),
+        borderRadius: BorderRadius.circular(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: ClipRRect(
+                      borderRadius:
+                          const BorderRadius.vertical(top: Radius.circular(24)),
+                      child: Container(
+                        color: const Color(0xFF111936),
+                        child: CachedNetworkImage(
+                          imageUrl: card.imageUrl,
+                          fit: BoxFit.contain,
+                          errorWidget: (_, __, ___) => const Icon(Icons.style,
+                              color: Color(0xFFFACC15), size: 54),
+                        ),
                       ),
                     ),
                   ),
-                ),
-                Positioned(
+                  Positioned(
+                      top: 12,
+                      left: 12,
+                      child: _Badge(
+                          text: card.rarity, color: const Color(0xFFFACC15))),
+                  Positioned(
                     top: 12,
-                    left: 12,
-                    child: _Badge(
-                        text: card.rarity, color: const Color(0xFFFACC15))),
-                Positioned(
-                  top: 12,
-                  right: 12,
-                  child: IconButton.filledTonal(
-                    onPressed: () => ref
-                        .read(favoritesProvider.notifier)
-                        .toggleFavorite(card.id),
-                    icon: Icon(
-                        isFavorite ? Icons.favorite : Icons.favorite_border),
+                    right: 12,
+                    child: IconButton.filledTonal(
+                      onPressed: () => ref
+                          .read(favoritesProvider.notifier)
+                          .toggleFavorite(card.id),
+                      icon: Icon(
+                          isFavorite ? Icons.favorite : Icons.favorite_border),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  card.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  '${card.set} #${card.number} · ${card.condition}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Color(0xFF93A4C8)),
-                ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _MiniSignal(
-                        icon: Icons.star, text: card.rating.toStringAsFixed(1)),
-                    const _MiniSignal(icon: Icons.block, text: 'Unavailable'),
-                    if (card.isHolo)
-                      const _MiniSignal(icon: Icons.auto_awesome, text: 'Holo'),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        formatPkn(card.price),
-                        style: const TextStyle(
-                            color: Color(0xFFFACC15),
-                            fontSize: 22,
-                            fontWeight: FontWeight.w900),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    card.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '${card.set} #${card.number} · ${card.condition}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Color(0xFF93A4C8)),
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _MiniSignal(
+                          icon: Icons.star,
+                          text: card.rating.toStringAsFixed(1)),
+                      const _MiniSignal(icon: Icons.block, text: 'Unavailable'),
+                      if (card.isHolo)
+                        const _MiniSignal(
+                            icon: Icons.auto_awesome, text: 'Holo'),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          formatPkn(card.price),
+                          style: const TextStyle(
+                              color: Color(0xFFFACC15),
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900),
+                        ),
                       ),
-                    ),
-                    FilledButton(
-                      onPressed: null,
-                      child: Text(isInCart ? 'Unavailable' : 'Unavailable'),
-                    ),
-                  ],
-                ),
-              ],
+                      FilledButton(
+                        onPressed: null,
+                        child: Text(isInCart ? 'Unavailable' : 'Unavailable'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -697,40 +705,45 @@ class _FeaturedCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: CachedNetworkImage(
-              imageUrl: card.imageUrl,
-              width: 92,
-              height: 124,
-              fit: BoxFit.contain,
+      child: InkWell(
+        onTap: () => context.go('/card/${card.id}'),
+        borderRadius: BorderRadius.circular(18),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: CachedNetworkImage(
+                imageUrl: card.imageUrl,
+                width: 92,
+                height: 124,
+                fit: BoxFit.contain,
+              ),
             ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _Badge(text: card.rarity, color: const Color(0xFF38BDF8)),
-                const SizedBox(height: 10),
-                Text(card.name,
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 18)),
-                const SizedBox(height: 6),
-                Text('${card.condition} · ${card.set}',
-                    style: const TextStyle(color: Color(0xFFB8C4E6))),
-                const SizedBox(height: 10),
-                Text(formatPkn(card.price),
-                    style: const TextStyle(
-                        color: Color(0xFFFACC15), fontWeight: FontWeight.w900)),
-              ],
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _Badge(text: card.rarity, color: const Color(0xFF38BDF8)),
+                  const SizedBox(height: 10),
+                  Text(card.name,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 18)),
+                  const SizedBox(height: 6),
+                  Text('${card.condition} · ${card.set}',
+                      style: const TextStyle(color: Color(0xFFB8C4E6))),
+                  const SizedBox(height: 10),
+                  Text(formatPkn(card.price),
+                      style: const TextStyle(
+                          color: Color(0xFFFACC15),
+                          fontWeight: FontWeight.w900)),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

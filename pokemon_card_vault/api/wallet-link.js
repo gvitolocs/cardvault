@@ -41,6 +41,7 @@ module.exports = async function handler(req, res) {
 
     const uid = decoded.uid;
     const email = String(decoded.email || '').trim().toLowerCase();
+    const walletOnlyUid = `wallet:${normalized}`;
     const now = admin.firestore.FieldValue.serverTimestamp();
     await ensureUniqueUsername({
       firestore,
@@ -51,12 +52,11 @@ module.exports = async function handler(req, res) {
     });
     const userRef = firestore.collection('users').doc(uid);
     const balanceRef = firestore.collection('balances').doc(uid);
+    const walletOnlyUserRef = firestore.collection('users').doc(walletOnlyUid);
+    const walletOnlyBalanceRef = firestore.collection('balances').doc(walletOnlyUid);
     const walletRegistryRef = firestore.collection('wallet_addresses').doc(normalized);
     const linkedRegistryRef = firestore.collection('wallet_addresses');
-    const requestRef = firestore.collection('withdraw_requests').doc();
-    const ledgerRef = firestore.collection('ledger_entries').doc();
 
-    let convertedPkn = 0;
     await firestore.runTransaction(async (transaction) => {
       const freshNonce = await transaction.get(nonceRef);
       if (!freshNonce.exists || freshNonce.data()?.used === true) {
@@ -67,7 +67,14 @@ module.exports = async function handler(req, res) {
 
       const registry = await transaction.get(walletRegistryRef);
       const ownerUid = registry.data()?.uid;
-      if (registry.exists && ownerUid && ownerUid !== uid) {
+      const canClaimWalletOnlyAccount = ownerUid === walletOnlyUid;
+      const walletOnlyUser = canClaimWalletOnlyAccount
+        ? await transaction.get(walletOnlyUserRef)
+        : null;
+      const walletOnlyBalance = canClaimWalletOnlyAccount
+        ? await transaction.get(walletOnlyBalanceRef)
+        : null;
+      if (registry.exists && ownerUid && ownerUid !== uid && !canClaimWalletOnlyAccount) {
         throw Object.assign(new Error('This wallet is already linked to another account.'), {
           statusCode: 409,
         });
@@ -97,20 +104,55 @@ module.exports = async function handler(req, res) {
         );
       }
 
-      const balance = await transaction.get(balanceRef);
-      convertedPkn = Number(balance.data()?.availablePkn || 0);
-
       transaction.update(nonceRef, { used: true, usedAt: now });
       transaction.set(
         userRef,
         {
           walletAddress: normalized,
           walletConnectedAt: now,
-          walletBalanceMode: 'on_chain',
           updatedAt: now,
         },
         { merge: true },
       );
+      if (canClaimWalletOnlyAccount) {
+        const sourceAvailable = Number(walletOnlyBalance.data()?.availablePkn || 0);
+        const sourceLocked = Number(walletOnlyBalance.data()?.lockedPkn || 0);
+        if (sourceAvailable || sourceLocked) {
+          transaction.set(
+            balanceRef,
+            {
+              availablePkn: admin.firestore.FieldValue.increment(sourceAvailable),
+              lockedPkn: admin.firestore.FieldValue.increment(sourceLocked),
+              updatedAt: now,
+            },
+            { merge: true },
+          );
+          transaction.set(
+            walletOnlyBalanceRef,
+            {
+              availablePkn: 0,
+              lockedPkn: 0,
+              mergedIntoUid: uid,
+              updatedAt: now,
+            },
+            { merge: true },
+          );
+        }
+        transaction.set(
+          walletOnlyUserRef,
+          {
+            mergedIntoUid: uid,
+            mergedAt: now,
+            active: false,
+            updatedAt: now,
+          },
+          { merge: true },
+        );
+        const walletOnlyUsername = String(walletOnlyUser.data()?.username || '').trim().toLowerCase();
+        if (walletOnlyUsername) {
+          transaction.delete(firestore.collection('usernames').doc(walletOnlyUsername));
+        }
+      }
       transaction.set(
         walletRegistryRef,
         {
@@ -122,43 +164,11 @@ module.exports = async function handler(req, res) {
         },
         { merge: true },
       );
-
-      if (convertedPkn > 0) {
-        transaction.set(
-          balanceRef,
-          {
-            availablePkn: admin.firestore.FieldValue.increment(-convertedPkn),
-            lockedPkn: admin.firestore.FieldValue.increment(convertedPkn),
-            updatedAt: now,
-          },
-          { merge: true },
-        );
-        transaction.set(requestRef, {
-          uid,
-          email,
-          toAddress: normalized,
-          amountPkn: convertedPkn,
-          status: 'pending',
-          source: 'wallet_connect_conversion',
-          createdAt: now,
-          updatedAt: now,
-        });
-        transaction.set(ledgerRef, {
-          uid,
-          type: 'wallet_connect_conversion_requested',
-          amountPkn: -convertedPkn,
-          toAddress: normalized,
-          withdrawRequestId: requestRef.id,
-          createdAt: now,
-        });
-      }
     });
 
     return res.status(200).json({
       ok: true,
       walletAddress: normalized,
-      convertedPkn,
-      withdrawRequestId: convertedPkn > 0 ? requestRef.id : null,
     });
   } catch (error) {
     console.error('wallet-link failed', error);

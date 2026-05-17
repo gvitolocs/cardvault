@@ -47,7 +47,6 @@ module.exports = async function handler(req, res) {
 
     const userDoc = await admin.firestore().collection('users').doc(decoded.uid).get();
     const userData = userDoc.data() || {};
-    const walletAddress = userData.walletAddress || '';
     const successUrl = `${process.env.PUBLIC_SITE_URL || 'https://pokoin.com'}/buy?status=success`;
     const cancelUrl = `${process.env.PUBLIC_SITE_URL || 'https://pokoin.com'}/buy?status=cancelled`;
 
@@ -65,9 +64,7 @@ module.exports = async function handler(req, res) {
             unit_amount: expectedFiat,
             product_data: {
               name: `${pknAmount} PKN`,
-              description: walletAddress
-                ? 'Pokoin purchase queued for on-chain delivery.'
-                : 'Pokoin site credit purchase.',
+              description: 'Pokoin account balance credit.',
             },
           },
         },
@@ -77,8 +74,7 @@ module.exports = async function handler(req, res) {
         email: decoded.email || userData.email || '',
         pknAmount: String(pknAmount),
         fiatCents: String(expectedFiat),
-        walletAddress,
-        fulfillmentTarget: walletAddress ? 'onchain_pending' : 'site_credit',
+        fulfillmentTarget: 'site_credit',
       },
     });
 

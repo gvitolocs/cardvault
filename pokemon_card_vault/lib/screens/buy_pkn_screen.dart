@@ -41,7 +41,8 @@ class _BuyPknScreenState extends ConsumerState<BuyPknScreen> {
   Widget build(BuildContext context) {
     final user = ref.watch(authStateProvider).valueOrNull;
     final profile = ref.watch(userProfileProvider).valueOrNull;
-    final balance = ref.watch(pknBalanceProvider).valueOrNull ?? 0;
+    final cachedBalance = ref.watch(cachedPknBalanceProvider).valueOrNull;
+    final balance = ref.watch(pknBalanceProvider).valueOrNull ?? cachedBalance ?? 0;
     final wallet = profile?.walletAddress;
 
     return Scaffold(
@@ -116,7 +117,7 @@ class _BuyPknScreenState extends ConsumerState<BuyPknScreen> {
                               : const Icon(Icons.payment_outlined),
                           label: Text(user == null
                               ? 'Login to buy PKN'
-                              : 'Pay with card or Google Pay'),
+                              : 'Pay securely with card'),
                           style: FilledButton.styleFrom(
                             backgroundColor: const Color(0xFFFACC15),
                             foregroundColor: const Color(0xFF111827),
@@ -205,11 +206,9 @@ class _BuyPknScreenState extends ConsumerState<BuyPknScreen> {
             data['error'] as String? ?? 'Payment confirmation failed.');
       }
       final amount = data['amountPkn']?.toString() ?? 'PKN';
-      final target = data['fulfillmentTarget'] as String? ?? '';
       setState(() {
-        _paymentMessage = target == 'site_credit'
-            ? 'Payment confirmed. $amount PKN added to your site balance.'
-            : 'Payment confirmed. $amount PKN queued for on-chain delivery.';
+        _paymentMessage =
+            'Payment confirmed. $amount PKN added to your account balance.';
       });
       ref.invalidate(pknBalanceProvider);
       ref.invalidate(userProfileProvider);
@@ -332,7 +331,7 @@ class _BuyHero extends StatelessWidget {
                 ),
                 SizedBox(height: 10),
                 Text(
-                  'Pay securely with Stripe Checkout. Google Pay appears automatically when available in your browser and Stripe account.',
+                  'Pay securely with Stripe Checkout. PKN is credited to your account balance after payment.',
                   style: TextStyle(color: Color(0xFFB8C4E6), height: 1.5),
                 ),
               ],
@@ -347,12 +346,10 @@ class _BuyHero extends StatelessWidget {
                 value: signedIn ? 'Logged in' : 'Login required',
                 icon: signedIn ? Icons.verified_user_outlined : Icons.login,
               ),
-              _StatusTile(
+              const _StatusTile(
                 label: 'Fulfillment',
-                value: walletAddress == null ? 'Site credit' : 'On-chain PKN',
-                icon: walletAddress == null
-                    ? Icons.account_balance_wallet_outlined
-                    : Icons.bolt_outlined,
+                value: 'Account balance',
+                icon: Icons.account_balance_wallet_outlined,
               ),
               _StatusTile(
                 label: 'Site balance',
@@ -431,7 +428,6 @@ class _FulfillmentNotice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasWallet = walletAddress != null && walletAddress!.isNotEmpty;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -441,16 +437,16 @@ class _FulfillmentNotice extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(
-            hasWallet ? Icons.bolt_outlined : Icons.info_outline,
-            color: const Color(0xFFFACC15),
+          const Icon(
+            Icons.info_outline,
+            color: Color(0xFFFACC15),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              hasWallet
-                  ? 'After payment, this purchase is queued for on-chain delivery to $walletAddress.'
-                  : 'No wallet is linked yet. After payment, PKN is added as site credit in your Pokoin profile.',
+              walletAddress == null || walletAddress!.isEmpty
+                  ? 'After payment, PKN is added to your account balance. Use Withdraw when you want to send it to a wallet.'
+                  : 'After payment, PKN is added to your account balance, not sent automatically to $walletAddress. Use Withdraw when you want an on-chain payout.',
               style: const TextStyle(color: Color(0xFFB8C4E6), height: 1.45),
             ),
           ),
@@ -523,11 +519,7 @@ class _BuyTopBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xF2050816),
-        border: Border(
-            bottom: BorderSide(color: Colors.white.withValues(alpha: 0.08))),
-      ),
+      decoration: const BoxDecoration(color: Color(0xF2050816)),
       child: SafeArea(
         bottom: false,
         child: Center(

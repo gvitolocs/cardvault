@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -58,8 +59,8 @@ class _WalletScreenState extends State<WalletScreen> {
   static const rpcUrl = 'https://rpc.pokoin.com/rpc';
   static const nativeSymbol = 'PKN';
   static const recentRecipientLimit = 5;
-  static const nativeTreasuryAddress =
-      '0x74466c3a204429b22ce8558f3f18f3c59f67fcb3';
+  static const nativeBankAddress =
+      '0xb4029F68E360280aa4Ad21D8aE5AD8896b8768B2';
   static const wpknSettlementAddress =
       '0x74466c3a204429B22CE8558F3F18f3C59F67fCB3';
 
@@ -67,8 +68,6 @@ class _WalletScreenState extends State<WalletScreen> {
   final WalletBridge _wallet = createWalletBridge();
   final TextEditingController _toController = TextEditingController();
   final TextEditingController _amountController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _exchangeAmountController =
       TextEditingController();
   final TextEditingController _exchangeAddressController =
@@ -83,9 +82,12 @@ class _WalletScreenState extends State<WalletScreen> {
   String? _address;
   WalletUser? _user;
   String? _username;
+  String? _linkedAddress;
   String _balance = '0';
+  int _accountBalance = 0;
   bool _loading = false;
-  bool _switchingWalletAccount = false;
+  bool _authResolved = false;
+  bool _accountBalanceReady = false;
   String? _error;
   int _recipientSearchToken = 0;
 
@@ -93,8 +95,6 @@ class _WalletScreenState extends State<WalletScreen> {
   void dispose() {
     _toController.dispose();
     _amountController.dispose();
-    _emailController.dispose();
-    _passwordController.dispose();
     _exchangeAmountController.dispose();
     _exchangeAddressController.dispose();
     super.dispose();
@@ -105,88 +105,37 @@ class _WalletScreenState extends State<WalletScreen> {
     super.initState();
     _syncConnectedWallet();
     if (_wallet.hasProvider) {
-      _wallet.onAccountsChanged((address) {
-        if (!mounted) {
-          return;
-        }
-        if (address == null) {
-          _handleWalletDisconnected();
-          return;
-        }
-        _handleWalletAccountChanged(address);
-      });
       _wallet.onChainChanged(() {
         if (_address != null) {
           _loadBalance(_address!);
         }
       });
     }
-    _auth.authState.listen((user) {
+    _auth.authState.listen((user) async {
       if (mounted) {
-        setState(() => _user = user);
+        setState(() {
+          _authResolved = true;
+          _user = user;
+        });
+        if (user == null) {
+          _redirectToAuth();
+          return;
+        }
+        final cached = await _auth.cachedAccountBalance(user.uid);
+        if (mounted) {
+          setState(() {
+            if (cached != null) {
+              _accountBalance = cached;
+            }
+            _accountBalanceReady = true;
+          });
+        }
         _loadUsername();
         _loadLinkedWallet();
+        _loadAccountBalance();
         _loadActivity();
       }
     });
-  }
-
-  Future<void> _handleWalletDisconnected() async {
-    setState(() {
-      _address = null;
-      _balance = '0';
-      _username = null;
-      _recipientSuggestions.clear();
-    });
-    await _auth.signOut();
-    if (mounted) {
-      _showMessage('MetaMask disconnected. You have been logged out.');
-    }
-  }
-
-  Future<void> _handleWalletAccountChanged(String address) async {
-    final normalized = address.trim().toLowerCase();
-    if (normalized.isEmpty || normalized == _address?.trim().toLowerCase()) {
-      return;
-    }
-    if (_switchingWalletAccount) {
-      return;
-    }
-
-    setState(() {
-      _switchingWalletAccount = true;
-      _address = null;
-      _balance = '0';
-      _username = null;
-      _recipientSuggestions.clear();
-    });
-
-    try {
-      await _auth.signOut();
-      await _signInWithWalletAddress(normalized);
-      await _loadBalance(normalized);
-      if (!mounted) {
-        return;
-      }
-      setState(() => _address = normalized);
-      await _record(
-          'Switched wallet account', normalized, ActivityKind.inbound);
-      _showMessage('Switched to the selected MetaMask account.');
-      await _loadActivity();
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _address = normalized;
-        _balance = '0';
-      });
-      _showMessage(_friendlyError(error));
-    } finally {
-      if (mounted) {
-        setState(() => _switchingWalletAccount = false);
-      }
-    }
   }
 
   Future<void> _refreshAll() async {
@@ -194,6 +143,7 @@ class _WalletScreenState extends State<WalletScreen> {
     await _loadLinkedWallet();
     await Future.wait(<Future<void>>[
       if (_address != null) _loadBalance(_address!),
+      _loadAccountBalance(),
     ]);
     await _loadActivity();
   }
@@ -203,22 +153,33 @@ class _WalletScreenState extends State<WalletScreen> {
       return;
     }
     final address = await _wallet.currentAccount();
-    if (!mounted || address == null || address == _address) {
+    if (!mounted) {
       return;
     }
-    setState(() => _address = address);
-    await _loadBalance(address);
+    final normalized = address?.trim();
+    if (normalized == null || normalized.isEmpty) {
+      if (_address != null) {
+        setState(() {
+          _address = null;
+          _balance = '0';
+        });
+      }
+      return;
+    }
+    if (normalized == _address) {
+      return;
+    }
+    setState(() => _address = normalized);
+    await _loadBalance(normalized);
     await _loadActivity();
   }
 
   Future<void> _loadLinkedWallet() async {
     final address = await _auth.linkedWalletAddress();
-    if (!mounted || address == null || address == _address) {
+    if (!mounted || address == _linkedAddress) {
       return;
     }
-    setState(() => _address = address);
-    await _loadBalance(address);
-    await _loadActivity();
+    setState(() => _linkedAddress = address);
   }
 
   Future<void> _loadUsername() async {
@@ -231,6 +192,10 @@ class _WalletScreenState extends State<WalletScreen> {
 
   Future<void> _connectWallet() async {
     if (!_wallet.hasProvider) {
+      if (_wallet.openMetaMaskDapp()) {
+        _showMessage('Opening this page in MetaMask...');
+        return;
+      }
       _showMessage('Install MetaMask or another EVM browser wallet first.');
       return;
     }
@@ -240,18 +205,20 @@ class _WalletScreenState extends State<WalletScreen> {
       if (account == null) {
         throw Exception('No wallet account selected');
       }
-      await _signInWithWalletAddress(account);
+      await _linkWalletAddress(account);
       await _wallet.addNetwork();
       await _wallet.switchNetwork();
       await _loadBalance(account);
       setState(() {
         _address = account;
+        _linkedAddress = account.trim().toLowerCase();
       });
-      await _record('Wallet signed in', account, ActivityKind.inbound);
+      await _loadLinkedWallet();
+      await _record('Wallet connected', account, ActivityKind.inbound);
     });
   }
 
-  Future<void> _signInWithWalletAddress(String address) async {
+  Future<void> _linkWalletAddress(String address) async {
     final normalized = address.trim().toLowerCase();
     final nonce = await _auth.requestWalletNonce(normalized);
     final message = nonce['message'];
@@ -262,15 +229,10 @@ class _WalletScreenState extends State<WalletScreen> {
       address: normalized,
       message: message,
     );
-    final verified = await _auth.verifyWalletSignature(
+    await _auth.linkSignedWallet(
       address: normalized,
       signature: signature,
     );
-    final customToken = verified['customToken'];
-    if (customToken == null || customToken.isEmpty) {
-      throw Exception('Wallet sign-in token was empty.');
-    }
-    await _auth.signInWithCustomToken(customToken);
   }
 
   Future<void> _loadBalance(String address) async {
@@ -279,6 +241,18 @@ class _WalletScreenState extends State<WalletScreen> {
       return;
     }
     setState(() => _balance = _formatWei(_hexToBigInt(result as String)));
+  }
+
+  Future<void> _loadAccountBalance() async {
+    final cached = await _auth.cachedAccountBalance(_user?.uid);
+    if (mounted && cached != null && cached != _accountBalance) {
+      setState(() => _accountBalance = cached);
+    }
+    final balance = await _auth.accountBalance();
+    if (!mounted) {
+      return;
+    }
+    setState(() => _accountBalance = balance);
   }
 
   Future<void> _openSendSheet() async {
@@ -518,85 +492,33 @@ class _WalletScreenState extends State<WalletScreen> {
         _showMessage('Enter a valid username or 0x address.');
         return;
       }
+      await _rememberRecipient(recipient);
       await _runTask(() async {
-        String? fundingTxHash;
-        try {
-          await _auth.transferAccountBalance(
-            recipientUsername: recipient,
-            amountPkn: accountAmount,
-          );
-        } catch (error) {
-          final from = _address?.trim();
-          if (!_isLowBalanceError(error) || from == null || from.isEmpty) {
-            rethrow;
-          }
-          fundingTxHash = await _wallet.sendTransaction(
-            from: from,
-            to: nativeTreasuryAddress,
-            valueWei: BigInt.from(accountAmount) * BigInt.from(10).pow(18),
-          );
-          await _auth.transferAccountBalance(
-            recipientUsername: recipient,
-            amountPkn: accountAmount,
-            fundingTxHash: fundingTxHash,
-          );
-          await _loadBalance(from);
-        }
-        await _rememberRecipient(recipient);
+        await _auth.transferAccountBalance(
+          recipientUsername: recipient,
+          amountPkn: accountAmount,
+        );
         _toController.clear();
         _amountController.clear();
-        await _record(
-          fundingTxHash == null
-              ? 'Sent $accountAmount PKN to account'
-              : 'Funded and sent $accountAmount PKN',
-          fundingTxHash ?? recipient,
-          ActivityKind.outbound,
-        );
-        _showMessage(
-          fundingTxHash == null
-              ? 'Account balance transfer sent.'
-              : 'Wallet funded the transfer and PKN was sent.',
-        );
+        await _loadAccountBalance();
+        _showMessage('Account balance transfer sent.');
         await _loadActivity();
       });
       return;
     }
 
     if (accountAmount == null || accountAmount <= 0) {
-      _showMessage('0x transfers use whole PKN amounts.');
-      return;
-    }
-
-    final from = _address?.trim();
-    if (from != null && from.isNotEmpty) {
-      await _runTask(() async {
-        final hash = await _wallet.sendTransaction(
-          from: from,
-          to: recipient,
-          valueWei: BigInt.from(accountAmount) * BigInt.from(10).pow(18),
-        );
-        await _rememberRecipient(recipient);
-        await _loadBalance(from);
-        _toController.clear();
-        _amountController.clear();
-        await _record(
-          'Sent $accountAmount PKN on-chain',
-          hash,
-          ActivityKind.outbound,
-        );
-        _showMessage('On-chain transaction sent.');
-        await _loadActivity();
-      });
+      _showMessage('Withdrawals use whole PKN amounts.');
       return;
     }
 
     if (_user == null) {
-      _showMessage('Connect MetaMask or log in before sending PKN.');
+      _showMessage('Log in before withdrawing PKN.');
       return;
     }
 
     await _runTask(() async {
-      await _auth.requestPknWithdraw(
+      final result = await _auth.requestPknWithdraw(
         toAddress: recipient,
         amountPkn: accountAmount,
       );
@@ -604,15 +526,298 @@ class _WalletScreenState extends State<WalletScreen> {
       _toController.clear();
       _amountController.clear();
       await _record(
-        'Requested $accountAmount PKN withdraw',
+        'Requested $accountAmount PKN withdrawal',
         recipient,
         ActivityKind.outbound,
       );
-      _showMessage(
-        'Withdraw request created. An operator will send PKN from the site treasury account.',
-      );
+      _showMessage(_withdrawMessage(result));
       await _loadActivity();
     });
+  }
+
+  Future<void> _topUpAccountBalance() async {
+    final from = _address?.trim();
+    if (from == null || from.isEmpty) {
+      _showMessage('Connect MetaMask with your linked wallet before topping up.');
+      return;
+    }
+    final linked = _linkedAddress?.trim().toLowerCase();
+    if (linked == null || linked.isEmpty) {
+      _showMessage('Link a wallet before topping up your account balance.');
+      return;
+    }
+    if (from.toLowerCase() != linked) {
+      _showMessage('Switch MetaMask to your linked wallet before topping up.');
+      return;
+    }
+    final amount = int.tryParse(_amountController.text.trim());
+    if (amount == null || amount <= 0) {
+      _showMessage('Enter a whole PKN top-up amount.');
+      return;
+    }
+
+    await _runTask(() async {
+      final hash = await _wallet.sendTransaction(
+        from: from,
+        to: nativeBankAddress,
+        valueWei: BigInt.from(amount) * BigInt.from(10).pow(18),
+      );
+      await _auth.topUpAccountBalance(amountPkn: amount, fundingTxHash: hash);
+      await _loadBalance(from);
+      await _loadAccountBalance();
+      _amountController.clear();
+      await _record('Topped up $amount PKN', hash, ActivityKind.inbound);
+      _showMessage('Account balance topped up.');
+      await _loadActivity();
+    });
+  }
+
+  Future<void> _openTopUpSheet() async {
+    final from = _address?.trim();
+    if (from == null || from.isEmpty) {
+      _showMessage('Connect MetaMask with your linked wallet before topping up.');
+      return;
+    }
+    final linked = _linkedAddress?.trim().toLowerCase();
+    if (linked == null || linked.isEmpty) {
+      _showMessage('Link a wallet before topping up your account balance.');
+      return;
+    }
+    if (from.toLowerCase() != linked) {
+      _showMessage('Switch MetaMask to your linked wallet before topping up.');
+      return;
+    }
+    _amountController.clear();
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(20),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 440),
+          child: Container(
+            padding: EdgeInsets.fromLTRB(
+              22,
+              22,
+              22,
+              22 + MediaQuery.of(dialogContext).viewInsets.bottom,
+            ),
+            decoration: BoxDecoration(
+              color: const Color(0xF20B1020),
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                const Text(
+                  'Top up account balance',
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Enter how many whole PKN to move from your connected MetaMask wallet into your site account balance.',
+                  style: TextStyle(color: Color(0xFFB8C4E6), height: 1.45),
+                ),
+                const SizedBox(height: 18),
+                TextField(
+                  controller: _amountController,
+                  autofocus: true,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Amount in PKN',
+                    prefixIcon: Icon(Icons.add_card_rounded),
+                  ),
+                  onSubmitted: (_) {
+                    Navigator.of(dialogContext).pop();
+                    _topUpAccountBalance();
+                  },
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(),
+                        child: const Text('Cancel'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: () {
+                          Navigator.of(dialogContext).pop();
+                          _topUpAccountBalance();
+                        },
+                        icon: const Icon(Icons.add_card_rounded),
+                        label: const Text('Top up'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openWithdrawSheet() async {
+    final to = _linkedAddress?.trim();
+    if (to == null || to.isEmpty) {
+      _showMessage('Link a default wallet before withdrawing.');
+      return;
+    }
+    if (_accountBalance <= 0) {
+      _showMessage('Your account balance is empty.');
+      return;
+    }
+    _amountController.clear();
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(20),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 440),
+          child: Container(
+            padding: EdgeInsets.fromLTRB(
+              22,
+              22,
+              22,
+              22 + MediaQuery.of(dialogContext).viewInsets.bottom,
+            ),
+            decoration: BoxDecoration(
+              color: const Color(0xF20B1020),
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                const Text(
+                  'Withdraw PKN',
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Enter how many whole PKN to send instantly to your linked wallet. Available: $_accountBalance PKN.',
+                  style: const TextStyle(
+                    color: Color(0xFFB8C4E6),
+                    height: 1.45,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SelectableText(
+                  to,
+                  style: const TextStyle(
+                    color: Color(0xFFFACC15),
+                    fontFamily: 'monospace',
+                  ),
+                ),
+                const SizedBox(height: 18),
+                TextField(
+                  controller: _amountController,
+                  autofocus: true,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Amount in PKN',
+                    prefixIcon: Icon(Icons.savings_outlined),
+                  ),
+                  onSubmitted: (_) {
+                    Navigator.of(dialogContext).pop();
+                    _withdrawToLinkedWallet();
+                  },
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: <Widget>[
+                    for (final preset in <int>[
+                      1,
+                      5,
+                      10,
+                      _accountBalance,
+                    ])
+                      if (preset > 0 && preset <= _accountBalance)
+                        ActionChip(
+                          label: Text(
+                            preset == _accountBalance ? 'Max' : '$preset PKN',
+                          ),
+                          onPressed: () {
+                            _amountController.text = preset.toString();
+                            _amountController.selection =
+                                TextSelection.collapsed(
+                              offset: _amountController.text.length,
+                            );
+                          },
+                        ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(),
+                        child: const Text('Cancel'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: () {
+                          Navigator.of(dialogContext).pop();
+                          _withdrawToLinkedWallet();
+                        },
+                        icon: const Icon(Icons.savings_outlined),
+                        label: const Text('Withdraw'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _withdrawToLinkedWallet() async {
+    final to = _linkedAddress?.trim();
+    if (to == null || to.isEmpty) {
+      _showMessage('Link a default wallet before withdrawing.');
+      return;
+    }
+    final amount = int.tryParse(_amountController.text.trim());
+    if (amount == null || amount <= 0) {
+      _showMessage('Enter a whole PKN withdraw amount.');
+      return;
+    }
+
+    await _runTask(() async {
+      final result =
+          await _auth.requestPknWithdraw(toAddress: to, amountPkn: amount);
+      await _loadAccountBalance();
+      _amountController.clear();
+      await _record('Requested $amount PKN withdraw', to, ActivityKind.outbound);
+      _showMessage(_withdrawMessage(result));
+      await _loadActivity();
+    });
+  }
+
+  String _withdrawMessage(Map<String, dynamic> result) {
+    final txHash = result['payoutTxHash'] as String? ?? '';
+    if (txHash.isNotEmpty) {
+      return 'Withdraw sent from the bank wallet.';
+    }
+    return result['warning'] as String? ??
+        'Withdraw request created for manual bank payout.';
   }
 
   Future<void> _openWpknExchangeSheet() async {
@@ -853,7 +1058,12 @@ class _WalletScreenState extends State<WalletScreen> {
 
   Future<List<ActivityItem>> _loadPersistentWalletActivityItems() async {
     final rows = await _auth.walletActivity();
-    return rows.map(_activityFromWalletActivity).toList(growable: false);
+    return rows
+        .where((row) => !_isLegacyAccountBalanceActivity(
+              row['title'] as String? ?? '',
+            ))
+        .map(_activityFromWalletActivity)
+        .toList(growable: false);
   }
 
   Future<List<ActivityItem>> _loadOnChainActivityItems(String address) async {
@@ -866,14 +1076,47 @@ class _WalletScreenState extends State<WalletScreen> {
 
   ActivityItem _activityFromWalletActivity(Map<String, dynamic> row) {
     final kindText = (row['kind'] as String? ?? '').trim();
+    final title = _cleanActivityTitle(
+      row['title'] as String? ?? 'Wallet activity',
+    );
     return ActivityItem(
       key: 'wallet_activity:${row['id'] ?? row['detail'] ?? ''}',
-      title: row['title'] as String? ?? 'Wallet activity',
-      detail: row['detail'] as String? ?? '',
+      title: title,
+      detail: _shouldHideWalletActivityDetail(title)
+          ? ''
+          : row['detail'] as String? ?? '',
       kind:
           kindText == 'inbound' ? ActivityKind.inbound : ActivityKind.outbound,
       at: _readDate(row['createdAt']),
     );
+  }
+
+  bool _shouldHideWalletActivityDetail(String title) {
+    final normalized = title.trim().toLowerCase();
+    return normalized.contains('from account balance') ||
+        normalized.contains('to account') ||
+        normalized.contains('to wallet') ||
+        RegExp(r'^(sent|received) \d+ pkn (to|from) ').hasMatch(normalized);
+  }
+
+  bool _isLegacyAccountBalanceActivity(String title) {
+    final normalized = title.trim().toLowerCase();
+    return normalized.contains('from account balance') ||
+        normalized.contains('to account balance');
+  }
+
+  String _cleanActivityTitle(String title) {
+    return title
+        .replaceAll(
+          RegExp(r'\s+from account balance\b', caseSensitive: false),
+          '',
+        )
+        .replaceAll(
+          RegExp(r'\s+from account\b', caseSensitive: false),
+          '',
+        )
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
   }
 
   ActivityItem _activityFromLedger(Map<String, dynamic> row) {
@@ -888,8 +1131,12 @@ class _WalletScreenState extends State<WalletScreen> {
         .toString();
     return ActivityItem(
       key: 'ledger:${row['id'] ?? type}:$counterparty:$amount',
-      title: _ledgerTitle(type, amount),
-      detail: counterparty.isEmpty ? type : counterparty,
+      title: _ledgerTitle(type, amount, counterparty),
+      detail: type.startsWith('account_transfer_')
+          ? ''
+          : counterparty.isEmpty
+              ? type
+              : counterparty,
       kind: outbound ? ActivityKind.outbound : ActivityKind.inbound,
       at: _readDate(row['createdAt']),
     );
@@ -901,6 +1148,9 @@ class _WalletScreenState extends State<WalletScreen> {
     final hash = row['hash'] as String? ?? '';
     final outbound = from == address;
     final amount = _readInt(row['amount']);
+    final block = _readInt(row['blockNumber']);
+    final index = _readInt(row['transactionIndex']);
+    final explicitDate = _readChainDate(row);
     return ActivityItem(
       key: 'chain:$hash',
       title:
@@ -909,19 +1159,28 @@ class _WalletScreenState extends State<WalletScreen> {
           ? '${_shortAddress(from)} -> ${_shortAddress(to)}'
           : hash,
       kind: outbound ? ActivityKind.outbound : ActivityKind.inbound,
-      at: _readDate(row['timestamp'] ?? row['createdAt']).subtract(
-        Duration(minutes: _readInt(row['transactionIndex'])),
-      ),
+      at: explicitDate ??
+          _chainSortDate(
+            blockNumber: block,
+            transactionIndex: index,
+          ),
+      timestampLabel:
+          explicitDate == null && block > 0 ? 'Block $block' : null,
     );
   }
 
-  String _ledgerTitle(String type, int amount) {
+  String _ledgerTitle(String type, int amount, String counterparty) {
     final abs = amount.abs();
+    final name = counterparty.trim();
     if (type == 'account_transfer_sent') {
-      return 'Sent $abs PKN to username';
+      return name.isEmpty ? 'Sent $abs PKN' : 'Sent $abs PKN to $name';
     }
     if (type == 'account_transfer_received') {
-      return 'Received $abs PKN by username';
+      return name.isEmpty ? 'Received $abs PKN' : 'Received $abs PKN from $name';
+    }
+    if (type == 'account_transfer_payout_pending' ||
+        type == 'account_transfer_payout_sent') {
+      return 'Received $abs PKN to wallet';
     }
     if (type == 'pkn_purchase_credit') {
       return 'Bought $abs PKN';
@@ -952,6 +1211,28 @@ class _WalletScreenState extends State<WalletScreen> {
     return DateTime.now();
   }
 
+  static DateTime? _readChainDate(Map<String, dynamic> row) {
+    final explicit = row['timestamp'] ?? row['createdAt'] ?? row['time'];
+    if (explicit != null) {
+      final parsed = _readDate(explicit);
+      if (explicit is! String || DateTime.tryParse(explicit) != null) {
+        return parsed;
+      }
+    }
+    return null;
+  }
+
+  static DateTime _chainSortDate({
+    required int blockNumber,
+    required int transactionIndex,
+  }) {
+    final base = DateTime(1970);
+    if (blockNumber <= 0) {
+      return base.add(Duration(milliseconds: transactionIndex));
+    }
+    return base.add(Duration(seconds: blockNumber, milliseconds: transactionIndex));
+  }
+
   static String _formatWholePkn(int amount) {
     final text = amount.toString();
     if (text.length > 18) {
@@ -974,11 +1255,11 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   String? get _recentRecipientKey {
-    final accountKey = (_user?.uid ?? _address)?.trim().toLowerCase();
+    final accountKey = (_address ?? _user?.uid)?.trim().toLowerCase();
     if (accountKey == null || accountKey.isEmpty) {
       return null;
     }
-    return 'pokoin_wallet_recent_recipients:$accountKey';
+    return 'pokoin_wallet_recent_recipients:v2:$accountKey';
   }
 
   Future<List<String>> _loadRecentRecipients() async {
@@ -1065,16 +1346,10 @@ class _WalletScreenState extends State<WalletScreen> {
         .replaceFirst('Invalid argument(s): ', '');
   }
 
-  static bool _isLowBalanceError(Object error) {
-    return error
-        .toString()
-        .toLowerCase()
-        .contains('account balance is too low');
-  }
-
   Future<void> _record(String title, String detail, ActivityKind kind) async {
+    final cleanTitle = _cleanActivityTitle(title);
     await _auth.recordWalletActivity(
-      title: title,
+      title: cleanTitle,
       detail: detail,
       kind: kind == ActivityKind.inbound ? 'inbound' : 'outbound',
     );
@@ -1083,7 +1358,7 @@ class _WalletScreenState extends State<WalletScreen> {
         0,
         ActivityItem(
           key: 'local:${DateTime.now().microsecondsSinceEpoch}:$detail',
-          title: title,
+          title: cleanTitle,
           detail: detail,
           kind: kind,
           at: DateTime.now(),
@@ -1104,33 +1379,18 @@ class _WalletScreenState extends State<WalletScreen> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
-  Future<void> _handleEmailAuth() async {
-    final email = _emailController.text.trim();
-    final password = _passwordController.text;
-    if (!email.contains('@') || password.length < 6) {
-      _showMessage(
-        'Enter a valid email and a password with at least 6 characters.',
-      );
-      return;
-    }
-
-    await _runTask(() async {
-      await _auth.signInWithEmail(email, password);
-      _passwordController.clear();
-      _showMessage('Logged in.');
-    });
-  }
-
-  Future<void> _handleGoogleAuth() async {
-    await _runTask(() async {
-      await _auth.signInWithGoogle();
-      _showMessage('Logged in with Google.');
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final wide = MediaQuery.sizeOf(context).width > 860;
+    if (!_authResolved || _user == null || !_accountBalanceReady) {
+      if (_authResolved) {
+        _redirectToAuth();
+      }
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       body: SafeArea(
         child: RefreshIndicator(
@@ -1149,7 +1409,6 @@ class _WalletScreenState extends State<WalletScreen> {
                             _openUrl('https://pokoin.com/marketplace'),
                       ),
                       const SizedBox(height: 20),
-                      _buildAuthPanel(),
                       if (_error != null) _ErrorBanner(message: _error!),
                       if (_loading) const LinearProgressIndicator(),
                       const SizedBox(height: 14),
@@ -1179,6 +1438,19 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
+  void _redirectToAuth() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      final location = GoRouterState.of(context).uri.toString();
+      final from = Uri.encodeComponent(
+        location.isEmpty || location == '/' ? '/wallet' : location,
+      );
+      context.go('/auth?from=$from');
+    });
+  }
+
   Widget _buildWalletPanel() {
     final hasConnectedWallet = (_address ?? '').trim().isNotEmpty;
     return _Panel(
@@ -1186,22 +1458,50 @@ class _WalletScreenState extends State<WalletScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           const Text(
-            'Live PKN balance',
+            'Account balance',
             style: TextStyle(color: Colors.white70),
           ),
           const SizedBox(height: 10),
           Text(
-            '$_balance $nativeSymbol',
+            '$_accountBalance $nativeSymbol',
             style: const TextStyle(fontSize: 38, fontWeight: FontWeight.w900),
           ),
-          const SizedBox(height: 12),
-          SelectableText(
-            _address ?? 'No wallet connected',
-            style: const TextStyle(
-              color: Color(0xFFCBD5E1),
-              fontFamily: 'monospace',
+          if (hasConnectedWallet) ...<Widget>[
+            const SizedBox(height: 18),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  const Text(
+                    'Connected wallet balance',
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '$_balance $nativeSymbol',
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SelectableText(
+                    _address!,
+                    style: const TextStyle(
+                      color: Color(0xFFCBD5E1),
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
+          ],
           if (!hasConnectedWallet) ...<Widget>[
             const SizedBox(height: 18),
             Wrap(
@@ -1211,7 +1511,12 @@ class _WalletScreenState extends State<WalletScreen> {
                 FilledButton.icon(
                   onPressed: _connectWallet,
                   icon: const Icon(Icons.account_balance_wallet),
-                  label: const Text('Sign in with MetaMask'),
+                  label: const Text('Connect MetaMask'),
+                  style: FilledButton.styleFrom(
+                    side: BorderSide.none,
+                    elevation: 0,
+                    shadowColor: Colors.transparent,
+                  ),
                 ),
                 OutlinedButton.icon(
                   onPressed: () => _runTask(() async {
@@ -1221,84 +1526,17 @@ class _WalletScreenState extends State<WalletScreen> {
                   }),
                   icon: const Icon(Icons.add_link),
                   label: const Text('Add Pokoin network'),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide.none,
+                    elevation: 0,
+                    shadowColor: Colors.transparent,
+                  ),
                 ),
               ],
             ),
           ],
         ],
       ),
-    );
-  }
-
-  Widget _buildAuthPanel() {
-    return StreamBuilder<WalletUser?>(
-      stream: _auth.authState,
-      builder: (context, snapshot) {
-        final user = snapshot.data;
-        final hasConnectedWallet = (_address ?? '').trim().isNotEmpty;
-        if (user != null || hasConnectedWallet) {
-          return const SizedBox.shrink();
-        }
-
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 18),
-          child: _Panel(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                const Text(
-                  'Login to Pokoin',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Use the same account as pokoin.com. Wallet connection remains separate and optional.',
-                  style: TextStyle(color: Colors.white70),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    prefixIcon: Icon(Icons.email_outlined),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _passwordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Password',
-                    prefixIcon: Icon(Icons.lock_outline),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: <Widget>[
-                    FilledButton.icon(
-                      onPressed: _handleEmailAuth,
-                      icon: const Icon(Icons.login),
-                      label: const Text('Login'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: _handleGoogleAuth,
-                      icon: const Icon(Icons.g_mobiledata),
-                      label: const Text('Google'),
-                    ),
-                    TextButton(
-                      onPressed: _connectWallet,
-                      child: const Text('Connect crypto wallet'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
     );
   }
 
@@ -1323,6 +1561,16 @@ class _WalletScreenState extends State<WalletScreen> {
             }
             _showAddressDialog();
           },
+        ),
+        _QuickActionButton(
+          icon: Icons.add_card_rounded,
+          label: 'Top up',
+          onTap: _openTopUpSheet,
+        ),
+        _QuickActionButton(
+          icon: Icons.savings_outlined,
+          label: 'Withdraw',
+          onTap: _openWithdrawSheet,
         ),
         _QuickActionButton(
           icon: Icons.currency_exchange,
@@ -1375,8 +1623,13 @@ class _WalletScreenState extends State<WalletScreen> {
                   ),
                 ),
                 title: Text(item.title),
-                subtitle: SelectableText(item.detail),
-                trailing: Text(_formatDate(item.at)),
+                subtitle: item.detail.isEmpty
+                    ? null
+                    : Text(
+                        item.detail,
+                        style: const TextStyle(decoration: TextDecoration.none),
+                      ),
+                trailing: Text(item.timestampLabel ?? _formatDate(item.at)),
               ),
         ],
       ),
@@ -1550,14 +1803,6 @@ class _Panel extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xCC0B1020),
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-        boxShadow: const <BoxShadow>[
-          BoxShadow(
-            color: Color(0x33000000),
-            blurRadius: 32,
-            offset: Offset(0, 18),
-          ),
-        ],
       ),
       child: child,
     );
@@ -1855,6 +2100,7 @@ class ActivityItem {
     required this.detail,
     required this.kind,
     required this.at,
+    this.timestampLabel,
   });
 
   final String key;
@@ -1862,4 +2108,5 @@ class ActivityItem {
   final String detail;
   final ActivityKind kind;
   final DateTime at;
+  final String? timestampLabel;
 }

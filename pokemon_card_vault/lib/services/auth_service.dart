@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
 import '../models/app_user_profile.dart';
@@ -43,6 +44,14 @@ class AuthService {
 
   User? get currentUser => _auth.currentUser;
 
+  Set<String> get currentProviderIds {
+    final user = _auth.currentUser;
+    if (user == null) {
+      return const <String>{};
+    }
+    return user.providerData.map((info) => info.providerId).toSet();
+  }
+
   Future<void> initializeSession() async {
     if (kIsWeb) {
       await _auth.setPersistence(Persistence.LOCAL);
@@ -63,6 +72,9 @@ class AuthService {
     required String email,
     required String password,
   }) async {
+    if (kIsWeb) {
+      await _auth.setPersistence(Persistence.LOCAL);
+    }
     final credential = await _auth.signInWithEmailAndPassword(
       email: email.trim(),
       password: password,
@@ -72,26 +84,66 @@ class AuthService {
     return credential;
   }
 
-  Future<UserCredential> registerWithEmail({
+  Future<void> registerWithEmail({
     required String email,
     required String password,
-    required String displayName,
+    required String username,
+    required String redirectPath,
   }) async {
-    final credential = await _auth.createUserWithEmailAndPassword(
-      email: email.trim(),
-      password: password,
-    );
-    if (displayName.trim().isNotEmpty) {
-      await credential.user?.updateDisplayName(displayName.trim());
-      await credential.user?.reload();
+    final cleanEmail = email.trim().toLowerCase();
+    final cleanUsername = username.trim().toLowerCase();
+    if (!RegExp(r'^[a-z0-9]{3,32}$').hasMatch(cleanUsername)) {
+      throw ArgumentError(
+        'Username must be 3-32 letters or numbers, with no spaces.',
+      );
     }
+    if (kIsWeb) {
+      await _auth.setPersistence(Persistence.LOCAL);
+    }
+    final response = await http.post(
+      Uri.parse('/api/register-email'),
+      headers: const {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'email': cleanEmail,
+        'password': password,
+        'username': cleanUsername,
+        'redirectPath': redirectPath,
+      }),
+    );
+    final payload = _decodeJsonResponse(response.body);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError(payload['error'] as String? ?? 'Registration failed.');
+    }
+  }
+
+  Future<String> verifyEmailSignupToken(String signupToken) async {
+    if (kIsWeb) {
+      await _auth.setPersistence(Persistence.LOCAL);
+    }
+    final response = await http.post(
+      Uri.parse('/api/verify-email-signup'),
+      headers: const {'Content-Type': 'application/json'},
+      body: jsonEncode({'token': signupToken.trim()}),
+    );
+    final payload = _decodeJsonResponse(response.body);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError(payload['error'] as String? ?? 'Email verification failed.');
+    }
+    final token = payload['customToken'] as String? ?? '';
+    if (token.isEmpty) {
+      throw StateError('Email verification did not return a login token.');
+    }
+    final credential = await _auth.signInWithCustomToken(token);
+    await credential.user?.reload();
     await ensureUserProfile(_auth.currentUser ?? credential.user);
     await _markFreshLogin(_auth.currentUser ?? credential.user);
-    return credential;
+    final redirectPath = payload['redirectPath'] as String? ?? '/';
+    return redirectPath.startsWith('/') ? redirectPath : '/';
   }
 
   Future<UserCredential> signInWithGoogle() async {
     if (kIsWeb) {
+      await _auth.setPersistence(Persistence.LOCAL);
       final provider = GoogleAuthProvider()
         ..setCustomParameters(<String, String>{
           'prompt': 'select_account',
@@ -99,6 +151,9 @@ class AuthService {
       final credential = await _auth.signInWithPopup(provider);
       await ensureUserProfile(credential.user);
       await _markFreshLogin(credential.user);
+      if (credential.additionalUserInfo?.isNewUser == true) {
+        await sendSignupNotification(provider: 'google');
+      }
       return credential;
     }
 
@@ -118,7 +173,116 @@ class AuthService {
     final userCredential = await _auth.signInWithCredential(credential);
     await ensureUserProfile(userCredential.user);
     await _markFreshLogin(userCredential.user);
+    if (userCredential.additionalUserInfo?.isNewUser == true) {
+      await sendSignupNotification(provider: 'google');
+    }
     return userCredential;
+  }
+
+  Map<String, dynamic> _decodeJsonResponse(String body) {
+    if (body.trim().isEmpty) {
+      return <String, dynamic>{'error': 'Server returned an empty response.'};
+    }
+    final decoded = jsonDecode(body);
+    if (decoded is Map<String, dynamic>) {
+      return decoded;
+    }
+    return <String, dynamic>{'error': 'Server returned an invalid response.'};
+  }
+
+  Future<void> sendSignupNotification({required String provider}) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      return;
+    }
+    final token = await user.getIdToken();
+    final response = await http.post(
+      Uri.parse('/api/signup-notification'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({'provider': provider}),
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      debugPrint('Signup notification failed: ${response.body}');
+    }
+  }
+
+  Future<UserCredential> linkGoogleToCurrentUser() async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw StateError('Log in before connecting Google.');
+    }
+
+    UserCredential credential;
+    if (kIsWeb) {
+      final provider = GoogleAuthProvider()
+        ..setCustomParameters(<String, String>{
+          'prompt': 'select_account',
+        });
+      credential = await user.linkWithPopup(provider);
+    } else {
+      final googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        throw FirebaseAuthException(
+          code: 'popup-closed-by-user',
+          message: 'Google sign-in was cancelled.',
+        );
+      }
+      final googleAuth = await googleUser.authentication;
+      final googleCredential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+      credential = await user.linkWithCredential(googleCredential);
+    }
+
+    await credential.user?.reload();
+    final refreshed = _auth.currentUser ?? credential.user;
+    await ensureUserProfile(refreshed);
+    await _markFreshLogin(refreshed);
+    return credential;
+  }
+
+  Future<void> setEmailPassword({
+    required String email,
+    required String password,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw StateError('Log in before updating email/password.');
+    }
+    final cleanEmail = email.trim().toLowerCase();
+    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(cleanEmail)) {
+      throw ArgumentError('Enter a valid email address.');
+    }
+    if (password.length < 6) {
+      throw ArgumentError('Password must be at least 6 characters.');
+    }
+
+    final hasPasswordProvider =
+        user.providerData.any((info) => info.providerId == 'password');
+    final currentEmail = (user.email ?? '').trim().toLowerCase();
+    if (currentEmail.isNotEmpty) {
+      if (currentEmail != cleanEmail) {
+        await user.verifyBeforeUpdateEmail(cleanEmail);
+      }
+      await user.updatePassword(password);
+    } else if (!hasPasswordProvider) {
+      final credential = EmailAuthProvider.credential(
+        email: cleanEmail,
+        password: password,
+      );
+      await user.linkWithCredential(credential);
+    } else {
+      await user.updatePassword(password);
+    }
+
+    await user.reload();
+    final refreshed = _auth.currentUser ?? user;
+    await ensureUserProfile(refreshed);
+    await _markFreshLogin(refreshed);
   }
 
   Future<void> signOut() async {
@@ -137,12 +301,31 @@ class AuthService {
     });
   }
 
-  Stream<int> balanceStream(String uid) {
-    return _firestore.collection('balances').doc(uid).snapshots().map((doc) {
+  Stream<int> balanceStream(String uid) async* {
+    final cached = await cachedBalance(uid);
+    if (cached != null) {
+      yield cached;
+    }
+
+    yield* _firestore.collection('balances').doc(uid).snapshots().map((doc) {
       final data = doc.data();
-      return data?['availablePkn'] as int? ?? 0;
+      final balance = (data?['availablePkn'] as num?)?.toInt() ?? 0;
+      _cacheBalance(uid, balance);
+      return balance;
     });
   }
+
+  Future<int?> cachedBalance(String uid) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt(_balanceCacheKey(uid));
+  }
+
+  Future<void> _cacheBalance(String uid, int balance) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_balanceCacheKey(uid), balance);
+  }
+
+  String _balanceCacheKey(String uid) => 'pokoin_account_balance:$uid';
 
   Future<void> ensureUserProfile(User? user) async {
     if (user == null) {
@@ -161,7 +344,6 @@ class AuthService {
         'email': user.email ?? '',
         'displayName':
             user.displayName ?? user.email?.split('@').first ?? 'Pokoin user',
-        'photoUrl': user.photoURL,
         'updatedAt': now,
       };
 
@@ -206,11 +388,14 @@ class AuthService {
     return payload['username'] as String?;
   }
 
-  Future<void> requestWithdraw({
-    required String uid,
+  Future<Map<String, dynamic>> requestWithdraw({
     required String toAddress,
     required int amountPkn,
   }) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw StateError('Log in before requesting a withdraw.');
+    }
     final address = toAddress.trim();
     if (!RegExp(r'^0x[a-fA-F0-9]{40}$').hasMatch(address)) {
       throw ArgumentError('Enter a valid 0x payout address.');
@@ -219,14 +404,20 @@ class AuthService {
       throw ArgumentError('Withdraw amount must be greater than zero.');
     }
 
-    await _firestore.collection('withdraw_requests').add({
-      'uid': uid,
-      'toAddress': address,
-      'amountPkn': amountPkn,
-      'status': 'pending',
-      'createdAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+    final token = await user.getIdToken();
+    final response = await http.post(
+      Uri.parse('/api/request-pkn-withdraw'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({'toAddress': address, 'amountPkn': amountPkn}),
+    );
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError(payload['error'] as String? ?? 'Withdraw request failed.');
+    }
+    return payload;
   }
 
   Future<Map<String, dynamic>> requestWalletNonce(String address) async {
@@ -264,6 +455,9 @@ class AuthService {
   }
 
   Future<void> signInWithCustomToken(String customToken) async {
+    if (kIsWeb) {
+      await _auth.setPersistence(Persistence.LOCAL);
+    }
     final credential = await _auth.signInWithCustomToken(customToken);
     await ensureUserProfile(credential.user);
     await _markFreshLogin(credential.user);
@@ -379,8 +573,6 @@ class AuthService {
           payload['error'] as String? ?? 'Profile picture upload failed.');
     }
     final photoUrl = payload['photoUrl'] as String? ?? '';
-    await user.updatePhotoURL(photoUrl);
-    await user.reload();
     return photoUrl;
   }
 
@@ -399,8 +591,6 @@ class AuthService {
       throw StateError(
           payload['error'] as String? ?? 'Profile picture removal failed.');
     }
-    await user.updatePhotoURL(null);
-    await user.reload();
   }
 
   Future<bool> _isInactivePastLimit(String uid) async {

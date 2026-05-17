@@ -25,6 +25,8 @@ import 'screens/docs_screen.dart';
 import 'screens/forum_screen.dart';
 import 'constants/app_colors.dart';
 import 'constants/project_links.dart';
+import 'providers/marketplace_account_provider.dart';
+import 'wallet/wallet_bridge_stub.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -58,14 +60,133 @@ Future<void> _initializeFirebase() async {
   }
 }
 
-class PokemonCardVaultApp extends ConsumerWidget {
+class PokemonCardVaultApp extends ConsumerStatefulWidget {
   const PokemonCardVaultApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PokemonCardVaultApp> createState() =>
+      _PokemonCardVaultAppState();
+}
+
+class _PokemonCardVaultAppState extends ConsumerState<PokemonCardVaultApp> {
+  late final WalletBridge _wallet = createWalletBridge();
+  final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey =
+      GlobalKey<ScaffoldMessengerState>();
+  bool _walletListenerAttached = false;
+  bool _switchingWalletAccount = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _attachWalletAccountListener();
+    });
+  }
+
+  void _attachWalletAccountListener() {
+    if (_walletListenerAttached || !_wallet.hasProvider) {
+      return;
+    }
+    _walletListenerAttached = true;
+    _wallet.onAccountsChanged((address) {
+      _handleWalletAccountChanged(address);
+    });
+  }
+
+  Future<void> _handleWalletAccountChanged(String? address) async {
+    final normalized = address?.trim().toLowerCase();
+    if (_switchingWalletAccount || WalletSignInCoordinator.isSigning) {
+      return;
+    }
+
+    final currentUser = ref.read(authServiceProvider).currentUser;
+    if (currentUser == null) {
+      return;
+    }
+
+    final currentProfile = ref.read(userProfileProvider).valueOrNull;
+    final linkedWallet =
+        currentProfile?.walletAddress?.trim().toLowerCase() ?? '';
+    final hasLinkedWallet = linkedWallet.isNotEmpty;
+    if (!hasLinkedWallet) {
+      return;
+    }
+
+    if (normalized == null || normalized.isEmpty) {
+      await ref.read(authServiceProvider).signOut();
+      _refreshAccountProviders();
+      if (mounted) {
+        _showWalletMessage('MetaMask disconnected. You have been logged out.');
+      }
+      return;
+    }
+
+    if (linkedWallet == normalized) {
+      ref.invalidate(linkedWalletBalanceProvider);
+      return;
+    }
+
+    try {
+      _switchingWalletAccount = true;
+      await WalletSignInCoordinator.run(() async {
+        final auth = ref.read(authServiceProvider);
+        final nonce = await auth.requestWalletNonce(normalized);
+        final message = nonce['message'] as String? ?? '';
+        if (message.isEmpty) {
+          throw StateError('Wallet sign-in nonce was empty.');
+        }
+        final signature = await _wallet.signMessage(
+          address: normalized,
+          message: message,
+        );
+        final result = await auth.verifyWalletSignature(
+          address: normalized,
+          signature: signature,
+        );
+        final token = result['customToken'] as String? ?? '';
+        if (token.isEmpty) {
+          throw StateError('Wallet sign-in token was empty.');
+        }
+        await auth.signInWithCustomToken(token);
+      });
+      _refreshAccountProviders();
+      if (mounted) {
+        _showWalletMessage('Switched to the selected MetaMask account.');
+      }
+    } catch (error) {
+      if (mounted) {
+        _showWalletMessage('Wallet account switch failed: $error',
+            isError: true);
+      }
+    } finally {
+      _switchingWalletAccount = false;
+    }
+  }
+
+  void _refreshAccountProviders() {
+    ref.invalidate(authStateProvider);
+    ref.invalidate(userProfileProvider);
+    ref.invalidate(pknBalanceProvider);
+    ref.invalidate(linkedWalletBalanceProvider);
+    ref.invalidate(userOrdersProvider);
+    ref.invalidate(withdrawRequestsProvider);
+  }
+
+  void _showWalletMessage(String message, {bool isError = false}) {
+    _scaffoldMessengerKey.currentState?.showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red : null,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     ref.watch(authBootstrapProvider);
     return MaterialApp.router(
       title: 'CardVault',
+      scaffoldMessengerKey: _scaffoldMessengerKey,
       debugShowCheckedModeBanner: false,
       scrollBehavior: const _WebScrollBehavior(),
       theme: ThemeData(
@@ -142,6 +263,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       final user = Firebase.apps.isEmpty ? null : authService.currentUser;
       final isLoggedIn = user != null;
       final isAuthRoute = state.matchedLocation == '/auth';
+      final isSignupVerification =
+          state.uri.queryParameters['signupToken']?.isNotEmpty == true;
       final isProtectedRoute = {
         '/wallet',
         '/profile',
@@ -153,7 +276,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         final from = Uri.encodeComponent(state.uri.toString());
         return '/auth?from=$from';
       }
-      if (isLoggedIn && isAuthRoute) {
+      if (isLoggedIn && isAuthRoute && !isSignupVerification) {
         return state.uri.queryParameters['from'] ?? '/profile';
       }
       return null;
@@ -187,6 +310,18 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/tx/:hash',
         builder: (context, state) => ScanScreen(
           initialQuery: state.pathParameters['hash'],
+        ),
+      ),
+      GoRoute(
+        path: '/address/:address',
+        builder: (context, state) => ScanScreen(
+          initialQuery: state.pathParameters['address'],
+        ),
+      ),
+      GoRoute(
+        path: '/block/:id',
+        builder: (context, state) => ScanScreen(
+          initialQuery: state.pathParameters['id'],
         ),
       ),
       GoRoute(

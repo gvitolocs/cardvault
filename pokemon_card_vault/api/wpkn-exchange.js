@@ -1,4 +1,5 @@
 const { getFirebaseAdmin, verifyBearerToken } = require('../server/_firebase');
+const { sendReservePkn } = require('../server/_native_pkn');
 const {
   calculateQuote,
   findWpknDeposit,
@@ -227,18 +228,8 @@ async function handleRequest(req, res, decoded, admin, firestore) {
           statusCode: 409,
         });
       }
-      baseRequest.status = 'completed';
-      baseRequest.settlementMode = 'automatic_available';
-      baseRequest.completedAt = now;
-      transaction.set(
-        balanceRef,
-        {
-          availablePkn: admin.firestore.FieldValue.increment(baseRequest.amountOutQuoted),
-          lockedPkn: admin.firestore.FieldValue.increment(0),
-          updatedAt: now,
-        },
-        { merge: true },
-      );
+      baseRequest.status = 'pending_payout';
+      baseRequest.settlementMode = 'pkn_reserve_pending';
       transaction.set(depositRef, {
         uid: decoded.uid,
         requestId: requestRef.id,
@@ -249,18 +240,19 @@ async function handleRequest(req, res, decoded, admin, firestore) {
       });
       transaction.set(ledgerRef, {
         uid: decoded.uid,
-        type: 'wpkn_exchange_pkn_credited',
+        type: 'wpkn_exchange_wpkn_deposited',
         amountPkn: baseRequest.amountOutQuoted,
         wpknExchangeRequestId: requestRef.id,
         depositTxHash: verifiedDeposit.txHash,
         fromAddress: verifiedDeposit.fromAddress,
+        toAddress: payoutAddress,
         createdAt: now,
       });
     }
 
     transaction.set(requestRef, baseRequest);
     transaction.update(quoteRef, {
-      status: direction === 'wpkn_to_pkn' ? 'completed' : 'pending_deposit_or_lock',
+      status: direction === 'wpkn_to_pkn' ? 'pending_payout' : 'pending_deposit_or_lock',
       requestId: requestRef.id,
       updatedAt: now,
     });
@@ -271,7 +263,47 @@ async function handleRequest(req, res, decoded, admin, firestore) {
     mode: requestPayload.settlementMode,
     txHash: direction === 'wpkn_to_pkn' ? verifiedDeposit.txHash : null,
   };
-  if (direction === 'pkn_to_wpkn') {
+  if (direction === 'wpkn_to_pkn') {
+    try {
+      settlement = await sendReservePkn({
+        toAddress: payoutAddress,
+        amountPkn: requestPayload.amountOutQuoted,
+      });
+    } catch (settlementError) {
+      settlement = { mode: 'manual_pending', txHash: null };
+      await requestRef.set(
+        {
+          status: 'pending_payout',
+          settlementMode: 'manual_pending',
+          settlementError: settlementError.message || 'Automatic native PKN payout failed.',
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+    }
+    if (settlement.txHash) {
+      await requestRef.set(
+        {
+          status: 'completed',
+          payoutTxHash: settlement.txHash,
+          settlementMode: settlement.mode,
+          completedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+      await firestore.collection('ledger_entries').add({
+        uid: decoded.uid,
+        type: 'wpkn_exchange_pkn_paid_out',
+        amountPkn: requestPayload.amountOutQuoted,
+        wpknExchangeRequestId: requestRef.id,
+        depositTxHash: verifiedDeposit.txHash,
+        payoutTxHash: settlement.txHash,
+        toAddress: payoutAddress,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+  } else if (direction === 'pkn_to_wpkn') {
     try {
       settlement = await maybeSendWpkn({
         toAddress: payoutAddress,
@@ -307,7 +339,9 @@ async function handleRequest(req, res, decoded, admin, firestore) {
     requestId: requestRef.id,
     status:
       direction === 'wpkn_to_pkn'
-        ? 'completed'
+        ? settlement.txHash
+          ? 'completed'
+          : 'pending_payout'
         : settlement.txHash
           ? 'processing'
           : requestPayload.status,

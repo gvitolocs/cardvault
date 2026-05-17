@@ -1,7 +1,29 @@
 import 'dart:async';
 
+class WalletSignInCoordinator {
+  static bool _signing = false;
+
+  static bool get isSigning => _signing;
+
+  static Future<T> run<T>(Future<T> Function() action) async {
+    if (_signing) {
+      throw StateError('A wallet sign-in is already in progress.');
+    }
+    _signing = true;
+    try {
+      return await action();
+    } finally {
+      _signing = false;
+    }
+  }
+}
+
 class WalletBridge {
   bool get hasProvider => false;
+
+  bool get isMobile => false;
+
+  bool openMetaMaskDapp() => false;
 
   Future<String?> currentAccount() async => null;
 

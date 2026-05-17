@@ -4,6 +4,12 @@ import 'dart:js_interop';
 @JS('window.pokoinWallet.hasProvider')
 external bool _hasProvider();
 
+@JS('window.pokoinWallet.isMobile')
+external bool _isMobile();
+
+@JS('window.pokoinWallet.openMetaMaskDapp')
+external bool _openMetaMaskDapp();
+
 @JS('window.pokoinWallet.requestAccounts')
 external JSPromise<JSArray<JSString>> _requestAccounts();
 
@@ -49,10 +55,44 @@ extension _GoogleUserPayloadExtension on _GoogleUserPayload {
   external JSString get idToken;
 }
 
+class WalletSignInCoordinator {
+  static bool _signing = false;
+
+  static bool get isSigning => _signing;
+
+  static Future<T> run<T>(Future<T> Function() action) async {
+    if (_signing) {
+      throw StateError('A wallet sign-in is already in progress.');
+    }
+    _signing = true;
+    try {
+      return await action();
+    } finally {
+      _signing = false;
+    }
+  }
+}
+
 class WalletBridge {
   bool get hasProvider {
     try {
       return _hasProvider();
+    } catch (_) {
+      return false;
+    }
+  }
+
+  bool get isMobile {
+    try {
+      return _isMobile();
+    } catch (_) {
+      return false;
+    }
+  }
+
+  bool openMetaMaskDapp() {
+    try {
+      return _openMetaMaskDapp();
     } catch (_) {
       return false;
     }

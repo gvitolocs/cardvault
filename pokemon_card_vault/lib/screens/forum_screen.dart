@@ -886,14 +886,8 @@ class _ForumTopBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     final compact = MediaQuery.sizeOf(context).width < 820;
     return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xF2050816),
-        border: Border(
-            bottom: BorderSide(color: Colors.white.withValues(alpha: 0.08))),
-        boxShadow: const [
-          BoxShadow(
-              color: Color(0x66000000), blurRadius: 24, offset: Offset(0, 10)),
-        ],
+      decoration: const BoxDecoration(
+        color: Color(0xF2050816),
       ),
       child: SafeArea(
         bottom: false,

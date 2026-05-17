@@ -107,6 +107,17 @@
       hasProvider: function () {
         return typeof window.ethereum !== 'undefined';
       },
+      isMobile: function () {
+        return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+      },
+      openMetaMaskDapp: function () {
+        if (!window.pokoinWallet.isMobile()) {
+          return false;
+        }
+        const target = `${window.location.host}${window.location.pathname}${window.location.search}${window.location.hash}`;
+        window.location.href = `https://metamask.app.link/dapp/${target}`;
+        return true;
+      },
       requestAccounts: function () {
         if (!window.ethereum) {
           return Promise.reject('MetaMask or another EVM wallet is not available');
@@ -123,6 +134,13 @@
         if (!window.ethereum || !window.ethereum.on) {
           return;
         }
+        if (window.pokoinWallet._accountsChangedCallback && window.ethereum.removeListener) {
+          window.ethereum.removeListener(
+            'accountsChanged',
+            window.pokoinWallet._accountsChangedCallback
+          );
+        }
+        window.pokoinWallet._accountsChangedCallback = callback;
         window.ethereum.on('accountsChanged', callback);
       },
       onChainChanged: function (callback) {

@@ -1,0 +1,1441 @@
+[
+  {
+    "id": 59,
+    "name": "Pokémon Tins",
+    "game_id": 5,
+    "properties": [
+      {
+        "name": "sealed",
+        "type": "boolean",
+        "possible_values": [
+          true,
+          false
+        ]
+      },
+      {
+        "name": "pokemon_language",
+        "type": "string",
+        "possible_values": [
+          "en",
+          "fr",
+          "it",
+          "de",
+          "es",
+          "pt",
+          "nl",
+          "ru",
+          "pl",
+          "sv",
+          "kr",
+          "jp",
+          "zh-CN",
+          "zh-TW",
+          "id",
+          "th"
+        ]
+      }
+    ]
+  },
+  {
+    "id": 60,
+    "name": "Pokémon Box Set",
+    "game_id": 5,
+    "properties": [
+      {
+        "name": "sealed",
+        "type": "boolean",
+        "possible_values": [
+          true,
+          false
+        ]
+      },
+      {
+        "name": "pokemon_language",
+        "type": "string",
+        "possible_values": [
+          "en",
+          "fr",
+          "it",
+          "de",
+          "es",
+          "pt",
+          "nl",
+          "ru",
+          "pl",
+          "sv",
+          "kr",
+          "jp",
+          "zh-CN",
+          "zh-TW",
+          "id",
+          "th"
+        ]
+      }
+    ]
+  },
+  {
+    "id": 61,
+    "name": "Pokémon Memorabilia",
+    "game_id": 5,
+    "properties": [
+      {
+        "name": "memorabilia_type",
+        "type": "string",
+        "possible_values": [
+          "Badges",
+          "Buttons",
+          "Collectors Coins",
+          "Hoodies",
+          "Keychains",
+          "Mousepads",
+          "Necklaces",
+          "Pens",
+          "Pendants",
+          "Pins",
+          "Statues",
+          "T-Shirts",
+          "Toys",
+          "Field Center Card",
+          "Backpack",
+          "Bottle",
+          "Playmat Tube",
+          "Card Frame",
+          "Mug",
+          "Dice Bag",
+          "Sticker",
+          "Abacus",
+          "Block",
+          "Commander",
+          "Dual Wheel",
+          "Miniature",
+          "Single Wheel",
+          "Tablet",
+          "Token",
+          "Gaming Stones",
+          "Counters"
+        ]
+      }
+    ]
+  },
+  {
+    "id": 62,
+    "name": "Pokémon Sleeves",
+    "game_id": 5,
+    "properties": [
+      {
+        "name": "sleeves_pack_amount",
+        "type": "string",
+        "possible_values": [
+          "40",
+          "50",
+          "60",
+          "65",
+          "80",
+          "100",
+          "120",
+          "1",
+          "25",
+          "15",
+          "24",
+          "70",
+          "75",
+          "18",
+          "20",
+          "30",
+          "55",
+          "160",
+          "200",
+          "45",
+          "90",
+          "10",
+          "66"
+        ]
+      },
+      {
+        "name": "products_brand",
+        "type": "string",
+        "possible_values": [
+          "Arcane Tinmen",
+          "Bordifies",
+          "Card Way",
+          "Cryptozoic",
+          "Epoch",
+          "Fantasy Flight Game",
+          "Generic",
+          "God Player",
+          "Hareruya",
+          "HobbyBase",
+          "KMC",
+          "Konami",
+          "Legion",
+          "Max Protection",
+          "Milestone",
+          "Monster",
+          "Player's Choice",
+          "Pro-Select",
+          "StarCityGames",
+          "TOP Sleeves",
+          "Ultimate Guard",
+          "Ultra-Pro",
+          "CCG",
+          "KONAMI",
+          "Blackfire",
+          "Pokémon Center",
+          "Gamegenic",
+          "Kadomaru",
+          "Bandai",
+          "Carddass",
+          "Dragon Shield",
+          "Legend Story Studios",
+          "Disney",
+          "Riot Games",
+          "TcgLab",
+          "Sorcery Contested Realm",
+          "Bushiroad",
+          "Dex Protection",
+          "Hobby Japan",
+          "Upper Deck",
+          "Wizards of the Coast",
+          "Wyrmwood",
+          "Arcane Tinmen ",
+          "FT Protection",
+          "Salvat",
+          "SAS Protection",
+          "DeckTutor",
+          "Bazaar of Moxen",
+          "BlackFire",
+          "Perfect Pro",
+          "Channel Fireball",
+          "GnD Cards",
+          "SpellGround",
+          "Tokens for Mtg",
+          "The Pokémon Company",
+          "Kraken Wargames",
+          "Tomy",
+          "BCW",
+          "Chessex"
+        ]
+      },
+      {
+        "name": "product_color",
+        "type": "string",
+        "possible_values": [
+          "Black",
+          "Blue",
+          "Brown",
+          "Clear",
+          "Gold/Metal",
+          "Green",
+          "Gray/Silver",
+          "Ivory",
+          "Orange",
+          "Pictures",
+          "Pink",
+          "Purple",
+          "Red",
+          "Turquoise",
+          "White",
+          "Yellow",
+          "Gold/Metal ",
+          "Green ",
+          "Sand",
+          "Light Blue",
+          "Petrol",
+          "Aquamarine",
+          "Apple Green",
+          "Gray",
+          "Transparent",
+          "Mixed"
+        ]
+      },
+      {
+        "name": "sleeves_surface",
+        "type": "string",
+        "possible_values": [
+          "Glossy",
+          "Matte",
+          "Brushed"
+        ]
+      }
+    ]
+  },
+  {
+    "id": 63,
+    "name": "Pokémon Playmats",
+    "game_id": 5,
+    "properties": [
+      {
+        "name": "products_brand",
+        "type": "string",
+        "possible_values": [
+          "Arcane Tinmen",
+          "Bordifies",
+          "Card Way",
+          "Cryptozoic",
+          "Epoch",
+          "Fantasy Flight Game",
+          "Generic",
+          "God Player",
+          "Hareruya",
+          "HobbyBase",
+          "KMC",
+          "Konami",
+          "Legion",
+          "Max Protection",
+          "Milestone",
+          "Monster",
+          "Player's Choice",
+          "Pro-Select",
+          "StarCityGames",
+          "TOP Sleeves",
+          "Ultimate Guard",
+          "Ultra-Pro",
+          "CCG",
+          "KONAMI",
+          "Blackfire",
+          "Pokémon Center",
+          "Gamegenic",
+          "Kadomaru",
+          "Bandai",
+          "Carddass",
+          "Dragon Shield",
+          "Legend Story Studios",
+          "Disney",
+          "Riot Games",
+          "TcgLab",
+          "Sorcery Contested Realm",
+          "Bushiroad",
+          "Dex Protection",
+          "Hobby Japan",
+          "Upper Deck",
+          "Wizards of the Coast",
+          "Wyrmwood",
+          "Arcane Tinmen ",
+          "FT Protection",
+          "Salvat",
+          "SAS Protection",
+          "DeckTutor",
+          "Bazaar of Moxen",
+          "BlackFire",
+          "Perfect Pro",
+          "Channel Fireball",
+          "GnD Cards",
+          "SpellGround",
+          "Tokens for Mtg",
+          "The Pokémon Company",
+          "Kraken Wargames",
+          "Tomy",
+          "BCW",
+          "Chessex"
+        ]
+      },
+      {
+        "name": "products_material",
+        "type": "string",
+        "possible_values": [
+          "Cardboard",
+          "Metal",
+          "Plastic",
+          "Synth. Leather",
+          "Wood",
+          "Leather",
+          "Rubber Foam",
+          "Synthetic Leather",
+          "Glass"
+        ]
+      }
+    ]
+  },
+  {
+    "id": 64,
+    "name": "Pokémon Deck Boxes",
+    "game_id": 5,
+    "properties": [
+      {
+        "name": "products_brand",
+        "type": "string",
+        "possible_values": [
+          "Arcane Tinmen",
+          "Bordifies",
+          "Card Way",
+          "Cryptozoic",
+          "Epoch",
+          "Fantasy Flight Game",
+          "Generic",
+          "God Player",
+          "Hareruya",
+          "HobbyBase",
+          "KMC",
+          "Konami",
+          "Legion",
+          "Max Protection",
+          "Milestone",
+          "Monster",
+          "Player's Choice",
+          "Pro-Select",
+          "StarCityGames",
+          "TOP Sleeves",
+          "Ultimate Guard",
+          "Ultra-Pro",
+          "CCG",
+          "KONAMI",
+          "Blackfire",
+          "Pokémon Center",
+          "Gamegenic",
+          "Kadomaru",
+          "Bandai",
+          "Carddass",
+          "Dragon Shield",
+          "Legend Story Studios",
+          "Disney",
+          "Riot Games",
+          "TcgLab",
+          "Sorcery Contested Realm",
+          "Bushiroad",
+          "Dex Protection",
+          "Hobby Japan",
+          "Upper Deck",
+          "Wizards of the Coast",
+          "Wyrmwood",
+          "Arcane Tinmen ",
+          "FT Protection",
+          "Salvat",
+          "SAS Protection",
+          "DeckTutor",
+          "Bazaar of Moxen",
+          "BlackFire",
+          "Perfect Pro",
+          "Channel Fireball",
+          "GnD Cards",
+          "SpellGround",
+          "Tokens for Mtg",
+          "The Pokémon Company",
+          "Kraken Wargames",
+          "Tomy",
+          "BCW",
+          "Chessex"
+        ]
+      },
+      {
+        "name": "product_color",
+        "type": "string",
+        "possible_values": [
+          "Black",
+          "Blue",
+          "Brown",
+          "Clear",
+          "Gold/Metal",
+          "Green",
+          "Gray/Silver",
+          "Ivory",
+          "Orange",
+          "Pictures",
+          "Pink",
+          "Purple",
+          "Red",
+          "Turquoise",
+          "White",
+          "Yellow",
+          "Gold/Metal ",
+          "Green ",
+          "Sand",
+          "Light Blue",
+          "Petrol",
+          "Aquamarine",
+          "Apple Green",
+          "Gray",
+          "Transparent",
+          "Mixed"
+        ]
+      },
+      {
+        "name": "capacity",
+        "type": "string",
+        "possible_values": [
+          "64",
+          "80",
+          "90",
+          "160",
+          "180",
+          "320",
+          "360",
+          "480",
+          "500+",
+          "126",
+          "252",
+          "40",
+          "270",
+          "432",
+          "30",
+          "50",
+          "60",
+          "75",
+          "100",
+          "110",
+          "120",
+          "150",
+          "170",
+          "200",
+          "240",
+          "300",
+          "350",
+          "400",
+          "550",
+          "660",
+          "800",
+          "1000",
+          "1600",
+          "2000",
+          "3200",
+          "5000",
+          "9600",
+          "15000",
+          "Playmat"
+        ]
+      },
+      {
+        "name": "products_material",
+        "type": "string",
+        "possible_values": [
+          "Cardboard",
+          "Metal",
+          "Plastic",
+          "Synth. Leather",
+          "Wood",
+          "Leather",
+          "Rubber Foam",
+          "Synthetic Leather",
+          "Glass"
+        ]
+      },
+      {
+        "name": "deckbox_type",
+        "type": "string",
+        "possible_values": [
+          "Commander",
+          "Deck-Vault",
+          "Dual",
+          "Duel Decks",
+          "Gaming Box",
+          "Oversized",
+          "Standard",
+          "Tray Box",
+          "Top Box"
+        ]
+      }
+    ]
+  },
+  {
+    "id": 65,
+    "name": "Pokémon Albums",
+    "game_id": 5,
+    "properties": [
+      {
+        "name": "products_brand",
+        "type": "string",
+        "possible_values": [
+          "Arcane Tinmen",
+          "Bordifies",
+          "Card Way",
+          "Cryptozoic",
+          "Epoch",
+          "Fantasy Flight Game",
+          "Generic",
+          "God Player",
+          "Hareruya",
+          "HobbyBase",
+          "KMC",
+          "Konami",
+          "Legion",
+          "Max Protection",
+          "Milestone",
+          "Monster",
+          "Player's Choice",
+          "Pro-Select",
+          "StarCityGames",
+          "TOP Sleeves",
+          "Ultimate Guard",
+          "Ultra-Pro",
+          "CCG",
+          "KONAMI",
+          "Blackfire",
+          "Pokémon Center",
+          "Gamegenic",
+          "Kadomaru",
+          "Bandai",
+          "Carddass",
+          "Dragon Shield",
+          "Legend Story Studios",
+          "Disney",
+          "Riot Games",
+          "TcgLab",
+          "Sorcery Contested Realm",
+          "Bushiroad",
+          "Dex Protection",
+          "Hobby Japan",
+          "Upper Deck",
+          "Wizards of the Coast",
+          "Wyrmwood",
+          "Arcane Tinmen ",
+          "FT Protection",
+          "Salvat",
+          "SAS Protection",
+          "DeckTutor",
+          "Bazaar of Moxen",
+          "BlackFire",
+          "Perfect Pro",
+          "Channel Fireball",
+          "GnD Cards",
+          "SpellGround",
+          "Tokens for Mtg",
+          "The Pokémon Company",
+          "Kraken Wargames",
+          "Tomy",
+          "BCW",
+          "Chessex"
+        ]
+      },
+      {
+        "name": "product_color",
+        "type": "string",
+        "possible_values": [
+          "Black",
+          "Blue",
+          "Brown",
+          "Clear",
+          "Gold/Metal",
+          "Green",
+          "Gray/Silver",
+          "Ivory",
+          "Orange",
+          "Pictures",
+          "Pink",
+          "Purple",
+          "Red",
+          "Turquoise",
+          "White",
+          "Yellow",
+          "Gold/Metal ",
+          "Green ",
+          "Sand",
+          "Light Blue",
+          "Petrol",
+          "Aquamarine",
+          "Apple Green",
+          "Gray",
+          "Transparent",
+          "Mixed"
+        ]
+      },
+      {
+        "name": "album_pages_slot",
+        "type": "string",
+        "possible_values": [
+          "12-Pocket",
+          "9-Pocket",
+          "8-Pocket",
+          "4-Pocket",
+          "2-Pocket",
+          "1-Pocket"
+        ]
+      },
+      {
+        "name": "capacity",
+        "type": "string",
+        "possible_values": [
+          "64",
+          "80",
+          "90",
+          "160",
+          "180",
+          "320",
+          "360",
+          "480",
+          "500+",
+          "126",
+          "252",
+          "40",
+          "270",
+          "432",
+          "30",
+          "50",
+          "60",
+          "75",
+          "100",
+          "110",
+          "120",
+          "150",
+          "170",
+          "200",
+          "240",
+          "300",
+          "350",
+          "400",
+          "550",
+          "660",
+          "800",
+          "1000",
+          "1600",
+          "2000",
+          "3200",
+          "5000",
+          "9600",
+          "15000",
+          "Playmat"
+        ]
+      }
+    ]
+  },
+  {
+    "id": 66,
+    "name": "Pokémon Booster",
+    "game_id": 5,
+    "properties": [
+      {
+        "name": "pokemon_language",
+        "type": "string",
+        "possible_values": [
+          "en",
+          "fr",
+          "it",
+          "de",
+          "es",
+          "pt",
+          "nl",
+          "ru",
+          "pl",
+          "sv",
+          "kr",
+          "jp",
+          "zh-CN",
+          "zh-TW",
+          "id",
+          "th"
+        ]
+      }
+    ]
+  },
+  {
+    "id": 67,
+    "name": "Pokémon Booster Box",
+    "game_id": 5,
+    "properties": [
+      {
+        "name": "sealed",
+        "type": "boolean",
+        "possible_values": [
+          true,
+          false
+        ]
+      },
+      {
+        "name": "pokemon_language",
+        "type": "string",
+        "possible_values": [
+          "en",
+          "fr",
+          "it",
+          "de",
+          "es",
+          "pt",
+          "nl",
+          "ru",
+          "pl",
+          "sv",
+          "kr",
+          "jp",
+          "zh-CN",
+          "zh-TW",
+          "id",
+          "th"
+        ]
+      }
+    ]
+  },
+  {
+    "id": 68,
+    "name": "Pokémon Bundle ",
+    "game_id": 5,
+    "properties": [
+      {
+        "name": "sealed",
+        "type": "boolean",
+        "possible_values": [
+          true,
+          false
+        ]
+      },
+      {
+        "name": "pokemon_language",
+        "type": "string",
+        "possible_values": [
+          "en",
+          "fr",
+          "it",
+          "de",
+          "es",
+          "pt",
+          "nl",
+          "ru",
+          "pl",
+          "sv",
+          "kr",
+          "jp",
+          "zh-CN",
+          "zh-TW",
+          "id",
+          "th"
+        ]
+      }
+    ]
+  },
+  {
+    "id": 69,
+    "name": "Pokémon Preconstructed Deck",
+    "game_id": 5,
+    "properties": [
+      {
+        "name": "sealed",
+        "type": "boolean",
+        "possible_values": [
+          true,
+          false
+        ]
+      },
+      {
+        "name": "pokemon_language",
+        "type": "string",
+        "possible_values": [
+          "en",
+          "fr",
+          "it",
+          "de",
+          "es",
+          "pt",
+          "nl",
+          "ru",
+          "pl",
+          "sv",
+          "kr",
+          "jp",
+          "zh-CN",
+          "zh-TW",
+          "id",
+          "th"
+        ]
+      }
+    ]
+  },
+  {
+    "id": 73,
+    "name": "Pokémon Singles",
+    "game_id": 5,
+    "properties": [
+      {
+        "name": "condition",
+        "type": "string",
+        "possible_values": [
+          "Near Mint",
+          "Slightly Played",
+          "Moderately Played",
+          "Played",
+          "Poor"
+        ]
+      },
+      {
+        "name": "signed",
+        "type": "boolean",
+        "possible_values": [
+          true,
+          false
+        ]
+      },
+      {
+        "name": "altered",
+        "type": "boolean",
+        "possible_values": [
+          true,
+          false
+        ]
+      },
+      {
+        "name": "collector_number",
+        "type": "string",
+        "possible_values": []
+      },
+      {
+        "name": "first_edition",
+        "type": "boolean",
+        "possible_values": [
+          true,
+          false
+        ]
+      },
+      {
+        "name": "pokemon_rarity",
+        "type": "string",
+        "possible_values": [
+          "Common",
+          "Uncommon",
+          "Rare",
+          "Holo Rare",
+          "Promo",
+          "Ultra Rare",
+          "Secret Rare",
+          "Shiny Holo Rare",
+          "ACE Rare",
+          "Fixed",
+          "No Rarity",
+          "Oversized",
+          "Illustration Rare",
+          "Special Illustration Rare",
+          "Shiny Ultra Rare"
+        ]
+      },
+      {
+        "name": "pokemon_language",
+        "type": "string",
+        "possible_values": [
+          "en",
+          "fr",
+          "it",
+          "de",
+          "es",
+          "pt",
+          "nl",
+          "ru",
+          "pl",
+          "sv",
+          "kr",
+          "jp",
+          "zh-CN",
+          "zh-TW",
+          "id",
+          "th"
+        ]
+      },
+      {
+        "name": "pokemon_attack",
+        "type": "string",
+        "possible_values": []
+      },
+      {
+        "name": "tournament_legal",
+        "type": "boolean",
+        "possible_values": [
+          true,
+          false
+        ]
+      },
+      {
+        "name": "pokemon_reverse",
+        "type": "boolean",
+        "possible_values": [
+          true,
+          false
+        ]
+      },
+      {
+        "name": "pokemon_species",
+        "type": "string",
+        "possible_values": []
+      }
+    ]
+  },
+  {
+    "id": 74,
+    "name": "Pokémon Dividers",
+    "game_id": 5,
+    "properties": [
+      {
+        "name": "products_brand",
+        "type": "string",
+        "possible_values": [
+          "Arcane Tinmen",
+          "Bordifies",
+          "Card Way",
+          "Cryptozoic",
+          "Epoch",
+          "Fantasy Flight Game",
+          "Generic",
+          "God Player",
+          "Hareruya",
+          "HobbyBase",
+          "KMC",
+          "Konami",
+          "Legion",
+          "Max Protection",
+          "Milestone",
+          "Monster",
+          "Player's Choice",
+          "Pro-Select",
+          "StarCityGames",
+          "TOP Sleeves",
+          "Ultimate Guard",
+          "Ultra-Pro",
+          "CCG",
+          "KONAMI",
+          "Blackfire",
+          "Pokémon Center",
+          "Gamegenic",
+          "Kadomaru",
+          "Bandai",
+          "Carddass",
+          "Dragon Shield",
+          "Legend Story Studios",
+          "Disney",
+          "Riot Games",
+          "TcgLab",
+          "Sorcery Contested Realm",
+          "Bushiroad",
+          "Dex Protection",
+          "Hobby Japan",
+          "Upper Deck",
+          "Wizards of the Coast",
+          "Wyrmwood",
+          "Arcane Tinmen ",
+          "FT Protection",
+          "Salvat",
+          "SAS Protection",
+          "DeckTutor",
+          "Bazaar of Moxen",
+          "BlackFire",
+          "Perfect Pro",
+          "Channel Fireball",
+          "GnD Cards",
+          "SpellGround",
+          "Tokens for Mtg",
+          "The Pokémon Company",
+          "Kraken Wargames",
+          "Tomy",
+          "BCW",
+          "Chessex"
+        ]
+      },
+      {
+        "name": "product_color",
+        "type": "string",
+        "possible_values": [
+          "Black",
+          "Blue",
+          "Brown",
+          "Clear",
+          "Gold/Metal",
+          "Green",
+          "Gray/Silver",
+          "Ivory",
+          "Orange",
+          "Pictures",
+          "Pink",
+          "Purple",
+          "Red",
+          "Turquoise",
+          "White",
+          "Yellow",
+          "Gold/Metal ",
+          "Green ",
+          "Sand",
+          "Light Blue",
+          "Petrol",
+          "Aquamarine",
+          "Apple Green",
+          "Gray",
+          "Transparent",
+          "Mixed"
+        ]
+      },
+      {
+        "name": "products_material",
+        "type": "string",
+        "possible_values": [
+          "Cardboard",
+          "Metal",
+          "Plastic",
+          "Synth. Leather",
+          "Wood",
+          "Leather",
+          "Rubber Foam",
+          "Synthetic Leather",
+          "Glass"
+        ]
+      }
+    ]
+  },
+  {
+    "id": 78,
+    "name": "Pokémon Oversized",
+    "game_id": 5,
+    "properties": [
+      {
+        "name": "condition",
+        "type": "string",
+        "possible_values": [
+          "Near Mint",
+          "Slightly Played",
+          "Moderately Played",
+          "Played",
+          "Poor"
+        ]
+      },
+      {
+        "name": "signed",
+        "type": "boolean",
+        "possible_values": [
+          true,
+          false
+        ]
+      },
+      {
+        "name": "altered",
+        "type": "boolean",
+        "possible_values": [
+          true,
+          false
+        ]
+      },
+      {
+        "name": "collector_number",
+        "type": "string",
+        "possible_values": []
+      },
+      {
+        "name": "first_edition",
+        "type": "boolean",
+        "possible_values": [
+          true,
+          false
+        ]
+      },
+      {
+        "name": "pokemon_rarity",
+        "type": "string",
+        "possible_values": [
+          "Common",
+          "Uncommon",
+          "Rare",
+          "Holo Rare",
+          "Promo",
+          "Ultra Rare",
+          "Secret Rare",
+          "Shiny Holo Rare",
+          "ACE Rare",
+          "Fixed",
+          "No Rarity",
+          "Oversized",
+          "Illustration Rare",
+          "Special Illustration Rare",
+          "Shiny Ultra Rare"
+        ]
+      },
+      {
+        "name": "pokemon_language",
+        "type": "string",
+        "possible_values": [
+          "en",
+          "fr",
+          "it",
+          "de",
+          "es",
+          "pt",
+          "nl",
+          "ru",
+          "pl",
+          "sv",
+          "kr",
+          "jp",
+          "zh-CN",
+          "zh-TW",
+          "id",
+          "th"
+        ]
+      },
+      {
+        "name": "pokemon_attack",
+        "type": "string",
+        "possible_values": []
+      },
+      {
+        "name": "tournament_legal",
+        "type": "boolean",
+        "possible_values": [
+          true,
+          false
+        ]
+      }
+    ]
+  },
+  {
+    "id": 86,
+    "name": "Pokémon Dice",
+    "game_id": 5,
+    "properties": [
+      {
+        "name": "products_brand",
+        "type": "string",
+        "possible_values": [
+          "Arcane Tinmen",
+          "Bordifies",
+          "Card Way",
+          "Cryptozoic",
+          "Epoch",
+          "Fantasy Flight Game",
+          "Generic",
+          "God Player",
+          "Hareruya",
+          "HobbyBase",
+          "KMC",
+          "Konami",
+          "Legion",
+          "Max Protection",
+          "Milestone",
+          "Monster",
+          "Player's Choice",
+          "Pro-Select",
+          "StarCityGames",
+          "TOP Sleeves",
+          "Ultimate Guard",
+          "Ultra-Pro",
+          "CCG",
+          "KONAMI",
+          "Blackfire",
+          "Pokémon Center",
+          "Gamegenic",
+          "Kadomaru",
+          "Bandai",
+          "Carddass",
+          "Dragon Shield",
+          "Legend Story Studios",
+          "Disney",
+          "Riot Games",
+          "TcgLab",
+          "Sorcery Contested Realm",
+          "Bushiroad",
+          "Dex Protection",
+          "Hobby Japan",
+          "Upper Deck",
+          "Wizards of the Coast",
+          "Wyrmwood",
+          "Arcane Tinmen ",
+          "FT Protection",
+          "Salvat",
+          "SAS Protection",
+          "DeckTutor",
+          "Bazaar of Moxen",
+          "BlackFire",
+          "Perfect Pro",
+          "Channel Fireball",
+          "GnD Cards",
+          "SpellGround",
+          "Tokens for Mtg",
+          "The Pokémon Company",
+          "Kraken Wargames",
+          "Tomy",
+          "BCW",
+          "Chessex"
+        ]
+      },
+      {
+        "name": "sides",
+        "type": "string",
+        "possible_values": [
+          "4",
+          "6",
+          "8",
+          "10",
+          "12",
+          "20",
+          "30"
+        ]
+      },
+      {
+        "name": "background_color",
+        "type": "string",
+        "possible_values": [
+          "Black",
+          "Blue",
+          "Brown",
+          "Gold",
+          "Gray",
+          "Green",
+          "Ivory",
+          "Orange",
+          "Pink",
+          "Purple",
+          "Red",
+          "Silver",
+          "Transparent",
+          "Turquoise",
+          "White",
+          "Yellow"
+        ]
+      },
+      {
+        "name": "text_color",
+        "type": "string",
+        "possible_values": [
+          "Black",
+          "Blue",
+          "Gold",
+          "Green",
+          "Orange",
+          "Pink",
+          "Purple",
+          "Red",
+          "Silver",
+          "White"
+        ]
+      }
+    ]
+  },
+  {
+    "id": 118,
+    "name": "Pokémon Empty Boxes & Storage",
+    "game_id": 5,
+    "properties": [
+      {
+        "name": "capacity",
+        "type": "string",
+        "possible_values": [
+          "64",
+          "80",
+          "90",
+          "160",
+          "180",
+          "320",
+          "360",
+          "480",
+          "500+",
+          "126",
+          "252",
+          "40",
+          "270",
+          "432",
+          "30",
+          "50",
+          "60",
+          "75",
+          "100",
+          "110",
+          "120",
+          "150",
+          "170",
+          "200",
+          "240",
+          "300",
+          "350",
+          "400",
+          "550",
+          "660",
+          "800",
+          "1000",
+          "1600",
+          "2000",
+          "3200",
+          "5000",
+          "9600",
+          "15000",
+          "Playmat"
+        ]
+      },
+      {
+        "name": "pokemon_language",
+        "type": "string",
+        "possible_values": [
+          "en",
+          "fr",
+          "it",
+          "de",
+          "es",
+          "pt",
+          "nl",
+          "ru",
+          "pl",
+          "sv",
+          "kr",
+          "jp",
+          "zh-CN",
+          "zh-TW",
+          "id",
+          "th"
+        ]
+      }
+    ]
+  },
+  {
+    "id": 136,
+    "name": "Pokémon Complete Set",
+    "game_id": 5,
+    "properties": [
+      {
+        "name": "condition",
+        "type": "string",
+        "possible_values": [
+          "Near Mint",
+          "Slightly Played",
+          "Moderately Played",
+          "Played",
+          "Poor"
+        ]
+      },
+      {
+        "name": "signed",
+        "type": "boolean",
+        "possible_values": [
+          true,
+          false
+        ]
+      },
+      {
+        "name": "pokemon_language",
+        "type": "string",
+        "possible_values": [
+          "en",
+          "fr",
+          "it",
+          "de",
+          "es",
+          "pt",
+          "nl",
+          "ru",
+          "pl",
+          "sv",
+          "kr",
+          "jp",
+          "zh-CN",
+          "zh-TW",
+          "id",
+          "th"
+        ]
+      }
+    ]
+  },
+  {
+    "id": 190,
+    "name": "Pokémon Blisters",
+    "game_id": 5,
+    "properties": [
+      {
+        "name": "pokemon_language",
+        "type": "string",
+        "possible_values": [
+          "en",
+          "fr",
+          "it",
+          "de",
+          "es",
+          "pt",
+          "nl",
+          "ru",
+          "pl",
+          "sv",
+          "kr",
+          "jp",
+          "zh-CN",
+          "zh-TW",
+          "id",
+          "th"
+        ]
+      }
+    ]
+  }
+]

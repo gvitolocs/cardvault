@@ -25,6 +25,16 @@ function baseUsernameFrom(value) {
   return compact.length >= 3 ? compact.slice(0, 24) : 'pokoin';
 }
 
+function normalizeRequestedUsername(value) {
+  const clean = String(value || '').trim().toLowerCase();
+  if (!/^[a-z0-9]{3,32}$/.test(clean)) {
+    throw Object.assign(new Error('Username must be 3-32 letters or numbers, with no spaces.'), {
+      statusCode: 400,
+    });
+  }
+  return clean;
+}
+
 function randomPokemonUsernameBase() {
   return pokemonUsernameBases[Math.floor(Math.random() * pokemonUsernameBases.length)];
 }
@@ -148,30 +158,84 @@ async function ensureUniqueUsername({
 }
 
 async function updateUniqueUsername({ firestore, admin, uid, desiredUsername }) {
-  const clean = baseUsernameFrom(desiredUsername);
-  if (!/^[a-z0-9]{3,32}$/.test(clean)) {
-    throw Object.assign(new Error('Username must be 3-32 letters or numbers, with no spaces.'), {
-      statusCode: 400,
-    });
-  }
+  const clean = normalizeRequestedUsername(desiredUsername);
   const userDoc = await firestore.collection('users').doc(uid).get();
   const previousUsername = String(userDoc.data()?.username || '').trim().toLowerCase();
   if (previousUsername === clean) {
     return clean;
   }
-  return assignUniqueUsername({
+  return claimExactUsername({
     firestore,
     admin,
     uid,
-    base: clean,
-    displayName: userDoc.data()?.displayName || '',
+    username: clean,
+    displayName: userDoc.data()?.displayName || clean,
+    email: userDoc.data()?.email || '',
     previousUsername,
   });
 }
 
+async function claimExactUsername({
+  firestore,
+  admin,
+  uid,
+  username,
+  displayName = '',
+  email = '',
+  previousUsername = '',
+}) {
+  const clean = normalizeRequestedUsername(username);
+  const userRef = firestore.collection('users').doc(uid);
+  const usernameRef = firestore.collection('usernames').doc(clean);
+  const now = admin.firestore.FieldValue.serverTimestamp();
+
+  await firestore.runTransaction(async (transaction) => {
+    const usernameDoc = await transaction.get(usernameRef);
+    const owner = String(usernameDoc.data()?.uid || '');
+    if (usernameDoc.exists && owner !== uid) {
+      throw Object.assign(new Error('Username is already taken.'), {
+        statusCode: 409,
+      });
+    }
+
+    const oldUsername = String(previousUsername || '').trim().toLowerCase();
+    if (oldUsername && oldUsername !== clean) {
+      transaction.delete(firestore.collection('usernames').doc(oldUsername));
+    }
+
+    transaction.set(
+      usernameRef,
+      {
+        uid,
+        username: clean,
+        displayName: String(displayName || clean),
+        createdAt: usernameDoc.exists ? usernameDoc.data()?.createdAt || now : now,
+        updatedAt: now,
+      },
+      { merge: true },
+    );
+    transaction.set(
+      userRef,
+      {
+        uid,
+        email: String(email || ''),
+        displayName: String(displayName || clean),
+        username: clean,
+        usernameLower: clean,
+        updatedAt: now,
+      },
+      { merge: true },
+    );
+  });
+
+  return clean;
+}
+
 module.exports = {
   baseUsernameFrom,
+  claimExactUsername,
   ensureUniqueUsername,
+  normalizeRequestedUsername,
   randomPokemonUsernameBase,
   updateUniqueUsername,
 };

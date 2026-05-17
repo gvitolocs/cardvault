@@ -23,118 +23,65 @@ class ProfileScreen extends ConsumerStatefulWidget {
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   late final bridge = createWalletBridge();
-  bool _walletListenerAttached = false;
-  bool _switchingWalletAccount = false;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _attachWalletAccountListener();
-  }
-
-  void _attachWalletAccountListener() {
-    if (_walletListenerAttached || !bridge.hasProvider) {
-      return;
-    }
-    _walletListenerAttached = true;
-    bridge.onAccountsChanged((address) {
-      if (!mounted) {
-        return;
-      }
-      _switchToWalletAccount(address);
-    });
-  }
-
-  Future<void> _switchToWalletAccount(String? address) async {
-    final normalized = address?.trim().toLowerCase();
-    if (normalized == null || normalized.isEmpty) {
-      await ref.read(authServiceProvider).signOut();
-      ref.invalidate(userProfileProvider);
-      ref.invalidate(pknBalanceProvider);
-      ref.invalidate(linkedWalletBalanceProvider);
-      ref.invalidate(userOrdersProvider);
-      ref.invalidate(withdrawRequestsProvider);
-      if (mounted) {
-        context.go('/wallet');
-      }
-      return;
-    }
-    if (_switchingWalletAccount) {
-      return;
-    }
-
-    final currentProfile = ref.read(userProfileProvider).valueOrNull;
-    if (currentProfile?.walletAddress?.trim().toLowerCase() == normalized) {
-      ref.invalidate(linkedWalletBalanceProvider);
-      return;
-    }
-
-    setState(() => _switchingWalletAccount = true);
-    try {
-      await ref.read(authServiceProvider).signOut();
-      await _signInWithWalletAddress(normalized);
-      ref.invalidate(userProfileProvider);
-      ref.invalidate(pknBalanceProvider);
-      ref.invalidate(linkedWalletBalanceProvider);
-      ref.invalidate(userOrdersProvider);
-      ref.invalidate(withdrawRequestsProvider);
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Wallet account switch failed: $error'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _switchingWalletAccount = false);
-      }
-    }
-  }
-
-  Future<void> _signInWithWalletAddress(String address) async {
-    final auth = ref.read(authServiceProvider);
-    final nonce = await auth.requestWalletNonce(address);
-    final message = nonce['message'] as String? ?? '';
-    if (message.isEmpty) {
-      throw StateError('Wallet sign-in nonce was empty.');
-    }
-    final signature =
-        await bridge.signMessage(address: address, message: message);
-    final result = await auth.verifyWalletSignature(
-      address: address,
-      signature: signature,
-    );
-    final token = result['customToken'] as String? ?? '';
-    if (token.isEmpty) {
-      throw StateError('Wallet sign-in token was empty.');
-    }
-    await auth.signInWithCustomToken(token);
-  }
+  final bool _switchingWalletAccount = false;
 
   @override
   Widget build(BuildContext context) {
-    final user = ref.watch(authStateProvider).valueOrNull;
+    ref.listen(authStateProvider, (previous, next) {
+      final previousUid = previous?.valueOrNull?.uid;
+      final nextUid = next.valueOrNull?.uid;
+      if (previousUid != nextUid) {
+        ref.invalidate(userProfileProvider);
+        ref.invalidate(pknBalanceProvider);
+        ref.invalidate(linkedWalletBalanceProvider);
+        ref.invalidate(userOrdersProvider);
+        ref.invalidate(withdrawRequestsProvider);
+      }
+      if (!next.isLoading && next.valueOrNull == null && mounted) {
+        context.go('/auth');
+      }
+    });
+
+    final authState = ref.watch(authStateProvider);
+    final user = authState.valueOrNull;
+    if (authState.isLoading) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF050816),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (user == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          context.go('/auth');
+        }
+      });
+      return const Scaffold(
+        backgroundColor: Color(0xFF050816),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
     final profile = ref.watch(userProfileProvider);
     final balanceState = ref.watch(pknBalanceProvider);
     final walletBalanceState = ref.watch(linkedWalletBalanceProvider);
     final ordersState = ref.watch(userOrdersProvider);
-    final withdrawState = ref.watch(withdrawRequestsProvider);
-    final balance = balanceState.valueOrNull ?? 0;
+    final cachedBalance = ref.watch(cachedPknBalanceProvider).valueOrNull;
+    final balance = balanceState.valueOrNull ?? cachedBalance ?? 0;
     final orders = ordersState.valueOrNull ?? const <Map<String, dynamic>>[];
-    final withdraws =
-        withdrawState.valueOrNull ?? const <Map<String, dynamic>>[];
 
     return Scaffold(
       backgroundColor: const Color(0xFF050816),
       appBar: _ProfileTopBar(
         onLogout: () async {
           await ref.read(authServiceProvider).signOut();
+          ref.invalidate(authStateProvider);
+          ref.invalidate(userProfileProvider);
+          ref.invalidate(pknBalanceProvider);
+          ref.invalidate(linkedWalletBalanceProvider);
+          ref.invalidate(userOrdersProvider);
+          ref.invalidate(withdrawRequestsProvider);
           if (context.mounted) {
-            context.go('/');
+            context.go('/auth');
           }
         },
       ),
@@ -157,39 +104,30 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 children: [
                   profile.when(
                     data: (profile) => _UserHeader(
-                      uid: user?.uid,
-                      email: user?.email ?? profile?.email ?? '',
                       username: profile?.username ?? '',
-                      photoUrl: profile?.photoUrl ?? user?.photoURL,
+                      photoUrl: profile?.photoUrl,
+                      photoVersion: profile?.updatedAt.millisecondsSinceEpoch
+                          .toString(),
                       walletAddress: profile?.walletAddress,
                       balance: balance,
                       walletBalance: walletBalanceState.valueOrNull,
                       walletBalanceLoading: walletBalanceState.isLoading,
                       ordersCount: orders.length,
-                      pendingWithdraws: withdraws
-                          .where((item) => item['status'] == 'pending')
-                          .length,
-                      onEditUsername: user == null
-                          ? null
-                          : () => _showUsernameDialog(
-                                context,
-                                ref,
-                                profile?.username ?? '',
-                              ),
-                      onEditPhoto: user == null
-                          ? null
-                          : () => _showPhotoDialog(
-                                context,
-                                ref,
-                                user.uid,
-                                profile?.photoUrl ?? user.photoURL,
-                              ),
-                      onConnectWallet: user == null
-                          ? null
-                          : () => _connectMetaMaskWallet(
-                                context,
-                                ref,
-                              ),
+                      onEditUsername: () => _showUsernameDialog(
+                        context,
+                        ref,
+                        profile?.username ?? '',
+                      ),
+                      onEditPhoto: () => _showPhotoDialog(
+                        context,
+                        ref,
+                        user.uid,
+                        profile?.photoUrl,
+                      ),
+                      onConnectWallet: () => _connectMetaMaskWallet(
+                        context,
+                        ref,
+                      ),
                       switchingWalletAccount: _switchingWalletAccount,
                     ),
                     loading: () => const _LoadingPanel(),
@@ -198,15 +136,30 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   const SizedBox(height: 22),
                   _QuickActions(
                     onWallet: () => context.go('/wallet'),
-                    onWithdraw: user == null
-                        ? null
-                        : () => _showWithdrawDialog(context, ref, user.uid),
+                    onWithdraw: () => _showWithdrawDialog(
+                      context,
+                      ref,
+                      profile.valueOrNull?.walletAddress,
+                    ),
                   ),
                   const SizedBox(height: 22),
-                  _ResponsiveColumns(
-                    left: _OrdersPanel(state: ordersState),
-                    right: _WithdrawPanel(state: withdrawState),
+                  _AccountSecurityPanel(
+                    providerIds:
+                        ref.read(authServiceProvider).currentProviderIds,
+                    email: user.email ?? profile.valueOrNull?.email ?? '',
+                    walletAddress: profile.valueOrNull?.walletAddress,
+                    onConnectGoogle: () => _connectGoogleAccount(
+                      context,
+                      ref,
+                    ),
+                    onSetPassword: () => _showPasswordDialog(
+                      context,
+                      ref,
+                      user.email ?? profile.valueOrNull?.email ?? '',
+                    ),
                   ),
+                  const SizedBox(height: 22),
+                  _OrdersPanel(state: ordersState),
                   const SiteFooter(),
                 ],
               ),
@@ -217,8 +170,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  void _showWithdrawDialog(BuildContext context, WidgetRef ref, String uid) {
-    final addressController = TextEditingController();
+  void _showWithdrawDialog(
+    BuildContext context,
+    WidgetRef ref,
+    String? linkedWalletAddress,
+  ) {
+    final linkedAddress = linkedWalletAddress?.trim() ?? '';
+    if (linkedAddress.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Link a wallet before withdrawing account balance.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
     final amountController = TextEditingController();
     showDialog(
       context: context,
@@ -228,14 +194,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
-              'Create a pending withdraw request. An operator process finalizes the on-chain payout.',
+              'Withdraw account balance to your linked wallet.',
               style: TextStyle(color: Color(0xFFB8C4E6), height: 1.45),
             ),
-            const SizedBox(height: 16),
-            _ProfileTextField(
-              controller: addressController,
-              label: '0x payout address',
-              icon: Icons.account_balance_wallet_outlined,
+            const SizedBox(height: 10),
+            SelectableText(
+              linkedAddress,
+              style: const TextStyle(
+                color: Color(0xFFCBD5E1),
+                fontFamily: 'monospace',
+              ),
             ),
             const SizedBox(height: 12),
             _ProfileTextField(
@@ -258,17 +226,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 if (amount == null) {
                   throw ArgumentError('Enter a whole PKN amount.');
                 }
-                await ref.read(authServiceProvider).requestWithdraw(
-                      uid: uid,
-                      toAddress: addressController.text,
+                final result = await ref.read(authServiceProvider).requestWithdraw(
+                      toAddress: linkedAddress,
                       amountPkn: amount,
                     );
+                ref.invalidate(pknBalanceProvider);
+                ref.invalidate(withdrawRequestsProvider);
                 if (context.mounted) {
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Withdraw request created.'),
-                      backgroundColor: Color(0xFFFACC15),
+                    SnackBar(
+                      content: Text(
+                        (result['payoutTxHash'] as String? ?? '').isNotEmpty
+                            ? 'Withdraw sent from the bank wallet.'
+                            : result['warning'] as String? ??
+                                'Withdraw request created for manual bank payout.',
+                      ),
+                      backgroundColor: const Color(0xFFFACC15),
                     ),
                   );
                 }
@@ -288,7 +262,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ],
       ),
     ).whenComplete(() {
-      addressController.dispose();
       amountController.dispose();
     });
   }
@@ -297,6 +270,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       BuildContext context, WidgetRef ref) async {
     final bridge = createWalletBridge();
     if (!bridge.hasProvider) {
+      if (bridge.openMetaMaskDapp()) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Opening this page in MetaMask...'),
+            backgroundColor: Color(0xFFFACC15),
+          ),
+        );
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content:
@@ -317,22 +299,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       if (linked != null &&
           linked.isNotEmpty &&
           linked != account.trim().toLowerCase()) {
-        await ref.read(authServiceProvider).signOut();
-        await _signInWithWalletAddress(account.trim().toLowerCase());
-        ref.invalidate(userProfileProvider);
-        ref.invalidate(pknBalanceProvider);
-        ref.invalidate(linkedWalletBalanceProvider);
-        ref.invalidate(userOrdersProvider);
-        ref.invalidate(withdrawRequestsProvider);
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Switched to the selected MetaMask account.'),
-              backgroundColor: Color(0xFFFACC15),
-            ),
-          );
-        }
-        return;
+        throw StateError(
+          'This account already has a different linked wallet.',
+        );
       }
       if (!context.mounted) {
         return;
@@ -349,23 +318,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       }
       final signature =
           await bridge.signMessage(address: account, message: message);
-      final result = await ref.read(authServiceProvider).linkSignedWallet(
-            address: account,
-            signature: signature,
-          );
+      await ref.read(authServiceProvider).linkSignedWallet(
+        address: account,
+        signature: signature,
+      );
       ref.invalidate(userProfileProvider);
       ref.invalidate(pknBalanceProvider);
       ref.invalidate(linkedWalletBalanceProvider);
-      final converted = _readInt(result['convertedPkn']);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              converted > 0
-                  ? 'Wallet connected. $converted PKN queued for payout to your wallet.'
-                  : 'Wallet connected. Your profile now shows on-chain wallet balance.',
-            ),
-            backgroundColor: const Color(0xFFFACC15),
+          const SnackBar(
+            content:
+                Text('Wallet connected. Top up and withdraw are now available.'),
+            backgroundColor: Color(0xFFFACC15),
           ),
         );
       }
@@ -406,14 +371,101 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     return result == true;
   }
 
-  static int _readInt(Object? value) {
-    if (value is int) {
-      return value;
+  Future<void> _connectGoogleAccount(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    try {
+      await ref.read(authServiceProvider).linkGoogleToCurrentUser();
+      ref.invalidate(authStateProvider);
+      ref.invalidate(userProfileProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Google account connected.')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+        );
+      }
     }
-    if (value is num) {
-      return value.toInt();
-    }
-    return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  void _showPasswordDialog(
+    BuildContext context,
+    WidgetRef ref,
+    String currentEmail,
+  ) {
+    final emailController = TextEditingController(text: currentEmail);
+    final passwordController = TextEditingController();
+    showDialog<void>(
+      context: context,
+      builder: (context) => _ProfileDialog(
+        title: 'Email and password',
+        body: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Add or update an email/password login for this same Pokoin account.',
+              style: TextStyle(color: Color(0xFFB8C4E6), height: 1.45),
+            ),
+            const SizedBox(height: 16),
+            _ProfileTextField(
+              controller: emailController,
+              label: 'Email',
+              icon: Icons.email_outlined,
+              keyboardType: TextInputType.emailAddress,
+            ),
+            const SizedBox(height: 12),
+            _ProfileTextField(
+              controller: passwordController,
+              label: 'New password',
+              icon: Icons.lock_outline,
+              obscureText: true,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              try {
+                await ref.read(authServiceProvider).setEmailPassword(
+                      email: emailController.text,
+                      password: passwordController.text,
+                    );
+                ref.invalidate(authStateProvider);
+                ref.invalidate(userProfileProvider);
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Email/password updated.')),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(e.toString()),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    ).whenComplete(() {
+      emailController.dispose();
+      passwordController.dispose();
+    });
   }
 
   void _showUsernameDialog(
@@ -478,11 +530,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         currentPhotoUrl: currentPhotoUrl,
         onRemove: () async {
           await ref.read(authServiceProvider).removeProfilePicture();
+          ref.invalidate(userProfileProvider);
         },
         onSave: (bytes) async {
           await ref.read(authServiceProvider).uploadProfilePicture(
                 imageBytes: bytes,
               );
+          ref.invalidate(userProfileProvider);
         },
       ),
     );
@@ -557,18 +611,21 @@ class _ProfileTextField extends StatelessWidget {
     required this.label,
     required this.icon,
     this.keyboardType,
+    this.obscureText = false,
   });
 
   final TextEditingController controller;
   final String label;
   final IconData icon;
   final TextInputType? keyboardType;
+  final bool obscureText;
 
   @override
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
+      obscureText: obscureText,
       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
       decoration: InputDecoration(
         labelText: label,
@@ -602,15 +659,8 @@ class _ProfileTopBar extends StatelessWidget implements PreferredSizeWidget {
     final compact = MediaQuery.sizeOf(context).width < 820;
 
     return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xF2050816),
-        border: Border(
-          bottom: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
-        ),
-        boxShadow: const [
-          BoxShadow(
-              color: Color(0x66000000), blurRadius: 24, offset: Offset(0, 10)),
-        ],
+      decoration: const BoxDecoration(
+        color: Color(0xF2050816),
       ),
       child: SafeArea(
         bottom: false,
@@ -806,32 +856,28 @@ class _TopBarButton extends StatelessWidget {
 }
 
 class _UserHeader extends StatelessWidget {
-  final String? uid;
-  final String email;
   final String username;
   final String? photoUrl;
+  final String? photoVersion;
   final String? walletAddress;
   final int balance;
   final String? walletBalance;
   final bool walletBalanceLoading;
   final int ordersCount;
-  final int pendingWithdraws;
   final VoidCallback? onEditUsername;
   final VoidCallback? onEditPhoto;
   final VoidCallback? onConnectWallet;
   final bool switchingWalletAccount;
 
   const _UserHeader({
-    required this.uid,
-    required this.email,
     required this.username,
     required this.photoUrl,
+    required this.photoVersion,
     required this.walletAddress,
     required this.balance,
     required this.walletBalance,
     required this.walletBalanceLoading,
     required this.ordersCount,
-    required this.pendingWithdraws,
     required this.onEditUsername,
     required this.onEditPhoto,
     required this.onConnectWallet,
@@ -861,7 +907,10 @@ class _UserHeader extends StatelessWidget {
             runSpacing: 16,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              _ProfileAvatar(photoUrl: photoUrl, onTap: onEditPhoto),
+              _ProfileAvatar(
+                  photoUrl: photoUrl,
+                  photoVersion: photoVersion,
+                  onTap: onEditPhoto),
               SizedBox(
                 width: 520,
                 child: Column(
@@ -893,11 +942,6 @@ class _UserHeader extends StatelessWidget {
                       ],
                     ),
                     Text(
-                      email.isEmpty ? 'Signed in account' : email,
-                      style: const TextStyle(color: Color(0xFFB8C4E6)),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
                       username.isEmpty
                           ? 'Username not assigned yet'
                           : '@$username',
@@ -906,14 +950,6 @@ class _UserHeader extends StatelessWidget {
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    if (uid != null) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        'User ID ${_short(uid!)}',
-                        style: const TextStyle(
-                            color: Color(0xFF64748B), fontSize: 12),
-                      ),
-                    ],
                     if (switchingWalletAccount) ...[
                       const SizedBox(height: 8),
                       const Row(
@@ -943,14 +979,18 @@ class _UserHeader extends StatelessWidget {
             runSpacing: 12,
             children: [
               _MetricChip(
-                label:
-                    hasLinkedWallet ? 'Wallet balance' : 'Marketplace balance',
-                value: hasLinkedWallet
-                    ? walletBalanceLoading
-                        ? 'Loading...'
-                        : '${walletBalance ?? '0.00'} PKN'
-                    : formatPkn(balance, decimals: 0),
+                label: 'Account balance',
+                value: formatPkn(balance, decimals: 0),
               ),
+              if (hasLinkedWallet)
+                _MetricChip(
+                  label: 'Connected wallet balance',
+                  value: walletBalanceLoading
+                      ? 'Loading...'
+                      : walletBalance == null
+                          ? 'Unavailable'
+                          : '$walletBalance PKN',
+                ),
               _MetricChip(
                 label: 'Linked wallet',
                 value: hasLinkedWallet ? linkedWalletAddress : 'Not linked yet',
@@ -961,18 +1001,7 @@ class _UserHeader extends StatelessWidget {
                 label: 'Orders',
                 value: '$ordersCount recent',
               ),
-              _MetricChip(
-                label: 'Withdraw requests',
-                value: '$pendingWithdraws pending',
-              ),
             ],
-          ),
-          const SizedBox(height: 14),
-          Text(
-            hasLinkedWallet
-                ? 'Wallet connected. Your visible PKN balance is the on-chain balance of this wallet; any remaining site credit is only pending treasury payout.'
-                : 'Your site balance is a marketplace credit. Connect MetaMask to move that credit to your wallet and use the wallet balance as your main PKN balance.',
-            style: const TextStyle(color: Color(0xFFB8C4E6), height: 1.5),
           ),
         ],
       ),
@@ -981,16 +1010,22 @@ class _UserHeader extends StatelessWidget {
 }
 
 class _ProfileAvatar extends StatelessWidget {
-  const _ProfileAvatar(
-      {required this.photoUrl, required this.onTap, this.size = 50});
+  const _ProfileAvatar({
+    required this.photoUrl,
+    required this.onTap,
+    this.photoVersion,
+    this.size = 50,
+  });
 
   final String? photoUrl;
+  final String? photoVersion;
   final VoidCallback? onTap;
   final double size;
 
   @override
   Widget build(BuildContext context) {
     final radius = BorderRadius.circular(size * 0.32);
+    final versionedPhotoUrl = _versionedPhotoUrl(photoUrl, photoVersion);
     final avatar = Container(
       width: size,
       height: size,
@@ -1000,9 +1035,10 @@ class _ProfileAvatar extends StatelessWidget {
         borderRadius: radius,
         border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
-      child: photoUrl != null && photoUrl!.isNotEmpty
+      child: versionedPhotoUrl != null && versionedPhotoUrl.isNotEmpty
           ? Image.network(
-              photoUrl!,
+              versionedPhotoUrl,
+              key: ValueKey(versionedPhotoUrl),
               fit: BoxFit.cover,
               errorBuilder: (_, __, ___) => _DefaultProfileLogo(size: size),
             )
@@ -1041,6 +1077,15 @@ class _ProfileAvatar extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  static String? _versionedPhotoUrl(String? url, String? version) {
+    final clean = url?.trim();
+    if (clean == null || clean.isEmpty || version == null || version.isEmpty) {
+      return clean;
+    }
+    final separator = clean.contains('?') ? '&' : '?';
+    return '$clean${separator}v=$version';
   }
 }
 
@@ -1124,6 +1169,171 @@ class _MetricChip extends StatelessWidget {
   }
 }
 
+class _AccountSecurityPanel extends StatelessWidget {
+  const _AccountSecurityPanel({
+    required this.providerIds,
+    required this.email,
+    required this.walletAddress,
+    required this.onConnectGoogle,
+    required this.onSetPassword,
+  });
+
+  final Set<String> providerIds;
+  final String email;
+  final String? walletAddress;
+  final VoidCallback onConnectGoogle;
+  final VoidCallback onSetPassword;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasGoogle = providerIds.contains('google.com');
+    final hasPassword = providerIds.contains('password');
+    final hasWallet = (walletAddress ?? '').trim().isNotEmpty;
+    final isWalletOnly = hasWallet &&
+        (providerIds.isEmpty ||
+            providerIds.every((provider) => provider == 'firebase'));
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Login methods',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            isWalletOnly
+                ? 'This account is currently wallet-only. Add Google or email/password so you can recover and sign in another way.'
+                : 'Manage the sign-in methods connected to this Pokoin account.',
+            style: const TextStyle(color: Color(0xFFB8C4E6), height: 1.45),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              _LoginMethodChip(
+                icon: Icons.account_balance_wallet_outlined,
+                label: 'Wallet',
+                status: hasWallet ? 'Connected' : 'Not connected',
+                connected: hasWallet,
+              ),
+              _LoginMethodChip(
+                icon: Icons.g_mobiledata,
+                label: 'Google',
+                status: hasGoogle ? 'Connected' : 'Not connected',
+                connected: hasGoogle,
+                actionLabel: hasGoogle ? null : 'Connect Google',
+                onTap: hasGoogle ? null : onConnectGoogle,
+              ),
+              _LoginMethodChip(
+                icon: Icons.lock_outline,
+                label: 'Email/password',
+                status: hasPassword
+                    ? 'Password enabled'
+                    : email.trim().isEmpty
+                        ? 'Not configured'
+                        : email,
+                connected: hasPassword,
+                actionLabel: hasPassword ? 'Update password' : 'Create password',
+                onTap: onSetPassword,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LoginMethodChip extends StatelessWidget {
+  const _LoginMethodChip({
+    required this.icon,
+    required this.label,
+    required this.status,
+    required this.connected,
+    this.actionLabel,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final String status;
+  final bool connected;
+  final String? actionLabel;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 240),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: connected
+            ? const Color(0x2238D39F)
+            : Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: connected
+              ? const Color(0x6638D39F)
+              : Colors.white.withValues(alpha: 0.08),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            color: connected ? const Color(0xFF38D39F) : const Color(0xFFFACC15),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  status,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFFB8C4E6),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (actionLabel != null && onTap != null) ...[
+            const SizedBox(width: 10),
+            TextButton(
+              onPressed: onTap,
+              child: Text(actionLabel!),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class _QuickActions extends StatelessWidget {
   final VoidCallback onWallet;
   final VoidCallback? onWithdraw;
@@ -1147,35 +1357,11 @@ class _QuickActions extends StatelessWidget {
         ),
         _ProfileAction(
           icon: Icons.payments_outlined,
-          title: 'Manual payout request',
-          subtitle:
-              'Use only if you need to move remaining site credit manually.',
+          title: 'Withdraw to wallet',
+          subtitle: 'Move account balance to your linked wallet.',
           onTap: onWithdraw ?? () {},
           disabled: onWithdraw == null,
         ),
-      ],
-    );
-  }
-}
-
-class _ResponsiveColumns extends StatelessWidget {
-  final Widget left;
-  final Widget right;
-
-  const _ResponsiveColumns({required this.left, required this.right});
-
-  @override
-  Widget build(BuildContext context) {
-    final wide = MediaQuery.sizeOf(context).width >= 900;
-    if (!wide) {
-      return Column(children: [left, const SizedBox(height: 18), right]);
-    }
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(child: left),
-        const SizedBox(width: 18),
-        Expanded(child: right),
       ],
     );
   }
@@ -1210,45 +1396,6 @@ class _OrdersPanel extends StatelessWidget {
                       _readNum(order['totalPkn'] ?? order['total']),
                       decimals: 0),
                   status: '${order['status'] ?? 'pending'}',
-                ),
-            ],
-          );
-        },
-        loading: () => const _PanelLoading(),
-        error: (error, _) => _InlineError(message: error.toString()),
-      ),
-    );
-  }
-}
-
-class _WithdrawPanel extends StatelessWidget {
-  final AsyncValue<List<Map<String, dynamic>>> state;
-
-  const _WithdrawPanel({required this.state});
-
-  @override
-  Widget build(BuildContext context) {
-    return _SectionPanel(
-      title: 'Withdraw history',
-      icon: Icons.outbound_outlined,
-      child: state.when(
-        data: (requests) {
-          if (requests.isEmpty) {
-            return const _EmptyState(
-              title: 'No withdrawals',
-              body: 'Requests to move PKN on-chain will be tracked here.',
-            );
-          }
-          return Column(
-            children: [
-              for (final request in requests.take(5))
-                _ActivityRow(
-                  leading: 'PKN',
-                  title: formatPkn(_readNum(request['amountPkn']), decimals: 0),
-                  subtitle: _short('${request['toAddress'] ?? ''}',
-                      head: 10, tail: 8),
-                  trailing: _formatDate(request['createdAt']),
-                  status: '${request['status'] ?? 'pending'}',
                 ),
             ],
           );
@@ -1614,7 +1761,10 @@ class _ProfilePictureDialogState extends State<_ProfilePictureDialog> {
         children: [
           if (_imageBytes == null) ...[
             _ProfileAvatar(
-                photoUrl: widget.currentPhotoUrl, onTap: null, size: 86),
+              photoUrl: widget.currentPhotoUrl,
+              onTap: null,
+              size: 86,
+            ),
             const SizedBox(height: 16),
             const Text(
               'Upload a photo, crop it to a square, and we will save it as a clean 256 x 256 avatar.',
@@ -1788,13 +1938,6 @@ class _ProfileAction extends StatelessWidget {
       ),
     );
   }
-}
-
-String _short(String value, {int head = 6, int tail = 4}) {
-  if (value.length <= head + tail + 3) {
-    return value;
-  }
-  return '${value.substring(0, head)}...${value.substring(value.length - tail)}';
 }
 
 num _readNum(Object? value) {
