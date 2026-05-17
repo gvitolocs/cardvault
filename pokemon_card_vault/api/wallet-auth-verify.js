@@ -1,6 +1,6 @@
 const { ethers } = require('ethers');
-const { getFirebaseAdmin } = require('./_firebase');
-const { ensureUniqueUsername } = require('./_username');
+const { getFirebaseAdmin } = require('../server/_firebase');
+const { ensureUniqueUsername } = require('../server/_username');
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -67,7 +67,10 @@ module.exports = async function handler(req, res) {
       uid,
       email,
       displayName,
+      preferPokemon: true,
     });
+    displayName = username;
+    await admin.auth().updateUser(uid, { displayName }).catch(() => {});
     await firestore.runTransaction(async (transaction) => {
       const freshNonce = await transaction.get(nonceRef);
       if (!freshNonce.exists || freshNonce.data()?.used === true) {

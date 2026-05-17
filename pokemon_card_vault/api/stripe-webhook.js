@@ -1,6 +1,6 @@
 const Stripe = require('stripe');
-const { getFirebaseAdmin } = require('./_firebase');
-const { handleCompletedCheckout } = require('./_pkn_purchase');
+const { getFirebaseAdmin } = require('../server/_firebase');
+const { handleCompletedCheckout } = require('../server/_pkn_purchase');
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -14,7 +14,10 @@ module.exports = async function handler(req, res) {
     return res.status(500).send('Stripe webhook is not configured.');
   }
 
-  const stripe = new Stripe(stripeSecret, { apiVersion: '2025-12-31.clover' });
+  const stripeOptions = process.env.STRIPE_API_VERSION
+    ? { apiVersion: process.env.STRIPE_API_VERSION }
+    : {};
+  const stripe = new Stripe(stripeSecret, stripeOptions);
 
   let event;
   try {

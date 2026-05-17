@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -64,14 +65,25 @@ class _WalletScreenState extends State<WalletScreen> {
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _exchangeAmountController =
+      TextEditingController();
+  final TextEditingController _exchangeAddressController =
+      TextEditingController();
+  final TextEditingController _exchangeDepositTxController =
+      TextEditingController();
   final List<ActivityItem> _activity = <ActivityItem>[];
   final List<String> _recipientSuggestions = <String>[];
 
+  RecipientSuggestionSource _recipientSuggestionSource =
+      RecipientSuggestionSource.recent;
+  bool _recipientSearchLoading = false;
+  bool _recipientSearchHadQuery = false;
   String? _address;
   WalletUser? _user;
   String? _username;
   String _balance = '0';
   bool _loading = false;
+  bool _switchingWalletAccount = false;
   String? _error;
   int _recipientSearchToken = 0;
 
@@ -81,6 +93,9 @@ class _WalletScreenState extends State<WalletScreen> {
     _amountController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _exchangeAmountController.dispose();
+    _exchangeAddressController.dispose();
+    _exchangeDepositTxController.dispose();
     super.dispose();
   }
 
@@ -97,10 +112,7 @@ class _WalletScreenState extends State<WalletScreen> {
           _handleWalletDisconnected();
           return;
         }
-        setState(() {
-          _address = address;
-        });
-        _loadBalance(address);
+        _handleWalletAccountChanged(address);
       });
       _wallet.onChainChanged(() {
         if (_address != null) {
@@ -113,6 +125,7 @@ class _WalletScreenState extends State<WalletScreen> {
         setState(() => _user = user);
         _loadUsername();
         _loadLinkedWallet();
+        _loadActivity();
       }
     });
   }
@@ -130,12 +143,57 @@ class _WalletScreenState extends State<WalletScreen> {
     }
   }
 
+  Future<void> _handleWalletAccountChanged(String address) async {
+    final normalized = address.trim().toLowerCase();
+    if (normalized.isEmpty || normalized == _address?.trim().toLowerCase()) {
+      return;
+    }
+    if (_switchingWalletAccount) {
+      return;
+    }
+
+    setState(() {
+      _switchingWalletAccount = true;
+      _address = null;
+      _balance = '0';
+      _username = null;
+      _recipientSuggestions.clear();
+    });
+
+    try {
+      await _auth.signOut();
+      await _signInWithWalletAddress(normalized);
+      await _loadBalance(normalized);
+      if (!mounted) {
+        return;
+      }
+      setState(() => _address = normalized);
+      _record('Switched wallet account', normalized, ActivityKind.inbound);
+      _showMessage('Switched to the selected MetaMask account.');
+      await _loadActivity();
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _address = normalized;
+        _balance = '0';
+      });
+      _showMessage(_friendlyError(error));
+    } finally {
+      if (mounted) {
+        setState(() => _switchingWalletAccount = false);
+      }
+    }
+  }
+
   Future<void> _refreshAll() async {
     await _syncConnectedWallet();
     await _loadLinkedWallet();
     await Future.wait(<Future<void>>[
       if (_address != null) _loadBalance(_address!),
     ]);
+    await _loadActivity();
   }
 
   Future<void> _syncConnectedWallet() async {
@@ -148,6 +206,7 @@ class _WalletScreenState extends State<WalletScreen> {
     }
     setState(() => _address = address);
     await _loadBalance(address);
+    await _loadActivity();
   }
 
   Future<void> _loadLinkedWallet() async {
@@ -157,6 +216,7 @@ class _WalletScreenState extends State<WalletScreen> {
     }
     setState(() => _address = address);
     await _loadBalance(address);
+    await _loadActivity();
   }
 
   Future<void> _loadUsername() async {
@@ -178,24 +238,7 @@ class _WalletScreenState extends State<WalletScreen> {
       if (account == null) {
         throw Exception('No wallet account selected');
       }
-      final nonce = await _auth.requestWalletNonce(account);
-      final message = nonce['message'];
-      if (message == null || message.isEmpty) {
-        throw Exception('Wallet sign-in nonce was empty.');
-      }
-      final signature = await _wallet.signMessage(
-        address: account,
-        message: message,
-      );
-      final verified = await _auth.verifyWalletSignature(
-        address: account,
-        signature: signature,
-      );
-      final customToken = verified['customToken'];
-      if (customToken == null || customToken.isEmpty) {
-        throw Exception('Wallet sign-in token was empty.');
-      }
-      await _auth.signInWithCustomToken(customToken);
+      await _signInWithWalletAddress(account);
       await _wallet.addNetwork();
       await _wallet.switchNetwork();
       await _loadBalance(account);
@@ -204,6 +247,28 @@ class _WalletScreenState extends State<WalletScreen> {
       });
       _record('Wallet signed in', account, ActivityKind.inbound);
     });
+  }
+
+  Future<void> _signInWithWalletAddress(String address) async {
+    final normalized = address.trim().toLowerCase();
+    final nonce = await _auth.requestWalletNonce(normalized);
+    final message = nonce['message'];
+    if (message == null || message.isEmpty) {
+      throw Exception('Wallet sign-in nonce was empty.');
+    }
+    final signature = await _wallet.signMessage(
+      address: normalized,
+      message: message,
+    );
+    final verified = await _auth.verifyWalletSignature(
+      address: normalized,
+      signature: signature,
+    );
+    final customToken = verified['customToken'];
+    if (customToken == null || customToken.isEmpty) {
+      throw Exception('Wallet sign-in token was empty.');
+    }
+    await _auth.signInWithCustomToken(customToken);
   }
 
   Future<void> _loadBalance(String address) async {
@@ -217,6 +282,9 @@ class _WalletScreenState extends State<WalletScreen> {
   Future<void> _openSendSheet() async {
     final balanceWei = _parsePknToWei(_balance) ?? BigInt.zero;
     _recipientSuggestions.clear();
+    _recipientSuggestionSource = RecipientSuggestionSource.recent;
+    _recipientSearchLoading = false;
+    _recipientSearchHadQuery = false;
     var loadedRecentRecipients = false;
 
     await showDialog<void>(
@@ -289,26 +357,24 @@ class _WalletScreenState extends State<WalletScreen> {
                           prefixIcon: Icon(Icons.person_search_outlined),
                         ),
                       ),
-                      if (_recipientSuggestions.isNotEmpty) ...<Widget>[
+                      if (_recipientSearchLoading ||
+                          _recipientSuggestions.isNotEmpty ||
+                          _recipientSearchHadQuery) ...<Widget>[
                         const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: <Widget>[
-                            for (final recipient in _recipientSuggestions)
-                              ActionChip(
-                                label: Text(recipient),
-                                avatar: const Icon(
-                                  Icons.history,
-                                  size: 16,
-                                ),
-                                onPressed: () {
-                                  _toController.text = recipient;
-                                  _recipientSuggestions.clear();
-                                  setDialogState(() {});
-                                },
-                              ),
-                          ],
+                        _RecipientSuggestions(
+                          loading: _recipientSearchLoading,
+                          hadQuery: _recipientSearchHadQuery,
+                          source: _recipientSuggestionSource,
+                          suggestions: List<String>.unmodifiable(
+                            _recipientSuggestions,
+                          ),
+                          onSelect: (recipient) {
+                            _toController.text = recipient;
+                            _recipientSuggestions.clear();
+                            _recipientSearchLoading = false;
+                            _recipientSearchHadQuery = false;
+                            setDialogState(() {});
+                          },
                         ),
                       ],
                       const SizedBox(height: 12),
@@ -380,16 +446,24 @@ class _WalletScreenState extends State<WalletScreen> {
     void Function(VoidCallback fn) setDialogState,
   ) async {
     final token = ++_recipientSearchToken;
-    final query = value.trim();
+    final query = value.trim().toLowerCase();
     if (query.isEmpty) {
+      _recipientSearchLoading = false;
+      _recipientSearchHadQuery = false;
       await _showRecentRecipientSuggestions(setDialogState, token: token);
       return;
     }
+    _recipientSearchHadQuery =
+        query.length >= 2 && !query.contains('@') && !_isAddress(query);
     if (query.length < 2 || query.contains('@') || _isAddress(query)) {
       _recipientSuggestions.clear();
+      _recipientSearchLoading = false;
       setDialogState(() {});
       return;
     }
+    _recipientSuggestionSource = RecipientSuggestionSource.search;
+    _recipientSearchLoading = true;
+    setDialogState(() {});
     try {
       final results = await _auth.searchRecipientUsernames(query);
       if (!mounted || token != _recipientSearchToken) {
@@ -397,13 +471,16 @@ class _WalletScreenState extends State<WalletScreen> {
       }
       _recipientSuggestions
         ..clear()
-        ..addAll(results);
+        ..addAll(results.map((username) => username.trim().toLowerCase()));
+      _recipientSuggestionSource = RecipientSuggestionSource.search;
+      _recipientSearchLoading = false;
       setDialogState(() {});
     } catch (_) {
       if (!mounted || token != _recipientSearchToken) {
         return;
       }
       _recipientSuggestions.clear();
+      _recipientSearchLoading = false;
       setDialogState(() {});
     }
   }
@@ -419,6 +496,9 @@ class _WalletScreenState extends State<WalletScreen> {
     _recipientSuggestions
       ..clear()
       ..addAll(recent);
+    _recipientSuggestionSource = RecipientSuggestionSource.recent;
+    _recipientSearchLoading = false;
+    _recipientSearchHadQuery = false;
     setDialogState(() {});
   }
 
@@ -432,7 +512,7 @@ class _WalletScreenState extends State<WalletScreen> {
         _showMessage('Username transfers use whole PKN amounts.');
         return;
       }
-      if (!RegExp(r'^[a-zA-Z0-9_]{3,32}$').hasMatch(recipient)) {
+      if (!RegExp(r'^[a-zA-Z0-9]{3,32}$').hasMatch(recipient)) {
         _showMessage('Enter a valid username or 0x address.');
         return;
       }
@@ -450,6 +530,7 @@ class _WalletScreenState extends State<WalletScreen> {
           ActivityKind.outbound,
         );
         _showMessage('Account balance transfer sent.');
+        await _loadActivity();
       });
       return;
     }
@@ -477,6 +558,7 @@ class _WalletScreenState extends State<WalletScreen> {
           ActivityKind.outbound,
         );
         _showMessage('On-chain transaction sent.');
+        await _loadActivity();
       });
       return;
     }
@@ -502,7 +584,350 @@ class _WalletScreenState extends State<WalletScreen> {
       _showMessage(
         'Withdraw request created. An operator will send PKN from the site treasury account.',
       );
+      await _loadActivity();
     });
+  }
+
+  Future<void> _openWpknExchangeSheet() async {
+    if (_user == null) {
+      _showMessage('Sign in before using the PKN/wPKN exchange.');
+      return;
+    }
+
+    var direction = 'pkn_to_wpkn';
+    Map<String, dynamic>? quote;
+    List<Map<String, dynamic>> requests = const <Map<String, dynamic>>[];
+    _exchangeAmountController.clear();
+    _exchangeAddressController.text = _address ?? '';
+    _exchangeDepositTxController.clear();
+
+    Future<void> loadRequests(
+        void Function(VoidCallback fn) setDialogState) async {
+      try {
+        final rows = await _auth.wpknExchangeRequests();
+        if (!mounted) {
+          return;
+        }
+        requests = rows;
+        setDialogState(() {});
+      } catch (_) {
+        // History is useful context but should not block quoting or requesting.
+      }
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            if (requests.isEmpty) {
+              loadRequests(setDialogState);
+            }
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              insetPadding: const EdgeInsets.all(20),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: Container(
+                  padding: EdgeInsets.fromLTRB(
+                    22,
+                    22,
+                    22,
+                    22 + MediaQuery.of(dialogContext).viewInsets.bottom,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xF20B1020),
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.08),
+                    ),
+                  ),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: <Widget>[
+                        const Text(
+                          'PKN / wPKN exchange',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Market rate, not fixed 1:1. Quotes include spread, slippage and reserve adjustment.',
+                          style: TextStyle(color: Color(0xFFB8C4E6)),
+                        ),
+                        const SizedBox(height: 16),
+                        SegmentedButton<String>(
+                          segments: const <ButtonSegment<String>>[
+                            ButtonSegment(
+                              value: 'pkn_to_wpkn',
+                              label: Text('PKN -> wPKN'),
+                            ),
+                            ButtonSegment(
+                              value: 'wpkn_to_pkn',
+                              label: Text('wPKN -> PKN'),
+                            ),
+                          ],
+                          selected: <String>{direction},
+                          onSelectionChanged: (selected) {
+                            direction = selected.first;
+                            quote = null;
+                            setDialogState(() {});
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _exchangeAmountController,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            labelText: direction == 'pkn_to_wpkn'
+                                ? 'Amount PKN'
+                                : 'Amount wPKN',
+                            prefixIcon: const Icon(Icons.payments_outlined),
+                          ),
+                          onChanged: (_) {
+                            quote = null;
+                            setDialogState(() {});
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _exchangeAddressController,
+                          keyboardType: TextInputType.text,
+                          decoration: InputDecoration(
+                            labelText: direction == 'pkn_to_wpkn'
+                                ? 'BSC payout address'
+                                : 'PKN payout address',
+                            prefixIcon:
+                                const Icon(Icons.account_balance_wallet),
+                          ),
+                        ),
+                        if (direction == 'wpkn_to_pkn') ...<Widget>[
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: _exchangeDepositTxController,
+                            keyboardType: TextInputType.text,
+                            decoration: const InputDecoration(
+                              labelText: 'wPKN deposit tx hash',
+                              prefixIcon: Icon(Icons.receipt_long_outlined),
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 14),
+                        if (quote != null) _ExchangeQuoteCard(quote: quote!),
+                        const SizedBox(height: 14),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: <Widget>[
+                            OutlinedButton.icon(
+                              onPressed: () => _runTask(() async {
+                                final amount = int.tryParse(
+                                    _exchangeAmountController.text);
+                                if (amount == null || amount <= 0) {
+                                  throw ArgumentError(
+                                    'Enter a whole amount greater than zero.',
+                                  );
+                                }
+                                if (amount < 1000) {
+                                  throw ArgumentError(
+                                    'Amount too low, the minimum is 1000',
+                                  );
+                                }
+                                quote = await _auth.quoteWpknExchange(
+                                  direction: direction,
+                                  amountIn: amount,
+                                );
+                                setDialogState(() {});
+                              }),
+                              icon: const Icon(Icons.price_check),
+                              label: const Text('Get quote'),
+                            ),
+                            FilledButton.icon(
+                              onPressed: quote == null
+                                  ? null
+                                  : () => _runTask(() async {
+                                        final response =
+                                            await _auth.requestWpknExchange(
+                                          quoteId:
+                                              quote!['quoteId'] as String? ??
+                                                  '',
+                                          direction: direction,
+                                          toAddress:
+                                              _exchangeAddressController.text,
+                                          depositTxHash:
+                                              direction == 'wpkn_to_pkn'
+                                                  ? _exchangeDepositTxController
+                                                      .text
+                                                  : null,
+                                        );
+                                        requests =
+                                            await _auth.wpknExchangeRequests();
+                                        quote = null;
+                                        _exchangeAmountController.clear();
+                                        _exchangeDepositTxController.clear();
+                                        setDialogState(() {});
+                                        _showMessage(
+                                          response['settlementMode'] ==
+                                                  'manual_pending'
+                                              ? 'Exchange request created for operator settlement.'
+                                              : 'Exchange request created.',
+                                        );
+                                        await _loadActivity();
+                                      }),
+                              icon: const Icon(Icons.swap_horiz),
+                              label: const Text('Request exchange'),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 18),
+                        _ExchangeHistory(requests: requests),
+                        const SizedBox(height: 12),
+                        TextButton(
+                          onPressed: () => Navigator.of(dialogContext).pop(),
+                          child: const Text('Close'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _loadActivity() async {
+    final address = _address?.trim();
+    final results = await Future.wait<List<ActivityItem>>([
+      _loadLedgerActivityItems(),
+      if (address != null && address.isNotEmpty)
+        _loadOnChainActivityItems(address)
+      else
+        Future.value(const <ActivityItem>[]),
+    ]);
+    if (!mounted) {
+      return;
+    }
+    final byKey = <String, ActivityItem>{};
+    for (final item in results.expand((items) => items)) {
+      byKey.putIfAbsent(item.key, () => item);
+    }
+    final merged = byKey.values.toList()..sort((a, b) => b.at.compareTo(a.at));
+    setState(() {
+      _activity
+        ..clear()
+        ..addAll(merged.take(12));
+    });
+  }
+
+  Future<List<ActivityItem>> _loadLedgerActivityItems() async {
+    final rows = await _auth.ledgerActivity();
+    return rows.map(_activityFromLedger).toList(growable: false);
+  }
+
+  Future<List<ActivityItem>> _loadOnChainActivityItems(String address) async {
+    final rows = await _auth.onChainActivity(address: address);
+    final normalized = address.trim().toLowerCase();
+    return rows.map((row) => _activityFromChain(row, normalized)).toList(
+          growable: false,
+        );
+  }
+
+  ActivityItem _activityFromLedger(Map<String, dynamic> row) {
+    final type = (row['type'] as String? ?? 'account_activity').trim();
+    final amount = _readInt(row['amountPkn']);
+    final outbound =
+        amount < 0 || type.contains('sent') || type.contains('withdraw');
+    final counterparty = (row['counterpartyUsername'] ??
+            row['toAddress'] ??
+            row['stripeSessionId'] ??
+            '')
+        .toString();
+    return ActivityItem(
+      key: 'ledger:${row['id'] ?? type}:$counterparty:$amount',
+      title: _ledgerTitle(type, amount),
+      detail: counterparty.isEmpty ? type : counterparty,
+      kind: outbound ? ActivityKind.outbound : ActivityKind.inbound,
+      at: _readDate(row['createdAt']),
+    );
+  }
+
+  ActivityItem _activityFromChain(Map<String, dynamic> row, String address) {
+    final from = (row['from'] as String? ?? '').trim().toLowerCase();
+    final to = (row['to'] as String? ?? '').trim().toLowerCase();
+    final hash = row['hash'] as String? ?? '';
+    final outbound = from == address;
+    final amount = _readInt(row['amount']);
+    return ActivityItem(
+      key: 'chain:$hash',
+      title:
+          '${outbound ? 'Sent' : 'Received'} ${_formatWholePkn(amount)} PKN on-chain',
+      detail: hash.isEmpty
+          ? '${_shortAddress(from)} -> ${_shortAddress(to)}'
+          : hash,
+      kind: outbound ? ActivityKind.outbound : ActivityKind.inbound,
+      at: _readDate(row['timestamp'] ?? row['createdAt']).subtract(
+        Duration(minutes: _readInt(row['transactionIndex'])),
+      ),
+    );
+  }
+
+  String _ledgerTitle(String type, int amount) {
+    final abs = amount.abs();
+    if (type == 'account_transfer_sent') {
+      return 'Sent $abs PKN to username';
+    }
+    if (type == 'account_transfer_received') {
+      return 'Received $abs PKN by username';
+    }
+    if (type == 'pkn_purchase_credit') {
+      return 'Bought $abs PKN';
+    }
+    if (type.contains('withdraw') || type.contains('conversion')) {
+      return 'Requested $abs PKN payout';
+    }
+    return '$type ${abs == 0 ? '' : '$abs PKN'}'.trim();
+  }
+
+  static int _readInt(Object? value) {
+    if (value is int) {
+      return value;
+    }
+    if (value is num) {
+      return value.toInt();
+    }
+    return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  static DateTime _readDate(Object? value) {
+    if (value is Timestamp) {
+      return value.toDate();
+    }
+    if (value is String) {
+      return DateTime.tryParse(value) ?? DateTime.now();
+    }
+    return DateTime.now();
+  }
+
+  static String _formatWholePkn(int amount) {
+    final text = amount.toString();
+    if (text.length > 18) {
+      return text.substring(0, text.length - 18);
+    }
+    return text;
+  }
+
+  static String _shortAddress(String value) {
+    if (value.length <= 12) {
+      return value;
+    }
+    return '${value.substring(0, 6)}...${value.substring(value.length - 4)}';
   }
 
   void _setAmountPercent(BigInt balanceWei, double percent) {
@@ -608,6 +1033,7 @@ class _WalletScreenState extends State<WalletScreen> {
       _activity.insert(
         0,
         ActivityItem(
+          key: 'local:${DateTime.now().microsecondsSinceEpoch}:$detail',
           title: title,
           detail: detail,
           kind: kind,
@@ -852,9 +1278,7 @@ class _WalletScreenState extends State<WalletScreen> {
         _QuickActionButton(
           icon: Icons.currency_exchange,
           label: 'wPKN',
-          onTap: () => _openUrl(
-            'https://pancakeswap.finance/swap?outputCurrency=0x91A17E2bddfF839078BD395482B38e4AC15276f4&chain=bsc',
-          ),
+          onTap: _openWpknExchangeSheet,
         ),
         _QuickActionButton(
           icon: Icons.shopping_cart_checkout,
@@ -1111,6 +1535,161 @@ class _ErrorBanner extends StatelessWidget {
   }
 }
 
+enum RecipientSuggestionSource { recent, search }
+
+class _RecipientSuggestions extends StatelessWidget {
+  const _RecipientSuggestions({
+    required this.loading,
+    required this.hadQuery,
+    required this.source,
+    required this.suggestions,
+    required this.onSelect,
+  });
+
+  final bool loading;
+  final bool hadQuery;
+  final RecipientSuggestionSource source;
+  final List<String> suggestions;
+  final ValueChanged<String> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    if (loading) {
+      return const Row(
+        children: <Widget>[
+          SizedBox.square(
+            dimension: 16,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          SizedBox(width: 10),
+          Text(
+            'Searching usernames...',
+            style: TextStyle(color: Color(0xFFB8C4E6)),
+          ),
+        ],
+      );
+    }
+
+    if (suggestions.isEmpty) {
+      if (!hadQuery) {
+        return const SizedBox.shrink();
+      }
+      return const Text(
+        'No username found.',
+        style: TextStyle(color: Color(0xFF93A4C8)),
+      );
+    }
+
+    final isRecent = source == RecipientSuggestionSource.recent;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          isRecent ? 'Recent recipients' : 'Username suggestions',
+          style: const TextStyle(
+            color: Color(0xFF93A4C8),
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: <Widget>[
+            for (final recipient in suggestions)
+              ActionChip(
+                label: Text(recipient),
+                avatar: Icon(
+                  isRecent ? Icons.history : Icons.person_search_outlined,
+                  size: 16,
+                ),
+                onPressed: () => onSelect(recipient),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _ExchangeQuoteCard extends StatelessWidget {
+  const _ExchangeQuoteCard({required this.quote});
+
+  final Map<String, dynamic> quote;
+
+  @override
+  Widget build(BuildContext context) {
+    final fromAsset = quote['fromAsset'] as String? ?? '';
+    final toAsset = quote['toAsset'] as String? ?? '';
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0x2214B8A6),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0x6638BDF8)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            '${quote['amountIn']} $fromAsset -> ${quote['amountOut']} $toAsset',
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Fee/slippage: ${quote['feeAmount']} $toAsset | total cost ${quote['totalCostBps']} bps',
+            style: const TextStyle(color: Color(0xFFB8C4E6)),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Expires: ${quote['quoteExpiresAt'] ?? ''}',
+            style: const TextStyle(color: Color(0xFF93A4C8), fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ExchangeHistory extends StatelessWidget {
+  const _ExchangeHistory({required this.requests});
+
+  final List<Map<String, dynamic>> requests;
+
+  @override
+  Widget build(BuildContext context) {
+    if (requests.isEmpty) {
+      return const Text(
+        'No exchange requests yet.',
+        style: TextStyle(color: Colors.white70),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        const Text(
+          'Exchange history',
+          style: TextStyle(fontWeight: FontWeight.w900),
+        ),
+        const SizedBox(height: 8),
+        for (final request in requests.take(5))
+          ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            title: Text(
+              '${request['amountIn']} ${request['fromAsset']} -> ${request['amountOutQuoted']} ${request['toAsset']}',
+            ),
+            subtitle: SelectableText(
+              '${request['status']} | ${request['requestId']}',
+            ),
+            trailing: const Icon(Icons.chevron_right),
+          ),
+      ],
+    );
+  }
+}
+
 class _PercentButton extends StatelessWidget {
   const _PercentButton({required this.label, required this.onTap});
 
@@ -1222,12 +1801,14 @@ enum ActivityKind { inbound, outbound }
 
 class ActivityItem {
   ActivityItem({
+    required this.key,
     required this.title,
     required this.detail,
     required this.kind,
     required this.at,
   });
 
+  final String key;
   final String title;
   final String detail;
   final ActivityKind kind;

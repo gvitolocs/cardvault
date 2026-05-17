@@ -1,4 +1,4 @@
-const { getFirebaseAdmin, verifyBearerToken } = require('./_firebase');
+const { getFirebaseAdmin, verifyBearerToken } = require('../server/_firebase');
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {

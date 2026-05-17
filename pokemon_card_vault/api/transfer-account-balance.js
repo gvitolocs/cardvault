@@ -1,4 +1,4 @@
-const { getFirebaseAdmin, verifyBearerToken } = require('./_firebase');
+const { getFirebaseAdmin, verifyBearerToken } = require('../server/_firebase');
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -12,7 +12,7 @@ module.exports = async function handler(req, res) {
     const toUsername = String(recipientUsername || '').trim().toLowerCase();
     const amount = Number(amountPkn);
 
-    if (!/^[a-z0-9_]{3,32}$/.test(toUsername)) {
+    if (!/^[a-z0-9]{3,32}$/.test(toUsername)) {
       return res.status(400).json({ error: 'Enter a valid recipient username.' });
     }
     if (!Number.isInteger(amount) || amount <= 0) {

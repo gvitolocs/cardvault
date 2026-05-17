@@ -1,6 +1,6 @@
 const Stripe = require('stripe');
-const { getFirebaseAdmin, verifyBearerToken } = require('./_firebase');
-const { handleCompletedCheckout } = require('./_pkn_purchase');
+const { getFirebaseAdmin, verifyBearerToken } = require('../server/_firebase');
+const { handleCompletedCheckout } = require('../server/_pkn_purchase');
 
 const allowedPackages = new Map([
   [500, 500],
@@ -22,7 +22,10 @@ module.exports = async function handler(req, res) {
 
     const decoded = await verifyBearerToken(req);
     const { pknAmount, fiatCents, checkoutSessionId } = req.body || {};
-    const stripe = new Stripe(stripeSecret, { apiVersion: '2025-12-31.clover' });
+    const stripeOptions = process.env.STRIPE_API_VERSION
+      ? { apiVersion: process.env.STRIPE_API_VERSION }
+      : {};
+    const stripe = new Stripe(stripeSecret, stripeOptions);
     const admin = getFirebaseAdmin();
 
     if (checkoutSessionId) {

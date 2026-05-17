@@ -1,6 +1,6 @@
 const { ethers } = require('ethers');
-const { getFirebaseAdmin, verifyBearerToken } = require('./_firebase');
-const { ensureUniqueUsername } = require('./_username');
+const { getFirebaseAdmin, verifyBearerToken } = require('../server/_firebase');
+const { ensureUniqueUsername } = require('../server/_username');
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -52,6 +52,7 @@ module.exports = async function handler(req, res) {
     const userRef = firestore.collection('users').doc(uid);
     const balanceRef = firestore.collection('balances').doc(uid);
     const walletRegistryRef = firestore.collection('wallet_addresses').doc(normalized);
+    const linkedRegistryRef = firestore.collection('wallet_addresses');
     const requestRef = firestore.collection('withdraw_requests').doc();
     const ledgerRef = firestore.collection('ledger_entries').doc();
 
@@ -70,6 +71,30 @@ module.exports = async function handler(req, res) {
         throw Object.assign(new Error('This wallet is already linked to another account.'), {
           statusCode: 409,
         });
+      }
+
+      const userDoc = await transaction.get(userRef);
+      const existingWallet = String(userDoc.data()?.walletAddress || '').trim().toLowerCase();
+      if (existingWallet && existingWallet !== normalized) {
+        throw Object.assign(
+          new Error(
+            'This account already has a linked wallet. Switch MetaMask accounts to sign in as a wallet-only user, or disconnect the current wallet first.',
+          ),
+          { statusCode: 409 },
+        );
+      }
+
+      const linkedWallets = await transaction.get(linkedRegistryRef.where('uid', '==', uid).limit(2));
+      const otherLinkedWallet = linkedWallets.docs
+        .map((doc) => doc.id)
+        .find((address) => address !== normalized);
+      if (otherLinkedWallet) {
+        throw Object.assign(
+          new Error(
+            'This account already has a linked wallet. Switch MetaMask accounts to sign in as a wallet-only user, or disconnect the current wallet first.',
+          ),
+          { statusCode: 409 },
+        );
       }
 
       const balance = await transaction.get(balanceRef);

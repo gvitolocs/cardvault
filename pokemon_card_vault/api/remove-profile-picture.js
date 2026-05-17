@@ -1,4 +1,5 @@
-const { getFirebaseAdmin, verifyBearerToken } = require('./_firebase');
+const { getFirebaseAdmin, verifyBearerToken } = require('../server/_firebase');
+const { deleteProfilePictureFromR2 } = require('../server/_r2');
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -14,7 +15,7 @@ module.exports = async function handler(req, res) {
     const storagePath = snapshot.data()?.photoStoragePath;
 
     if (typeof storagePath === 'string' && storagePath.startsWith(`profile-pictures/${decoded.uid}/`)) {
-      await admin.storage().bucket().file(storagePath).delete({ ignoreNotFound: true });
+      await deleteProfilePictureFromR2(storagePath).catch(() => {});
     }
 
     await admin.auth().updateUser(decoded.uid, { photoURL: null });
@@ -22,6 +23,7 @@ module.exports = async function handler(req, res) {
       {
         photoUrl: null,
         photoStoragePath: null,
+        photoInlineId: null,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       },
       { merge: true },

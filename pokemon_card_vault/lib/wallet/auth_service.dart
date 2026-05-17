@@ -230,6 +230,85 @@ class WalletAuthService {
     }
   }
 
+  Future<Map<String, dynamic>> quoteWpknExchange({
+    required String direction,
+    required int amountIn,
+  }) async {
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+    if (firebaseUser == null) {
+      throw StateError('Sign in before requesting an exchange quote.');
+    }
+    final token = await firebaseUser.getIdToken();
+    final response = await http.post(
+      Uri.parse('/api/wpkn-exchange/quote'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({'direction': direction, 'amountIn': amountIn}),
+    );
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError(payload['error'] as String? ?? 'Exchange quote failed.');
+    }
+    return payload;
+  }
+
+  Future<Map<String, dynamic>> requestWpknExchange({
+    required String quoteId,
+    required String direction,
+    required String toAddress,
+    String? depositTxHash,
+  }) async {
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+    if (firebaseUser == null) {
+      throw StateError('Sign in before requesting an exchange.');
+    }
+    final token = await firebaseUser.getIdToken();
+    final response = await http.post(
+      Uri.parse('/api/wpkn-exchange/request'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'quoteId': quoteId,
+        'direction': direction,
+        'toAddress': toAddress.trim(),
+        if (depositTxHash != null && depositTxHash.trim().isNotEmpty)
+          'depositTxHash': depositTxHash.trim(),
+      }),
+    );
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError(
+        payload['error'] as String? ?? 'Exchange request failed.',
+      );
+    }
+    return payload;
+  }
+
+  Future<List<Map<String, dynamic>>> wpknExchangeRequests() async {
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+    if (firebaseUser == null) {
+      return const <Map<String, dynamic>>[];
+    }
+    final token = await firebaseUser.getIdToken();
+    final response = await http.get(
+      Uri.parse('/api/wpkn-exchange/status'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError(
+        payload['error'] as String? ?? 'Exchange status failed.',
+      );
+    }
+    return ((payload['requests'] as List?) ?? const <dynamic>[])
+        .whereType<Map<String, dynamic>>()
+        .toList(growable: false);
+  }
+
   Future<String?> linkedWalletAddress() async {
     if (Firebase.apps.isEmpty) {
       return null;
@@ -244,6 +323,46 @@ class WalletAuthService {
         .get();
     final address = (doc.data()?['walletAddress'] as String?)?.trim();
     return address == null || address.isEmpty ? null : address;
+  }
+
+  Future<List<Map<String, dynamic>>> ledgerActivity({int limit = 12}) async {
+    if (Firebase.apps.isEmpty) {
+      return const <Map<String, dynamic>>[];
+    }
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+    if (firebaseUser == null) {
+      return const <Map<String, dynamic>>[];
+    }
+    final snapshot = await FirebaseFirestore.instance
+        .collection('ledger_entries')
+        .where('uid', isEqualTo: firebaseUser.uid)
+        .orderBy('createdAt', descending: true)
+        .limit(limit)
+        .get();
+    return snapshot.docs
+        .map((doc) => <String, dynamic>{'id': doc.id, ...doc.data()})
+        .toList(growable: false);
+  }
+
+  Future<List<Map<String, dynamic>>> onChainActivity({
+    required String address,
+    int limit = 12,
+  }) async {
+    final normalized = address.trim().toLowerCase();
+    if (!RegExp(r'^0x[a-f0-9]{40}$').hasMatch(normalized)) {
+      return const <Map<String, dynamic>>[];
+    }
+    final response = await http
+        .get(Uri.parse('https://rpc.pokoin.com/explorer/address/$normalized'))
+        .timeout(const Duration(seconds: 10));
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      return const <Map<String, dynamic>>[];
+    }
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    return ((payload['transactions'] as List?) ?? const <dynamic>[])
+        .whereType<Map<String, dynamic>>()
+        .take(limit)
+        .toList(growable: false);
   }
 
   Future<List<String>> searchRecipientUsernames(String query) async {

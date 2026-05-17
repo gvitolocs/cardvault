@@ -20,7 +20,7 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.username == username
-        && username.matches('^[a-z0-9_]{3,32}$');
+        && username.matches('^[a-z0-9]{3,32}$');
       allow update: if signedIn()
         && resource.data.uid == request.auth.uid
         && request.resource.data.uid == request.auth.uid

@@ -11,7 +11,24 @@ flutter build web --release --pwa-strategy=none
 
 rm -rf "$ROOT_DIR/build/web/api"
 mkdir -p "$ROOT_DIR/build/web/api"
-cp "$ROOT_DIR"/api/*.js "$ROOT_DIR/build/web/api/"
+mkdir -p "$ROOT_DIR/build/web/server"
+for helper in _firebase _pkn_purchase _r2 _username _wpkn_exchange; do
+  cp "$ROOT_DIR/api/${helper}.js" "$ROOT_DIR/build/web/server/${helper}.js"
+done
+for endpoint in \
+  create-pkn-checkout-session \
+  remove-profile-picture \
+  request-pkn-withdraw \
+  search-recipient-emails \
+  stripe-webhook \
+  transfer-account-balance \
+  upload-profile-picture \
+  wallet-auth-nonce \
+  wallet-auth-verify \
+  wallet-link \
+  wpkn-exchange; do
+  cp "$ROOT_DIR/api/${endpoint}.js" "$ROOT_DIR/build/web/api/${endpoint}.js"
+done
 cp "$ROOT_DIR/package.json" "$ROOT_DIR/build/web/package.json"
 cp "$ROOT_DIR/vercel.json" "$ROOT_DIR/build/web/vercel.json"
 if [[ -f "/Users/giuseppe/pokoinpos/deploy/bootstrap/bootstrap-peers.json" ]]; then

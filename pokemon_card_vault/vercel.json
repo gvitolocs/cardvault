@@ -127,11 +127,11 @@
     },
     {
       "source": "/api/total-supply",
-      "destination": "/api/total-supply.js"
+      "destination": "https://pokoin-status.vercel.app/api/total-supply"
     },
     {
       "source": "/api/circulating-supply",
-      "destination": "/api/circulating-supply.js"
+      "destination": "https://pokoin-status.vercel.app/api/circulating-supply"
     },
     {
       "source": "/api/transfer-account-balance",
@@ -140,6 +140,10 @@
     {
       "source": "/api/request-pkn-withdraw",
       "destination": "/api/request-pkn-withdraw.js"
+    },
+    {
+      "source": "/api/wpkn-exchange/:action",
+      "destination": "/api/wpkn-exchange.js?action=:action"
     },
     {
       "source": "/api/search-recipient-emails",

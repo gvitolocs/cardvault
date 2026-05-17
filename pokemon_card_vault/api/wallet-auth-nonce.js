@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const { getFirebaseAdmin } = require('./_firebase');
+const { getFirebaseAdmin } = require('../server/_firebase');
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {

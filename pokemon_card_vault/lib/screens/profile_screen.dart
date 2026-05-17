@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:crop_your_image/crop_your_image.dart';
 import 'package:image_picker/image_picker.dart';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import '../constants/project_links.dart';
@@ -70,6 +71,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
     setState(() => _switchingWalletAccount = true);
     try {
+      await ref.read(authServiceProvider).signOut();
       await _signInWithWalletAddress(normalized);
       ref.invalidate(userProfileProvider);
       ref.invalidate(pknBalanceProvider);
@@ -157,9 +159,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     data: (profile) => _UserHeader(
                       uid: user?.uid,
                       email: user?.email ?? profile?.email ?? '',
-                      displayName: profile?.displayName ??
-                          user?.displayName ??
-                          'Pokoin user',
                       username: profile?.username ?? '',
                       photoUrl: profile?.photoUrl ?? user?.photoURL,
                       walletAddress: profile?.walletAddress,
@@ -170,15 +169,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       pendingWithdraws: withdraws
                           .where((item) => item['status'] == 'pending')
                           .length,
-                      onEditName: user == null
+                      onEditUsername: user == null
                           ? null
-                          : () => _showDisplayNameDialog(
+                          : () => _showUsernameDialog(
                                 context,
                                 ref,
-                                user.uid,
-                                profile?.displayName ??
-                                    user.displayName ??
-                                    'Pokoin user',
+                                profile?.username ?? '',
                               ),
                       onEditPhoto: user == null
                           ? null
@@ -321,6 +317,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       if (linked != null &&
           linked.isNotEmpty &&
           linked != account.trim().toLowerCase()) {
+        await ref.read(authServiceProvider).signOut();
         await _signInWithWalletAddress(account.trim().toLowerCase());
         ref.invalidate(userProfileProvider);
         ref.invalidate(pknBalanceProvider);
@@ -335,6 +332,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
           );
         }
+        return;
+      }
+      if (!context.mounted) {
+        return;
+      }
+      final shouldLink = await _confirmWalletLink(context, account);
+      if (!shouldLink) {
         return;
       }
       final nonce =
@@ -374,6 +378,34 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     }
   }
 
+  Future<bool> _confirmWalletLink(BuildContext context, String account) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF111827),
+        title: const Text(
+          'Link this wallet?',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+        ),
+        content: Text(
+          'This will link $account to the current Pokoin account. A Google/email account can have only one linked wallet.',
+          style: const TextStyle(color: Color(0xFFB8C4E6), height: 1.45),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Link wallet'),
+          ),
+        ],
+      ),
+    );
+    return result == true;
+  }
+
   static int _readInt(Object? value) {
     if (value is int) {
       return value;
@@ -384,20 +416,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     return int.tryParse(value?.toString() ?? '') ?? 0;
   }
 
-  void _showDisplayNameDialog(
+  void _showUsernameDialog(
     BuildContext context,
     WidgetRef ref,
-    String uid,
-    String currentName,
+    String currentUsername,
   ) {
-    final controller = TextEditingController(text: currentName);
+    final controller = TextEditingController(text: currentUsername);
     showDialog<void>(
       context: context,
       builder: (context) => _ProfileDialog(
-        title: 'Edit display name',
+        title: 'Edit username',
         body: _ProfileTextField(
           controller: controller,
-          label: 'Display name',
+          label: 'Username',
           icon: Icons.person_outline,
         ),
         actions: [
@@ -408,14 +439,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           FilledButton(
             onPressed: () async {
               try {
-                await ref.read(authServiceProvider).updateDisplayName(
-                      uid: uid,
-                      displayName: controller.text,
+                await ref.read(authServiceProvider).updateUsername(
+                      username: controller.text,
                     );
+                ref.invalidate(userProfileProvider);
                 if (context.mounted) {
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Profile updated.')),
+                    const SnackBar(content: Text('Username updated.')),
                   );
                 }
               } catch (e) {
@@ -777,7 +808,6 @@ class _TopBarButton extends StatelessWidget {
 class _UserHeader extends StatelessWidget {
   final String? uid;
   final String email;
-  final String displayName;
   final String username;
   final String? photoUrl;
   final String? walletAddress;
@@ -786,7 +816,7 @@ class _UserHeader extends StatelessWidget {
   final bool walletBalanceLoading;
   final int ordersCount;
   final int pendingWithdraws;
-  final VoidCallback? onEditName;
+  final VoidCallback? onEditUsername;
   final VoidCallback? onEditPhoto;
   final VoidCallback? onConnectWallet;
   final bool switchingWalletAccount;
@@ -794,7 +824,6 @@ class _UserHeader extends StatelessWidget {
   const _UserHeader({
     required this.uid,
     required this.email,
-    required this.displayName,
     required this.username,
     required this.photoUrl,
     required this.walletAddress,
@@ -803,7 +832,7 @@ class _UserHeader extends StatelessWidget {
     required this.walletBalanceLoading,
     required this.ordersCount,
     required this.pendingWithdraws,
-    required this.onEditName,
+    required this.onEditUsername,
     required this.onEditPhoto,
     required this.onConnectWallet,
     required this.switchingWalletAccount,
@@ -843,7 +872,7 @@ class _UserHeader extends StatelessWidget {
                       children: [
                         Flexible(
                           child: Text(
-                            displayName,
+                            username.isEmpty ? 'Pokoin user' : username,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               color: Colors.white,
@@ -852,11 +881,11 @@ class _UserHeader extends StatelessWidget {
                             ),
                           ),
                         ),
-                        if (onEditName != null) ...[
+                        if (onEditUsername != null) ...[
                           const SizedBox(width: 8),
                           IconButton(
-                            tooltip: 'Edit display name',
-                            onPressed: onEditName,
+                            tooltip: 'Edit username',
+                            onPressed: onEditUsername,
                             icon: const Icon(Icons.edit_outlined,
                                 color: Color(0xFF93A4C8)),
                           ),
@@ -867,16 +896,16 @@ class _UserHeader extends StatelessWidget {
                       email.isEmpty ? 'Signed in account' : email,
                       style: const TextStyle(color: Color(0xFFB8C4E6)),
                     ),
-                    if (username.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        '@$username',
-                        style: const TextStyle(
-                          color: Color(0xFFFACC15),
-                          fontWeight: FontWeight.w800,
-                        ),
+                    const SizedBox(height: 4),
+                    Text(
+                      username.isEmpty
+                          ? 'Username not assigned yet'
+                          : '@$username',
+                      style: const TextStyle(
+                        color: Color(0xFFFACC15),
+                        fontWeight: FontWeight.w800,
                       ),
-                    ],
+                    ),
                     if (uid != null) ...[
                       const SizedBox(height: 6),
                       Text(
@@ -1577,6 +1606,7 @@ class _ProfilePictureDialogState extends State<_ProfilePictureDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final cropSide = math.min(MediaQuery.sizeOf(context).width - 92, 360.0);
     return _ProfileDialog(
       title: 'Profile picture',
       body: Column(
@@ -1598,22 +1628,24 @@ class _ProfilePictureDialogState extends State<_ProfilePictureDialog> {
               label: 'Choose image',
             ),
           ] else ...[
-            ClipRRect(
-              borderRadius: BorderRadius.circular(22),
-              child: SizedBox(
-                height: 320,
-                child: Crop(
-                  image: _imageBytes!,
-                  controller: _cropController,
-                  aspectRatio: 1,
-                  withCircleUi: true,
-                  interactive: true,
-                  baseColor: const Color(0xFF0B1020),
-                  maskColor: Colors.black.withValues(alpha: 0.55),
-                  radius: 22,
-                  onCropped: _handleCropped,
-                  progressIndicator: const Center(
-                    child: CircularProgressIndicator(),
+            Center(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(22),
+                child: SizedBox.square(
+                  dimension: cropSide.clamp(220.0, 360.0),
+                  child: Crop(
+                    image: _imageBytes!,
+                    controller: _cropController,
+                    aspectRatio: 1,
+                    withCircleUi: true,
+                    interactive: true,
+                    baseColor: const Color(0xFF0B1020),
+                    maskColor: Colors.black.withValues(alpha: 0.55),
+                    radius: 22,
+                    onCropped: _handleCropped,
+                    progressIndicator: const Center(
+                      child: CircularProgressIndicator(),
+                    ),
                   ),
                 ),
               ),

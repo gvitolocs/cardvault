@@ -1,5 +1,5 @@
-const { getFirebaseAdmin, verifyBearerToken } = require('./_firebase');
-const { ensureUniqueUsername } = require('./_username');
+const { getFirebaseAdmin, verifyBearerToken } = require('../server/_firebase');
+const { ensureUniqueUsername, updateUniqueUsername } = require('../server/_username');
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'GET' && req.method !== 'POST') {
@@ -13,6 +13,16 @@ module.exports = async function handler(req, res) {
     const firestore = admin.firestore();
 
     if (req.method === 'POST') {
+      const requestedUsername = String(req.body?.username || '').trim();
+      if (requestedUsername) {
+        const username = await updateUniqueUsername({
+          firestore,
+          admin,
+          uid: decoded.uid,
+          desiredUsername: requestedUsername,
+        });
+        return res.status(200).json({ username });
+      }
       const userDoc = await firestore.collection('users').doc(decoded.uid).get();
       const profile = userDoc.data() || {};
       const username = await ensureUniqueUsername({
@@ -30,7 +40,7 @@ module.exports = async function handler(req, res) {
     if (query.length < 2) {
       return res.status(200).json({ usernames: [] });
     }
-    if (!/^[a-z0-9_]{0,32}$/.test(query)) {
+    if (!/^[a-z0-9]{0,32}$/.test(query)) {
       return res.status(200).json({ usernames: [] });
     }
 

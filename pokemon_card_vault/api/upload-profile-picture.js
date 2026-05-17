@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const sharp = require('sharp');
-const { getFirebaseAdmin, verifyBearerToken } = require('./_firebase');
+const { getFirebaseAdmin, verifyBearerToken } = require('../server/_firebase');
+const { deleteProfilePictureFromR2, uploadProfilePictureToR2 } = require('../server/_r2');
 
 const maxUploadBytes = 6 * 1024 * 1024;
 
@@ -30,29 +31,27 @@ module.exports = async function handler(req, res) {
       .toBuffer();
 
     const admin = getFirebaseAdmin();
-    const token = crypto.randomUUID();
-    const bucket = admin.storage().bucket();
-    const filePath = `profile-pictures/${decoded.uid}/avatar-256.webp`;
-    const file = bucket.file(filePath);
-
-    await file.save(avatarBuffer, {
-      resumable: false,
-      metadata: {
-        contentType: 'image/webp',
-        cacheControl: 'public, max-age=31536000, immutable',
-        metadata: {
-          firebaseStorageDownloadTokens: token,
-        },
-      },
+    const avatarId = crypto.randomUUID();
+    const userRef = admin.firestore().collection('users').doc(decoded.uid);
+    const existingProfile = await userRef.get();
+    const previousStoragePath = existingProfile.data()?.photoStoragePath;
+    const storagePath = `profile-pictures/${decoded.uid}/${avatarId}.webp`;
+    const uploaded = await uploadProfilePictureToR2({
+      key: storagePath,
+      body: avatarBuffer,
     });
+    const photoUrl = uploaded?.url || `data:image/webp;base64,${avatarBuffer.toString('base64')}`;
 
-    const encodedPath = encodeURIComponent(filePath);
-    const photoUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodedPath}?alt=media&token=${token}`;
+    if (uploaded && typeof previousStoragePath === 'string' && previousStoragePath !== storagePath) {
+      await deleteProfilePictureFromR2(previousStoragePath).catch(() => {});
+    }
+
     await admin.auth().updateUser(decoded.uid, { photoURL: photoUrl });
-    await admin.firestore().collection('users').doc(decoded.uid).set(
+    await userRef.set(
       {
         photoUrl,
-        photoStoragePath: filePath,
+        photoStoragePath: uploaded?.key || null,
+        photoInlineId: uploaded ? null : avatarId,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       },
       { merge: true },

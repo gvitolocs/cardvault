@@ -206,7 +206,6 @@ class AuthService {
     return payload['username'] as String?;
   }
 
-
   Future<void> requestWithdraw({
     required String uid,
     required String toAddress,
@@ -330,23 +329,32 @@ class AuthService {
     }
   }
 
-  Future<void> updateDisplayName({
-    required String uid,
-    required String displayName,
-  }) async {
-    final name = displayName.trim();
-    if (name.length < 2) {
-      throw ArgumentError('Display name must be at least 2 characters.');
+  Future<String> updateUsername({required String username}) async {
+    final clean = username.trim().toLowerCase();
+    if (!RegExp(r'^[a-z0-9]{3,32}$').hasMatch(clean)) {
+      throw ArgumentError(
+        'Username must be 3-32 letters or numbers, with no spaces.',
+      );
     }
-
-    await _auth.currentUser?.updateDisplayName(name);
-    await _firestore.collection('users').doc(uid).set(
-      {
-        'displayName': name,
-        'updatedAt': FieldValue.serverTimestamp(),
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw StateError('Log in before updating your username.');
+    }
+    final token = await user.getIdToken();
+    final response = await http.post(
+      Uri.parse('/api/ensure-username'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
       },
-      SetOptions(merge: true),
+      body: jsonEncode({'username': clean}),
     );
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError(
+          payload['error'] as String? ?? 'Username update failed.');
+    }
+    return payload['username'] as String? ?? clean;
   }
 
   Future<String> uploadProfilePicture({
@@ -367,7 +375,8 @@ class AuthService {
     );
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw StateError(payload['error'] as String? ?? 'Profile picture upload failed.');
+      throw StateError(
+          payload['error'] as String? ?? 'Profile picture upload failed.');
     }
     final photoUrl = payload['photoUrl'] as String? ?? '';
     await user.updatePhotoURL(photoUrl);
@@ -387,7 +396,8 @@ class AuthService {
     );
     if (response.statusCode < 200 || response.statusCode >= 300) {
       final payload = jsonDecode(response.body) as Map<String, dynamic>;
-      throw StateError(payload['error'] as String? ?? 'Profile picture removal failed.');
+      throw StateError(
+          payload['error'] as String? ?? 'Profile picture removal failed.');
     }
     await user.updatePhotoURL(null);
     await user.reload();
