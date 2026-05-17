@@ -81,12 +81,14 @@ async function handleStatus(req, res, decoded, firestore) {
   const snapshot = await firestore
     .collection('wpkn_exchange_requests')
     .where('uid', '==', decoded.uid)
-    .orderBy('createdAt', 'desc')
-    .limit(12)
     .get();
+  const requests = snapshot.docs
+    .map(serialize)
+    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
+    .slice(0, 12);
 
   return res.status(200).json({
-    requests: snapshot.docs.map(serialize),
+    requests,
   });
 }
 

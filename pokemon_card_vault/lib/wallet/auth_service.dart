@@ -336,12 +336,24 @@ class WalletAuthService {
     final snapshot = await FirebaseFirestore.instance
         .collection('ledger_entries')
         .where('uid', isEqualTo: firebaseUser.uid)
-        .orderBy('createdAt', descending: true)
-        .limit(limit)
         .get();
-    return snapshot.docs
+    final rows = snapshot.docs
         .map((doc) => <String, dynamic>{'id': doc.id, ...doc.data()})
         .toList(growable: false);
+    rows.sort((a, b) => _readTimestamp(b['createdAt']).compareTo(
+          _readTimestamp(a['createdAt']),
+        ));
+    return rows.take(limit).toList(growable: false);
+  }
+
+  static DateTime _readTimestamp(Object? value) {
+    if (value is Timestamp) {
+      return value.toDate();
+    }
+    if (value is String) {
+      return DateTime.tryParse(value) ?? DateTime.fromMillisecondsSinceEpoch(0);
+    }
+    return DateTime.fromMillisecondsSinceEpoch(0);
   }
 
   Future<List<Map<String, dynamic>>> onChainActivity({
