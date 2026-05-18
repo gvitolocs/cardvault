@@ -8,13 +8,21 @@ search, Supabase blueprint schema, or CDN preview thumbnails.
 The marketplace search should behave like CardTrader:
 
 - Typing in `/marketplace` opens an autocomplete panel.
-- Results show a small preview image, card name plus expansion/collector number,
-  set and action text. Example: `Mew ex #Special Illustration Rare | 232/091`.
+- The panel must be anchored to the top-bar search field and use the field
+  width. Do not let it stretch across the viewport or cover the whole page.
+- The preview panel is capped at 15 mixed results and can contain both singles
+  and products.
+- Results show a small preview image, card name plus collector/expansion number,
+  set and action text. Example: `Mew ex #232/091`, not the rarity as the
+  hashtag.
 - Search previews may be seeded from the loaded Flutter catalog, then merged
   with Supabase projection results.
 - Numeric searches such as `mew 232` should wait for full Supabase projection
   results instead of showing weak local-cache-only suggestions from the capped
   home catalog.
+- Compound searches should still show similar results. `mew 232` should rank the
+  exact `Mew ex #232/091` match first, then fall back to the strongest text term
+  (`mew`) so related singles/products can fill the 15-result panel.
 - The full `/marketplace/search` page must query Supabase projections directly.
   Do not limit it to the 500-card marketplace/home catalog loaded in
   `CardState.cards`.
@@ -27,12 +35,16 @@ The marketplace search should behave like CardTrader:
 ## Files Involved
 
 - `lib/screens/home_screen.dart`
-  - Search input and CardTrader-style preview dropdown.
+  - Search input and CardTrader-style preview dropdown. The dropdown uses a
+    `CompositedTransformFollower`, the search field width, and a short delayed
+    close so row clicks are not swallowed by focus loss.
 - `lib/providers/card_provider.dart`
-  - Local preview ranking, async search preview state and stale request guard.
+  - Local preview ranking, async search preview state, 15-result preview limit,
+    and stale request guard.
 - `lib/services/card_service.dart`
   - Supabase catalog loading, projection search, preview image mapping and
-    fallback behavior.
+    fallback behavior. `searchCardPreviews` merges exact remote/local results
+    with a similar-query fallback for compound searches.
 - `lib/models/pokemon_card.dart`
   - `previewImageUrl`, defaulting to `imageUrl`.
 - `supabase/migrations/20260518070000_cardtrader_search_previews.sql`
@@ -45,13 +57,17 @@ The marketplace search should behave like CardTrader:
   - Creates `marketplace_card_versions` and its refresh function.
 - `supabase/migrations/20260518104000_fix_expansion_navigation_scope.sql`
   - Keeps expansion navigation scoped to exact expansion name.
+- `supabase/migrations/20260518164500_cardtrader_expansion_symbols.sql`
+  - Creates `cardtrader_pokemon_expansions` for imported expansion symbol URLs.
 - `scripts/generate-cardtrader-preview-images.js`
   - Generates WebP previews with `sharp`, uploads to R2, updates Supabase rows.
 - `scripts/import-cardtrader-preview-images.js`
   - Imports CardTrader API preview images directly, uploads them to R2 under
     `previews/...jpg`, updates blueprint and marketplace projection rows.
-- `workflows/generate-cardtrader-preview-images.sh`
-  - Wrapper for running the preview generator.
+- `scripts/import-ptcg-expansion-symbols.js`
+  - Imports `symbol.png` files from `ptcg-assets`, maps CardTrader expansion
+    codes/names to asset folder codes, uploads to R2, and upserts
+    `cardtrader_pokemon_expansions`.
 
 ## Required Env
 
@@ -149,6 +165,35 @@ projection tables:
 select public.refresh_marketplace_cards_from_blueprints();
 select public.refresh_marketplace_card_versions();
 ```
+
+## Expansion Symbol Import
+
+Expansion symbols are imported from
+`https://github.com/1niceroli/ptcg-assets`. Each source expansion folder
+contains `symbol.png`; the importer maps CardTrader expansion codes/names to
+those source folders and writes the symbol to R2 as:
+
+```bash
+expansions/symbols/<cardtrader-expansion-name>.png
+```
+
+The importer also upserts `public.cardtrader_pokemon_expansions`, storing the
+CardTrader expansion id, CardTrader code/name, matched source asset code, CDN
+URL, and R2 object key.
+
+Run from the project root:
+
+```bash
+git clone --depth 1 https://github.com/1niceroli/ptcg-assets.git ../ptcg-assets
+DRY_RUN=1 PTCG_ASSETS_DIR=../ptcg-assets node scripts/import-ptcg-expansion-symbols.js
+PTCG_ASSETS_DIR=../ptcg-assets node scripts/import-ptcg-expansion-symbols.js
+```
+
+The first production run on 2026-05-18 uploaded 182 symbols. Verification was
+done through Supabase rows and direct R2 `HeadObject` checks. Local HTTP checks
+against `https://cdn.pokoin.com/...` returned `403` for both new symbol paths
+and pre-existing preview paths, so do not treat that local CDN check alone as
+proof that an object is missing.
 
 ## Verify Fuzzy Search
 
@@ -321,6 +366,10 @@ The production image source should be our R2 bucket behind
 higher-resolution blueprint image, import that source into R2 and keep the app
 using the same `/card-images/...` proxy format.
 
+For the dated operational report that preserves importer behavior, known
+fragilities, and retest commands, see
+`workflows/cardtrader-full-image-import-report.md`.
+
 Run a targeted import first:
 
 ```bash
@@ -456,6 +505,11 @@ rejecting `HEAD`.
 Then open `https://pokoin.com/marketplace`, hard refresh if needed, and verify:
 
 - Search suggestions for `mew 232` include Mew ex `232/091`.
+- Search suggestions for `mew 232` also include similar Mew results after the
+  exact match, capped at 15.
+- Search suggestion rows can be clicked reliably; if clicks fail, inspect focus
+  loss/removal timing in `_MarketplaceTopSearchState`.
+- The popup width matches the search bar width.
 - Search suggestions show card name plus collector/expansion number.
 - Search suggestions for `pika uni` include Pikachu from Unified Minds.
 
@@ -480,6 +534,9 @@ Then open `https://pokoin.com/marketplace`, hard refresh if needed, and verify:
   Common causes are stale production builds, browser cache, DB-side ordering on
   active search, or local cached suggestions masking the remote full-catalog
   result.
+- If the popup contains only one exact compound match, verify the similar-query
+  fallback in `CardService.searchCardPreviews(...)` still runs and that
+  `CardNotifier._loadSearchPreviews(...)` asks for 15 results.
 - The full search page is intentionally separate from the home catalog. If it
   returns only a few cards while Supabase has more matches, check that it is
   calling `CardService.searchMarketplaceCards(...)` instead of filtering

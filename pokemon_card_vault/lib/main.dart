@@ -376,6 +376,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                 initialQuery: state.uri.queryParameters['q'] ?? '',
                 expansion: state.uri.queryParameters['expansion'],
                 productType: state.uri.queryParameters['productType'],
+                searchLanguage: state.uri.queryParameters['lang'] ?? 'en',
               ),
             ),
           ),

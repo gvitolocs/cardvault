@@ -147,7 +147,7 @@ class CardService {
     final productType = _normalizeProductType(row['product_type'], itemKind);
     final type = _marketplaceDisplayType(
       productType,
-      fallback: _cleanLabel(row['card_type'], fallback: 'Trading card'),
+      fallback: _cleanLabel(row['card_type'], fallback: 'Card'),
     );
     final imageUrl =
         _normalizeImageUrl(row['cdn_image_url'] ?? row['image_url']);
@@ -189,7 +189,7 @@ class CardService {
     final setName = _cleanLabel(row['expansion_name'], fallback: 'Pokemon');
     final productType = _normalizeProductType(row['product_type'], 'single');
     final itemKind = productType == 'card' ? 'single' : 'product';
-    final type = _marketplaceDisplayType(productType, fallback: 'Trading card');
+    final type = _marketplaceDisplayType(productType, fallback: 'Card');
     final imageUrl =
         _normalizeImageUrl(row['cdn_image_url'] ?? row['image_url']);
     final previewImageUrl = _normalizeImageUrl(
@@ -286,13 +286,27 @@ class CardService {
           '',
       fallback: 'Card',
     );
-    final type = _cleanLabel(
+    final cardType = _cleanLabel(
       properties['card_type'] ??
           properties['type'] ??
           blueprint['type'] ??
           blueprint['category_name'] ??
           '',
-      fallback: 'Trading card',
+      fallback: 'Card',
+    );
+    final productType = _classifyProductType(
+      name: name,
+      setName: setName,
+      categoryName: blueprint['category_name'],
+      itemType: properties['type'] ?? blueprint['type'],
+      number: number,
+      version: row['version'],
+      id: id,
+    );
+    final itemKind = productType == 'card' ? 'single' : 'product';
+    final type = _marketplaceDisplayType(
+      productType,
+      fallback: cardType,
     );
     final imageUrl = _normalizeImageUrl(
       row['cdn_image_url'] ??
@@ -334,12 +348,14 @@ class CardService {
         setName,
         rarity,
         type,
-        'single',
+        itemKind,
+        productType,
         if (properties['stage'] != null) '${properties['stage']}',
       ],
       condition: 'NM',
       isGraded: false,
-      itemKind: 'single',
+      itemKind: itemKind,
+      productType: productType,
     );
   }
 
@@ -424,6 +440,65 @@ class CardService {
     return itemKind == 'product' ? 'sealed_product' : 'card';
   }
 
+  String _classifyProductType({
+    required String name,
+    required String setName,
+    required Object? categoryName,
+    required Object? itemType,
+    required Object? number,
+    required Object? version,
+    required String id,
+  }) {
+    final normalizedName = name.toLowerCase();
+    final normalizedSet = setName.toLowerCase();
+    final normalizedCategory = '${categoryName ?? ''}'.toLowerCase();
+    final normalizedType = '${itemType ?? ''}'.toLowerCase();
+    final normalizedNumber = '${number ?? ''}'.toLowerCase().trim();
+    final normalizedVersion = '${version ?? ''}'.toLowerCase().trim();
+    final idText = id.trim();
+    final hasCollectorNumber =
+        RegExp(r'(^|[^0-9])[0-9]{1,4}[a-z]?/[0-9]{1,4}([^0-9]|$)')
+            .hasMatch(normalizedNumber);
+    final looksLikeBlueprintNumber = normalizedNumber == idText ||
+        RegExp(r'^[0-9]{5,}$').hasMatch(normalizedNumber);
+    final hasVersion = normalizedVersion.isNotEmpty;
+    final championshipSet =
+        RegExp(r'world championship decks|world championships .* deck')
+            .hasMatch(normalizedSet);
+
+    bool matches(String pattern) {
+      final expression = RegExp('(^|[^a-z0-9])($pattern)([^a-z0-9]|\$)');
+      return expression.hasMatch(normalizedName) ||
+          expression.hasMatch(normalizedCategory) ||
+          expression.hasMatch(normalizedType);
+    }
+
+    if (hasCollectorNumber) return 'card';
+    if (matches(r'booster box|display box|sealed box')) return 'booster_box';
+    if (matches(r'booster bundle|bundle')) return 'booster_bundle';
+    if (matches(r'booster pack|booster|pack')) return 'booster_pack';
+    if (matches(r'elite trainer box|etb')) return 'elite_trainer_box';
+    if (matches(r'tin|tins')) return 'tin';
+    if (matches(
+        r'premium collection|special collection|collection box|collection')) {
+      return 'collection_box';
+    }
+    if (matches(r'theme deck|starter deck|battle deck|deck')) return 'deck';
+    if (championshipSet &&
+        !hasCollectorNumber &&
+        (!hasVersion || looksLikeBlueprintNumber)) {
+      return 'championship_deck';
+    }
+    if (matches(r'coin|sleeves|playmat|binder|portfolio|accessory')) {
+      return 'accessory';
+    }
+    if (!hasCollectorNumber &&
+        matches(r'sealed|sealed product|product|sealed case')) {
+      return 'sealed_product';
+    }
+    return 'card';
+  }
+
   String _marketplaceDisplayType(String productType,
       {required String fallback}) {
     switch (productType) {
@@ -448,7 +523,7 @@ class CardService {
       case 'sealed_product':
         return 'Sealed product';
       default:
-        return fallback;
+        return fallback.toLowerCase() == 'trading card' ? 'Card' : fallback;
     }
   }
 
@@ -727,33 +802,52 @@ class CardService {
     String query, {
     int limit = 120,
     String? productType,
+    String searchLanguage = 'en',
   }) async {
     final normalizedQuery = query.trim();
     if (normalizedQuery.length < 2) {
       return const [];
     }
 
+    final localizedQueries = await _localizedSearchQueries(
+      normalizedQuery,
+      searchLanguage,
+    );
+    final queries = <String>[normalizedQuery, ...localizedQueries];
+    final results = <PokemonCard>[];
+
     if (productType != null && productType.trim().isNotEmpty) {
-      final rows = await _searchMarketplaceCardVersions(
-        normalizedQuery,
-        limit: limit,
-        productType: productType,
-      );
-      return rows;
+      for (final searchQuery in queries) {
+        final rows = await _searchMarketplaceCardVersions(
+          searchQuery,
+          limit: limit,
+          productType: productType,
+        );
+        results.addAll(rows);
+        if (results.length >= limit) {
+          break;
+        }
+      }
+      return _dedupeCards(results).take(limit).toList();
     }
 
-    final versionRows = await _searchMarketplaceCardVersions(
-      normalizedQuery,
-      limit: limit * 2,
-    );
-    final singleRows =
-        versionRows.where((card) => card.itemKind != 'product').toList();
-    final productRows = await _searchMarketplaceCardRows(
-      normalizedQuery,
-      limit: limit * 2,
-      productSearchOnly: true,
-    );
-    return _dedupeCards([...singleRows, ...productRows]).take(limit).toList();
+    for (final searchQuery in queries) {
+      final rows = await _searchMarketplaceCardVersions(
+        searchQuery,
+        limit: limit,
+      );
+      results.addAll(rows.where((card) => card.itemKind != 'product'));
+      final productRows = await _searchMarketplaceCardRows(
+        searchQuery,
+        limit: limit,
+        productSearchOnly: true,
+      );
+      results.addAll(productRows);
+      if (results.length >= limit) {
+        break;
+      }
+    }
+    return _dedupeCards(results).take(limit).toList();
   }
 
   Future<List<PokemonCard>> getMarketplaceCardsByProductType(
@@ -771,6 +865,7 @@ class CardService {
     String query, {
     List<PokemonCard> fallbackCards = const [],
     int limit = 8,
+    String searchLanguage = 'en',
   }) async {
     final normalizedQuery = query.trim();
     if (normalizedQuery.length < 2) {
@@ -783,12 +878,121 @@ class CardService {
     }
 
     try {
-      final remote =
-          await searchMarketplaceCards(normalizedQuery, limit: limit);
-      return _dedupeCards([...remote, ...local]).take(limit).toList();
+      final remote = await searchMarketplaceCards(
+        normalizedQuery,
+        limit: limit,
+        searchLanguage: searchLanguage,
+      );
+      final similarQuery = _previewSimilarQuery(normalizedQuery);
+      final similarRemote = similarQuery == null
+          ? const <PokemonCard>[]
+          : await searchMarketplaceCards(
+              similarQuery,
+              limit: limit,
+              searchLanguage: searchLanguage,
+            );
+      final similarLocal = similarQuery == null
+          ? const <PokemonCard>[]
+          : _rankLocalCards(fallbackCards, similarQuery, limit);
+      return _dedupeCards([
+        ...remote,
+        ...local,
+        ...similarRemote,
+        ...similarLocal,
+      ]).take(limit).toList();
     } catch (error) {
       debugPrint('Supabase card search failed: $error');
       return local;
+    }
+  }
+
+  String? _previewSimilarQuery(String query) {
+    final terms = _searchTerms(query)
+        .where((term) => !RegExp(r'^[0-9]+$').hasMatch(term))
+        .toList();
+    if (terms.isEmpty) {
+      return null;
+    }
+    terms.sort((a, b) => b.length.compareTo(a.length));
+    final strongest = terms.first;
+    return strongest == query.trim().toLowerCase() ? null : strongest;
+  }
+
+  Future<List<String>> _localizedSearchQueries(
+    String query,
+    String language,
+  ) async {
+    final lang = _tcgdexLanguage(language);
+    if (lang == 'en') {
+      return const [];
+    }
+    try {
+      final uri = Uri.https('api.tcgdex.net', '/v2/$lang/cards', {
+        'name': query,
+      });
+      final response = await http.get(uri).timeout(const Duration(seconds: 3));
+      if (response.statusCode >= 400) {
+        return const [];
+      }
+      final rows = jsonDecode(response.body) as List<dynamic>;
+      final ids = rows
+          .whereType<Map>()
+          .map((row) => '${row['id'] ?? ''}')
+          .where((id) => id.isNotEmpty)
+          .take(8)
+          .toList();
+      final names = <String>{};
+      for (final id in ids) {
+        final englishName = await _tcgdexEnglishName(id);
+        if (englishName != null && englishName.trim().length >= 2) {
+          names.add(englishName.trim());
+        }
+      }
+      return names.toList();
+    } catch (error) {
+      debugPrint('Localized card search failed: $error');
+      return const [];
+    }
+  }
+
+  Future<String?> _tcgdexEnglishName(String id) async {
+    try {
+      final uri = Uri.https('api.tcgdex.net', '/v2/en/cards/$id');
+      final response = await http.get(uri).timeout(const Duration(seconds: 3));
+      if (response.statusCode >= 400) {
+        return null;
+      }
+      final row = jsonDecode(response.body) as Map<String, dynamic>;
+      return row['name'] as String?;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String _tcgdexLanguage(String language) {
+    switch (language.trim().toLowerCase()) {
+      case 'it':
+      case 'fr':
+      case 'de':
+      case 'es':
+      case 'pt':
+      case 'nl':
+      case 'pl':
+      case 'ru':
+      case 'ko':
+      case 'id':
+      case 'th':
+        return language.trim().toLowerCase();
+      case 'jp':
+      case 'ja':
+        return 'ja';
+      case 'zh':
+      case 'zh-cn':
+        return 'zh-cn';
+      case 'zh-tw':
+        return 'zh-tw';
+      default:
+        return 'en';
     }
   }
 

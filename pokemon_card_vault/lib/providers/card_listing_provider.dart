@@ -7,6 +7,10 @@ final cardListingServiceProvider = Provider<CardListingService>((ref) {
   return CardListingService();
 });
 
+final activeCardListingsProvider = StreamProvider<List<CardListing>>((ref) {
+  return ref.watch(cardListingServiceProvider).activeListings();
+});
+
 final cardListingsProvider =
     StreamProvider.family<List<CardListing>, String>((ref, cardId) {
   return ref.watch(cardListingServiceProvider).activeListingsForCard(cardId);

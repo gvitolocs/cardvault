@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../models/card_listing.dart';
+import '../models/pokemon_card.dart';
+import '../providers/card_listing_provider.dart';
 import '../providers/card_provider.dart';
+import '../utils/price_format.dart';
 
 class MarketplaceSignalScreen extends ConsumerWidget {
   const MarketplaceSignalScreen({super.key});
@@ -10,6 +14,12 @@ class MarketplaceSignalScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cardState = ref.watch(cardProvider);
+    final listingsState = ref.watch(activeCardListingsProvider);
+    final listings = listingsState.valueOrNull ?? const <CardListing>[];
+    final signal = _MarketplaceSignal.from(
+      cards: cardState.cards,
+      listings: listings,
+    );
 
     return Scaffold(
       backgroundColor: const Color(0xFF050816),
@@ -42,14 +52,19 @@ class MarketplaceSignalScreen extends ConsumerWidget {
                           padding: EdgeInsets.all(48),
                           child: Center(child: CircularProgressIndicator()),
                         )
-                      : const Column(
+                      : Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            _SignalHero(),
-                            SizedBox(height: 18),
-                            _SignalUnavailablePanel(),
-                            SizedBox(height: 18),
-                            _SignalNextSteps(),
+                            _SignalHero(
+                              signal: signal,
+                              listingsLoading: listingsState.isLoading,
+                            ),
+                            const SizedBox(height: 18),
+                            _SignalMetrics(signal: signal),
+                            const SizedBox(height: 18),
+                            _SignalBreakdown(signal: signal),
+                            const SizedBox(height: 18),
+                            const _SignalIntegrityNote(),
                           ],
                         ),
                 ),
@@ -63,7 +78,13 @@ class MarketplaceSignalScreen extends ConsumerWidget {
 }
 
 class _SignalHero extends StatelessWidget {
-  const _SignalHero();
+  const _SignalHero({
+    required this.signal,
+    required this.listingsLoading,
+  });
+
+  final _MarketplaceSignal signal;
+  final bool listingsLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -74,7 +95,7 @@ class _SignalHero extends StatelessWidget {
         const _Pill('Card Reserve analytics'),
         const SizedBox(height: 18),
         Text(
-          'Live marketplace signal is not available yet.',
+          'Live marketplace signal from real catalog and seller listings.',
           style: Theme.of(context).textTheme.displaySmall?.copyWith(
                 color: Colors.white,
                 fontWeight: FontWeight.w900,
@@ -83,7 +104,7 @@ class _SignalHero extends StatelessWidget {
         ),
         const SizedBox(height: 14),
         const Text(
-          'The previous modeled reserve metrics have been removed because they were not based on live listings, fills, or verified order-book depth. This page will only show analytics once the data is real.',
+          'This dashboard now uses loaded marketplace rows and active Firestore seller listings. Catalog coverage, product mix, seller depth and asks are shown from live data; volume stays empty until completed orders are aggregated.',
           style: TextStyle(
             color: Color(0xFFB8C4E6),
             fontSize: 16,
@@ -93,26 +114,31 @@ class _SignalHero extends StatelessWidget {
       ],
     );
 
-    const pulse = _Panel(
+    final pulse = _Panel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          const Text(
             'Current status',
             style: TextStyle(
               color: Color(0xFFFDE68A),
               fontWeight: FontWeight.w900,
             ),
           ),
-          SizedBox(height: 18),
-          _PulseRow(label: 'Live listed cards', value: 'Pending'),
-          _PulseRow(label: 'Completed sales', value: 'Pending'),
-          _PulseRow(label: '24h volume', value: 'Pending'),
-          _PulseRow(label: 'Floor ask', value: 'Pending'),
-          SizedBox(height: 14),
+          const SizedBox(height: 18),
+          _PulseRow(label: 'Catalog items', value: '${signal.totalCards}'),
+          _PulseRow(label: 'Active listings', value: '${signal.listingCount}'),
+          _PulseRow(
+            label: 'Listed quantity',
+            value: '${signal.availableQuantity}',
+          ),
+          _PulseRow(label: 'Floor ask', value: signal.floorAskLabel),
+          const SizedBox(height: 14),
           Text(
-            'Signals will activate after seller listings and completed purchase events are connected to the analytics pipeline.',
-            style: TextStyle(color: Color(0xFFB8C4E6), height: 1.45),
+            listingsLoading
+                ? 'Loading seller listings...'
+                : 'Completed sale volume is intentionally not shown until order settlement events are aggregated.',
+            style: const TextStyle(color: Color(0xFFB8C4E6), height: 1.45),
           ),
         ],
       ),
@@ -130,7 +156,7 @@ class _SignalHero extends StatelessWidget {
               children: [
                 Expanded(flex: 6, child: copy),
                 const SizedBox(width: 26),
-                const Expanded(flex: 4, child: pulse),
+                Expanded(flex: 4, child: pulse),
               ],
             )
           : Column(
@@ -141,59 +167,106 @@ class _SignalHero extends StatelessWidget {
   }
 }
 
-class _SignalUnavailablePanel extends StatelessWidget {
-  const _SignalUnavailablePanel();
+class _SignalMetrics extends StatelessWidget {
+  const _SignalMetrics({required this.signal});
+
+  final _MarketplaceSignal signal;
 
   @override
   Widget build(BuildContext context) {
-    return const _Panel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Analytics offline',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          SizedBox(height: 12),
-          Text(
-            'We are not showing estimated reserve value, fake volume, modeled charts, or synthetic depth. Cards can exist in the catalog even when no seller has listed stock, so catalog presence is not marketplace liquidity.',
-            style: TextStyle(color: Color(0xFFB8C4E6), height: 1.55),
-          ),
-          SizedBox(height: 16),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              _SignalChip(
-                icon: Icons.inventory_2_outlined,
-                label: 'Unavailable catalog cards show Out of stock',
-              ),
-              _SignalChip(
-                icon: Icons.receipt_long_outlined,
-                label: 'Volume requires completed orders',
-              ),
-              _SignalChip(
-                icon: Icons.sell_outlined,
-                label: 'Floor requires active seller listings',
-              ),
-              _SignalChip(
-                icon: Icons.query_stats,
-                label: 'Charts require live event history',
-              ),
-            ],
-          ),
-        ],
-      ),
+    return Wrap(
+      spacing: 14,
+      runSpacing: 14,
+      children: [
+        _MetricCard(
+          label: 'Catalog rows',
+          value: '${signal.totalCards}',
+          detail:
+              '${signal.singleCount} singles · ${signal.productCount} products',
+          icon: Icons.inventory_2_outlined,
+        ),
+        _MetricCard(
+          label: 'Image coverage',
+          value: signal.imageCoverageLabel,
+          detail: '${signal.withImages} rows with CDN/proxy image',
+          icon: Icons.image_outlined,
+        ),
+        _MetricCard(
+          label: 'Seller listings',
+          value: '${signal.listingCount}',
+          detail:
+              '${signal.sellerCount} sellers · ${signal.availableQuantity} quantity',
+          icon: Icons.storefront_outlined,
+        ),
+        _MetricCard(
+          label: 'Listed ask value',
+          value: signal.totalAskLabel,
+          detail: 'Active seller listings only',
+          icon: Icons.price_change_outlined,
+        ),
+        _MetricCard(
+          label: 'Median ask',
+          value: signal.medianAskLabel,
+          detail: signal.spreadLabel,
+          icon: Icons.show_chart,
+        ),
+        _MetricCard(
+          label: 'Expansion coverage',
+          value: '${signal.expansionCount}',
+          detail: 'Unique sets in loaded marketplace rows',
+          icon: Icons.hub_outlined,
+        ),
+      ],
     );
   }
 }
 
-class _SignalNextSteps extends StatelessWidget {
-  const _SignalNextSteps();
+class _SignalBreakdown extends StatelessWidget {
+  const _SignalBreakdown({required this.signal});
+
+  final _MarketplaceSignal signal;
+
+  @override
+  Widget build(BuildContext context) {
+    final wide = MediaQuery.sizeOf(context).width > 850;
+    final children = [
+      _RankPanel(
+        title: 'Top expansions in catalog',
+        rows: signal.topExpansions,
+      ),
+      _RankPanel(
+        title: 'Top product types',
+        rows: signal.topProductTypes,
+      ),
+      _RankPanel(
+        title: 'Top listed cards',
+        rows: signal.topListedCards,
+      ),
+    ];
+
+    return wide
+        ? Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final child in children) ...[
+                Expanded(child: child),
+                if (child != children.last) const SizedBox(width: 14),
+              ],
+            ],
+          )
+        : Column(
+            children: [
+              for (final child in children) ...[
+                child,
+                if (child != children.last) const SizedBox(height: 14),
+              ],
+            ],
+          );
+  }
+}
+
+class _SignalIntegrityNote extends StatelessWidget {
+  const _SignalIntegrityNote();
 
   @override
   Widget build(BuildContext context) {
@@ -202,7 +275,7 @@ class _SignalNextSteps extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'What will make this page live',
+            'What this is showing',
             style: TextStyle(
               color: Colors.white,
               fontSize: 24,
@@ -210,32 +283,32 @@ class _SignalNextSteps extends StatelessWidget {
             ),
           ),
           SizedBox(height: 12),
+          Text(
+            'Catalog metrics come from marketplace projection rows. Listing metrics come from active seller listing documents. Completed sales, 24h volume and historical charts are still hidden until settled order events are wired into this dashboard.',
+            style: TextStyle(color: Color(0xFFB8C4E6), height: 1.55),
+          ),
+          SizedBox(height: 16),
           Wrap(
             spacing: 12,
             runSpacing: 12,
             children: [
               _SignalChip(
-                icon: Icons.price_change_outlined,
-                label: 'Active listing floor and spread',
-              ),
-              _SignalChip(
                 icon: Icons.inventory_2_outlined,
-                label: 'Real available seller quantity',
+                label: 'Catalog coverage is real',
               ),
               _SignalChip(
-                icon: Icons.local_shipping_outlined,
-                label: 'Completed order and settlement events',
+                icon: Icons.receipt_long_outlined,
+                label: 'Volume still requires completed orders',
               ),
               _SignalChip(
-                icon: Icons.show_chart,
-                label: 'Rolling 24h marketplace event window',
+                icon: Icons.sell_outlined,
+                label: 'Floor uses active seller listings',
+              ),
+              _SignalChip(
+                icon: Icons.query_stats,
+                label: 'Charts require event history',
               ),
             ],
-          ),
-          SizedBox(height: 16),
-          Text(
-            'Until those sources are wired, the marketplace should only say whether a card has real stock. Catalog-only cards are not listed liquidity.',
-            style: TextStyle(color: Color(0xFFB8C4E6), height: 1.55),
           ),
         ],
       ),
@@ -304,6 +377,120 @@ class _PulseRow extends StatelessWidget {
   }
 }
 
+class _MetricCard extends StatelessWidget {
+  const _MetricCard({
+    required this.label,
+    required this.value,
+    required this.detail,
+    required this.icon,
+  });
+
+  final String label;
+  final String value;
+  final String detail;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 385,
+      child: _Panel(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: const Color(0xFFFACC15), size: 26),
+            const SizedBox(height: 16),
+            Text(
+              value,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 30,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Color(0xFFFDE68A),
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              detail,
+              style: const TextStyle(color: Color(0xFF93A4C8), height: 1.4),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RankPanel extends StatelessWidget {
+  const _RankPanel({
+    required this.title,
+    required this.rows,
+  });
+
+  final String title;
+  final List<_RankRow> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    return _Panel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 14),
+          if (rows.isEmpty)
+            const Text(
+              'No live rows yet',
+              style: TextStyle(color: Color(0xFF93A4C8)),
+            )
+          else
+            for (final row in rows)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 7),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        row.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFFE5E7EB),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      row.value,
+                      style: const TextStyle(
+                        color: Color(0xFFFACC15),
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SignalChip extends StatelessWidget {
   const _SignalChip({required this.icon, required this.label});
 
@@ -335,6 +522,163 @@ class _SignalChip extends StatelessWidget {
       ),
     );
   }
+}
+
+class _MarketplaceSignal {
+  const _MarketplaceSignal({
+    required this.totalCards,
+    required this.singleCount,
+    required this.productCount,
+    required this.withImages,
+    required this.expansionCount,
+    required this.listingCount,
+    required this.availableQuantity,
+    required this.sellerCount,
+    required this.floorAsk,
+    required this.medianAsk,
+    required this.totalAsk,
+    required this.topExpansions,
+    required this.topProductTypes,
+    required this.topListedCards,
+  });
+
+  final int totalCards;
+  final int singleCount;
+  final int productCount;
+  final int withImages;
+  final int expansionCount;
+  final int listingCount;
+  final int availableQuantity;
+  final int sellerCount;
+  final double? floorAsk;
+  final double? medianAsk;
+  final double totalAsk;
+  final List<_RankRow> topExpansions;
+  final List<_RankRow> topProductTypes;
+  final List<_RankRow> topListedCards;
+
+  String get imageCoverageLabel {
+    if (totalCards == 0) {
+      return '0%';
+    }
+    return '${((withImages / totalCards) * 100).round()}%';
+  }
+
+  String get floorAskLabel => floorAsk == null ? '—' : formatPkn(floorAsk!);
+
+  String get medianAskLabel => medianAsk == null ? '—' : formatPkn(medianAsk!);
+
+  String get totalAskLabel =>
+      totalAsk <= 0 ? '—' : formatPkn(totalAsk, decimals: 0);
+
+  String get spreadLabel {
+    if (floorAsk == null || medianAsk == null) {
+      return 'No active ask spread yet';
+    }
+    return 'Floor ${formatPkn(floorAsk!)} · median ${formatPkn(medianAsk!)}';
+  }
+
+  static _MarketplaceSignal from({
+    required List<PokemonCard> cards,
+    required List<CardListing> listings,
+  }) {
+    final activeListings = listings
+        .where((listing) => listing.isActive && listing.pricePkn > 0)
+        .toList()
+      ..sort((a, b) => a.pricePkn.compareTo(b.pricePkn));
+    final prices = activeListings.map((listing) => listing.pricePkn).toList();
+    final totalAsk = activeListings.fold<double>(
+      0,
+      (sum, listing) => sum + listing.pricePkn * listing.quantityAvailable,
+    );
+    final topListed = activeListings.take(5).map((listing) {
+      final title = [
+        listing.cardName.isEmpty ? listing.cardId : listing.cardName,
+        if (listing.collectorNumber.trim().isNotEmpty)
+          '#${listing.collectorNumber}',
+      ].join(' ');
+      return _RankRow(title, formatPkn(listing.pricePkn));
+    }).toList();
+
+    final expansions = <String, int>{};
+    final productTypes = <String, int>{};
+    var singleCount = 0;
+    var productCount = 0;
+    var withImages = 0;
+    for (final card in cards) {
+      if (card.itemKind == 'product') {
+        productCount += 1;
+        final productType = card.productType.trim().isEmpty
+            ? card.type
+            : card.productType.replaceAll('_', ' ');
+        productTypes[productType] = (productTypes[productType] ?? 0) + 1;
+      } else {
+        singleCount += 1;
+      }
+      if (card.imageUrl.trim().isNotEmpty ||
+          card.previewImageUrl.trim().isNotEmpty) {
+        withImages += 1;
+      }
+      final set = card.set.trim();
+      if (set.isNotEmpty) {
+        expansions[set] = (expansions[set] ?? 0) + 1;
+      }
+    }
+
+    return _MarketplaceSignal(
+      totalCards: cards.length,
+      singleCount: singleCount,
+      productCount: productCount,
+      withImages: withImages,
+      expansionCount: expansions.length,
+      listingCount: activeListings.length,
+      availableQuantity: activeListings.fold<int>(
+        0,
+        (sum, listing) => sum + listing.quantityAvailable,
+      ),
+      sellerCount:
+          activeListings.map((listing) => listing.sellerUid).toSet().length,
+      floorAsk: prices.isEmpty ? null : prices.first,
+      medianAsk: _median(prices),
+      totalAsk: totalAsk,
+      topExpansions: _topRows(expansions),
+      topProductTypes: _topRows(productTypes),
+      topListedCards: topListed,
+    );
+  }
+
+  static double? _median(List<double> values) {
+    if (values.isEmpty) {
+      return null;
+    }
+    final middle = values.length ~/ 2;
+    if (values.length.isOdd) {
+      return values[middle];
+    }
+    return (values[middle - 1] + values[middle]) / 2;
+  }
+
+  static List<_RankRow> _topRows(Map<String, int> counts) {
+    final rows = counts.entries.toList()
+      ..sort((a, b) {
+        final count = b.value.compareTo(a.value);
+        if (count != 0) {
+          return count;
+        }
+        return a.key.compareTo(b.key);
+      });
+    return rows
+        .take(5)
+        .map((entry) => _RankRow(entry.key, '${entry.value}'))
+        .toList();
+  }
+}
+
+class _RankRow {
+  const _RankRow(this.label, this.value);
+
+  final String label;
+  final String value;
 }
 
 class _Pill extends StatelessWidget {

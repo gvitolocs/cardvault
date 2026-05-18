@@ -31,11 +31,13 @@ class MarketplaceSearchScreen extends ConsumerStatefulWidget {
     required this.initialQuery,
     this.expansion,
     this.productType,
+    this.searchLanguage = 'en',
   });
 
   final String initialQuery;
   final String? expansion;
   final String? productType;
+  final String searchLanguage;
 
   @override
   ConsumerState<MarketplaceSearchScreen> createState() =>
@@ -52,6 +54,7 @@ class _MarketplaceSearchScreenState
   String? _error;
   String? _selectedExpansion;
   String? _selectedRarity;
+  late String _searchLanguage;
   int _requestId = 0;
   Timer? _debounce;
 
@@ -59,6 +62,7 @@ class _MarketplaceSearchScreenState
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.initialQuery);
+    _searchLanguage = _normalizeSearchLanguage(widget.searchLanguage);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _runSearch(widget.initialQuery);
     });
@@ -77,10 +81,12 @@ class _MarketplaceSearchScreenState
     super.didUpdateWidget(oldWidget);
     if (oldWidget.initialQuery != widget.initialQuery ||
         oldWidget.expansion != widget.expansion ||
-        oldWidget.productType != widget.productType) {
+        oldWidget.productType != widget.productType ||
+        oldWidget.searchLanguage != widget.searchLanguage) {
       _controller.text = widget.initialQuery;
       _selectedExpansion = null;
       _selectedRarity = null;
+      _searchLanguage = _normalizeSearchLanguage(widget.searchLanguage);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           _runSearch(widget.initialQuery);
@@ -112,12 +118,14 @@ class _MarketplaceSearchScreenState
                       normalizedQuery,
                       limit: 240,
                       productType: productType,
+                      searchLanguage: _searchLanguage,
                     )
               : normalizedQuery.length < 2
                   ? await _cardService.getAllCards()
                   : await _cardService.searchMarketplaceCards(
                       normalizedQuery,
                       limit: 240,
+                      searchLanguage: _searchLanguage,
                     );
       if (!mounted || requestId != _requestId) {
         return;
@@ -164,10 +172,15 @@ class _MarketplaceSearchScreenState
     final query = _controller.text.trim();
     final expansion = widget.expansion?.trim();
     final productType = widget.productType?.trim();
+    final cartState = ref.watch(cartProvider);
+    final cachedBalance = ref.watch(cachedPknBalanceProvider).valueOrNull;
+    final balance =
+        ref.watch(pknBalanceProvider).valueOrNull ?? cachedBalance ?? 0;
     final filteredResults = _applySearchPageFilters(_results);
     final isProductCategory =
         productType != null && productType.isNotEmpty && productType != 'card';
     final isSingleCategory = productType == 'card';
+    final compactTopBar = MediaQuery.sizeOf(context).width < 760;
     final title = expansion != null && expansion.isNotEmpty
         ? 'Cards in $expansion'
         : productType != null && productType.isNotEmpty
@@ -198,26 +211,18 @@ class _MarketplaceSearchScreenState
       backgroundColor: const Color(0xFF050816),
       appBar: AppBar(
         backgroundColor: const Color(0xE60A1026),
-        titleSpacing: 0,
+        titleSpacing: 16,
         title: Row(
           children: [
-            Flexible(
-              flex: 3,
-              child: Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            const SizedBox(width: 18),
+            _MarketplaceLogoButton(onTap: () => context.go('/marketplace')),
+            const SizedBox(width: 14),
             Expanded(
-              flex: 5,
               child: _MarketplaceTopSearch(
                 controller: _controller,
                 focusNode: _searchFocusNode,
                 query: _controller.text,
                 isSearching: _isSearching,
-                previews: _results.take(12).toList(),
+                previews: _results.take(15).toList(),
                 hintText: 'Search cards, sets, products...',
                 onChanged: (value) {
                   setState(() {});
@@ -231,18 +236,47 @@ class _MarketplaceSearchScreenState
                       if (query.trim().isNotEmpty) 'q': query.trim(),
                       if (productType?.isNotEmpty == true)
                         'productType': productType!,
+                      if (_searchLanguage != 'en') 'lang': _searchLanguage,
                     },
                   ).toString(),
                 ),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
+            _SearchLanguageMenu(
+              value: _searchLanguage,
+              onChanged: (language) {
+                setState(() => _searchLanguage = language);
+                _runSearch(_controller.text);
+              },
+            ),
           ],
         ),
-        leading: IconButton(
-          onPressed: () => _goBackOr(context, '/marketplace'),
-          icon: const Icon(Icons.arrow_back),
-        ),
+        actions: [
+          if (!compactTopBar) ...[
+            TextButton(
+                onPressed: () => context.go('/'), child: const Text('Home')),
+            TextButton(
+                onPressed: () => context.go('/scan'),
+                child: const Text('Scan')),
+            TextButton(
+                onPressed: () => context.go('/marketplace/signal'),
+                child: const Text('Signal')),
+          ],
+          _WalletBalanceButton(
+            balance: balance,
+            onTap: () => context.go('/wallet'),
+          ),
+          const SizedBox(width: 8),
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: FilledButton.icon(
+              onPressed: () => context.go('/cart'),
+              icon: const Icon(Icons.shopping_bag_outlined, size: 18),
+              label: Text('${cartState.itemCount}'),
+            ),
+          ),
+        ],
       ),
       body: Center(
         child: ConstrainedBox(
@@ -425,13 +459,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       cachedSections: cardState.homeSections,
       recentViews: recentViews,
     );
-    if (cardState.searchQuery.isEmpty && _searchController.text.isNotEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && cardState.searchQuery.isEmpty) {
-          _searchController.clear();
-        }
-      });
-    }
+    final compactTopBar = MediaQuery.sizeOf(context).width < 760;
 
     return Scaffold(
       backgroundColor: const Color(0xFF050816),
@@ -444,24 +472,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             titleSpacing: 16,
             title: Row(
               children: [
-                InkWell(
-                  onTap: () => context.go('/'),
-                  borderRadius: BorderRadius.circular(12),
-                  child: Padding(
-                    padding: const EdgeInsets.all(4),
-                    child: Image.network(
-                      ProjectLinks.logo,
-                      width: 34,
-                      height: 34,
-                      fit: BoxFit.contain,
-                      filterQuality: FilterQuality.none,
-                      errorBuilder: (_, __, ___) => const Icon(
-                        Icons.token,
-                        color: Color(0xFFFACC15),
-                      ),
-                    ),
-                  ),
-                ),
+                _MarketplaceLogoButton(onTap: () => context.go('/marketplace')),
                 const SizedBox(width: 14),
                 Expanded(
                   child: _MarketplaceTopSearch(
@@ -469,7 +480,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     focusNode: _searchFocusNode,
                     query: cardState.previewQuery,
                     isSearching: cardState.isSearchingPreviews,
-                    previews: cardState.searchPreviews,
+                    previews: cardState.searchPreviews.take(15).toList(),
                     hintText: 'Search cards, sets, products...',
                     onChanged: (value) {
                       ref.read(cardProvider.notifier).searchPreviewsOnly(value);
@@ -486,22 +497,36 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     onShowAll: (query) => context.go(
                       Uri(
                         path: '/marketplace/search',
-                        queryParameters: {'q': query},
+                        queryParameters: {
+                          'q': query,
+                          if (cardState.searchLanguage != 'en')
+                            'lang': cardState.searchLanguage,
+                        },
                       ).toString(),
                     ),
                   ),
                 ),
+                const SizedBox(width: 8),
+                _SearchLanguageMenu(
+                  value: cardState.searchLanguage,
+                  onChanged: (language) => ref
+                      .read(cardProvider.notifier)
+                      .setSearchLanguage(language),
+                ),
               ],
             ),
             actions: [
-              TextButton(
-                  onPressed: () => context.go('/'), child: const Text('Home')),
-              TextButton(
-                  onPressed: () => context.go('/scan'),
-                  child: const Text('Scan')),
-              TextButton(
-                  onPressed: () => context.go('/marketplace/signal'),
-                  child: const Text('Signal')),
+              if (!compactTopBar) ...[
+                TextButton(
+                    onPressed: () => context.go('/'),
+                    child: const Text('Home')),
+                TextButton(
+                    onPressed: () => context.go('/scan'),
+                    child: const Text('Scan')),
+                TextButton(
+                    onPressed: () => context.go('/marketplace/signal'),
+                    child: const Text('Signal')),
+              ],
               _WalletBalanceButton(
                 balance: balance,
                 onTap: () => context.go('/wallet'),
@@ -518,66 +543,86 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ],
           ),
           SliverToBoxAdapter(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1220),
-                child: Padding(
-                  padding: const EdgeInsets.all(22),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (cardState.isLoading)
-                        const _LoadingMarket()
-                      else if (cardState.error != null)
-                        _ErrorState(error: cardState.error!)
-                      else ...[
-                        if (sections.recentlySeen.isNotEmpty ||
-                            recentViewsState.isLoading) ...[
-                          _CardCarouselSection(
-                            title: 'Recently seen',
-                            subtitle: null,
-                            cards: sections.recentlySeen,
-                            isLoading: recentViewsState.isLoading &&
-                                sections.recentlySeen.isEmpty,
-                          ),
-                          const SizedBox(height: 24),
-                        ],
-                        _CardCarouselSection(
-                          title: 'Best sellers',
-                          subtitle:
-                              'Demand-weighted picks until live sale history is available.',
-                          cards: sections.bestSellers,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 22),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (cardState.isLoading)
+                    Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 1220),
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 22),
+                          child: _LoadingMarket(),
                         ),
-                        const SizedBox(height: 24),
-                        _CardCarouselSection(
-                          title: 'Featured',
-                          subtitle:
-                              'Collector picks across sets and rarity bands.',
-                          cards: sections.featured,
+                      ),
+                    )
+                  else if (cardState.error != null)
+                    Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 1220),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 22),
+                          child: _ErrorState(error: cardState.error!),
                         ),
-                        const SizedBox(height: 24),
-                        const _SuggestedCategories(),
-                        const SizedBox(height: 28),
-                        const _MarketHeader(),
-                        const SizedBox(height: 16),
-                        _MarketplaceGrid(cards: visibleCards),
-                        const SizedBox(height: 18),
-                        if (visibleCards.length < personalizedCards.length)
-                          Center(
-                            child: OutlinedButton.icon(
-                              onPressed: () => setState(() {
-                                _visibleCount += _pageSize;
-                              }),
-                              icon: const Icon(Icons.expand_more),
-                              label: Text(
-                                'Show next ${math.min(_pageSize, personalizedCards.length - visibleCards.length)} cards',
-                              ),
-                            ),
-                          ),
-                      ],
+                      ),
+                    )
+                  else ...[
+                    if (sections.recentlySeen.isNotEmpty ||
+                        recentViewsState.isLoading) ...[
+                      _CardCarouselSection(
+                        title: 'Recently seen',
+                        cards: sections.recentlySeen,
+                        isLoading: recentViewsState.isLoading &&
+                            sections.recentlySeen.isEmpty,
+                      ),
+                      const SizedBox(height: 24),
                     ],
-                  ),
-                ),
+                    _CardCarouselSection(
+                      title: 'Best sellers',
+                      cards: sections.bestSellers,
+                    ),
+                    const SizedBox(height: 24),
+                    _CardCarouselSection(
+                      title: 'Featured',
+                      cards: sections.featured,
+                    ),
+                    const SizedBox(height: 24),
+                    Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 1220),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 22),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              const _SuggestedCategories(),
+                              const SizedBox(height: 28),
+                              const _MarketHeader(),
+                              const SizedBox(height: 16),
+                              _MarketplaceGrid(cards: visibleCards),
+                              const SizedBox(height: 18),
+                              if (visibleCards.length <
+                                  personalizedCards.length)
+                                Center(
+                                  child: OutlinedButton.icon(
+                                    onPressed: () => setState(() {
+                                      _visibleCount += _pageSize;
+                                    }),
+                                    icon: const Icon(Icons.expand_more),
+                                    label: Text(
+                                      'Show next ${math.min(_pageSize, personalizedCards.length - visibleCards.length)} cards',
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
           ),
@@ -621,6 +666,104 @@ class _WalletBalanceButton extends StatelessWidget {
   }
 }
 
+class _SearchLanguageMenu extends StatelessWidget {
+  const _SearchLanguageMenu({
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String value;
+  final ValueChanged<String> onChanged;
+
+  static const _languages = <String, String>{
+    'en': 'EN',
+    'it': 'IT',
+    'fr': 'FR',
+    'de': 'DE',
+    'es': 'ES',
+    'ja': 'JA',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final normalized = _normalizeSearchLanguage(value);
+    return PopupMenuButton<String>(
+      tooltip: 'Search language',
+      initialValue: normalized,
+      onSelected: onChanged,
+      color: const Color(0xFF111936),
+      itemBuilder: (context) => [
+        for (final entry in _languages.entries)
+          PopupMenuItem(
+            value: entry.key,
+            child: Text(entry.value),
+          ),
+      ],
+      child: Container(
+        height: 38,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFF111936),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          _languages[normalized] ?? 'EN',
+          style: const TextStyle(
+            color: Color(0xFFFACC15),
+            fontSize: 12,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MarketplaceLogoButton extends StatelessWidget {
+  const _MarketplaceLogoButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: Image.network(
+          ProjectLinks.logo,
+          width: 34,
+          height: 34,
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.none,
+          errorBuilder: (_, __, ___) => const Icon(
+            Icons.token,
+            color: Color(0xFFFACC15),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+String _normalizeSearchLanguage(String value) {
+  switch (value.trim().toLowerCase()) {
+    case 'it':
+    case 'fr':
+    case 'de':
+    case 'es':
+    case 'ja':
+      return value.trim().toLowerCase();
+    case 'jp':
+      return 'ja';
+    default:
+      return 'en';
+  }
+}
+
 class _MarketplaceTopSearch extends StatefulWidget {
   const _MarketplaceTopSearch({
     required this.controller,
@@ -653,6 +796,7 @@ class _MarketplaceTopSearchState extends State<_MarketplaceTopSearch> {
   final GlobalKey _fieldKey = GlobalKey();
   OverlayEntry? _overlayEntry;
   double _overlayWidth = 520;
+  Timer? _removeOverlayTimer;
 
   @override
   void initState() {
@@ -672,6 +816,7 @@ class _MarketplaceTopSearchState extends State<_MarketplaceTopSearch> {
 
   @override
   void dispose() {
+    _removeOverlayTimer?.cancel();
     widget.focusNode.removeListener(_syncOverlay);
     _removeOverlay();
     super.dispose();
@@ -684,13 +829,18 @@ class _MarketplaceTopSearchState extends State<_MarketplaceTopSearch> {
     final shouldShow =
         widget.focusNode.hasFocus && widget.query.trim().length >= 2;
     if (!shouldShow) {
-      _removeOverlay();
+      _removeOverlayTimer?.cancel();
+      _removeOverlayTimer = Timer(
+        const Duration(milliseconds: 140),
+        _removeOverlay,
+      );
       return;
     }
+    _removeOverlayTimer?.cancel();
     final fieldContext = _fieldKey.currentContext;
     final fieldSize = fieldContext?.size;
     if (fieldSize != null) {
-      _overlayWidth = math.max(360, fieldSize.width);
+      _overlayWidth = fieldSize.width;
     }
     if (_overlayEntry == null) {
       _overlayEntry = OverlayEntry(builder: _buildOverlay);
@@ -700,52 +850,45 @@ class _MarketplaceTopSearchState extends State<_MarketplaceTopSearch> {
     }
   }
 
+  void _selectPreview(PokemonCard card) {
+    _removeOverlayTimer?.cancel();
+    _removeOverlay();
+    widget.focusNode.unfocus();
+    widget.onSelected(card);
+  }
+
+  void _showAll(String query) {
+    _removeOverlayTimer?.cancel();
+    _removeOverlay();
+    widget.focusNode.unfocus();
+    widget.onShowAll(query);
+  }
+
   void _removeOverlay() {
+    _removeOverlayTimer?.cancel();
+    _removeOverlayTimer = null;
     _overlayEntry?.remove();
     _overlayEntry = null;
   }
 
   Widget _buildOverlay(BuildContext context) {
-    return Positioned.fill(
-      child: IgnorePointer(
-        ignoring: false,
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                onTap: widget.focusNode.unfocus,
-              ),
-            ),
-            CompositedTransformFollower(
-              link: _layerLink,
-              showWhenUnlinked: false,
-              targetAnchor: Alignment.bottomLeft,
-              followerAnchor: Alignment.topLeft,
-              offset: const Offset(0, 8),
-              child: Material(
-                color: Colors.transparent,
-                child: SizedBox(
-                  width: _overlayWidth,
-                  child: _SearchPreviewPanel(
-                    query: widget.query,
-                    cards: widget.previews,
-                    isSearching: widget.isSearching,
-                    onSelected: (card) {
-                      _removeOverlay();
-                      widget.focusNode.unfocus();
-                      widget.onSelected(card);
-                    },
-                    onShowAll: (query) {
-                      _removeOverlay();
-                      widget.focusNode.unfocus();
-                      widget.onShowAll(query);
-                    },
-                  ),
-                ),
-              ),
-            ),
-          ],
+    return CompositedTransformFollower(
+      link: _layerLink,
+      showWhenUnlinked: false,
+      targetAnchor: Alignment.bottomLeft,
+      followerAnchor: Alignment.topLeft,
+      offset: const Offset(0, 8),
+      child: Material(
+        color: Colors.transparent,
+        child: SizedBox(
+          width: _overlayWidth,
+          child: _SearchPreviewPanel(
+            query: widget.query,
+            cards: widget.previews,
+            isSearching: widget.isSearching,
+            onSelected: _selectPreview,
+            onShowAll: _showAll,
+          ),
         ),
       ),
     );
@@ -1062,24 +1205,14 @@ class _SearchPreviewRow extends StatelessWidget {
   }
 }
 
-void _goBackOr(BuildContext context, String fallbackPath) {
-  if (context.canPop()) {
-    context.pop();
-    return;
-  }
-  context.go(fallbackPath);
-}
-
 class _CardCarouselSection extends StatefulWidget {
   const _CardCarouselSection({
     required this.title,
     required this.cards,
-    this.subtitle,
     this.isLoading = false,
   });
 
   final String title;
-  final String? subtitle;
   final List<PokemonCard> cards;
   final bool isLoading;
 
@@ -1150,75 +1283,72 @@ class _CardCarouselSectionState extends State<_CardCarouselSection> {
     if (widget.cards.isEmpty && !widget.isLoading) {
       return const SizedBox.shrink();
     }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _SectionHeading(title: widget.title, subtitle: widget.subtitle),
-        const SizedBox(height: 14),
-        if (widget.isLoading)
-          const _RecentViewsLoadingStrip()
-        else
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final screenWidth = MediaQuery.sizeOf(context).width;
-              final isDesktop = screenWidth >= 900;
-              final useDesktopControls = isDesktop && hasDesktopPointer();
-              WidgetsBinding.instance
-                  .addPostFrameCallback((_) => _syncArrowVisibility());
-              final sideInset = math.max(
-                0.0,
-                (screenWidth - constraints.maxWidth) / 2,
-              );
-              return Transform.translate(
-                offset: Offset(-sideInset, 0),
-                child: SizedBox(
-                  width: screenWidth,
-                  height: 210,
-                  child: Stack(
-                    children: [
-                      ListView.separated(
-                        controller: _scrollController,
-                        padding: EdgeInsets.symmetric(horizontal: sideInset),
-                        physics: useDesktopControls
-                            ? const NeverScrollableScrollPhysics()
-                            : null,
-                        scrollDirection: Axis.horizontal,
-                        itemCount: widget.cards.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 14),
-                        itemBuilder: (context, index) => SizedBox(
-                          width: 360,
-                          child: _FeaturedCard(card: widget.cards[index]),
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final isDesktop = screenWidth >= 900;
+    final useDesktopControls = isDesktop && hasDesktopPointer();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncArrowVisibility());
+    final contentInset = screenWidth >= 1264 ? (screenWidth - 1220) / 2 : 22.0;
+    return SizedBox(
+      width: double.infinity,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: contentInset),
+            child: _SectionHeading(title: widget.title),
+          ),
+          const SizedBox(height: 14),
+          if (widget.isLoading)
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: contentInset),
+              child: const _RecentViewsLoadingStrip(),
+            )
+          else
+            SizedBox(
+              height: 210,
+              child: Stack(
+                children: [
+                  ListView.separated(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.symmetric(horizontal: 22),
+                    physics: useDesktopControls
+                        ? const NeverScrollableScrollPhysics()
+                        : null,
+                    scrollDirection: Axis.horizontal,
+                    itemCount: widget.cards.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 14),
+                    itemBuilder: (context, index) => SizedBox(
+                      width: 360,
+                      child: _FeaturedCard(card: widget.cards[index]),
+                    ),
+                  ),
+                  if (useDesktopControls && widget.cards.length > 2) ...[
+                    if (_canScrollBack)
+                      Positioned(
+                        left: 16,
+                        top: 72,
+                        child: _CarouselArrowButton(
+                          icon: Icons.chevron_left,
+                          label: 'Previous cards',
+                          onPressed: () => _scrollBy(-748),
                         ),
                       ),
-                      if (useDesktopControls && widget.cards.length > 2) ...[
-                        if (_canScrollBack)
-                          Positioned(
-                            left: 16,
-                            top: 72,
-                            child: _CarouselArrowButton(
-                              icon: Icons.chevron_left,
-                              label: 'Previous cards',
-                              onPressed: () => _scrollBy(-748),
-                            ),
-                          ),
-                        if (_canScrollForward)
-                          Positioned(
-                            right: 16,
-                            top: 72,
-                            child: _CarouselArrowButton(
-                              icon: Icons.chevron_right,
-                              label: 'Next cards',
-                              onPressed: () => _scrollBy(748),
-                            ),
-                          ),
-                      ],
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-      ],
+                    if (_canScrollForward)
+                      Positioned(
+                        right: 16,
+                        top: 72,
+                        child: _CarouselArrowButton(
+                          icon: Icons.chevron_right,
+                          label: 'Next cards',
+                          onPressed: () => _scrollBy(748),
+                        ),
+                      ),
+                  ],
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -1342,7 +1472,6 @@ class _SearchResultSection extends StatelessWidget {
       children: [
         _SectionHeading(
           title: title,
-          subtitle: cards.isEmpty ? null : '${cards.length} matching $title.',
         ),
         const SizedBox(height: 16),
         _MarketplaceGrid(
@@ -1901,11 +2030,34 @@ String _marketPriceLabel(PokemonCard card) {
 }
 
 String _cardTitleWithNumber(PokemonCard card) {
-  final number = card.number.trim();
+  final number = _displayCollectorNumber(card.number);
   if (number.isEmpty) {
     return card.name;
   }
   return '${card.name} #$number';
+}
+
+String _displayCollectorNumber(String rawNumber) {
+  final text = rawNumber.trim();
+  if (text.isEmpty) {
+    return '';
+  }
+  final parts = text
+      .split(RegExp(r'\s*(?:\||•|-{2,}|–|—)\s*'))
+      .map((part) => part.trim())
+      .where((part) => part.isNotEmpty)
+      .toList();
+  for (final part in parts.reversed) {
+    if (RegExp(r'\d+\s*/\s*\d+').hasMatch(part)) {
+      return part.replaceAll(RegExp(r'\s+'), '');
+    }
+  }
+  for (final part in parts.reversed) {
+    if (RegExp(r'\d').hasMatch(part)) {
+      return part;
+    }
+  }
+  return text;
 }
 
 class _CardImageFrame extends StatelessWidget {
@@ -2038,9 +2190,8 @@ class _Notice extends StatelessWidget {
 
 class _SectionHeading extends StatelessWidget {
   final String title;
-  final String? subtitle;
 
-  const _SectionHeading({required this.title, this.subtitle});
+  const _SectionHeading({required this.title});
 
   @override
   Widget build(BuildContext context) {
@@ -2052,13 +2203,6 @@ class _SectionHeading extends StatelessWidget {
                 color: Colors.white,
                 fontSize: 24,
                 fontWeight: FontWeight.w900)),
-        if (subtitle != null) ...[
-          const SizedBox(height: 6),
-          Text(
-            subtitle!,
-            style: const TextStyle(color: Color(0xFF93A4C8), height: 1.4),
-          ),
-        ],
       ],
     );
   }
@@ -2332,7 +2476,7 @@ class _SuggestedCategories extends StatelessWidget {
           imageUrl:
               '/card-images/274416_mew-ex-special-illustration-rare-232-091-paldean-fates.jpg',
           set: 'Paldean Fates',
-          number: 'Special Illustration Rare | 232/091',
+          number: '232/091',
           itemKind: 'single',
           productType: 'card',
         ),
@@ -2344,7 +2488,6 @@ class _SuggestedCategories extends StatelessWidget {
       children: [
         _SectionHeading(
           title: 'Suggested categories',
-          subtitle: 'Quick entry points for common CardTrader-style browsing.',
         ),
         SizedBox(height: 14),
         Wrap(

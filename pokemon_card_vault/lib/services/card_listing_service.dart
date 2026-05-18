@@ -9,6 +9,25 @@ class CardListingService {
 
   final FirebaseFirestore _firestore;
 
+  Stream<List<CardListing>> activeListings({int limit = 500}) {
+    if (Firebase.apps.isEmpty) {
+      return Stream.value(const []);
+    }
+    return _firestore
+        .collection('card_listings')
+        .where('status', isEqualTo: 'active')
+        .limit(limit)
+        .snapshots()
+        .map((snapshot) {
+      final listings = snapshot.docs
+          .map(CardListing.fromDocument)
+          .where((listing) => listing.isActive)
+          .toList();
+      listings.sort((a, b) => a.pricePkn.compareTo(b.pricePkn));
+      return listings;
+    });
+  }
+
   Stream<List<CardListing>> activeListingsForCard(String cardId) {
     if (Firebase.apps.isEmpty) {
       return Stream.value(const []);

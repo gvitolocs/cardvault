@@ -30,6 +30,8 @@ especially `/marketplace`, `/card/:id`, seller listings, cart, and checkout.
     unavailable.
 - `lib/providers/card_listing_provider.dart`
   - Streams active `card_listings` from Firestore by `cardId`.
+  - Also exposes `activeCardListingsProvider` for aggregate signal/dashboard
+    metrics.
 - `lib/models/card_listing.dart`
   - Defines seller listing fields: condition, language, reverse holo, signed,
     graded, grading company, grade, shipping, NFT, seller snapshot, card
@@ -42,6 +44,13 @@ especially `/marketplace`, `/card/:id`, seller listings, cart, and checkout.
   - Loads the ordered version list for the current expansion once through
     `CardService.getExpansionVersionCards(...)`; previous/next is computed
     locally from that cached list.
+- `lib/screens/marketplace_signal_screen.dart`
+  - Owns `/marketplace/signal`.
+  - Shows real loaded catalog/projection metrics plus active Firestore listing
+    metrics: listing count, quantity, sellers, floor, median, total ask, top
+    expansions, product types, and listed cards.
+  - Must not show completed sales, 24h volume, or historical charts until
+    settled order/event aggregates exist.
 
 ## Supabase Projection Tables
 
@@ -51,7 +60,7 @@ especially `/marketplace`, `/card/:id`, seller listings, cart, and checkout.
   - Refreshed by `public.refresh_marketplace_cards_from_blueprints()`.
 - `public.marketplace_card_events`
   - Analytics input for dynamic home sections and rolling 24h marketplace
-    signals.
+    signals. These are interaction events, not completed-sale volume.
 - `public.marketplace_card_versions`
   - Minimal ordered version/navigation rows:
     `card_id`, `name`, `expansion_name`, `expansion_number`,
@@ -95,6 +104,13 @@ especially `/marketplace`, `/card/:id`, seller listings, cart, and checkout.
 - Previous/next must stay within the exact same expansion name. Load the whole
   expansion list once and calculate next/previous locally; do not call an
   adjacent-card RPC for every arrow click.
+- Homepage/search/card-detail top bars should stay consistent: logo, search,
+  Home/Scan/Signal, wallet balance, and cart where appropriate.
+- Homepage landing top bar should keep a single primary `Shop` CTA and should
+  not duplicate `Forum`/`Shop` in adjacent controls.
+- The marketplace autocomplete overlay should be the width of the search field,
+  not a full-width page panel. Result rows must be selectable before focus loss
+  removes the overlay.
 
 ## Card Page Checklist
 
@@ -121,12 +137,25 @@ When changing cart or checkout, verify:
 - Checkout creates a pending `orders` document with listing snapshots.
 - Anonymous users can still use local cart fallback where supported.
 
+## Marketplace Signal Checklist
+
+When changing `lib/screens/marketplace_signal_screen.dart`, verify:
+
+- Catalog metrics are computed from loaded marketplace rows, not hardcoded
+  placeholder copy.
+- Listing metrics are computed from active Firestore `card_listings`, using only
+  `status == active`, `quantityAvailable > 0`, and positive `pricePkn`.
+- Floor/median/total ask are clearly active listing asks, not completed sales.
+- 24h volume, completed sale count, and historical charts stay hidden until
+  settled order events are aggregated.
+- Empty listing state still renders honestly with `—` instead of fake liquidity.
+
 ## Verification Commands
 
 Run from `pokemon_card_vault`:
 
 ```bash
-dart format lib/screens/card_detail_screen.dart lib/screens/cart_screen.dart lib/screens/checkout_screen.dart
+dart format lib/screens/card_detail_screen.dart lib/screens/cart_screen.dart lib/screens/checkout_screen.dart lib/screens/marketplace_signal_screen.dart lib/providers/card_listing_provider.dart lib/services/card_listing_service.dart
 flutter analyze
 flutter test
 flutter build web --release --pwa-strategy=none

@@ -93,6 +93,16 @@ class SiteFooter extends StatelessWidget {
                     fontSize: 12,
                     fontWeight: FontWeight.w700),
               ),
+              TextButton(
+                onPressed: () => _openExternal('mailto:contact@pokoin.com'),
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFFB8C4E6),
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(0, 24),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: const Text('contact@pokoin.com'),
+              ),
             ],
           ),
         ],

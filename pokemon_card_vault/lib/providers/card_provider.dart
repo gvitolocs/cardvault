@@ -24,6 +24,7 @@ class CardState {
   final bool showOnlyInStock;
   final String sortBy;
   final bool sortAscending;
+  final String searchLanguage;
 
   CardState({
     this.cards = const [],
@@ -43,6 +44,7 @@ class CardState {
     this.showOnlyInStock = false,
     this.sortBy = 'name',
     this.sortAscending = true,
+    this.searchLanguage = 'en',
   });
 
   CardState copyWith({
@@ -63,6 +65,7 @@ class CardState {
     bool? showOnlyInStock,
     String? sortBy,
     bool? sortAscending,
+    String? searchLanguage,
   }) {
     return CardState(
       cards: cards ?? this.cards,
@@ -82,6 +85,7 @@ class CardState {
       showOnlyInStock: showOnlyInStock ?? this.showOnlyInStock,
       sortBy: sortBy ?? this.sortBy,
       sortAscending: sortAscending ?? this.sortAscending,
+      searchLanguage: searchLanguage ?? this.searchLanguage,
     );
   }
 }
@@ -140,6 +144,20 @@ class CardNotifier extends StateNotifier<CardState> {
     _loadSearchPreviews(query);
   }
 
+  void setSearchLanguage(String language) {
+    final normalized = language.trim().toLowerCase();
+    if (normalized == state.searchLanguage) {
+      return;
+    }
+    state = state.copyWith(searchLanguage: normalized);
+    if (state.previewQuery.trim().length >= 2) {
+      _loadSearchPreviews(state.previewQuery);
+    }
+    if (state.searchQuery.trim().length >= 2) {
+      _loadFullSearchResults(state.searchQuery);
+    }
+  }
+
   Future<void> _loadFullSearchResults(String query) async {
     final requestId = ++_searchRequestId;
     final normalizedQuery = query.trim();
@@ -150,6 +168,7 @@ class CardNotifier extends StateNotifier<CardState> {
     final results = await _cardService.searchMarketplaceCards(
       normalizedQuery,
       limit: 240,
+      searchLanguage: state.searchLanguage,
     );
     if (requestId != _searchRequestId ||
         normalizedQuery != state.searchQuery.trim()) {
@@ -205,7 +224,7 @@ class CardNotifier extends StateNotifier<CardState> {
     final shouldWaitForRemote = _hasNumericSearchTerm(normalizedQuery);
     final localPreviews = shouldWaitForRemote
         ? const <PokemonCard>[]
-        : _rankLocalPreviews(state.cards, normalizedQuery, limit: 40);
+        : _rankLocalPreviews(state.cards, normalizedQuery, limit: 15);
     state = state.copyWith(
       searchPreviews: localPreviews,
       isSearchingPreviews: true,
@@ -214,7 +233,8 @@ class CardNotifier extends StateNotifier<CardState> {
     final previews = await _cardService.searchCardPreviews(
       normalizedQuery,
       fallbackCards: state.cards,
-      limit: 40,
+      limit: 15,
+      searchLanguage: state.searchLanguage,
     );
     if (requestId != _searchPreviewRequestId) {
       return;
@@ -373,6 +393,7 @@ class CardNotifier extends StateNotifier<CardState> {
       showOnlyInStock: false,
       sortBy: 'name',
       sortAscending: true,
+      searchLanguage: 'en',
     );
     _applyFilters();
   }

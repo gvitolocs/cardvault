@@ -15,6 +15,7 @@ import '../providers/cart_provider.dart';
 import '../providers/favorites_provider.dart';
 import '../providers/recent_views_provider.dart';
 import '../services/card_service.dart';
+import '../constants/project_links.dart';
 import '../utils/card_url.dart';
 import '../utils/price_format.dart';
 
@@ -54,6 +55,10 @@ class CardDetailScreen extends ConsumerWidget {
     final market = _CardMarketData.forCard(resolvedCard, listings);
     final bestListing = market.bestListing;
     final cartState = ref.watch(cartProvider);
+    final cachedBalance = ref.watch(cachedPknBalanceProvider).valueOrNull;
+    final balance =
+        ref.watch(pknBalanceProvider).valueOrNull ?? cachedBalance ?? 0;
+    final compactTopBar = MediaQuery.sizeOf(context).width < 760;
     final isInCart = bestListing == null
         ? cartState.isInCart(resolvedCard.id)
         : cartState.isListingInCart(bestListing.id);
@@ -78,18 +83,45 @@ class CardDetailScreen extends ConsumerWidget {
           SliverAppBar(
             pinned: true,
             backgroundColor: const Color(0xF20A1026),
-            leading: IconButton(
-              onPressed: () => _goBackOr(context, '/marketplace'),
-              icon: const Icon(Icons.arrow_back),
+            titleSpacing: 16,
+            title: Row(
+              children: [
+                _MarketplaceLogoButton(onTap: () => context.go('/marketplace')),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    resolvedCard.name,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ],
             ),
-            title: Text(resolvedCard.name, overflow: TextOverflow.ellipsis),
             actions: [
-              TextButton.icon(
-                onPressed: () => context.go('/wallet'),
-                icon: const Icon(Icons.account_balance_wallet_outlined),
-                label: const Text('Wallet'),
+              if (!compactTopBar) ...[
+                TextButton(
+                    onPressed: () => context.go('/'),
+                    child: const Text('Home')),
+                TextButton(
+                    onPressed: () => context.go('/scan'),
+                    child: const Text('Scan')),
+                TextButton(
+                    onPressed: () => context.go('/marketplace/signal'),
+                    child: const Text('Signal')),
+              ],
+              _WalletBalanceButton(
+                balance: balance,
+                onTap: () => context.go('/wallet'),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: FilledButton.icon(
+                  onPressed: () => context.go('/cart'),
+                  icon: const Icon(Icons.shopping_bag_outlined, size: 18),
+                  label: Text('${cartState.itemCount}'),
+                ),
+              ),
             ],
           ),
           SliverToBoxAdapter(
@@ -231,6 +263,81 @@ void _goBackOr(BuildContext context, String fallbackPath) {
     return;
   }
   context.go(fallbackPath);
+}
+
+class _WalletBalanceButton extends StatelessWidget {
+  const _WalletBalanceButton({
+    required this.balance,
+    required this.onTap,
+  });
+
+  final int balance;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton.icon(
+      onPressed: onTap,
+      icon: const Icon(Icons.account_balance_wallet_outlined, size: 18),
+      label: Text(formatPkn(balance, decimals: 0)),
+      style: TextButton.styleFrom(
+        foregroundColor: const Color(0xFFFACC15),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        textStyle: const TextStyle(fontWeight: FontWeight.w800),
+      ),
+    );
+  }
+}
+
+class _MarketplaceLogoButton extends StatelessWidget {
+  const _MarketplaceLogoButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: Image.network(
+          ProjectLinks.logo,
+          width: 34,
+          height: 34,
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.none,
+          errorBuilder: (_, __, ___) => const Icon(
+            Icons.token,
+            color: Color(0xFFFACC15),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+String _displayCollectorNumber(String rawNumber) {
+  final text = rawNumber.trim();
+  if (text.isEmpty) {
+    return '';
+  }
+  final parts = text
+      .split(RegExp(r'\s*(?:\||•|-{2,}|–|—)\s*'))
+      .map((part) => part.trim())
+      .where((part) => part.isNotEmpty)
+      .toList();
+  for (final part in parts.reversed) {
+    if (RegExp(r'\d+\s*/\s*\d+').hasMatch(part)) {
+      return part.replaceAll(RegExp(r'\s+'), '');
+    }
+  }
+  for (final part in parts.reversed) {
+    if (RegExp(r'\d').hasMatch(part)) {
+      return part;
+    }
+  }
+  return text;
 }
 
 class _DetailScaffold extends StatelessWidget {
@@ -388,7 +495,9 @@ class _AssetHeader extends StatelessWidget {
               ),
             ),
             Text(
-              ' #${card.number} · ${card.condition} · ${card.type}',
+              card.itemKind == 'product'
+                  ? ' · ${card.type}'
+                  : ' #${_displayCollectorNumber(card.number)} · ${card.type}',
               style: const TextStyle(color: Color(0xFFB8C4E6)),
             ),
           ],
@@ -541,6 +650,7 @@ class _ArtworkPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final displayNumber = _displayCollectorNumber(card.number);
     return _Panel(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -555,7 +665,7 @@ class _ArtworkPanel extends StatelessWidget {
               ),
               Flexible(
                 child: _Badge(
-                  text: card.number,
+                  text: displayNumber,
                   color: const Color(0xFF38BDF8),
                 ),
               ),
@@ -589,7 +699,7 @@ class _ArtworkPanel extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          _SelectorLike(label: '${card.set} #${card.number}'),
+          _SelectorLike(label: '${card.set} #$displayNumber'),
           const SizedBox(height: 8),
           TextButton(
             onPressed: onViewAllVersions,
@@ -1588,8 +1698,13 @@ class _SellListingDialogState extends ConsumerState<_SellListingDialog> {
         surface: Color(0xFF0B1024),
         onSurface: Colors.white,
       ),
+      textTheme: Theme.of(context).textTheme.apply(
+            bodyColor: Colors.white,
+            displayColor: Colors.white,
+          ),
       inputDecorationTheme: InputDecorationTheme(
         labelStyle: const TextStyle(color: Color(0xFF93A4C8)),
+        floatingLabelStyle: const TextStyle(color: Color(0xFFFACC15)),
         hintStyle: const TextStyle(color: Color(0xFF64748B)),
         filled: true,
         fillColor: const Color(0xFF111936),
@@ -1645,6 +1760,8 @@ class _SellListingDialogState extends ConsumerState<_SellListingDialog> {
                 TextField(
                   controller: _priceController,
                   keyboardType: TextInputType.number,
+                  style: const TextStyle(color: Colors.white),
+                  cursorColor: const Color(0xFFFACC15),
                   decoration: const InputDecoration(
                     labelText: 'Price in PKN',
                     border: OutlineInputBorder(),
@@ -1654,6 +1771,8 @@ class _SellListingDialogState extends ConsumerState<_SellListingDialog> {
                 TextField(
                   controller: _quantityController,
                   keyboardType: TextInputType.number,
+                  style: const TextStyle(color: Colors.white),
+                  cursorColor: const Color(0xFFFACC15),
                   decoration: const InputDecoration(
                     labelText: 'Quantity available',
                     border: OutlineInputBorder(),
@@ -1665,6 +1784,8 @@ class _SellListingDialogState extends ConsumerState<_SellListingDialog> {
                     Expanded(
                       child: DropdownButtonFormField<String>(
                         initialValue: _condition,
+                        style: const TextStyle(color: Colors.white),
+                        dropdownColor: const Color(0xFF111936),
                         decoration: const InputDecoration(
                           labelText: 'Condition',
                           border: OutlineInputBorder(),
@@ -1685,6 +1806,8 @@ class _SellListingDialogState extends ConsumerState<_SellListingDialog> {
                     Expanded(
                       child: DropdownButtonFormField<String>(
                         initialValue: _language,
+                        style: const TextStyle(color: Colors.white),
+                        dropdownColor: const Color(0xFF111936),
                         decoration: const InputDecoration(
                           labelText: 'Language',
                           border: OutlineInputBorder(),
@@ -1742,6 +1865,8 @@ class _SellListingDialogState extends ConsumerState<_SellListingDialog> {
                       Expanded(
                         child: TextField(
                           controller: _gradingCompanyController,
+                          style: const TextStyle(color: Colors.white),
+                          cursorColor: const Color(0xFFFACC15),
                           decoration: const InputDecoration(
                             labelText: 'Grading company',
                             border: OutlineInputBorder(),
@@ -1753,6 +1878,8 @@ class _SellListingDialogState extends ConsumerState<_SellListingDialog> {
                         child: TextField(
                           controller: _gradeController,
                           keyboardType: TextInputType.number,
+                          style: const TextStyle(color: Colors.white),
+                          cursorColor: const Color(0xFFFACC15),
                           decoration: const InputDecoration(
                             labelText: 'Grade',
                             hintText: '10',
@@ -1765,6 +1892,8 @@ class _SellListingDialogState extends ConsumerState<_SellListingDialog> {
                   const SizedBox(height: 12),
                   TextField(
                     controller: _certificationIdController,
+                    style: const TextStyle(color: Colors.white),
+                    cursorColor: const Color(0xFFFACC15),
                     decoration: const InputDecoration(
                       labelText: 'Certification ID',
                       hintText: 'e.g. 12345678',

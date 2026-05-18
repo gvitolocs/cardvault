@@ -20,8 +20,12 @@ reconstructing commands from chat history.
   - `public.marketplace_cards` for home/search/catalog card rows.
   - `public.marketplace_card_events` for rolling marketplace analytics.
   - `public.marketplace_card_versions` for expansion-scoped navigation.
+  - `public.cardtrader_pokemon_expansions` for imported expansion symbol CDN
+    URLs from `ptcg-assets`.
 - Firebase remains the production auth/profile/account store for the current
-  marketplace app unless intentionally migrated.
+  marketplace app unless intentionally migrated. Active seller listings live in
+  Firestore `card_listings`; the signal dashboard reads an aggregate stream from
+  that collection.
 
 ## Secrets
 
@@ -95,7 +99,15 @@ reconstructing commands from chat history.
    open workflows/cardtrader-search-preview-workflow.md
    ```
 
-11. Refresh marketplace projections after a blueprint import or classifier
+11. Import expansion symbols from `ptcg-assets`:
+   ```bash
+   DRY_RUN=1 PTCG_ASSETS_DIR=../ptcg-assets node scripts/import-ptcg-expansion-symbols.js
+   PTCG_ASSETS_DIR=../ptcg-assets node scripts/import-ptcg-expansion-symbols.js
+   ```
+   This writes `expansions/symbols/<expansion-name>.png` to R2 and upserts
+   `public.cardtrader_pokemon_expansions`.
+
+12. Refresh marketplace projections after a blueprint import or classifier
     change:
    ```bash
    supabase db push
@@ -148,3 +160,12 @@ reconstructing commands from chat history.
 - Do not make `/marketplace` carousels depend only on the capped catalog either.
   Merge `/api/marketplace-home` snapshot cards into the provider state so
   Best sellers and Featured can resolve their section IDs.
+- The marketplace top bar is shared in spirit across home, search, and card
+  detail. Keep logo/search/navigation/wallet/cart behavior consistent when
+  changing one surface.
+- The homepage top bar should not duplicate primary actions. Keep `Shop` as the
+  primary CTA and avoid repeating `Forum` or `Shop` inside adjacent controls.
+- `/marketplace/signal` now shows real loaded catalog metrics and active
+  Firestore listing metrics. Do not revert it to "analytics offline"; instead
+  keep completed sales and 24h volume hidden until settled order events are
+  wired.

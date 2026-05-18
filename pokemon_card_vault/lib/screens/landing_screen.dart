@@ -136,13 +136,6 @@ class _TopBar extends StatelessWidget {
                       const SizedBox(width: 12),
                     ],
                     _TopBarCta(
-                      label: 'Forum',
-                      icon: Icons.forum_outlined,
-                      primary: false,
-                      onPressed: () => context.go('/forum'),
-                    ),
-                    const SizedBox(width: 10),
-                    _TopBarCta(
                       label: 'Shop',
                       icon: Icons.storefront,
                       primary: true,
@@ -214,8 +207,6 @@ class _NavPill extends StatelessWidget {
       child: const Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _NavAction(
-              label: 'Shop', path: '/marketplace', icon: Icons.storefront),
           _NavAction(
               label: 'Wallet',
               path: '/wallet',
