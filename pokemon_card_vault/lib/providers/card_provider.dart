@@ -385,9 +385,11 @@ class CardNotifier extends StateNotifier<CardState> {
   int _localSearchScore(PokemonCard card, String query) {
     final name = card.name.toLowerCase();
     final set = card.set.toLowerCase();
-    final number = card.number.toLowerCase();
+    final isProduct = card.itemKind == 'product';
+    final number = isProduct ? '' : card.number.toLowerCase();
     final tags = card.tags.join(' ').toLowerCase();
-    final haystack = '$name $set $number $tags';
+    final haystack =
+        isProduct ? '$name $set $tags' : '$name $set $number $tags';
     final terms = _searchTerms(query);
 
     if (number == query) {

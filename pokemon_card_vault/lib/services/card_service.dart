@@ -711,20 +711,27 @@ class CardService {
       return const [];
     }
 
-    final versionRows = await _searchMarketplaceCardVersions(
-      normalizedQuery,
-      limit: limit,
-      productType: productType,
-    );
-    if (versionRows.isNotEmpty) {
-      return versionRows;
+    if (productType != null && productType.trim().isNotEmpty) {
+      final rows = await _searchMarketplaceCardVersions(
+        normalizedQuery,
+        limit: limit,
+        productType: productType,
+      );
+      return rows;
     }
 
-    return _searchMarketplaceCardRows(
+    final versionRows = await _searchMarketplaceCardVersions(
       normalizedQuery,
-      limit: limit,
-      productType: productType,
+      limit: limit * 2,
     );
+    final singleRows =
+        versionRows.where((card) => card.itemKind != 'product').toList();
+    final productRows = await _searchMarketplaceCardRows(
+      normalizedQuery,
+      limit: limit * 2,
+      productSearchOnly: true,
+    );
+    return _dedupeCards([...singleRows, ...productRows]).take(limit).toList();
   }
 
   Future<List<PokemonCard>> getMarketplaceCardsByProductType(
@@ -767,6 +774,7 @@ class CardService {
     String normalizedQuery, {
     required int limit,
     String? productType,
+    bool productSearchOnly = false,
   }) async {
     if (_supabaseUrl.isEmpty || _supabaseAnonKey.isEmpty) {
       return const [];
@@ -783,20 +791,28 @@ class CardService {
       final normalizedProductType = productType?.trim();
       if (normalizedProductType != null && normalizedProductType.isNotEmpty) {
         queryParameters['product_type'] = 'eq.$normalizedProductType';
+      } else if (productSearchOnly) {
+        queryParameters['item_kind'] = 'eq.product';
       }
       if (terms.length <= 1) {
         if (normalizedQuery.isNotEmpty) {
-          queryParameters['or'] =
-              '(name.ilike.*$normalizedQuery*,set_name.ilike.*$normalizedQuery*,card_type.ilike.*$normalizedQuery*,rarity.ilike.*$normalizedQuery*,card_number.ilike.*$normalizedQuery*)';
+          queryParameters['or'] = productSearchOnly
+              ? '(name.ilike.*$normalizedQuery*,set_name.ilike.*$normalizedQuery*)'
+              : '(name.ilike.*$normalizedQuery*,set_name.ilike.*$normalizedQuery*,card_type.ilike.*$normalizedQuery*,rarity.ilike.*$normalizedQuery*,card_number.ilike.*$normalizedQuery*)';
         }
       } else {
-        queryParameters['and'] = _andAnyFieldFilter(terms, [
-          'name',
-          'set_name',
-          'card_type',
-          'rarity',
-          'card_number',
-        ]);
+        queryParameters['and'] = _andAnyFieldFilter(
+          terms,
+          productSearchOnly
+              ? ['name', 'set_name']
+              : [
+                  'name',
+                  'set_name',
+                  'card_type',
+                  'rarity',
+                  'card_number',
+                ],
+        );
       }
       final uri = Uri.parse('$_supabaseUrl/rest/v1/marketplace_cards').replace(
         queryParameters: queryParameters,
@@ -851,15 +867,18 @@ class CardService {
       }
       if (terms.length <= 1) {
         if (normalizedQuery.isNotEmpty) {
-          queryParameters['or'] =
-              '(name.ilike.*$normalizedQuery*,expansion_name.ilike.*$normalizedQuery*,expansion_number.ilike.*$normalizedQuery*)';
+          queryParameters['or'] = normalizedProductType != null &&
+                  normalizedProductType.isNotEmpty
+              ? '(name.ilike.*$normalizedQuery*,expansion_name.ilike.*$normalizedQuery*)'
+              : '(name.ilike.*$normalizedQuery*,expansion_name.ilike.*$normalizedQuery*,expansion_number.ilike.*$normalizedQuery*)';
         }
       } else {
-        queryParameters['and'] = _andAnyFieldFilter(terms, [
-          'name',
-          'expansion_name',
-          'expansion_number',
-        ]);
+        queryParameters['and'] = _andAnyFieldFilter(
+          terms,
+          normalizedProductType != null && normalizedProductType.isNotEmpty
+              ? ['name', 'expansion_name']
+              : ['name', 'expansion_name', 'expansion_number'],
+        );
       }
       final uri =
           Uri.parse('$_supabaseUrl/rest/v1/marketplace_card_versions').replace(
@@ -938,9 +957,11 @@ class CardService {
   int _localSearchScore(PokemonCard card, String query) {
     final name = card.name.toLowerCase();
     final set = card.set.toLowerCase();
-    final number = card.number.toLowerCase();
+    final isProduct = card.itemKind == 'product';
+    final number = isProduct ? '' : card.number.toLowerCase();
     final tags = card.tags.join(' ').toLowerCase();
-    final haystack = '$name $set $number $tags';
+    final haystack =
+        isProduct ? '$name $set $tags' : '$name $set $number $tags';
     final terms = _searchTerms(query);
 
     if (number == query) {
