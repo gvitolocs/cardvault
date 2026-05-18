@@ -15,6 +15,7 @@ import '../providers/cart_provider.dart';
 import '../providers/favorites_provider.dart';
 import '../providers/recent_views_provider.dart';
 import '../services/card_service.dart';
+import '../utils/card_url.dart';
 import '../utils/price_format.dart';
 
 class CardDetailScreen extends ConsumerWidget {
@@ -59,12 +60,12 @@ class CardDetailScreen extends ConsumerWidget {
     final expansionCardsState =
         ref.watch(_expansionVersionCardsProvider(resolvedCard));
     final expansionCards = expansionCardsState.valueOrNull ?? const [];
-    final previousId = _adjacentExpansionCardId(
+    final previousCard = _adjacentExpansionCard(
       expansionCards,
       resolvedCard.id,
       direction: -1,
     );
-    final nextId = _adjacentExpansionCardId(
+    final nextCard = _adjacentExpansionCard(
       expansionCards,
       resolvedCard.id,
       direction: 1,
@@ -116,12 +117,12 @@ class CardDetailScreen extends ConsumerWidget {
                         isInCart: isInCart,
                         onSell: () =>
                             _openSellDialog(context, ref, resolvedCard),
-                        onPrevious: previousId == null
+                        onPrevious: previousCard == null
                             ? null
-                            : () => context.go('/card/$previousId'),
-                        onNext: nextId == null
+                            : () => context.go(cardDetailPath(previousCard)),
+                        onNext: nextCard == null
                             ? null
-                            : () => context.go('/card/$nextId'),
+                            : () => context.go(cardDetailPath(nextCard)),
                         onViewAllVersions: () => context.go(
                           Uri(
                             path: '/marketplace/search',
@@ -162,7 +163,7 @@ class CardDetailScreen extends ConsumerWidget {
     return null;
   }
 
-  String? _adjacentExpansionCardId(
+  PokemonCard? _adjacentExpansionCard(
     List<PokemonCard> expansionCards,
     String currentId, {
     required int direction,
@@ -177,7 +178,7 @@ class CardDetailScreen extends ConsumerWidget {
     final adjacentIndex = (index + direction) % expansionCards.length;
     final adjacent = expansionCards[
         adjacentIndex < 0 ? expansionCards.length - 1 : adjacentIndex];
-    return adjacent.id == currentId ? null : adjacent.id;
+    return adjacent.id == currentId ? null : adjacent;
   }
 
   void _openSellDialog(
@@ -341,83 +342,124 @@ class _AssetHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _Panel(
-      padding: const EdgeInsets.all(18),
+    final compact = MediaQuery.sizeOf(context).width < 820;
+    final badges = Align(
+      alignment: Alignment.centerLeft,
       child: Wrap(
-        spacing: 16,
-        runSpacing: 14,
-        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 12,
+        runSpacing: 10,
         children: [
           const _Badge(text: 'Pokémon', color: Color(0xFF38BDF8)),
           _Badge(text: card.rarity, color: const Color(0xFFFACC15)),
           if (card.itemKind == 'product')
             _Badge(text: card.type, color: const Color(0xFFA78BFA)),
           if (card.isHolo) const _Badge(text: 'Holo', color: Color(0xFFA78BFA)),
+        ],
+      ),
+    );
+    final title = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          card.name,
+          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+              ),
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            InkWell(
+              borderRadius: BorderRadius.circular(6),
+              onTap: () => context.go(
+                '/marketplace/search?expansion=${Uri.encodeQueryComponent(card.set)}',
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Text(
+                  card.set,
+                  style: const TextStyle(
+                    color: Color(0xFF38BDF8),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+            Text(
+              ' #${card.number} · ${card.condition} · ${card.type}',
+              style: const TextStyle(color: Color(0xFFB8C4E6)),
+            ),
+          ],
+        ),
+      ],
+    );
+    final actions = Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        _QuotePill(
+          label: 'Floor',
+          value: market.hasListings ? formatPkn(market.floorPrice) : '—',
+        ),
+        _QuotePill(
+          label: '24h',
+          value: market.change24hLabel,
+          positive: true,
+        ),
+        FilledButton.icon(
+          onPressed: onSell,
+          icon: const Icon(Icons.sell_outlined, size: 18),
+          label: const Text('Sell'),
+          style: FilledButton.styleFrom(
+            backgroundColor: const Color(0xFF38BDF8),
+            foregroundColor: const Color(0xFF07111F),
+          ),
+        ),
+        IconButton.filledTonal(
+          onPressed: onWishlist,
+          icon: const Icon(Icons.favorite_border),
+          tooltip: 'Add to wishlist',
+        ),
+        IconButton.filledTonal(
+          onPressed: () {},
+          icon: const Icon(Icons.ios_share),
+          tooltip: 'Share',
+        ),
+      ],
+    );
+
+    if (compact) {
+      return _Panel(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            badges,
+            const SizedBox(height: 16),
+            title,
+            const SizedBox(height: 16),
+            actions,
+          ],
+        ),
+      );
+    }
+
+    return _Panel(
+      padding: const EdgeInsets.all(18),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
           SizedBox(
-            width: 520,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  card.name,
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w900,
-                      ),
-                ),
-                const SizedBox(height: 6),
-                Wrap(
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    InkWell(
-                      borderRadius: BorderRadius.circular(6),
-                      onTap: () => context.go(
-                        '/marketplace/search?expansion=${Uri.encodeQueryComponent(card.set)}',
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 2),
-                        child: Text(
-                          card.set,
-                          style: const TextStyle(
-                            color: Color(0xFF38BDF8),
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ),
-                    Text(
-                      ' #${card.number} · ${card.condition} · ${card.type}',
-                      style: const TextStyle(color: Color(0xFFB8C4E6)),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+            width: 260,
+            child: badges,
           ),
-          _QuotePill(
-              label: 'Floor',
-              value: market.hasListings ? formatPkn(market.floorPrice) : '—'),
-          _QuotePill(
-              label: '24h', value: market.change24hLabel, positive: true),
-          FilledButton.icon(
-            onPressed: onSell,
-            icon: const Icon(Icons.sell_outlined, size: 18),
-            label: const Text('Sell'),
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF38BDF8),
-              foregroundColor: const Color(0xFF07111F),
-            ),
-          ),
-          IconButton.filledTonal(
-            onPressed: onWishlist,
-            icon: const Icon(Icons.favorite_border),
-            tooltip: 'Add to wishlist',
-          ),
-          IconButton.filledTonal(
-            onPressed: () {},
-            icon: const Icon(Icons.ios_share),
-            tooltip: 'Share',
-          ),
+          const SizedBox(width: 18),
+          Expanded(child: title),
+          const SizedBox(width: 18),
+          actions,
         ],
       ),
     );

@@ -13,6 +13,8 @@ import '../providers/cart_provider.dart';
 import '../providers/favorites_provider.dart';
 import '../providers/recent_views_provider.dart';
 import '../services/card_service.dart';
+import '../constants/project_links.dart';
+import '../utils/card_url.dart';
 import '../utils/price_format.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -42,10 +44,13 @@ class MarketplaceSearchScreen extends ConsumerStatefulWidget {
 class _MarketplaceSearchScreenState
     extends ConsumerState<MarketplaceSearchScreen> {
   late final TextEditingController _controller;
+  final FocusNode _searchFocusNode = FocusNode();
   final CardService _cardService = CardService();
   List<PokemonCard> _results = const [];
   bool _isSearching = false;
   String? _error;
+  String? _selectedExpansion;
+  String? _selectedRarity;
   int _requestId = 0;
   Timer? _debounce;
 
@@ -61,8 +66,26 @@ class _MarketplaceSearchScreenState
   @override
   void dispose() {
     _debounce?.cancel();
+    _searchFocusNode.dispose();
     _controller.dispose();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant MarketplaceSearchScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialQuery != widget.initialQuery ||
+        oldWidget.expansion != widget.expansion ||
+        oldWidget.productType != widget.productType) {
+      _controller.text = widget.initialQuery;
+      _selectedExpansion = null;
+      _selectedRarity = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _runSearch(widget.initialQuery);
+        }
+      });
+    }
   }
 
   Future<void> _runSearch(String query) async {
@@ -140,21 +163,81 @@ class _MarketplaceSearchScreenState
     final query = _controller.text.trim();
     final expansion = widget.expansion?.trim();
     final productType = widget.productType?.trim();
+    final filteredResults = _applySearchPageFilters(_results);
+    final isProductCategory =
+        productType != null && productType.isNotEmpty && productType != 'card';
+    final isSingleCategory = productType == 'card';
     final title = expansion != null && expansion.isNotEmpty
         ? 'Cards in $expansion'
         : productType != null && productType.isNotEmpty
             ? _productTypeTitle(productType)
             : 'Marketplace search';
     final singles =
-        _results.where((card) => card.itemKind != 'product').toList();
+        filteredResults.where((card) => card.itemKind != 'product').toList();
     final products =
-        _results.where((card) => card.itemKind == 'product').toList();
+        filteredResults.where((card) => card.itemKind == 'product').toList();
+    final content = [
+      _SearchResultsHeader(query: query, count: filteredResults.length),
+      const SizedBox(height: 24),
+      if (!isProductCategory) ...[
+        _SearchResultSection(
+          title: isSingleCategory ? 'Graded candidates' : 'Singles',
+          cards: singles,
+        ),
+        const SizedBox(height: 28),
+      ],
+      if (!isSingleCategory)
+        _SearchResultSection(
+          title: isProductCategory ? title : 'Products',
+          cards: products,
+        ),
+    ];
 
     return Scaffold(
       backgroundColor: const Color(0xFF050816),
       appBar: AppBar(
         backgroundColor: const Color(0xE60A1026),
-        title: Text(title),
+        titleSpacing: 0,
+        title: Row(
+          children: [
+            Flexible(
+              flex: 3,
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 18),
+            Expanded(
+              flex: 5,
+              child: _MarketplaceTopSearch(
+                controller: _controller,
+                focusNode: _searchFocusNode,
+                query: _controller.text,
+                isSearching: _isSearching,
+                previews: _results.take(12).toList(),
+                hintText: 'Search cards, sets, products...',
+                onChanged: (value) {
+                  setState(() {});
+                  _onSearchChanged(value);
+                },
+                onSelected: (card) => context.go(cardDetailPath(card)),
+                onShowAll: (query) => context.go(
+                  Uri(
+                    path: '/marketplace/search',
+                    queryParameters: {
+                      if (query.trim().isNotEmpty) 'q': query.trim(),
+                      if (productType?.isNotEmpty == true)
+                        'productType': productType!,
+                    },
+                  ).toString(),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+          ],
+        ),
         leading: IconButton(
           onPressed: () => _goBackOr(context, '/marketplace'),
           icon: const Icon(Icons.arrow_back),
@@ -162,49 +245,124 @@ class _MarketplaceSearchScreenState
       ),
       body: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1220),
-          child: ListView(
-            padding: const EdgeInsets.all(22),
-            children: [
-              TextField(
-                controller: _controller,
-                onChanged: _onSearchChanged,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  prefixIcon:
-                      const Icon(Icons.search, color: Color(0xFFFACC15)),
-                  hintText: 'Search singles and sealed products',
-                  hintStyle: const TextStyle(color: Color(0xFF93A4C8)),
-                  filled: true,
-                  fillColor: const Color(0xFF111936),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(18),
-                    borderSide: BorderSide.none,
+          constraints: const BoxConstraints(maxWidth: 1280),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final filters = _SearchFilterPanel(
+                productType: productType,
+                selectedExpansion: _selectedExpansion,
+                selectedRarity: _selectedRarity,
+                expansionCounts: _facetCounts(
+                  _results,
+                  (card) => card.set,
+                ),
+                rarityCounts: _facetCounts(
+                  _results.where((card) => card.itemKind != 'product'),
+                  (card) => card.rarity,
+                ),
+                onExpansionChanged: (value) =>
+                    setState(() => _selectedExpansion = value),
+                onRarityChanged: (value) =>
+                    setState(() => _selectedRarity = value),
+                onClear: () => setState(() {
+                  _selectedExpansion = null;
+                  _selectedRarity = null;
+                }),
+              );
+              final main = ListView(
+                padding: const EdgeInsets.all(22),
+                children: [
+                  if (_isSearching)
+                    const LinearProgressIndicator(color: Color(0xFFFACC15)),
+                  if (_error != null) ...[
+                    Text(
+                      'Search failed: $_error',
+                      style: const TextStyle(color: Color(0xFFFCA5A5)),
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+                  ...content,
+                ],
+              );
+              if (constraints.maxWidth < 880) {
+                return ListView(
+                  padding: const EdgeInsets.all(18),
+                  children: [
+                    filters,
+                    const SizedBox(height: 18),
+                    if (_isSearching)
+                      const LinearProgressIndicator(color: Color(0xFFFACC15)),
+                    if (_error != null) ...[
+                      Text(
+                        'Search failed: $_error',
+                        style: const TextStyle(color: Color(0xFFFCA5A5)),
+                      ),
+                      const SizedBox(height: 14),
+                    ],
+                    ...content,
+                  ],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 300,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(22, 22, 0, 22),
+                      child: filters,
+                    ),
                   ),
-                ),
-              ),
-              const SizedBox(height: 22),
-              if (_isSearching)
-                const LinearProgressIndicator(color: Color(0xFFFACC15)),
-              if (_error != null) ...[
-                Text(
-                  'Search failed: $_error',
-                  style: const TextStyle(color: Color(0xFFFCA5A5)),
-                ),
-                const SizedBox(height: 14),
-              ],
-              _SearchResultsHeader(query: query, count: _results.length),
-              const SizedBox(height: 24),
-              _SearchResultSection(
-                title: productType == 'card' ? 'Graded candidates' : 'Singles',
-                cards: singles,
-              ),
-              const SizedBox(height: 28),
-              _SearchResultSection(title: 'Products', cards: products),
-            ],
+                  const SizedBox(width: 22),
+                  Expanded(child: main),
+                ],
+              );
+            },
           ),
         ),
       ),
+    );
+  }
+
+  List<PokemonCard> _applySearchPageFilters(List<PokemonCard> cards) {
+    return cards.where((card) {
+      final selectedExpansion = _selectedExpansion;
+      if (selectedExpansion != null &&
+          selectedExpansion.isNotEmpty &&
+          card.set != selectedExpansion) {
+        return false;
+      }
+      final selectedRarity = _selectedRarity;
+      if (selectedRarity != null &&
+          selectedRarity.isNotEmpty &&
+          card.rarity != selectedRarity) {
+        return false;
+      }
+      return true;
+    }).toList();
+  }
+
+  Map<String, int> _facetCounts(
+    Iterable<PokemonCard> cards,
+    String Function(PokemonCard card) valueForCard,
+  ) {
+    final counts = <String, int>{};
+    for (final card in cards) {
+      final value = valueForCard(card).trim();
+      if (value.isEmpty || value == 'Card') {
+        continue;
+      }
+      counts[value] = (counts[value] ?? 0) + 1;
+    }
+    return Map.fromEntries(
+      counts.entries.toList()
+        ..sort((a, b) {
+          final count = b.value.compareTo(a.value);
+          if (count != 0) {
+            return count;
+          }
+          return a.key.compareTo(b.key);
+        }),
     );
   }
 
@@ -224,15 +382,10 @@ class _MarketplaceSearchScreenState
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
   final ScrollController _scrollController = ScrollController();
   static const int _pageSize = 12;
   int _visibleCount = _pageSize;
-  final List<_MarketFilter> _quickFilters = const [
-    _MarketFilter(label: 'Holo grails', query: 'holo'),
-    _MarketFilter(label: 'Trainer cards', query: 'trainer'),
-    _MarketFilter(label: 'Booster boxes', query: 'booster'),
-    _MarketFilter(label: 'Under 50k PKN', maxPrice: 50000),
-  ];
 
   @override
   void initState() {
@@ -245,6 +398,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   void dispose() {
+    _searchFocusNode.dispose();
     _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -286,7 +440,58 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           SliverAppBar(
             pinned: true,
             backgroundColor: const Color(0xE60A1026),
-            title: const Text('Pokoin'),
+            titleSpacing: 16,
+            title: Row(
+              children: [
+                InkWell(
+                  onTap: () => context.go('/'),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: Image.network(
+                      ProjectLinks.logo,
+                      width: 34,
+                      height: 34,
+                      fit: BoxFit.contain,
+                      filterQuality: FilterQuality.none,
+                      errorBuilder: (_, __, ___) => const Icon(
+                        Icons.token,
+                        color: Color(0xFFFACC15),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: _MarketplaceTopSearch(
+                    controller: _searchController,
+                    focusNode: _searchFocusNode,
+                    query: cardState.previewQuery,
+                    isSearching: cardState.isSearchingPreviews,
+                    previews: cardState.searchPreviews,
+                    hintText: 'Search cards, sets, products...',
+                    onChanged: (value) {
+                      ref.read(cardProvider.notifier).searchPreviewsOnly(value);
+                    },
+                    onSelected: (card) {
+                      ref.read(cardProvider.notifier).recordCardInteraction(
+                            card,
+                            'click',
+                            source: 'search_preview',
+                          );
+                      _resetTransientSearch();
+                      context.go(cardDetailPath(card));
+                    },
+                    onShowAll: (query) => context.go(
+                      Uri(
+                        path: '/marketplace/search',
+                        queryParameters: {'q': query},
+                      ).toString(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
             actions: [
               TextButton(
                   onPressed: () => context.go('/'), child: const Text('Home')),
@@ -320,35 +525,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _SearchAndControls(
-                        controller: _searchController,
-                        state: cardState,
-                        quickFilters: _quickFilters,
-                        onSearch: (value) {
-                          setState(() => _visibleCount = _pageSize);
-                          ref.read(cardProvider.notifier).searchCards(value);
-                        },
-                        onSort: (value) {
-                          setState(() => _visibleCount = _pageSize);
-                          ref.read(cardProvider.notifier).sortCards(value);
-                        },
-                        onFilter: _applyFilter,
-                        onPreviewSelected: (card) {
-                          ref.read(cardProvider.notifier).recordCardInteraction(
-                                card,
-                                'click',
-                                source: 'search_preview',
-                              );
-                          _resetTransientSearch();
-                          context.go('/card/${card.id}');
-                        },
-                        onClear: () {
-                          setState(() => _visibleCount = _pageSize);
-                          _searchController.clear();
-                          ref.read(cardProvider.notifier).clearFilters();
-                        },
-                      ),
-                      const SizedBox(height: 24),
                       if (cardState.isLoading)
                         const _LoadingMarket()
                       else if (cardState.error != null)
@@ -409,18 +585,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  void _applyFilter(_MarketFilter filter) {
-    final notifier = ref.read(cardProvider.notifier);
-    setState(() => _visibleCount = _pageSize);
-    if (filter.query != null) {
-      _searchController.text = filter.query!;
-      notifier.searchCards(filter.query!);
-    }
-    if (filter.maxPrice != null) {
-      notifier.filterByPriceRange(0, filter.maxPrice!);
-    }
-  }
-
   void _resetTransientSearch() {
     if (_searchController.text.isNotEmpty) {
       _searchController.clear();
@@ -456,149 +620,191 @@ class _WalletBalanceButton extends StatelessWidget {
   }
 }
 
-class _SearchAndControls extends StatelessWidget {
-  final TextEditingController controller;
-  final CardState state;
-  final List<_MarketFilter> quickFilters;
-  final ValueChanged<String> onSearch;
-  final ValueChanged<String> onSort;
-  final ValueChanged<_MarketFilter> onFilter;
-  final ValueChanged<PokemonCard> onPreviewSelected;
-  final VoidCallback onClear;
-
-  const _SearchAndControls({
+class _MarketplaceTopSearch extends StatefulWidget {
+  const _MarketplaceTopSearch({
     required this.controller,
-    required this.state,
-    required this.quickFilters,
-    required this.onSearch,
-    required this.onSort,
-    required this.onFilter,
-    required this.onPreviewSelected,
-    required this.onClear,
+    required this.focusNode,
+    required this.query,
+    required this.isSearching,
+    required this.previews,
+    required this.hintText,
+    required this.onChanged,
+    required this.onSelected,
+    required this.onShowAll,
   });
 
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final String query;
+  final bool isSearching;
+  final List<PokemonCard> previews;
+  final String hintText;
+  final ValueChanged<String> onChanged;
+  final ValueChanged<PokemonCard> onSelected;
+  final ValueChanged<String> onShowAll;
+
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: const Color(0xCC0B1024),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-      ),
-      child: Column(
-        children: [
-          Column(
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      children: [
-                        TextField(
-                          controller: controller,
-                          onChanged: onSearch,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: InputDecoration(
-                            prefixIcon: const Icon(
-                              Icons.search,
-                              color: Color(0xFFFACC15),
-                            ),
-                            suffixIcon: state.isSearchingPreviews
-                                ? const Padding(
-                                    padding: EdgeInsets.all(14),
-                                    child: SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Color(0xFFFACC15),
-                                      ),
-                                    ),
-                                  )
-                                : null,
-                            hintText:
-                                'Search Pikachu, Base Set, holo, artist...',
-                            hintStyle:
-                                const TextStyle(color: Color(0xFF93A4C8)),
-                            filled: true,
-                            fillColor: const Color(0xFF111936),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(18),
-                              borderSide: BorderSide.none,
-                            ),
-                          ),
-                        ),
-                        _SearchPreviewPanel(
-                          query: state.searchQuery,
-                          cards: state.searchPreviews,
-                          isSearching: state.isSearchingPreviews,
-                          onSelected: onPreviewSelected,
-                          onShowAll: (query) => context.go(
-                            Uri(
-                              path: '/marketplace/search',
-                              queryParameters: {'q': query},
-                            ).toString(),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  PopupMenuButton<String>(
-                    tooltip: 'Sort',
-                    onSelected: onSort,
-                    itemBuilder: (context) => const [
-                      PopupMenuItem(
-                          value: 'price', child: Text('Sort by price')),
-                      PopupMenuItem(
-                          value: 'rarity', child: Text('Sort by rarity')),
-                      PopupMenuItem(
-                          value: 'rating', child: Text('Sort by rating')),
-                      PopupMenuItem(value: 'name', child: Text('Sort by name')),
-                    ],
-                    child: const _RoundControl(icon: Icons.sort, label: 'Sort'),
-                  ),
-                  const SizedBox(width: 12),
-                  TextButton(onPressed: onClear, child: const Text('Clear')),
-                ],
+  State<_MarketplaceTopSearch> createState() => _MarketplaceTopSearchState();
+}
+
+class _MarketplaceTopSearchState extends State<_MarketplaceTopSearch> {
+  final LayerLink _layerLink = LayerLink();
+  final GlobalKey _fieldKey = GlobalKey();
+  OverlayEntry? _overlayEntry;
+  double _overlayWidth = 520;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.focusNode.addListener(_syncOverlay);
+  }
+
+  @override
+  void didUpdateWidget(covariant _MarketplaceTopSearch oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.focusNode != widget.focusNode) {
+      oldWidget.focusNode.removeListener(_syncOverlay);
+      widget.focusNode.addListener(_syncOverlay);
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncOverlay());
+  }
+
+  @override
+  void dispose() {
+    widget.focusNode.removeListener(_syncOverlay);
+    _removeOverlay();
+    super.dispose();
+  }
+
+  void _syncOverlay() {
+    if (!mounted) {
+      return;
+    }
+    final shouldShow =
+        widget.focusNode.hasFocus && widget.query.trim().length >= 2;
+    if (!shouldShow) {
+      _removeOverlay();
+      return;
+    }
+    final fieldContext = _fieldKey.currentContext;
+    final fieldSize = fieldContext?.size;
+    if (fieldSize != null) {
+      _overlayWidth = math.max(360, fieldSize.width);
+    }
+    if (_overlayEntry == null) {
+      _overlayEntry = OverlayEntry(builder: _buildOverlay);
+      Overlay.of(context).insert(_overlayEntry!);
+    } else {
+      _overlayEntry!.markNeedsBuild();
+    }
+  }
+
+  void _removeOverlay() {
+    _overlayEntry?.remove();
+    _overlayEntry = null;
+  }
+
+  Widget _buildOverlay(BuildContext context) {
+    return Positioned.fill(
+      child: IgnorePointer(
+        ignoring: false,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: widget.focusNode.unfocus,
               ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                for (final filter in quickFilters)
-                  ChoiceChip(
-                    label: Text(filter.label),
-                    selected: _isActive(filter),
-                    onSelected: (_) => onFilter(filter),
-                    selectedColor: const Color(0xFFFACC15),
-                    backgroundColor: const Color(0xFF111936),
-                    labelStyle: TextStyle(
-                      color: _isActive(filter)
-                          ? const Color(0xFF111827)
-                          : const Color(0xFFE5E7EB),
-                      fontWeight: FontWeight.w700,
-                    ),
-                    side:
-                        BorderSide(color: Colors.white.withValues(alpha: 0.08)),
-                  ),
-              ],
             ),
-          ),
-        ],
+            CompositedTransformFollower(
+              link: _layerLink,
+              showWhenUnlinked: false,
+              targetAnchor: Alignment.bottomLeft,
+              followerAnchor: Alignment.topLeft,
+              offset: const Offset(0, 8),
+              child: Material(
+                color: Colors.transparent,
+                child: SizedBox(
+                  width: _overlayWidth,
+                  child: _SearchPreviewPanel(
+                    query: widget.query,
+                    cards: widget.previews,
+                    isSearching: widget.isSearching,
+                    onSelected: (card) {
+                      _removeOverlay();
+                      widget.focusNode.unfocus();
+                      widget.onSelected(card);
+                    },
+                    onShowAll: (query) {
+                      _removeOverlay();
+                      widget.focusNode.unfocus();
+                      widget.onShowAll(query);
+                    },
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  bool _isActive(_MarketFilter filter) {
-    return state.searchQuery == filter.query && filter.query != null ||
-        filter.maxPrice != null && state.maxPrice == filter.maxPrice;
+  @override
+  Widget build(BuildContext context) {
+    return CompositedTransformTarget(
+      link: _layerLink,
+      child: SizedBox(
+        key: _fieldKey,
+        height: 42,
+        child: TextField(
+          controller: widget.controller,
+          focusNode: widget.focusNode,
+          onChanged: widget.onChanged,
+          onTap: _syncOverlay,
+          style: const TextStyle(color: Colors.white, fontSize: 14),
+          textInputAction: TextInputAction.search,
+          onSubmitted: widget.onShowAll,
+          decoration: InputDecoration(
+            prefixIcon: const Icon(Icons.search, color: Color(0xFFFACC15)),
+            suffixIcon: widget.isSearching
+                ? const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Color(0xFFFACC15),
+                      ),
+                    ),
+                  )
+                : widget.controller.text.isNotEmpty
+                    ? IconButton(
+                        tooltip: 'Clear search',
+                        onPressed: () {
+                          widget.controller.clear();
+                          widget.onChanged('');
+                          _removeOverlay();
+                        },
+                        icon: const Icon(Icons.close,
+                            color: Color(0xFF93A4C8), size: 18),
+                      )
+                    : null,
+            hintText: widget.hintText,
+            hintStyle: const TextStyle(color: Color(0xFF93A4C8)),
+            filled: true,
+            fillColor: const Color(0xFF111936),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(999),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -863,7 +1069,7 @@ void _goBackOr(BuildContext context, String fallbackPath) {
   context.go(fallbackPath);
 }
 
-class _CardCarouselSection extends StatelessWidget {
+class _CardCarouselSection extends StatefulWidget {
   const _CardCarouselSection({
     required this.title,
     required this.cards,
@@ -877,31 +1083,182 @@ class _CardCarouselSection extends StatelessWidget {
   final bool isLoading;
 
   @override
+  State<_CardCarouselSection> createState() => _CardCarouselSectionState();
+}
+
+class _CardCarouselSectionState extends State<_CardCarouselSection> {
+  final ScrollController _scrollController = ScrollController();
+  bool _canScrollBack = false;
+  bool _canScrollForward = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_syncArrowVisibility);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncArrowVisibility());
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_syncArrowVisibility);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _syncArrowVisibility() {
+    if (!_scrollController.hasClients) {
+      if (_canScrollBack || _canScrollForward) {
+        setState(() {
+          _canScrollBack = false;
+          _canScrollForward = false;
+        });
+      }
+      return;
+    }
+    final position = _scrollController.position;
+    final canScrollBack = position.pixels > position.minScrollExtent + 2;
+    final canScrollForward = position.pixels < position.maxScrollExtent - 2;
+    if (canScrollBack == _canScrollBack &&
+        canScrollForward == _canScrollForward) {
+      return;
+    }
+    setState(() {
+      _canScrollBack = canScrollBack;
+      _canScrollForward = canScrollForward;
+    });
+  }
+
+  void _scrollBy(double delta) {
+    if (!_scrollController.hasClients) {
+      return;
+    }
+    final position = _scrollController.position;
+    final target = (position.pixels + delta).clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
+    _scrollController.animateTo(
+      target,
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (cards.isEmpty && !isLoading) {
+    if (widget.cards.isEmpty && !widget.isLoading) {
       return const SizedBox.shrink();
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionHeading(title: title, subtitle: subtitle),
+        _SectionHeading(title: widget.title, subtitle: widget.subtitle),
         const SizedBox(height: 14),
-        if (isLoading)
+        if (widget.isLoading)
           const _RecentViewsLoadingStrip()
         else
-          SizedBox(
-            height: 210,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: cards.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 14),
-              itemBuilder: (context, index) => SizedBox(
-                width: 360,
-                child: _FeaturedCard(card: cards[index]),
-              ),
-            ),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final screenWidth = MediaQuery.sizeOf(context).width;
+              final isDesktop = screenWidth >= 900;
+              WidgetsBinding.instance
+                  .addPostFrameCallback((_) => _syncArrowVisibility());
+              final sideInset = math.max(
+                0.0,
+                (screenWidth - constraints.maxWidth) / 2,
+              );
+              return Transform.translate(
+                offset: Offset(-sideInset, 0),
+                child: SizedBox(
+                  width: screenWidth,
+                  height: 210,
+                  child: Stack(
+                    children: [
+                      ListView.separated(
+                        controller: _scrollController,
+                        padding: EdgeInsets.symmetric(horizontal: sideInset),
+                        scrollDirection: Axis.horizontal,
+                        itemCount: widget.cards.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 14),
+                        itemBuilder: (context, index) => SizedBox(
+                          width: 360,
+                          child: _FeaturedCard(card: widget.cards[index]),
+                        ),
+                      ),
+                      if (isDesktop && widget.cards.length > 2) ...[
+                        if (_canScrollBack)
+                          Positioned(
+                            left: 16,
+                            top: 72,
+                            child: _CarouselArrowButton(
+                              icon: Icons.chevron_left,
+                              label: 'Previous cards',
+                              onPressed: () => _scrollBy(-748),
+                            ),
+                          ),
+                        if (_canScrollForward)
+                          Positioned(
+                            right: 16,
+                            top: 72,
+                            child: _CarouselArrowButton(
+                              icon: Icons.chevron_right,
+                              label: 'Next cards',
+                              onPressed: () => _scrollBy(748),
+                            ),
+                          ),
+                      ],
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
       ],
+    );
+  }
+}
+
+class _CarouselArrowButton extends StatelessWidget {
+  const _CarouselArrowButton({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: label,
+      child: Material(
+        color: const Color(0xEE0B1024),
+        shape: const CircleBorder(),
+        elevation: 8,
+        shadowColor: Colors.black.withValues(alpha: 0.28),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onPressed,
+          child: Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: const Color(0xFFFACC15).withValues(alpha: 0.45),
+              ),
+            ),
+            child: Icon(
+              icon,
+              color: const Color(0xFFFACC15),
+              size: 28,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -949,8 +1306,6 @@ class _MarketHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return const _SectionHeading(
       title: 'Card spotlight',
-      subtitle:
-          'Dynamically refreshed marketplace picks based on recent signals.',
     );
   }
 }
@@ -996,6 +1351,278 @@ class _SearchResultSection extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+class _SearchFilterPanel extends StatelessWidget {
+  const _SearchFilterPanel({
+    required this.productType,
+    required this.selectedExpansion,
+    required this.selectedRarity,
+    required this.expansionCounts,
+    required this.rarityCounts,
+    required this.onExpansionChanged,
+    required this.onRarityChanged,
+    required this.onClear,
+  });
+
+  final String? productType;
+  final String? selectedExpansion;
+  final String? selectedRarity;
+  final Map<String, int> expansionCounts;
+  final Map<String, int> rarityCounts;
+  final ValueChanged<String?> onExpansionChanged;
+  final ValueChanged<String?> onRarityChanged;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasFilters = selectedExpansion?.isNotEmpty == true ||
+        selectedRarity?.isNotEmpty == true ||
+        productType?.isNotEmpty == true;
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xCC0B1024),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'APPLIED FILTERS',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    const _FilterChipLabel(label: 'Pokémon'),
+                    if (productType?.isNotEmpty == true)
+                      _FilterChipLabel(label: _productTypeFilterLabel()),
+                    if (selectedExpansion?.isNotEmpty == true)
+                      _FilterChipLabel(label: selectedExpansion!),
+                    if (selectedRarity?.isNotEmpty == true)
+                      _FilterChipLabel(label: selectedRarity!),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          _FilterDivider(),
+          _FacetSection(
+            title: 'EXPANSION',
+            placeholder: 'Expansion',
+            selectedValue: selectedExpansion,
+            counts: expansionCounts,
+            onChanged: onExpansionChanged,
+          ),
+          _FilterDivider(),
+          _FacetSection(
+            title: 'RARITY',
+            placeholder: 'Rarity',
+            selectedValue: selectedRarity,
+            counts: rarityCounts,
+            onChanged: onRarityChanged,
+          ),
+          _FilterDivider(),
+          Padding(
+            padding: const EdgeInsets.all(18),
+            child: FilledButton(
+              onPressed: hasFilters ? onClear : null,
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF1F2A44),
+                disabledBackgroundColor: const Color(0x661F2A44),
+                foregroundColor: Colors.white,
+                disabledForegroundColor: const Color(0xFF64748B),
+              ),
+              child: const Text('Clear filters'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _productTypeFilterLabel() {
+    switch (productType) {
+      case 'booster_box':
+        return 'Booster boxes';
+      case 'booster_pack':
+        return 'Boosters';
+      case 'card':
+        return 'Singles';
+      default:
+        return productType ?? '';
+    }
+  }
+}
+
+class _FacetSection extends StatelessWidget {
+  const _FacetSection({
+    required this.title,
+    required this.placeholder,
+    required this.selectedValue,
+    required this.counts,
+    required this.onChanged,
+  });
+
+  final String title;
+  final String placeholder;
+  final String? selectedValue;
+  final Map<String, int> counts;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final entries = counts.entries.take(6).toList();
+    return Padding(
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            height: 42,
+            alignment: Alignment.centerLeft,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            decoration: BoxDecoration(
+              color: const Color(0xFF111936),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+            ),
+            child: Text(
+              selectedValue?.isNotEmpty == true ? selectedValue! : placeholder,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: selectedValue?.isNotEmpty == true
+                    ? Colors.white
+                    : const Color(0xFF64748B),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          for (final entry in entries)
+            _FacetOption(
+              label: entry.key,
+              count: entry.value,
+              selected: entry.key == selectedValue,
+              onTap: () =>
+                  onChanged(entry.key == selectedValue ? null : entry.key),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FacetOption extends StatelessWidget {
+  const _FacetOption({
+    required this.label,
+    required this.count,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final int count;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 7),
+        child: Row(
+          children: [
+            Container(
+              width: 18,
+              height: 18,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: selected
+                      ? const Color(0xFFFACC15)
+                      : const Color(0xFF94A3B8),
+                  width: selected ? 5 : 1.4,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Color(0xFFE5E7EB)),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '($count)',
+              style: const TextStyle(color: Color(0xFF93A4C8)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FilterChipLabel extends StatelessWidget {
+  const _FilterChipLabel({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111936),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
+class _FilterDivider extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(height: 1, color: Colors.white.withValues(alpha: 0.08));
   }
 }
 
@@ -1067,7 +1694,7 @@ class _MarketCard extends ConsumerWidget {
                 source: 'market_grid',
               );
           ref.read(cardProvider.notifier).clearFilters();
-          context.go('/card/${card.id}');
+          context.go(cardDetailPath(card));
         },
         borderRadius: BorderRadius.circular(24),
         child: Column(
@@ -1078,7 +1705,8 @@ class _MarketCard extends ConsumerWidget {
                 children: [
                   Positioned.fill(
                     child: _CardImageFrame(
-                      imageUrl: card.imageUrl,
+                      imageUrl: card.previewImageUrl,
+                      fallbackImageUrl: card.imageUrl,
                       borderRadius:
                           const BorderRadius.vertical(top: Radius.circular(24)),
                       padding: const EdgeInsets.all(14),
@@ -1166,7 +1794,7 @@ class _MarketCard extends ConsumerWidget {
                                 source: 'market_grid_button',
                               );
                           ref.read(cardProvider.notifier).clearFilters();
-                          context.go('/card/${card.id}');
+                          context.go(cardDetailPath(card));
                         },
                         child: const Text('View'),
                       ),
@@ -1205,13 +1833,14 @@ class _FeaturedCard extends ConsumerWidget {
                 source: 'market_carousel',
               );
           ref.read(cardProvider.notifier).clearFilters();
-          context.go('/card/${card.id}');
+          context.go(cardDetailPath(card));
         },
         borderRadius: BorderRadius.circular(18),
         child: Row(
           children: [
             _CardImageFrame(
-              imageUrl: card.imageUrl,
+              imageUrl: card.previewImageUrl,
+              fallbackImageUrl: card.imageUrl,
               width: 126,
               height: 170,
               borderRadius: BorderRadius.circular(16),
@@ -1278,6 +1907,7 @@ class _CardImageFrame extends StatelessWidget {
   const _CardImageFrame({
     required this.imageUrl,
     required this.borderRadius,
+    this.fallbackImageUrl,
     this.width,
     this.height,
     this.padding = const EdgeInsets.all(6),
@@ -1285,6 +1915,7 @@ class _CardImageFrame extends StatelessWidget {
   });
 
   final String imageUrl;
+  final String? fallbackImageUrl;
   final BorderRadius borderRadius;
   final double? width;
   final double? height;
@@ -1306,11 +1937,26 @@ class _CardImageFrame extends StatelessWidget {
         imageUrl: imageUrl,
         fit: BoxFit.contain,
         alignment: Alignment.center,
-        errorWidget: (_, __, ___) => Icon(
-          Icons.style,
-          color: const Color(0xFFFACC15),
-          size: fallbackSize,
-        ),
+        errorWidget: (_, __, ___) {
+          final fallback = fallbackImageUrl?.trim();
+          if (fallback != null && fallback.isNotEmpty && fallback != imageUrl) {
+            return CachedNetworkImage(
+              imageUrl: fallback,
+              fit: BoxFit.contain,
+              alignment: Alignment.center,
+              errorWidget: (_, __, ___) => Icon(
+                Icons.style,
+                color: const Color(0xFFFACC15),
+                size: fallbackSize,
+              ),
+            );
+          }
+          return Icon(
+            Icons.style,
+            color: const Color(0xFFFACC15),
+            size: fallbackSize,
+          );
+        },
       ),
     );
   }
@@ -1379,33 +2025,6 @@ class _Notice extends StatelessWidget {
           Text(body,
               textAlign: TextAlign.center,
               style: const TextStyle(color: Color(0xFFB8C4E6))),
-        ],
-      ),
-    );
-  }
-}
-
-class _RoundControl extends StatelessWidget {
-  final IconData icon;
-  final String label;
-
-  const _RoundControl({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF111936),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: const Color(0xFFFACC15)),
-          const SizedBox(width: 8),
-          Text(label,
-              style: const TextStyle(
-                  color: Colors.white, fontWeight: FontWeight.w800)),
         ],
       ),
     );
@@ -1483,18 +2102,6 @@ class _MiniSignal extends StatelessWidget {
       ],
     );
   }
-}
-
-class _MarketFilter {
-  final String label;
-  final String? query;
-  final double? maxPrice;
-
-  const _MarketFilter({
-    required this.label,
-    this.query,
-    this.maxPrice,
-  });
 }
 
 List<PokemonCard> _rankCardsByRecentViews(
@@ -1577,12 +2184,9 @@ class _MarketplaceSections {
     final recentCards = _cardsForRecentViews(recentViews, cards);
     if (cachedSections != null) {
       final byId = {for (final card in cards) card.id: card};
-      final recentlySeen = _cardsForIds(cachedSections.recentlySeenIds, byId);
       final bestSellers = _cardsForIds(cachedSections.bestSellerIds, byId);
       final featured = _cardsForIds(cachedSections.featuredIds, byId);
-      if (recentlySeen.isNotEmpty ||
-          bestSellers.isNotEmpty ||
-          featured.isNotEmpty) {
+      if (bestSellers.isNotEmpty || featured.isNotEmpty) {
         return _MarketplaceSections(
           recentlySeen: recentCards,
           bestSellers: bestSellers.isNotEmpty
@@ -1687,6 +2291,8 @@ class _SuggestedCategories extends StatelessWidget {
         card: _CategoryCardData(
           id: '249796',
           name: 'Pokemon Card 151 Booster Box',
+          previewImageUrl:
+              '/card-images/previews/249796_pokemon-card-151-booster-box.jpg',
           imageUrl:
               '/card-images/249796_pokemon-card-151-booster-box-pokemon-card-151.jpg',
           set: 'Pokemon Card 151',
@@ -1702,6 +2308,7 @@ class _SuggestedCategories extends StatelessWidget {
         card: _CategoryCardData(
           id: '258625',
           name: '151 Booster',
+          previewImageUrl: '/card-images/previews/258625_151-booster.jpg',
           imageUrl: '/card-images/258625_151-booster-151.jpg',
           set: '151',
           number: '258625',
@@ -1716,6 +2323,7 @@ class _SuggestedCategories extends StatelessWidget {
         card: _CategoryCardData(
           id: '274416',
           name: 'Mew ex',
+          previewImageUrl: '/card-images/previews/274416_mew-ex.jpg',
           imageUrl:
               '/card-images/274416_mew-ex-special-illustration-rare-232-091-paldean-fates.jpg',
           set: 'Paldean Fates',
@@ -1748,6 +2356,7 @@ class _CategoryCardData {
   const _CategoryCardData({
     required this.id,
     required this.name,
+    required this.previewImageUrl,
     required this.imageUrl,
     required this.set,
     required this.number,
@@ -1757,6 +2366,7 @@ class _CategoryCardData {
 
   final String id;
   final String name;
+  final String previewImageUrl;
   final String imageUrl;
   final String set;
   final String number;
@@ -1802,7 +2412,8 @@ class _CategoryCard extends StatelessWidget {
           child: Row(
             children: [
               _CardImageFrame(
-                imageUrl: card.imageUrl,
+                imageUrl: card.previewImageUrl,
+                fallbackImageUrl: card.imageUrl,
                 width: 86,
                 height: 86,
                 borderRadius: BorderRadius.circular(12),

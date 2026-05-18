@@ -86,6 +86,9 @@ reconstructing commands from chat history.
    ```bash
    open workflows/card-market-page-workflow.md
    ```
+   Also use this workflow for `/marketplace` home carousel changes. The home
+   API returns section IDs and card payloads; the Flutter provider must merge the
+   payload before resolving carousel IDs.
 
 10. Maintain CardTrader-style search previews and Supabase fuzzy search:
    ```bash
@@ -142,3 +145,6 @@ reconstructing commands from chat history.
 - Do not make `/marketplace/search` depend only on `CardState.cards`. The home
   catalog is intentionally capped for performance; full search must query
   Supabase projections directly.
+- Do not make `/marketplace` carousels depend only on the capped catalog either.
+  Merge `/api/marketplace-home` snapshot cards into the provider state so
+  Best sellers and Featured can resolve their section IDs.

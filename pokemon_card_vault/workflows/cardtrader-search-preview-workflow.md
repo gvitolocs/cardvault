@@ -19,7 +19,8 @@ The marketplace search should behave like CardTrader:
   Do not limit it to the 500-card marketplace/home catalog loaded in
   `CardState.cards`.
 - Preview images live in the same R2 bucket as full card images under
-  `previews/...webp`.
+  `previews/...`. Generated previews use `.webp`; CardTrader API preview imports
+  currently preserve the downloaded preview bytes under `.jpg` keys.
 - Flutter receives `preview_image_url` when available and falls back to the full
   card image when preview generation is incomplete.
 
@@ -46,6 +47,9 @@ The marketplace search should behave like CardTrader:
   - Keeps expansion navigation scoped to exact expansion name.
 - `scripts/generate-cardtrader-preview-images.js`
   - Generates WebP previews with `sharp`, uploads to R2, updates Supabase rows.
+- `scripts/import-cardtrader-preview-images.js`
+  - Imports CardTrader API preview images directly, uploads them to R2 under
+    `previews/...jpg`, updates blueprint and marketplace projection rows.
 - `workflows/generate-cardtrader-preview-images.sh`
   - Wrapper for running the preview generator.
 
@@ -207,6 +211,35 @@ fallbacks, but new UI work should prefer `marketplace_cards` and
 ## Generate Preview Images
 
 Preview generation is long because it covers every CardTrader blueprint image.
+Prefer `import-cardtrader-preview-images.js` when you specifically want the
+preview image exposed by CardTrader's API. Use the generated WebP script when
+you want previews resized from our full CDN-hosted card images.
+
+Run a targeted CardTrader API preview import first:
+
+```bash
+PREVIEW_IDS=274416,254235 node scripts/import-cardtrader-preview-images.js
+```
+
+Prioritize new CardTrader rows that do not have previews yet:
+
+```bash
+PREVIEW_MISSING_ONLY=1 PREVIEW_NEWEST_FIRST=1 PREVIEW_BATCH_SIZE=100 PREVIEW_MAX_ROWS=1000 node scripts/import-cardtrader-preview-images.js
+```
+
+For newest-first missing-only runs, the importer prints `next cursor <id>`.
+Resume from that cursor:
+
+```bash
+PREVIEW_MISSING_ONLY=1 PREVIEW_NEWEST_FIRST=1 PREVIEW_CURSOR_ID=<id> PREVIEW_BATCH_SIZE=100 PREVIEW_MAX_ROWS=1000 node scripts/import-cardtrader-preview-images.js
+```
+
+The importer stores `preview_object_key` only on
+`cardtrader_pokemon_blueprints`; projection tables receive `preview_image_url`.
+Homepage/grid/card widgets should use `previewImageUrl` first and pass the full
+`imageUrl` as a fallback. This protects old recent-view entries and cards whose
+preview import has not completed yet.
+
 Run the small batch first:
 
 ```bash
@@ -281,6 +314,72 @@ Expected:
 - HTTP `200`
 - `content-type: image/webp`
 
+## Import Full CardTrader Images
+
+The production image source should be our R2 bucket behind
+`https://cdn.pokoin.com`, not CardTrader URLs. When CardTrader exposes a
+higher-resolution blueprint image, import that source into R2 and keep the app
+using the same `/card-images/...` proxy format.
+
+Run a targeted import first:
+
+```bash
+FULL_IMAGE_IDS=274416 node scripts/import-cardtrader-full-images.js
+```
+
+The importer:
+
+- Reads `blueprint.image.url` from `cardtrader_pokemon_blueprints`.
+- Downloads the full CardTrader image, ignoring `/preview_` sources.
+- Uploads the bytes to R2 using the existing `<blueprint_id>_slug.ext` key when
+  present, otherwise generates that key format.
+- Updates `cardtrader_pokemon_blueprints.image_url`, `cdn_image_url`,
+  `cdn_object_key`, and `cardtrader_image_url`.
+- Updates `marketplace_cards` and `marketplace_card_versions` for the imported
+  card ID, so no full projection refresh is required.
+
+Verify through the app proxy:
+
+```bash
+curl -L -I "https://pokoin.com/card-images/274416_mew-ex-special-illustration-rare-232-091-paldean-fates.jpg"
+```
+
+Expected:
+
+- HTTP `200`
+- `content-type: image/jpeg`
+- A full-image `content-length` larger than the old preview-derived object.
+
+Run the full job in resumable chunks:
+
+```bash
+FULL_IMAGE_BATCH_SIZE=50 FULL_IMAGE_MAX_ROWS=1000 node scripts/import-cardtrader-full-images.js
+```
+
+Prioritize new CardTrader rows that do not have CDN images yet:
+
+```bash
+FULL_IMAGE_MISSING_ONLY=1 FULL_IMAGE_NEWEST_FIRST=1 FULL_IMAGE_BATCH_SIZE=50 FULL_IMAGE_MAX_ROWS=1000 node scripts/import-cardtrader-full-images.js
+```
+
+If the regular full-catalog job stops after printing `next offset 1000`,
+resume with:
+
+```bash
+FULL_IMAGE_OFFSET=1000 FULL_IMAGE_BATCH_SIZE=50 FULL_IMAGE_MAX_ROWS=1000 node scripts/import-cardtrader-full-images.js
+```
+
+For newest-first missing-only runs, the importer prints `next cursor <id>`.
+Keep the same mode flags and resume from that cursor:
+
+```bash
+FULL_IMAGE_MISSING_ONLY=1 FULL_IMAGE_NEWEST_FIRST=1 FULL_IMAGE_CURSOR_ID=<id> FULL_IMAGE_BATCH_SIZE=50 FULL_IMAGE_MAX_ROWS=1000 node scripts/import-cardtrader-full-images.js
+```
+
+Do not set `REFRESH_MARKETPLACE_PROJECTIONS=1` for normal full-image imports.
+The full projection RPCs can time out on the whole catalog, and image-only
+changes are already synced row-by-row by the importer.
+
 ## Deploy Web Changes
 
 Always use the project deploy script after changing Flutter/app/API code:
@@ -333,6 +432,10 @@ curl -L -I "https://pokoin.com/marketplace/search?q=Steven"
 curl -L -I "https://pokoin.com/card-images/<known-card-image>"
 curl -L -I "https://pokoin.com/card-images/previews/<known-preview-image>"
 ```
+
+If `HEAD` returns `403` for image routes, verify with a normal `GET` before
+assuming the image is broken. Some CDN/proxy paths serve `GET` correctly while
+rejecting `HEAD`.
 
 Then open `https://pokoin.com/marketplace`, hard refresh if needed, and verify:
 

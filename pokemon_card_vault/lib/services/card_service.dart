@@ -295,9 +295,9 @@ class CardService {
       fallback: 'Trading card',
     );
     final imageUrl = _normalizeImageUrl(
-      _fullBlueprintImageUrl(blueprint) ??
-          row['cdn_image_url'] ??
+      row['cdn_image_url'] ??
           row['image_url'] ??
+          _fullBlueprintImageUrl(blueprint) ??
           blueprint['image_url'],
     );
     final previewImageUrl = _normalizeImageUrl(
@@ -567,13 +567,10 @@ class CardService {
     if (blueprintCard == null) {
       return projectionCard;
     }
-    final shouldUseProjectionImage = projectionCard.itemKind == 'product' ||
-        blueprintCard.imageUrl.trim().isEmpty;
+    final shouldUseProjectionImage = projectionCard.imageUrl.isNotEmpty;
     return blueprintCard.copyWith(
       name: projectionCard.name,
-      imageUrl: shouldUseProjectionImage && projectionCard.imageUrl.isNotEmpty
-          ? projectionCard.imageUrl
-          : null,
+      imageUrl: shouldUseProjectionImage ? projectionCard.imageUrl : null,
       previewImageUrl: projectionCard.previewImageUrl.isNotEmpty
           ? projectionCard.previewImageUrl
           : null,

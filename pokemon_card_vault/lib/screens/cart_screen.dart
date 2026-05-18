@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../providers/cart_provider.dart';
+import '../utils/card_url.dart';
 import '../utils/price_format.dart';
 
 class CartScreen extends ConsumerWidget {
@@ -301,7 +302,7 @@ class _ReserveCartRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 InkWell(
-                  onTap: () => context.go('/card/${item.card.id}'),
+                  onTap: () => context.go(cardDetailPath(item.card)),
                   child: Text(
                     item.card.name,
                     maxLines: 1,

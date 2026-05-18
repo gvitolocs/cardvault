@@ -27,6 +27,7 @@ import 'screens/forum_screen.dart';
 import 'constants/app_colors.dart';
 import 'constants/project_links.dart';
 import 'providers/marketplace_account_provider.dart';
+import 'utils/card_url.dart';
 import 'wallet/wallet_bridge_stub.dart';
 
 void main() async {
@@ -401,7 +402,14 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/card/:id',
             pageBuilder: (context, state) {
-              final cardId = state.pathParameters['id']!;
+              final cardId = cardIdFromSlug(state.pathParameters['id']!);
+              return _appPage(state, CardDetailScreen(cardId: cardId));
+            },
+          ),
+          GoRoute(
+            path: '/:cardSlug',
+            pageBuilder: (context, state) {
+              final cardId = cardIdFromSlug(state.pathParameters['cardSlug']!);
               return _appPage(state, CardDetailScreen(cardId: cardId));
             },
           ),
@@ -499,7 +507,7 @@ int _routeOrder(String path) {
   if (path.startsWith('/marketplace')) {
     return 10;
   }
-  if (path.startsWith('/card/')) {
+  if (path.startsWith('/card/') || RegExp(r'^/\d+').hasMatch(path)) {
     return 20;
   }
   if (path.startsWith('/cart')) {

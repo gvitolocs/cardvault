@@ -24,11 +24,13 @@ class LandingScreen extends StatelessWidget {
               children: [
                 _HeroSection(),
                 _MetricStrip(),
+                _ProjectAccessSection(),
                 _SectionTitle(
                   eyebrow: 'Pokoin today',
-                  title: 'Card marketplace, reserve analytics and PKN wallet.',
+                  title:
+                      'A collector marketplace with wallet rails and network roles.',
                   body:
-                      'Pokoin now centers on Card Reserve: real card discovery from the catalog, seller listings, cart and watchlist flows, wallet-linked accounts, and a dedicated marketplace signal page for reserve analytics.',
+                      'Pokoin combines card discovery, seller listings, PKN balances, node operations and community coordination in one project surface. The homepage should get every role to the right place quickly.',
                 ),
                 Wrap(
                   spacing: 18,
@@ -134,17 +136,17 @@ class _TopBar extends StatelessWidget {
                       const SizedBox(width: 12),
                     ],
                     _TopBarCta(
-                      label: 'Marketplace',
-                      icon: Icons.storefront,
+                      label: 'Forum',
+                      icon: Icons.forum_outlined,
                       primary: false,
-                      onPressed: () => context.go('/marketplace'),
+                      onPressed: () => context.go('/forum'),
                     ),
                     const SizedBox(width: 10),
                     _TopBarCta(
-                      label: 'Signal',
-                      icon: Icons.query_stats,
+                      label: 'Shop',
+                      icon: Icons.storefront,
                       primary: true,
-                      onPressed: () => context.go('/marketplace/signal'),
+                      onPressed: () => context.go('/marketplace'),
                     ),
                   ],
                 ),
@@ -213,18 +215,15 @@ class _NavPill extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           _NavAction(
-              label: 'Marketplace',
-              path: '/marketplace',
-              icon: Icons.storefront),
+              label: 'Shop', path: '/marketplace', icon: Icons.storefront),
           _NavAction(
               label: 'Wallet',
               path: '/wallet',
               icon: Icons.account_balance_wallet_outlined),
-          _NavAction(label: 'Scan', path: '/scan', icon: Icons.query_stats),
           _NavAction(
-              label: 'Health',
-              path: '/health',
-              icon: Icons.health_and_safety_outlined),
+              label: 'Host node', path: '/docs', icon: Icons.terminal_outlined),
+          _NavAction(
+              label: 'Forum', path: '/forum', icon: Icons.forum_outlined),
         ],
       ),
     );
@@ -316,7 +315,7 @@ class _HeroSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Card collector and crypto market.',
+          'Card collecting, marketplace liquidity and PKN network access.',
           style: Theme.of(context).textTheme.displayMedium?.copyWith(
                 color: Colors.white,
                 fontWeight: FontWeight.w800,
@@ -325,7 +324,7 @@ class _HeroSection extends StatelessWidget {
         ),
         const SizedBox(height: 22),
         const Text(
-          'Find cards, compare seller listings, watch market signals and use crypto rails built for collectors who want faster settlement and transparent pricing.',
+          'Pokoin is building a permissioned PoS ecosystem around collectible cards: shop inventory, use wallet-linked accounts, follow reserve signals, host infrastructure and coordinate in the community forum.',
           style: TextStyle(color: Color(0xFFB8C4E6), fontSize: 18, height: 1.6),
         ),
         const SizedBox(height: 28),
@@ -335,19 +334,19 @@ class _HeroSection extends StatelessWidget {
           children: [
             FilledButton(
               onPressed: () => context.go('/marketplace'),
-              child: const Text('Open marketplace'),
+              child: const Text('Shop cards'),
             ),
             OutlinedButton(
-              onPressed: () => context.go('/marketplace/signal'),
-              child: const Text('View marketplace signal'),
+              onPressed: () => context.go('/docs'),
+              child: const Text('Join the network'),
             ),
             OutlinedButton(
               onPressed: () => context.go('/wallet'),
-              child: const Text('Open wallet'),
+              child: const Text('Wallet roles'),
             ),
             TextButton(
-              onPressed: () => context.go('/scan'),
-              child: const Text('Open Pokoin Scan'),
+              onPressed: () => context.go('/forum'),
+              child: const Text('Open forum'),
             ),
           ],
         ),
@@ -423,14 +422,29 @@ class _HeroTokenCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           const Text(
-            'Buy, sell, track and settle with PKN',
+            'Shop cards and settle with PKN',
             textAlign: TextAlign.center,
             style: TextStyle(color: Color(0xFFB8C4E6)),
+          ),
+          const SizedBox(height: 18),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () => context.go('/marketplace'),
+              icon: const Icon(Icons.storefront_outlined),
+              label: const Text('Shop the marketplace'),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFFACC15),
+                foregroundColor: const Color(0xFF111827),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                textStyle: const TextStyle(fontWeight: FontWeight.w900),
+              ),
+            ),
           ),
           const SizedBox(height: 24),
           const _InfoRow(label: 'Discover', value: 'Real card images'),
           const _InfoRow(label: 'Trade', value: 'Seller offers'),
-          const _InfoRow(label: 'Track', value: 'Price signals'),
+          const _InfoRow(label: 'Settle', value: 'PKN wallet rails'),
         ],
       ),
     );
@@ -446,11 +460,143 @@ class _MetricStrip extends StatelessWidget {
       spacing: 14,
       runSpacing: 14,
       children: [
-        _Metric(label: 'Marketplace', value: 'Live'),
-        _Metric(label: 'Listings', value: 'User-created'),
-        _Metric(label: 'Cart', value: 'Listing-aware'),
-        _Metric(label: 'Analytics', value: 'Signal page'),
+        _Metric(label: 'Shop', value: 'Marketplace'),
+        _Metric(label: 'Wallet', value: 'PKN roles'),
+        _Metric(label: 'Network', value: 'Host nodes'),
+        _Metric(label: 'Community', value: 'Forum'),
       ],
+    );
+  }
+}
+
+class _ProjectAccessSection extends StatelessWidget {
+  const _ProjectAccessSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Wrap(
+      spacing: 18,
+      runSpacing: 18,
+      children: [
+        _AccessCard(
+          icon: Icons.storefront_outlined,
+          title: 'Card Reserve Market',
+          body:
+              'Browse cards, sealed products, seller offers, cart flows and collectible inventory.',
+          path: '/marketplace',
+          action: 'Enter market',
+        ),
+        _AccessCard(
+          icon: Icons.account_balance_wallet_outlined,
+          title: 'PKN Utility',
+          body:
+              'Use PKN balances for marketplace settlement, account identity, withdrawals and buyer or seller activity.',
+          path: '/wallet',
+          action: 'Use wallet',
+        ),
+        _AccessCard(
+          icon: Icons.terminal_outlined,
+          title: 'Node Operators',
+          body:
+              'Run a peer, understand validator operations, read setup docs and help secure the permissioned PoS layer.',
+          path: '/docs',
+          action: 'Host node',
+        ),
+        _AccessCard(
+          icon: Icons.forum_outlined,
+          title: 'Community Forum',
+          body:
+              'Coordinate marketplace ideas, wallet support, validator operations and community proposals.',
+          path: '/forum',
+          action: 'Discuss',
+        ),
+      ],
+    );
+  }
+}
+
+class _AccessCard extends StatelessWidget {
+  const _AccessCard({
+    required this.icon,
+    required this.title,
+    required this.body,
+    required this.path,
+    required this.action,
+  });
+
+  final IconData icon;
+  final String title;
+  final String body;
+  final String path;
+  final String action;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 270,
+      child: InkWell(
+        onTap: () => context.go(path),
+        borderRadius: BorderRadius.circular(24),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 250),
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            color: const Color(0xCC0B1024),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: const Color(0x1AFACC15),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0x44FACC15)),
+                ),
+                child: Icon(icon, color: const Color(0xFFFACC15)),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 18,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Expanded(
+                child: Text(
+                  body,
+                  style:
+                      const TextStyle(color: Color(0xFFB8C4E6), height: 1.45),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Text(
+                    action,
+                    style: const TextStyle(
+                      color: Color(0xFFFACC15),
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Icon(
+                    Icons.arrow_forward,
+                    color: Color(0xFFFACC15),
+                    size: 18,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -15,6 +15,7 @@ class CardState {
   final bool isSearchingPreviews;
   final String? error;
   final String searchQuery;
+  final String previewQuery;
   final String selectedRarity;
   final String selectedType;
   final String selectedSet;
@@ -33,6 +34,7 @@ class CardState {
     this.isSearchingPreviews = false,
     this.error,
     this.searchQuery = '',
+    this.previewQuery = '',
     this.selectedRarity = '',
     this.selectedType = '',
     this.selectedSet = '',
@@ -52,6 +54,7 @@ class CardState {
     bool? isSearchingPreviews,
     String? error,
     String? searchQuery,
+    String? previewQuery,
     String? selectedRarity,
     String? selectedType,
     String? selectedSet,
@@ -70,6 +73,7 @@ class CardState {
       isSearchingPreviews: isSearchingPreviews ?? this.isSearchingPreviews,
       error: error ?? this.error,
       searchQuery: searchQuery ?? this.searchQuery,
+      previewQuery: previewQuery ?? this.previewQuery,
       selectedRarity: selectedRarity ?? this.selectedRarity,
       selectedType: selectedType ?? this.selectedType,
       selectedSet: selectedSet ?? this.selectedSet,
@@ -97,9 +101,11 @@ class CardNotifier extends StateNotifier<CardState> {
     try {
       final cards = await _cardService.getAllCards();
       final snapshot = await _cardService.getMarketplaceHomeSnapshot();
+      final mergedCards =
+          snapshot == null ? cards : _mergeCards(cards, snapshot.cards);
       state = state.copyWith(
-        cards: cards,
-        filteredCards: cards,
+        cards: mergedCards,
+        filteredCards: mergedCards,
         homeSections: snapshot?.sections,
         isLoading: false,
       );
@@ -126,6 +132,12 @@ class CardNotifier extends StateNotifier<CardState> {
         source: 'marketplace_search',
       );
     }
+  }
+
+  void searchPreviewsOnly(String query) {
+    _searchRequestId++;
+    state = state.copyWith(previewQuery: query);
+    _loadSearchPreviews(query);
   }
 
   Future<void> _loadFullSearchResults(String query) async {
@@ -183,6 +195,7 @@ class CardNotifier extends StateNotifier<CardState> {
     final normalizedQuery = query.trim();
     if (normalizedQuery.length < 2) {
       state = state.copyWith(
+        previewQuery: '',
         searchPreviews: const [],
         isSearchingPreviews: false,
       );
@@ -346,8 +359,10 @@ class CardNotifier extends StateNotifier<CardState> {
 
   void clearFilters() {
     _searchRequestId++;
+    _searchPreviewRequestId++;
     state = state.copyWith(
       searchQuery: '',
+      previewQuery: '',
       searchPreviews: const [],
       isSearchingPreviews: false,
       selectedRarity: '',

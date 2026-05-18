@@ -18,6 +18,10 @@ especially `/marketplace`, `/card/:id`, seller listings, cart, and checkout.
 - `lib/services/card_service.dart`
   - Loads lightweight marketplace projections before the heavy blueprint table.
   - Uses `marketplace_cards` for homepage/catalog/search preview card rows.
+  - Uses `/api/marketplace-home` for dynamic carousel sections. That endpoint
+    returns both section IDs and a card payload; merge `snapshot.cards` into
+    `CardState.cards` before resolving carousel IDs, otherwise Best sellers and
+    Featured can render empty when their IDs are not in the capped catalog load.
   - Uses `marketplace_card_versions` for expansion-scoped navigation and full
     search result rows.
   - Fetches a single `cardtrader_pokemon_blueprints` row only when `/card/:id`
@@ -83,6 +87,9 @@ especially `/marketplace`, `/card/:id`, seller listings, cart, and checkout.
 - Keep old catalog blueprints intact. They are metadata, not mutable inventory.
 - The marketplace home/catalog can be capped for performance. Do not assume
   `CardState.cards` contains every card.
+- The marketplace home carousel sections must not depend only on the capped
+  catalog. Use the `MarketplaceHomeSnapshot.cards` payload to hydrate section
+  IDs, then fall back per section if some IDs are unavailable.
 - Full search and "View all versions" style results must call Supabase projection
   data directly, not just filter the loaded home catalog.
 - Previous/next must stay within the exact same expansion name. Load the whole
@@ -159,3 +166,20 @@ For production deployment, use:
 
 After deploy, verify `https://pokoin.com` rather than assuming a pushed commit
 or local build is live.
+
+For homepage/carousel changes, also inspect the production home API:
+
+```bash
+python3 - <<'PY'
+import json, urllib.request
+with urllib.request.urlopen('https://pokoin.com/api/marketplace-home', timeout=20) as res:
+    data = json.loads(res.read().decode())
+print('cards', len(data.get('cards') or []))
+for key, value in (data.get('sections') or {}).items():
+    print(key, len(value or []), (value or [])[:10])
+PY
+```
+
+Expected: non-zero `cards`, `bestSellerIds`, and `featuredIds`. If the API is
+healthy but Flutter carousels are empty, check the provider merge path before
+changing Supabase data.
