@@ -295,7 +295,10 @@ class CardService {
       fallback: 'Trading card',
     );
     final imageUrl = _normalizeImageUrl(
-      row['cdn_image_url'] ?? row['image_url'] ?? blueprint['image_url'],
+      _fullBlueprintImageUrl(blueprint) ??
+          row['cdn_image_url'] ??
+          row['image_url'] ??
+          blueprint['image_url'],
     );
     final previewImageUrl = _normalizeImageUrl(
       row['preview_image_url'] ??
@@ -357,6 +360,25 @@ class CardService {
       properties.putIfAbsent(entry.key.toLowerCase(), () => entry.value);
     }
     return properties;
+  }
+
+  String? _fullBlueprintImageUrl(Map<String, dynamic> blueprint) {
+    final image = blueprint['image'];
+    if (image is! Map) {
+      return null;
+    }
+
+    final rawUrl = '${image['url'] ?? ''}'.trim();
+    if (rawUrl.isEmpty || rawUrl.contains('/preview_')) {
+      return null;
+    }
+    if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
+      return rawUrl;
+    }
+    if (rawUrl.startsWith('/')) {
+      return 'https://cardtrader.com$rawUrl';
+    }
+    return rawUrl;
   }
 
   int _stableSeed(String value) {
@@ -545,10 +567,13 @@ class CardService {
     if (blueprintCard == null) {
       return projectionCard;
     }
+    final shouldUseProjectionImage = projectionCard.itemKind == 'product' ||
+        blueprintCard.imageUrl.trim().isEmpty;
     return blueprintCard.copyWith(
       name: projectionCard.name,
-      imageUrl:
-          projectionCard.imageUrl.isNotEmpty ? projectionCard.imageUrl : null,
+      imageUrl: shouldUseProjectionImage && projectionCard.imageUrl.isNotEmpty
+          ? projectionCard.imageUrl
+          : null,
       previewImageUrl: projectionCard.previewImageUrl.isNotEmpty
           ? projectionCard.previewImageUrl
           : null,
