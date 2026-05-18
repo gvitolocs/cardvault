@@ -1688,7 +1688,7 @@ class _SuggestedCategories extends StatelessWidget {
           id: '249796',
           name: 'Pokemon Card 151 Booster Box',
           imageUrl:
-              'https://cdn.pokoin.com/249796_pokemon-card-151-booster-box-pokemon-card-151.jpg',
+              '/card-images/249796_pokemon-card-151-booster-box-pokemon-card-151.jpg',
           set: 'Pokemon Card 151',
           number: '',
           itemKind: 'product',
@@ -1702,7 +1702,7 @@ class _SuggestedCategories extends StatelessWidget {
         card: _CategoryCardData(
           id: '258625',
           name: '151 Booster',
-          imageUrl: 'https://cdn.pokoin.com/258625_151-booster-151.jpg',
+          imageUrl: '/card-images/258625_151-booster-151.jpg',
           set: '151',
           number: '258625',
           itemKind: 'product',
@@ -1717,7 +1717,7 @@ class _SuggestedCategories extends StatelessWidget {
           id: '274416',
           name: 'Mew ex',
           imageUrl:
-              'https://cdn.pokoin.com/274416_mew-ex-special-illustration-rare-232-091-paldean-fates.jpg',
+              '/card-images/274416_mew-ex-special-illustration-rare-232-091-paldean-fates.jpg',
           set: 'Paldean Fates',
           number: 'Special Illustration Rare | 232/091',
           itemKind: 'single',
