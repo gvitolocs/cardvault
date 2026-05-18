@@ -1,4 +1,4 @@
-# Pokoin/CardVault Agent Workflows
+# Pokoin Agent Workflows
 
 This folder is for future agents and operators. Use these workflows instead of
 reconstructing commands from chat history.
@@ -15,6 +15,11 @@ reconstructing commands from chat history.
   this Flutter project.
 - Supabase stores the CardTrader Pokemon blueprint catalog in
   `public.cardtrader_pokemon_blueprints`.
+- Marketplace pages should read lightweight Supabase projections before touching
+  the heavy blueprint JSON:
+  - `public.marketplace_cards` for home/search/catalog card rows.
+  - `public.marketplace_card_events` for rolling marketplace analytics.
+  - `public.marketplace_card_versions` for expansion-scoped navigation.
 - Firebase remains the production auth/profile/account store for the current
   marketplace app unless intentionally migrated.
 
@@ -29,6 +34,7 @@ reconstructing commands from chat history.
   - `SUPABASE_URL`
   - `SUPABASE_SERVICE_ROLE_KEY`
   - `SUPABASE_DB_URL`
+  - `FIREBASE_CLI_PROJECT_ID` for Firebase CLI deploys
 
 ## Standard Workflows
 
@@ -77,6 +83,23 @@ reconstructing commands from chat history.
    open workflows/card-market-page-workflow.md
    ```
 
+10. Maintain CardTrader-style search previews and Supabase fuzzy search:
+   ```bash
+   open workflows/cardtrader-search-preview-workflow.md
+   ```
+
+11. Refresh marketplace projections after a blueprint import or classifier
+    change:
+   ```bash
+   supabase db push
+   ```
+   Then run the projection refresh functions from Supabase SQL editor or an
+   authenticated script:
+   ```sql
+   select public.refresh_marketplace_cards_from_blueprints();
+   select public.refresh_marketplace_card_versions();
+   ```
+
 ## Operational Notes
 
 - Do not use plain `vercel deploy` from the project root. It can publish an
@@ -95,6 +118,20 @@ reconstructing commands from chat history.
 - Card image matching is intentionally ID-based. R2 objects in
   `cardvault-images` use `<cardtrader_blueprint_id>_...` keys, and only matching
   blueprint IDs should update `image_url`.
-- Card detail page changes should follow `workflows/card-market-page-workflow.md`
-  so CardTrader-style collectible listings and DEX-style market panels stay
-  consistent.
+- Card Reserve marketplace changes must follow
+  `workflows/card-market-page-workflow.md` so `/card/:id`, seller listings,
+  cart, checkout, and no-seller states stay connected to real Supabase/Firebase
+  data instead of reverting to mock rows.
+- Firebase CLI commands should use the local env project explicitly, for example
+  `firebase deploy --only firestore:rules --project "$FIREBASE_CLI_PROJECT_ID"`,
+  rather than changing global Firebase CLI state.
+- Supabase migrations for CardTrader search should follow
+  `workflows/cardtrader-search-preview-workflow.md`. Do not use the raw direct
+  DB URL if it resolves to IPv6 and fails; relink with the DB password and push
+  through Supabase CLI.
+- Do not make `/card/:id` previous/next call Supabase on every arrow press. Load
+  the ordered `marketplace_card_versions` rows for the current expansion once
+  and compute previous/next locally while the user stays in that expansion.
+- Do not make `/marketplace/search` depend only on `CardState.cards`. The home
+  catalog is intentionally capped for performance; full search must query
+  Supabase projections directly.

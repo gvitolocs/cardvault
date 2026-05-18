@@ -1,95 +1,151 @@
-# Card Market Page Workflow
+# Card Market Modification Workflow
 
-Use this workflow when future agents need to build or revise the card detail
-marketplace page at `/card/:id`.
+Use this workflow for every future change to the Pokoin Card Reserve market,
+especially `/marketplace`, `/card/:id`, seller listings, cart, and checkout.
 
-## Goal
+## Product Direction
 
-The card page should feel like a collectible asset terminal:
+- The card page must not regress to a static mockup.
+- Card identity and images come from the Supabase CardTrader blueprint catalog.
+- Seller listings, cart entries, and pending orders live in Firebase/Firestore.
+- The UI should stay dark and Pokoin-branded, not white shop-template styling.
+- Pricing is Pokoin-first. Show PKN clearly; fiat can be secondary context.
+- Do not show CardTrader-specific labels such as `CT Min Price` or
+  `CT Market Price` in the graph panel.
 
-- CardTrader-style card identity, best deal, condition/language selectors,
-  filters, seller rows, quantity, and custody/trust badges.
-- CoinMarketCap/DEX-style quote panel, chart, market statistics, spread,
-  liquidity, volume, and trade/offer controls.
-- Pokoin-native pricing in PKN, with fiat shown only as supporting context.
+## Current Data Flow
 
-## Reference Inputs
-
-When the user provides a CardTrader page or screenshots, extract:
-
-- Card name, set, rarity, collector number, language, and condition model.
-- Best deal and market price placement.
-- Listings table columns: seller, product badges, price, quantity, Zero/custody,
-  cart action.
-- Filters: price, condition, language, signed/altered/graded/Zero.
-
-When the user references CoinMarketCap or DEX pages, extract:
-
-- Prominent current price/floor quote.
-- Compact stat cards: volume, market cap, listings, liquidity, spread.
-- Chart area with time-series feel.
-- Market/order-book tabs and trade panel semantics.
-
-## Current Implementation
-
-Primary files:
-
+- `lib/services/card_service.dart`
+  - Loads lightweight marketplace projections before the heavy blueprint table.
+  - Uses `marketplace_cards` for homepage/catalog/search preview card rows.
+  - Uses `marketplace_card_versions` for expansion-scoped navigation and full
+    search result rows.
+  - Fetches a single `cardtrader_pokemon_blueprints` row only when `/card/:id`
+    needs full card detail not already loaded.
+  - Falls back to Hive cache and then local sample cards only when remote data is
+    unavailable.
+- `lib/providers/card_listing_provider.dart`
+  - Streams active `card_listings` from Firestore by `cardId`.
+- `lib/models/card_listing.dart`
+  - Defines seller listing fields: condition, language, reverse holo, signed,
+    graded, grading company, grade, shipping, NFT, seller snapshot, card
+    snapshot, price, and quantity.
+- `lib/providers/cart_provider.dart`
+  - Stores listing-aware cart entries keyed by listing id.
 - `lib/screens/card_detail_screen.dart`
-  - Owns the `/card/:id` UI.
-  - Uses `cardProvider` for local cards.
-  - Uses deterministic local mock data via `_CardMarketData` and `_Listing`.
-  - Handles loading and not-found states for deep links.
-- `lib/screens/home_screen.dart`
-  - `_MarketCard` and `_FeaturedCard` navigate to `/card/${card.id}`.
-- `lib/main.dart`
-  - Already defines the `/card/:id` route.
+  - Owns `/card/:id`, sell dialog, real listing table, no-seller state, and
+    chart/market panels.
+  - Loads the ordered version list for the current expansion once through
+    `CardService.getExpansionVersionCards(...)`; previous/next is computed
+    locally from that cached list.
 
-The first production-looking version is intentionally UI-first. Do not create
-Supabase order-book tables unless the user explicitly asks for real inventory.
+## Supabase Projection Tables
 
-## Safe Change Steps
+- `public.marketplace_cards`
+  - Lightweight marketplace card rows for home, search preview, and catalog
+    surfaces.
+  - Refreshed by `public.refresh_marketplace_cards_from_blueprints()`.
+- `public.marketplace_card_events`
+  - Analytics input for dynamic home sections and rolling 24h marketplace
+    signals.
+- `public.marketplace_card_versions`
+  - Minimal ordered version/navigation rows:
+    `card_id`, `name`, `expansion_name`, `expansion_number`,
+    `expansion_number_int`, `blueprint_id`, and image URLs.
+  - Refreshed by `public.refresh_marketplace_card_versions()`.
+  - Use this table for `/card/:id` previous/next and version search. Do not
+    parse the heavy blueprint JSON in the client for navigation.
 
-1. Inspect the current route and screen:
+## Required Checks Before Editing
+
+1. Search for the current implementation points:
    ```bash
-   rg "path: '/card/:id'|CardDetailScreen" lib/main.dart lib/screens
+   rg "CardDetailScreen|cardListingsProvider|CardListing|_CardMarketData|Sell this card" lib
    ```
+2. Confirm the requested change affects one of these surfaces:
+   - catalog card data
+   - seller listing form
+   - listing table actions
+   - market chart/stats
+   - cart/checkout listing behavior
+   - no-seller state
 
-2. Update `lib/screens/card_detail_screen.dart`:
-   - Keep the dark marketplace style used by `HomeScreen`.
-   - Preserve loading and not-found states.
-   - Keep market/listing mock data deterministic from `card.id` until real APIs
-     are requested.
-   - Prefer private widgets/classes in the same file while the feature is still
-     evolving.
+## Implementation Rules
 
-3. Update card entry points in `lib/screens/home_screen.dart`:
-   - Make card surfaces clickable with `context.go('/card/${card.id}')`.
-   - Keep favorite/cart icon actions from accidentally swallowing or breaking
-     card navigation.
+- Do not reintroduce deterministic fake sellers as the main data source.
+- If a card has no seller listing, render a CardTrader-like empty state:
+  `No items found`, wishlist action, and `Sell this card`.
+- Every actionable listing row must refer to a real Firestore listing id.
+- Cart buttons must add the exact selected listing, not just the generic card.
+- Seller-created listings must persist to Firestore and appear realtime.
+- Graded listings must capture both grading company and grade.
+- Reverse holo should be a first-class listing option because it is common.
+- Keep old catalog blueprints intact. They are metadata, not mutable inventory.
+- The marketplace home/catalog can be capped for performance. Do not assume
+  `CardState.cards` contains every card.
+- Full search and "View all versions" style results must call Supabase projection
+  data directly, not just filter the loaded home catalog.
+- Previous/next must stay within the exact same expansion name. Load the whole
+  expansion list once and calculate next/previous locally; do not call an
+  adjacent-card RPC for every arrow click.
 
-4. Verify:
-   ```bash
-   dart format lib/screens/card_detail_screen.dart lib/screens/home_screen.dart
-   flutter analyze lib/screens/card_detail_screen.dart lib/screens/home_screen.dart
-   flutter build web --debug
-   ```
+## Card Page Checklist
 
-5. Manually check:
-   - `/card/1` renders the terminal page.
-   - `/card/unknown` shows a clean not-found state.
-   - Marketplace and featured cards open `/card/:id`.
+When changing `lib/screens/card_detail_screen.dart`, verify:
 
-## Future Real Data Upgrade
+- `/card/:id` loads the real card image from Supabase/CDN when available.
+- Previous/next arrows appear when the current expansion has neighboring rows in
+  `marketplace_card_versions`.
+- Pressing previous/next after the first page load does not create a new
+  adjacency database request for every arrow press.
+- The graph panel does not show `CT Min Price` or `CT Market Price`.
+- The seller table uses `CardListing`, not a local `_Listing` mock.
+- The no-listing state works for cards with zero Firestore listings.
+- The sell dialog can create a listing for the current user.
+- Cart, NFT, and shipping actions stay aligned in the action column.
 
-When moving from mock listings to real order book data, add an API layer instead
-of wiring Supabase directly into widgets. Suggested direction:
+## Cart And Checkout Checklist
 
-- `api/card-market.js` or equivalent serverless endpoint.
-- Supabase tables for listings, sellers, inventory quantity, condition,
-  language, custody status, and price in PKN.
-- Flutter service/provider that returns a `CardMarket` model.
-- Keep `_CardMarketData` shape or migrate it into a public model to minimize UI
-  churn.
+When changing cart or checkout, verify:
 
-Do not overwrite existing CardTrader blueprint import data. The blueprint table
-is catalog metadata; seller listings/order book should be separate.
+- Cart rows display seller, condition, language, reverse, graded, NFT, and
+  shipping metadata when available.
+- Quantity clamps to the listing's `quantityAvailable`.
+- Checkout creates a pending `orders` document with listing snapshots.
+- Anonymous users can still use local cart fallback where supported.
+
+## Verification Commands
+
+Run from `pokemon_card_vault`:
+
+```bash
+dart format lib/screens/card_detail_screen.dart lib/screens/cart_screen.dart lib/screens/checkout_screen.dart
+flutter analyze
+flutter test
+flutter build web --release --pwa-strategy=none
+```
+
+For version/navigation changes, also verify the projection data with the anon
+key or SQL editor:
+
+```sql
+select public.refresh_marketplace_card_versions();
+
+select card_id, name, expansion_name, expansion_number
+from public.marketplace_card_versions
+where expansion_name = 'Unified Minds'
+order by expansion_number_int nulls last, expansion_number, blueprint_id
+limit 20;
+```
+
+If Firestore rules changed:
+
+```bash
+firebase deploy --only firestore:rules --project "$FIREBASE_CLI_PROJECT_ID"
+```
+
+For production deployment, use:
+
+```bash
+./deploy-pokoin-web.sh
+```
