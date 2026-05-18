@@ -14,6 +14,7 @@ import '../providers/favorites_provider.dart';
 import '../providers/recent_views_provider.dart';
 import '../services/card_service.dart';
 import '../constants/project_links.dart';
+import '../utils/browser_capabilities.dart';
 import '../utils/card_url.dart';
 import '../utils/price_format.dart';
 
@@ -1161,6 +1162,7 @@ class _CardCarouselSectionState extends State<_CardCarouselSection> {
             builder: (context, constraints) {
               final screenWidth = MediaQuery.sizeOf(context).width;
               final isDesktop = screenWidth >= 900;
+              final useDesktopControls = isDesktop && hasDesktopPointer();
               WidgetsBinding.instance
                   .addPostFrameCallback((_) => _syncArrowVisibility());
               final sideInset = math.max(
@@ -1177,6 +1179,9 @@ class _CardCarouselSectionState extends State<_CardCarouselSection> {
                       ListView.separated(
                         controller: _scrollController,
                         padding: EdgeInsets.symmetric(horizontal: sideInset),
+                        physics: useDesktopControls
+                            ? const NeverScrollableScrollPhysics()
+                            : null,
                         scrollDirection: Axis.horizontal,
                         itemCount: widget.cards.length,
                         separatorBuilder: (_, __) => const SizedBox(width: 14),
@@ -1185,7 +1190,7 @@ class _CardCarouselSectionState extends State<_CardCarouselSection> {
                           child: _FeaturedCard(card: widget.cards[index]),
                         ),
                       ),
-                      if (isDesktop && widget.cards.length > 2) ...[
+                      if (useDesktopControls && widget.cards.length > 2) ...[
                         if (_canScrollBack)
                           Positioned(
                             left: 16,
