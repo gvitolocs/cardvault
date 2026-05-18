@@ -45,23 +45,20 @@ function normalizeCardTraderImageUrl(rawValue) {
   return `https://cardtrader.com/${rawUrl}`;
 }
 
-function fullCardTraderImageUrl(row) {
+function fullCardTraderImageUrls(row) {
   const image = row.blueprint?.image;
   const candidates = [
     typeof image?.url === 'string' ? image.url : null,
+    typeof image?.show?.url === 'string' ? image.show.url : null,
     typeof row.blueprint?.image_url === 'string' ? row.blueprint.image_url : null,
     typeof row.cardtrader_image_url === 'string' ? row.cardtrader_image_url : null,
     typeof row.image_url === 'string' && row.image_url.includes('cardtrader.com')
       ? row.image_url
       : null,
   ];
-  for (const candidate of candidates) {
-    const normalized = normalizeCardTraderImageUrl(candidate);
-    if (normalized) {
-      return normalized;
-    }
-  }
-  return null;
+  return [...new Set(candidates
+    .map((candidate) => normalizeCardTraderImageUrl(candidate))
+    .filter(Boolean))];
 }
 
 function slugify(value) {
@@ -96,11 +93,28 @@ function contentTypeForExtension(ext) {
   }
 }
 
-function objectKeyForRow(row, sourceUrl) {
+function extensionFromContentType(contentType) {
+  const normalized = String(contentType || '').toLowerCase();
+  if (normalized.includes('image/webp')) return 'webp';
+  if (normalized.includes('image/png')) return 'png';
+  if (normalized.includes('image/gif')) return 'gif';
+  if (normalized.includes('image/jpeg') || normalized.includes('image/jpg')) return 'jpg';
+  return null;
+}
+
+function imageFormatFromBytes(body) {
+  if (!Buffer.isBuffer(body) || body.length < 12) return null;
+  if (body[0] === 0xff && body[1] === 0xd8 && body[2] === 0xff) return 'jpg';
+  if (body.slice(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'png';
+  if (body.slice(0, 6).toString('ascii') === 'GIF87a' || body.slice(0, 6).toString('ascii') === 'GIF89a') return 'gif';
+  if (body.slice(0, 4).toString('ascii') === 'RIFF' && body.slice(8, 12).toString('ascii') === 'WEBP') return 'webp';
+  return null;
+}
+
+function objectKeyForRow(row, sourceUrl, ext) {
   if (row.cdn_object_key && !String(row.cdn_object_key).includes('/previews/')) {
-    return row.cdn_object_key;
+    return String(row.cdn_object_key).replace(/\.[^.]+$/, `.${ext}`);
   }
-  const ext = extensionFromUrl(sourceUrl);
   const slug = slugify(row.name) || `card-${row.id}`;
   return `${row.id}_${slug}.${ext}`;
 }
@@ -439,18 +453,40 @@ async function download(sourceUrl) {
   if (body.length < 1024) {
     throw new Error(`Image download too small (${body.length} bytes): ${sourceUrl}`);
   }
-  return body;
+  return {
+    body,
+    contentType: response.headers.get('content-type') || '',
+  };
 }
 
 async function importRow({ client, env, bucket, cdnBase, row }) {
-  const sourceUrl = fullCardTraderImageUrl(row);
-  if (!sourceUrl) {
+  const sourceUrls = fullCardTraderImageUrls(row);
+  if (sourceUrls.length === 0) {
     return { skipped: true, reason: 'no-full-image' };
   }
 
-  const key = objectKeyForRow(row, sourceUrl);
-  const ext = extensionFromUrl(sourceUrl);
-  const image = await download(sourceUrl);
+  let sourceUrl = '';
+  let downloadResult = null;
+  const errors = [];
+  for (const candidate of sourceUrls) {
+    try {
+      downloadResult = await download(candidate);
+      sourceUrl = candidate;
+      break;
+    } catch (error) {
+      errors.push(`${candidate}: ${error.message}`);
+    }
+  }
+  if (!downloadResult) {
+    throw new Error(`All image candidates failed: ${errors.join(' | ')}`);
+  }
+
+  const image = downloadResult.body;
+  const ext =
+    imageFormatFromBytes(image) ||
+    extensionFromContentType(downloadResult.contentType) ||
+    extensionFromUrl(sourceUrl);
+  const key = objectKeyForRow(row, sourceUrl, ext);
   await client.send(
     new PutObjectCommand({
       Bucket: bucket,

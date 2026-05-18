@@ -329,10 +329,15 @@ FULL_IMAGE_IDS=274416 node scripts/import-cardtrader-full-images.js
 
 The importer:
 
-- Reads `blueprint.image.url` from `cardtrader_pokemon_blueprints`.
+- Reads `blueprint.image.url` and `blueprint.image.show.url` from
+  `cardtrader_pokemon_blueprints`, trying each usable candidate before failing a
+  row.
 - Downloads the full CardTrader image, ignoring `/preview_` sources.
-- Uploads the bytes to R2 using the existing `<blueprint_id>_slug.ext` key when
-  present, otherwise generates that key format.
+- Detects the actual image format from magic bytes and response headers before
+  choosing the R2 object extension/content type. Do not trust CardTrader URL
+  extensions; some `.jpg` URLs return WebP bytes.
+- Uploads the bytes to R2 using the existing `<blueprint_id>_slug.ext` key
+  format with the detected extension.
 - Updates `cardtrader_pokemon_blueprints.image_url`, `cdn_image_url`,
   `cdn_object_key`, and `cardtrader_image_url`.
 - Updates `marketplace_cards` and `marketplace_card_versions` for the imported
@@ -361,6 +366,17 @@ Prioritize new CardTrader rows that do not have CDN images yet:
 ```bash
 FULL_IMAGE_MISSING_ONLY=1 FULL_IMAGE_NEWEST_FIRST=1 FULL_IMAGE_BATCH_SIZE=50 FULL_IMAGE_MAX_ROWS=1000 node scripts/import-cardtrader-full-images.js
 ```
+
+For older missing rows, run oldest-first chunks. This has found product rows with
+valid CardTrader images that were missed by newer-first imports:
+
+```bash
+FULL_IMAGE_MISSING_ONLY=1 FULL_IMAGE_BATCH_SIZE=50 FULL_IMAGE_MAX_ROWS=300 node scripts/import-cardtrader-full-images.js
+```
+
+If a row still fails after all candidates are tried, inspect CardTrader directly.
+Some blueprint image URLs are stale and return `404` for both full and `show_`
+variants; those are upstream-broken rather than CDN import failures.
 
 If the regular full-catalog job stops after printing `next offset 1000`,
 resume with:

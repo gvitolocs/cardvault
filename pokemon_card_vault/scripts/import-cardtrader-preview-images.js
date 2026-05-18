@@ -71,6 +71,39 @@ function slugify(value) {
     .slice(0, 120);
 }
 
+function contentTypeForExtension(ext) {
+  switch (ext) {
+    case 'png':
+      return 'image/png';
+    case 'webp':
+      return 'image/webp';
+    case 'gif':
+      return 'image/gif';
+    case 'jpg':
+    case 'jpeg':
+    default:
+      return 'image/jpeg';
+  }
+}
+
+function extensionFromContentType(contentType) {
+  const normalized = String(contentType || '').toLowerCase();
+  if (normalized.includes('image/webp')) return 'webp';
+  if (normalized.includes('image/png')) return 'png';
+  if (normalized.includes('image/gif')) return 'gif';
+  if (normalized.includes('image/jpeg') || normalized.includes('image/jpg')) return 'jpg';
+  return null;
+}
+
+function imageFormatFromBytes(body) {
+  if (!Buffer.isBuffer(body) || body.length < 12) return null;
+  if (body[0] === 0xff && body[1] === 0xd8 && body[2] === 0xff) return 'jpg';
+  if (body.slice(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'png';
+  if (body.slice(0, 6).toString('ascii') === 'GIF87a' || body.slice(0, 6).toString('ascii') === 'GIF89a') return 'gif';
+  if (body.slice(0, 4).toString('ascii') === 'RIFF' && body.slice(8, 12).toString('ascii') === 'WEBP') return 'webp';
+  return null;
+}
+
 async function fetchRows(env, { ids, limit, offset, cursorId, missingOnly, sortDirection }) {
   const url = new URL(
     `${env.SUPABASE_URL.replace(/\/$/, '')}/rest/v1/cardtrader_pokemon_blueprints`,
@@ -168,7 +201,10 @@ async function download(sourceUrl) {
   if (body.length < 256) {
     throw new Error(`Preview download too small (${body.length} bytes): ${sourceUrl}`);
   }
-  return body;
+  return {
+    body,
+    contentType: response.headers.get('content-type') || '',
+  };
 }
 
 async function importRow({ client, env, bucket, cdnBase, row }) {
@@ -178,14 +214,19 @@ async function importRow({ client, env, bucket, cdnBase, row }) {
   }
 
   const slug = slugify(row.name) || `card-${row.id}`;
-  const key = `previews/${row.id}_${slug}.jpg`;
-  const preview = await download(sourceUrl);
+  const downloadResult = await download(sourceUrl);
+  const preview = downloadResult.body;
+  const ext =
+    imageFormatFromBytes(preview) ||
+    extensionFromContentType(downloadResult.contentType) ||
+    'jpg';
+  const key = `previews/${row.id}_${slug}.${ext}`;
   await client.send(
     new PutObjectCommand({
       Bucket: bucket,
       Key: key,
       Body: preview,
-      ContentType: 'image/jpeg',
+      ContentType: contentTypeForExtension(ext),
       CacheControl: 'public, max-age=31536000, immutable',
     }),
   );
