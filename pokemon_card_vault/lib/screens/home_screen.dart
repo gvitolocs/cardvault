@@ -1710,8 +1710,8 @@ class _MarketCard extends ConsumerWidget {
                 children: [
                   Positioned.fill(
                     child: _CardImageFrame(
-                      imageUrl: card.previewImageUrl,
-                      fallbackImageUrl: card.imageUrl,
+                      imageUrl: card.imageUrl,
+                      fallbackImageUrl: card.previewImageUrl,
                       borderRadius:
                           const BorderRadius.vertical(top: Radius.circular(24)),
                       padding: const EdgeInsets.all(14),
@@ -1844,8 +1844,8 @@ class _FeaturedCard extends ConsumerWidget {
         child: Row(
           children: [
             _CardImageFrame(
-              imageUrl: card.previewImageUrl,
-              fallbackImageUrl: card.imageUrl,
+              imageUrl: card.imageUrl,
+              fallbackImageUrl: card.previewImageUrl,
               width: 126,
               height: 170,
               borderRadius: BorderRadius.circular(16),
