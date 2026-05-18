@@ -473,7 +473,12 @@ class CardService {
 
   Future<PokemonCard?> getCardById(String id) async {
     try {
-      final remoteCard = await _getSupabaseBlueprintCardById(id);
+      final projectionCard = await _getMarketplaceProjectionCardById(id);
+      final blueprintCard = await _getSupabaseBlueprintCardById(id);
+      final remoteCard = _mergeProjectionWithBlueprint(
+        projectionCard: projectionCard,
+        blueprintCard: blueprintCard,
+      );
       if (remoteCard != null) {
         await _upsertCardToLocal(remoteCard);
         return remoteCard;
@@ -485,6 +490,76 @@ class CardService {
       debugPrint('Error getting card by ID: $e');
       return null;
     }
+  }
+
+  Future<PokemonCard?> _getMarketplaceProjectionCardById(String id) async {
+    if (_supabaseUrl.isEmpty || _supabaseAnonKey.isEmpty) {
+      return null;
+    }
+    final trimmedId = id.trim();
+    if (!RegExp(r'^\d+$').hasMatch(trimmedId)) {
+      return null;
+    }
+
+    try {
+      final uri = Uri.parse(
+        '$_supabaseUrl/rest/v1/marketplace_card_versions',
+      ).replace(
+        queryParameters: {
+          'select':
+              'card_id,name,expansion_name,expansion_number,image_url,cdn_image_url,preview_image_url,projected_at,product_type',
+          'card_id': 'eq.$trimmedId',
+          'limit': '1',
+        },
+      );
+      final response = await http.get(
+        uri,
+        headers: {
+          'apikey': _supabaseAnonKey,
+          'authorization': 'Bearer $_supabaseAnonKey',
+        },
+      ).timeout(const Duration(seconds: 6));
+
+      if (response.statusCode >= 400) {
+        return null;
+      }
+      final rows = jsonDecode(response.body) as List<dynamic>;
+      final maps = rows.whereType<Map>();
+      if (maps.isEmpty) {
+        return null;
+      }
+      return _cardFromVersionRow(Map<String, dynamic>.from(maps.first));
+    } catch (error) {
+      debugPrint('Marketplace projection card by id failed: $error');
+      return null;
+    }
+  }
+
+  PokemonCard? _mergeProjectionWithBlueprint({
+    required PokemonCard? projectionCard,
+    required PokemonCard? blueprintCard,
+  }) {
+    if (projectionCard == null) {
+      return blueprintCard;
+    }
+    if (blueprintCard == null) {
+      return projectionCard;
+    }
+    return blueprintCard.copyWith(
+      name: projectionCard.name,
+      imageUrl:
+          projectionCard.imageUrl.isNotEmpty ? projectionCard.imageUrl : null,
+      previewImageUrl: projectionCard.previewImageUrl.isNotEmpty
+          ? projectionCard.previewImageUrl
+          : null,
+      type: projectionCard.type,
+      description: projectionCard.description,
+      set: projectionCard.set,
+      number: projectionCard.number,
+      tags: projectionCard.tags,
+      itemKind: projectionCard.itemKind,
+      productType: projectionCard.productType,
+    );
   }
 
   Future<List<PokemonCard>> getExpansionVersionCards(PokemonCard card) async {
