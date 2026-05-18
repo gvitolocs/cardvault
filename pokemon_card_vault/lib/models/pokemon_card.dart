@@ -73,10 +73,20 @@ class PokemonCard extends HiveObject {
   @HiveField(22)
   final String? gradingCompany;
 
+  @HiveField(23)
+  final String previewImageUrl;
+
+  @HiveField(24)
+  final String itemKind;
+
+  @HiveField(25)
+  final String productType;
+
   PokemonCard({
     required this.id,
     required this.name,
     required this.imageUrl,
+    String? previewImageUrl,
     required this.rarity,
     required this.type,
     required this.hp,
@@ -97,13 +107,16 @@ class PokemonCard extends HiveObject {
     required this.isGraded,
     this.grade,
     this.gradingCompany,
-  });
+    this.itemKind = 'single',
+    this.productType = 'card',
+  }) : previewImageUrl = previewImageUrl ?? imageUrl;
 
   factory PokemonCard.fromJson(Map<String, dynamic> json) {
     return PokemonCard(
       id: json['id'] ?? '',
       name: json['name'] ?? '',
       imageUrl: json['imageUrl'] ?? '',
+      previewImageUrl: json['previewImageUrl'] ?? json['imageUrl'] ?? '',
       rarity: json['rarity'] ?? '',
       type: json['type'] ?? '',
       hp: json['hp'] ?? 0,
@@ -125,6 +138,8 @@ class PokemonCard extends HiveObject {
       isGraded: json['isGraded'] ?? false,
       grade: json['grade'],
       gradingCompany: json['gradingCompany'],
+      itemKind: json['itemKind'] ?? 'single',
+      productType: json['productType'] ?? json['product_type'] ?? 'card',
     );
   }
 
@@ -133,6 +148,7 @@ class PokemonCard extends HiveObject {
       'id': id,
       'name': name,
       'imageUrl': imageUrl,
+      'previewImageUrl': previewImageUrl,
       'rarity': rarity,
       'type': type,
       'hp': hp,
@@ -153,6 +169,8 @@ class PokemonCard extends HiveObject {
       'isGraded': isGraded,
       'grade': grade,
       'gradingCompany': gradingCompany,
+      'itemKind': itemKind,
+      'productType': productType,
     };
   }
 
@@ -160,6 +178,7 @@ class PokemonCard extends HiveObject {
     String? id,
     String? name,
     String? imageUrl,
+    String? previewImageUrl,
     String? rarity,
     String? type,
     int? hp,
@@ -180,11 +199,14 @@ class PokemonCard extends HiveObject {
     bool? isGraded,
     String? grade,
     String? gradingCompany,
+    String? itemKind,
+    String? productType,
   }) {
     return PokemonCard(
       id: id ?? this.id,
       name: name ?? this.name,
       imageUrl: imageUrl ?? this.imageUrl,
+      previewImageUrl: previewImageUrl ?? this.previewImageUrl,
       rarity: rarity ?? this.rarity,
       type: type ?? this.type,
       hp: hp ?? this.hp,
@@ -205,6 +227,8 @@ class PokemonCard extends HiveObject {
       isGraded: isGraded ?? this.isGraded,
       grade: grade ?? this.grade,
       gradingCompany: gradingCompany ?? this.gradingCompany,
+      itemKind: itemKind ?? this.itemKind,
+      productType: productType ?? this.productType,
     );
   }
 }

@@ -17,6 +17,7 @@ import 'screens/cart_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/favorites_screen.dart';
 import 'screens/card_detail_screen.dart';
+import 'screens/marketplace_signal_screen.dart';
 import 'screens/checkout_screen.dart';
 import 'screens/orders_screen.dart';
 import 'screens/auth_screen.dart';
@@ -37,7 +38,7 @@ void main() async {
 
   runApp(
     const ProviderScope(
-      child: PokemonCardVaultApp(),
+      child: PokoinApp(),
     ),
   );
 }
@@ -60,15 +61,14 @@ Future<void> _initializeFirebase() async {
   }
 }
 
-class PokemonCardVaultApp extends ConsumerStatefulWidget {
-  const PokemonCardVaultApp({super.key});
+class PokoinApp extends ConsumerStatefulWidget {
+  const PokoinApp({super.key});
 
   @override
-  ConsumerState<PokemonCardVaultApp> createState() =>
-      _PokemonCardVaultAppState();
+  ConsumerState<PokoinApp> createState() => _PokoinAppState();
 }
 
-class _PokemonCardVaultAppState extends ConsumerState<PokemonCardVaultApp> {
+class _PokoinAppState extends ConsumerState<PokoinApp> {
   late final WalletBridge _wallet = createWalletBridge();
   final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey =
       GlobalKey<ScaffoldMessengerState>();
@@ -185,7 +185,7 @@ class _PokemonCardVaultAppState extends ConsumerState<PokemonCardVaultApp> {
   Widget build(BuildContext context) {
     ref.watch(authBootstrapProvider);
     return MaterialApp.router(
-      title: 'CardVault',
+      title: 'Pokoin',
       scaffoldMessengerKey: _scaffoldMessengerKey,
       debugShowCheckedModeBanner: false,
       scrollBehavior: const _WebScrollBehavior(),
@@ -287,68 +287,74 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(
         path: '/',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final host = Uri.base.host;
           if (host == 'explorer.pokoin.com') {
-            return const ScanScreen();
+            return _appPage(state, const ScanScreen());
           }
           if (host == 'forum.pokoin.com') {
-            return const ForumScreen();
+            return _appPage(state, const ForumScreen());
           }
-          return const LandingScreen();
+          return _appPage(state, const LandingScreen());
         },
       ),
       GoRoute(
         path: '/health',
-        builder: (context, state) => const HealthScreen(),
+        pageBuilder: (context, state) => _appPage(state, const HealthScreen()),
       ),
       GoRoute(
         path: '/scan',
-        builder: (context, state) => const ScanScreen(),
+        pageBuilder: (context, state) => _appPage(state, const ScanScreen()),
       ),
       GoRoute(
         path: '/tx/:hash',
-        builder: (context, state) => ScanScreen(
-          initialQuery: state.pathParameters['hash'],
+        pageBuilder: (context, state) => _appPage(
+          state,
+          ScanScreen(initialQuery: state.pathParameters['hash']),
         ),
       ),
       GoRoute(
         path: '/address/:address',
-        builder: (context, state) => ScanScreen(
-          initialQuery: state.pathParameters['address'],
+        pageBuilder: (context, state) => _appPage(
+          state,
+          ScanScreen(initialQuery: state.pathParameters['address']),
         ),
       ),
       GoRoute(
         path: '/block/:id',
-        builder: (context, state) => ScanScreen(
-          initialQuery: state.pathParameters['id'],
+        pageBuilder: (context, state) => _appPage(
+          state,
+          ScanScreen(initialQuery: state.pathParameters['id']),
         ),
       ),
       GoRoute(
         path: '/docs',
-        builder: (context, state) => const DocsScreen(),
+        pageBuilder: (context, state) => _appPage(state, const DocsScreen()),
       ),
       GoRoute(
         path: '/wallet',
-        builder: (context, state) => Theme(
-          data: ThemeData(
-            brightness: Brightness.dark,
-            scaffoldBackgroundColor: const Color(0xFF050816),
-            colorScheme: const ColorScheme.dark(
-              primary: Color(0xFFFACC15),
-              secondary: Color(0xFF38BDF8),
-              surface: Color(0xFF0B1020),
-            ),
-            inputDecorationTheme: InputDecorationTheme(
-              filled: true,
-              fillColor: const Color(0xFF111936),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
+        pageBuilder: (context, state) => _appPage(
+          state,
+          Theme(
+            data: ThemeData(
+              brightness: Brightness.dark,
+              scaffoldBackgroundColor: const Color(0xFF050816),
+              colorScheme: const ColorScheme.dark(
+                primary: Color(0xFFFACC15),
+                secondary: Color(0xFF38BDF8),
+                surface: Color(0xFF0B1020),
               ),
+              inputDecorationTheme: InputDecorationTheme(
+                filled: true,
+                fillColor: const Color(0xFF111936),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              useMaterial3: true,
             ),
-            useMaterial3: true,
+            child: const WalletScreen(),
           ),
-          child: const WalletScreen(),
         ),
       ),
       ShellRoute(
@@ -358,57 +364,84 @@ final routerProvider = Provider<GoRouter>((ref) {
         routes: [
           GoRoute(
             path: '/marketplace',
-            builder: (context, state) => const HomeScreen(),
+            pageBuilder: (context, state) =>
+                _appPage(state, const HomeScreen()),
+          ),
+          GoRoute(
+            path: '/marketplace/search',
+            pageBuilder: (context, state) => _appPage(
+              state,
+              MarketplaceSearchScreen(
+                initialQuery: state.uri.queryParameters['q'] ?? '',
+                expansion: state.uri.queryParameters['expansion'],
+                productType: state.uri.queryParameters['productType'],
+              ),
+            ),
+          ),
+          GoRoute(
+            path: '/marketplace/signal',
+            pageBuilder: (context, state) =>
+                _appPage(state, const MarketplaceSignalScreen()),
           ),
           GoRoute(
             path: '/cart',
-            builder: (context, state) => const CartScreen(),
+            pageBuilder: (context, state) =>
+                _appPage(state, const CartScreen()),
           ),
           GoRoute(
             path: '/favorites',
-            builder: (context, state) => const FavoritesScreen(),
+            pageBuilder: (context, state) =>
+                _appPage(state, const FavoritesScreen()),
           ),
           GoRoute(
             path: '/profile',
-            builder: (context, state) => const ProfileScreen(),
+            pageBuilder: (context, state) =>
+                _appPage(state, const ProfileScreen()),
           ),
           GoRoute(
             path: '/card/:id',
-            builder: (context, state) {
+            pageBuilder: (context, state) {
               final cardId = state.pathParameters['id']!;
-              return CardDetailScreen(cardId: cardId);
+              return _appPage(state, CardDetailScreen(cardId: cardId));
             },
           ),
           GoRoute(
             path: '/checkout',
-            builder: (context, state) => const CheckoutScreen(),
+            pageBuilder: (context, state) =>
+                _appPage(state, const CheckoutScreen()),
           ),
           GoRoute(
             path: '/orders',
-            builder: (context, state) => const OrdersScreen(),
+            pageBuilder: (context, state) =>
+                _appPage(state, const OrdersScreen()),
           ),
           GoRoute(
             path: '/auth',
-            builder: (context, state) => const AuthScreen(),
+            pageBuilder: (context, state) =>
+                _appPage(state, const AuthScreen()),
           ),
           GoRoute(
             path: '/buy',
-            builder: (context, state) => const BuyPknScreen(),
+            pageBuilder: (context, state) =>
+                _appPage(state, const BuyPknScreen()),
           ),
           GoRoute(
             path: '/forum',
-            builder: (context, state) => const ForumScreen(),
+            pageBuilder: (context, state) =>
+                _appPage(state, const ForumScreen()),
           ),
           GoRoute(
             path: '/forum/category/:id',
-            builder: (context, state) => ForumScreen(
-              categoryId: state.pathParameters['id'],
+            pageBuilder: (context, state) => _appPage(
+              state,
+              ForumScreen(categoryId: state.pathParameters['id']),
             ),
           ),
           GoRoute(
             path: '/forum/topic/:id',
-            builder: (context, state) => ForumScreen(
-              topicId: state.pathParameters['id'],
+            pageBuilder: (context, state) => _appPage(
+              state,
+              ForumScreen(topicId: state.pathParameters['id']),
             ),
           ),
         ],
@@ -416,6 +449,73 @@ final routerProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
+
+CustomTransitionPage<void> _appPage(GoRouterState state, Widget child) {
+  final path = state.uri.path;
+  final depth = _routeDepth(path);
+  final isReverse = depth < _lastRouteDepth ||
+      (depth == _lastRouteDepth && _routeOrder(path) < _lastRouteOrder);
+  _lastRouteDepth = depth;
+  _lastRouteOrder = _routeOrder(path);
+
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 280),
+    reverseTransitionDuration: const Duration(milliseconds: 240),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final curve = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
+      );
+      final begin = Offset(isReverse ? -0.08 : 0.08, 0);
+      return FadeTransition(
+        opacity: curve,
+        child: SlideTransition(
+          position:
+              Tween<Offset>(begin: begin, end: Offset.zero).animate(curve),
+          child: child,
+        ),
+      );
+    },
+  );
+}
+
+int _lastRouteDepth = 0;
+int _lastRouteOrder = 0;
+
+int _routeDepth(String path) {
+  if (path == '/' || path.isEmpty) {
+    return 0;
+  }
+  return path.split('/').where((segment) => segment.isNotEmpty).length;
+}
+
+int _routeOrder(String path) {
+  if (path == '/') {
+    return 0;
+  }
+  if (path.startsWith('/marketplace')) {
+    return 10;
+  }
+  if (path.startsWith('/card/')) {
+    return 20;
+  }
+  if (path.startsWith('/cart')) {
+    return 30;
+  }
+  if (path.startsWith('/checkout')) {
+    return 40;
+  }
+  if (path.startsWith('/orders')) {
+    return 50;
+  }
+  if (path.startsWith('/wallet')) {
+    return 60;
+  }
+  return 100;
+}
 
 class PokoinNotFoundScreen extends StatelessWidget {
   const PokoinNotFoundScreen({super.key, required this.location});

@@ -125,6 +125,13 @@ flutter test
 flutter build web --release --pwa-strategy=none
 ```
 
+Passing local checks is not the same as updating production. If the user expects
+the change on `pokoin.com`, deploy after the checks:
+
+```bash
+./deploy-pokoin-web.sh
+```
+
 For version/navigation changes, also verify the projection data with the anon
 key or SQL editor:
 
@@ -149,3 +156,6 @@ For production deployment, use:
 ```bash
 ./deploy-pokoin-web.sh
 ```
+
+After deploy, verify `https://pokoin.com` rather than assuming a pushed commit
+or local build is live.

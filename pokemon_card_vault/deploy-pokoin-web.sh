@@ -7,7 +7,40 @@ VERCEL_ORG_ID="team_WIppHrH49qzR3JDOj6AynDiC"
 
 cd "$ROOT_DIR"
 
-flutter build web --release --pwa-strategy=none
+read_env_value() {
+  local key="$1"
+  local file="$ROOT_DIR/.env.local"
+  [[ -f "$file" ]] || return 0
+  python3 - "$file" "$key" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+key = sys.argv[2]
+for line in path.read_text().splitlines():
+    stripped = line.strip()
+    if not stripped or stripped.startswith("#") or "=" not in stripped:
+        continue
+    name, value = stripped.split("=", 1)
+    name = name.removeprefix("export ").strip()
+    if name == key:
+        print(value.strip().strip('"').strip("'"))
+        break
+PY
+}
+
+SUPABASE_URL="${SUPABASE_URL:-$(read_env_value SUPABASE_URL)}"
+SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY:-$(read_env_value SUPABASE_ANON_KEY)}"
+
+FLUTTER_DEFINES=()
+if [[ -n "${SUPABASE_URL:-}" ]]; then
+  FLUTTER_DEFINES+=(--dart-define="SUPABASE_URL=$SUPABASE_URL")
+fi
+if [[ -n "${SUPABASE_ANON_KEY:-}" ]]; then
+  FLUTTER_DEFINES+=(--dart-define="SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY")
+fi
+
+flutter build web --release --pwa-strategy=none "${FLUTTER_DEFINES[@]}"
 
 rm -rf "$ROOT_DIR/build/web/api"
 mkdir -p "$ROOT_DIR/build/web/api"
@@ -17,6 +50,8 @@ for helper in _email _firebase _native_pkn _pending_signup _pkn_purchase _r2 _us
 done
 for endpoint in \
   create-pkn-checkout-session \
+  marketplace-event \
+  marketplace-home \
   register-email \
   remove-profile-picture \
   request-pkn-withdraw \

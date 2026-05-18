@@ -94,17 +94,6 @@
       "has": [
         {
           "type": "host",
-          "value": "cardvault.pokoin.com"
-        }
-      ],
-      "destination": "https://pokoin.com/:protected",
-      "permanent": true
-    },
-    {
-      "source": "/:protected(wallet|auth|profile|checkout|orders)",
-      "has": [
-        {
-          "type": "host",
           "value": "cardcaveau.pokoin.com"
         }
       ],
@@ -160,17 +149,6 @@
       "has": [
         {
           "type": "host",
-          "value": "cardvault.pokoin.com"
-        }
-      ],
-      "destination": "https://pokoin.com/marketplace",
-      "permanent": true
-    },
-    {
-      "source": "/(.*)",
-      "has": [
-        {
-          "type": "host",
           "value": "cardcaveau.pokoin.com"
         }
       ],
@@ -200,6 +178,10 @@
     {
       "source": "/pokoin-crypto.html",
       "destination": "/pokoin-crypto.html"
+    },
+    {
+      "source": "/marketplace/signal",
+      "destination": "/marketplace-signal.html"
     },
     {
       "source": "/api/supply/total.txt",
@@ -270,6 +252,14 @@
       "destination": "/api/create-pkn-checkout-session.js"
     },
     {
+      "source": "/api/marketplace-home",
+      "destination": "/api/marketplace-home.js"
+    },
+    {
+      "source": "/api/marketplace-event",
+      "destination": "/api/marketplace-event.js"
+    },
+    {
       "source": "/api/stripe-webhook",
       "destination": "/api/stripe-webhook.js"
     },
@@ -292,6 +282,10 @@
     {
       "source": "/wpkn-reserve.json",
       "destination": "/wpkn-reserve.json"
+    },
+    {
+      "source": "/card-images/:path*",
+      "destination": "https://cdn.pokoin.com/:path*"
     },
     {
       "source": "/tx/:path*",

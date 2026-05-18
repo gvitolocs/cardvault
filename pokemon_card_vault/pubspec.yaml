@@ -1,5 +1,5 @@
-name: pokemon_card_vault
-description: "A complete Pokemon card ecommerce app with advanced features"
+name: pokoin
+description: "Pokoin marketplace, wallet, and card reserve app"
 publish_to: 'none'
 
 version: 1.0.0+1

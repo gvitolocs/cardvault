@@ -14,33 +14,42 @@ class CartScreen extends ConsumerWidget {
     final cartState = ref.watch(cartProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F9FC),
+      backgroundColor: const Color(0xFF050816),
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
             pinned: true,
-            backgroundColor: const Color(0xFF0B1B3A),
+            backgroundColor: const Color(0xF20A1026),
             foregroundColor: Colors.white,
-            title: const Text('Your shopping cart'),
+            title: const Text('Pokoin cart'),
             actions: [
               TextButton(
                 onPressed: () => context.go('/marketplace'),
-                child: const Text('Marketplace'),
+                child: const Text('Pokoin'),
               ),
               const SizedBox(width: 8),
             ],
           ),
           SliverToBoxAdapter(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1180),
-                child: Padding(
-                  padding: const EdgeInsets.all(22),
-                  child: cartState.isLoading
-                      ? const _LoadingCart()
-                      : cartState.items.isEmpty
-                          ? const _EmptyCart()
-                          : _CartContent(cartState: cartState),
+            child: Container(
+              decoration: const BoxDecoration(
+                gradient: RadialGradient(
+                  center: Alignment.topRight,
+                  radius: 1.4,
+                  colors: [Color(0x2238BDF8), Color(0x00050816)],
+                ),
+              ),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1180),
+                  child: Padding(
+                    padding: const EdgeInsets.all(22),
+                    child: cartState.isLoading
+                        ? const _LoadingCart()
+                        : cartState.items.isEmpty
+                            ? const _EmptyCart()
+                            : _CartContent(cartState: cartState),
+                  ),
                 ),
               ),
             ),
@@ -149,14 +158,14 @@ class _ReservePackage extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFFFB800), width: 2),
+        color: const Color(0xFF0B1024),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0x55FACC15), width: 1.4),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 18,
-            offset: const Offset(0, 10),
+            color: Colors.black.withValues(alpha: 0.30),
+            blurRadius: 28,
+            offset: const Offset(0, 16),
           ),
         ],
       ),
@@ -165,8 +174,8 @@ class _ReservePackage extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
             decoration: const BoxDecoration(
-              color: Color(0xFFFFB800),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(6)),
+              color: Color(0xFFFACC15),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
             ),
             child: Row(
               children: [
@@ -177,7 +186,7 @@ class _ReservePackage extends StatelessWidget {
                   child: const Text(
                     'More info',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: Color(0xFF111827),
                       fontWeight: FontWeight.w900,
                       decoration: TextDecoration.underline,
                     ),
@@ -190,19 +199,19 @@ class _ReservePackage extends StatelessWidget {
             margin: const EdgeInsets.all(12),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
-              color: const Color(0xFFE8F8EF),
-              borderRadius: BorderRadius.circular(4),
-              border: Border.all(color: const Color(0xFF74C69D)),
+              color: const Color(0x2216A34A),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0x6634D399)),
             ),
             child: const Row(
               children: [
-                Icon(Icons.hub_outlined, color: Color(0xFF15803D), size: 18),
+                Icon(Icons.hub_outlined, color: Color(0xFF34D399), size: 18),
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     'Add as many items as you want, send all to our Hub without paying repeated shipments.',
                     style: TextStyle(
-                      color: Color(0xFF15803D),
+                      color: Color(0xFFBBF7D0),
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -220,22 +229,25 @@ class _ReservePackage extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
             decoration: const BoxDecoration(
-              border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
+              border: Border(top: BorderSide(color: Color(0x1FFFFFFF))),
             ),
             child: Row(
               children: [
                 Text(
                   '${items.length} ${items.length == 1 ? 'item' : 'items'}',
-                  style: const TextStyle(fontWeight: FontWeight.w800),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
                 const Spacer(),
                 const Text('Subtotal',
-                    style: TextStyle(color: Color(0xFF64748B))),
+                    style: TextStyle(color: Color(0xFF93A4C8))),
                 const SizedBox(width: 10),
                 Text(
                   formatPkn(subtotal),
                   style: const TextStyle(
-                    color: Color(0xFF0B1B3A),
+                    color: Color(0xFFFACC15),
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
                   ),
@@ -265,7 +277,7 @@ class _ReserveCartRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
       decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
+        border: Border(top: BorderSide(color: Color(0x1FFFFFFF))),
       ),
       child: Row(
         children: [
@@ -274,7 +286,7 @@ class _ReserveCartRow extends StatelessWidget {
             child: Container(
               width: 56,
               height: 72,
-              color: const Color(0xFFF1F5F9),
+              color: const Color(0xFF111936),
               child: CachedNetworkImage(
                 imageUrl: item.card.imageUrl,
                 fit: BoxFit.contain,
@@ -295,7 +307,7 @@ class _ReserveCartRow extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      color: Color(0xFF0284C7),
+                      color: Color(0xFF38BDF8),
                       fontWeight: FontWeight.w900,
                     ),
                   ),
@@ -305,7 +317,7 @@ class _ReserveCartRow extends StatelessWidget {
                   '${item.card.rarity} | ${item.card.number}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Color(0xFF64748B)),
+                  style: const TextStyle(color: Color(0xFF93A4C8)),
                 ),
                 const SizedBox(height: 5),
                 Wrap(
@@ -313,12 +325,27 @@ class _ReserveCartRow extends StatelessWidget {
                   runSpacing: 5,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    const _ConditionChip('NM'),
-                    const _LanguageDot(),
+                    _ConditionChip(item.condition ?? item.card.condition),
+                    _LanguageDot(label: item.language ?? 'EN'),
+                    if (item.reverse) const _DelayBadge(text: 'Reverse'),
+                    if (item.sellerName != null)
+                      _DelayBadge(text: item.sellerName!),
+                    if (item.graded)
+                      _DelayBadge(
+                        text: [
+                          item.gradingCompany ?? 'Graded',
+                          if ((item.grade ?? '').isNotEmpty) item.grade!,
+                          if ((item.certificationId ?? '').isNotEmpty)
+                            '#${item.certificationId!}',
+                        ].join(' '),
+                      ),
+                    if (item.nftAvailable) const _DelayBadge(text: 'NFT'),
+                    if (item.shippingAvailable)
+                      const _DelayBadge(text: 'Shipping'),
                     Text(
                       'Ready about ${_readyDate(item.card.id)}',
                       style: const TextStyle(
-                        color: Color(0xFF334155),
+                        color: Color(0xFFB8C4E6),
                         fontSize: 12,
                       ),
                     ),
@@ -330,16 +357,16 @@ class _ReserveCartRow extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           Text(
-            formatPkn(item.card.price),
+            formatPkn(item.unitPrice),
             style: const TextStyle(
-              color: Color(0xFF0B1B3A),
+              color: Color(0xFFFACC15),
               fontWeight: FontWeight.w900,
             ),
           ),
           const SizedBox(width: 12),
           _QuantityStepper(
             quantity: item.quantity,
-            maxQuantity: mathMax(1, item.card.stock),
+            maxQuantity: mathMax(1, item.maxQuantity),
             onChanged: onQuantityChanged,
           ),
           const SizedBox(width: 12),
@@ -349,7 +376,7 @@ class _ReserveCartRow extends StatelessWidget {
               formatPkn(item.totalPrice),
               textAlign: TextAlign.right,
               style: const TextStyle(
-                color: Color(0xFF0B1B3A),
+                color: Colors.white,
                 fontWeight: FontWeight.w900,
               ),
             ),
@@ -360,7 +387,7 @@ class _ReserveCartRow extends StatelessWidget {
             icon: const Icon(Icons.delete, size: 16),
             label: const Text('Remove'),
             style: TextButton.styleFrom(
-              foregroundColor: const Color(0xFF0B1B3A),
+              foregroundColor: const Color(0xFFCBD5E1),
               textStyle: const TextStyle(fontWeight: FontWeight.w800),
             ),
           ),
@@ -392,9 +419,9 @@ class _QuantityStepper extends StatelessWidget {
     return Container(
       height: 34,
       decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9),
+        color: const Color(0xFF111936),
         borderRadius: BorderRadius.circular(5),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: const Color(0x22FFFFFF)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -407,15 +434,18 @@ class _QuantityStepper extends StatelessWidget {
           ),
           Text(
             '$quantity',
-            style: const TextStyle(fontWeight: FontWeight.w900),
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+            ),
           ),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 4),
-            child: Text('of', style: TextStyle(color: Color(0xFF64748B))),
+            child: Text('of', style: TextStyle(color: Color(0xFF93A4C8))),
           ),
           Text(
             '$maxQuantity',
-            style: const TextStyle(color: Color(0xFF64748B)),
+            style: const TextStyle(color: Color(0xFF93A4C8)),
           ),
           IconButton(
             padding: EdgeInsets.zero,
@@ -455,7 +485,7 @@ class _CartSummary extends StatelessWidget {
           const Text(
             'Cart summary',
             style: TextStyle(
-              color: Color(0xFF0B1B3A),
+              color: Colors.white,
               fontSize: 22,
               fontWeight: FontWeight.w900,
             ),
@@ -499,7 +529,7 @@ class _CartSummary extends StatelessWidget {
           FilledButton(
             onPressed: onPayNow,
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFFFFB800),
+              backgroundColor: const Color(0xFFFACC15),
               foregroundColor: const Color(0xFF0B1B3A),
               minimumSize: const Size.fromHeight(48),
             ),
@@ -530,7 +560,7 @@ class _OptimizerCard extends StatelessWidget {
           const Text(
             'Optimize your shopping cart and save money now!',
             style: TextStyle(
-              color: Color(0xFF0B1B3A),
+              color: Colors.white,
               fontWeight: FontWeight.w800,
               height: 1.35,
             ),
@@ -540,13 +570,13 @@ class _OptimizerCard extends StatelessWidget {
             value: 0.68,
             minHeight: 8,
             borderRadius: BorderRadius.circular(999),
-            backgroundColor: const Color(0xFFE2E8F0),
+            backgroundColor: const Color(0x22FFFFFF),
             valueColor: const AlwaysStoppedAnimation(Color(0xFF22C55E)),
           ),
           const SizedBox(height: 10),
           const Text(
             'Pokoin Card Reserve groups sellers before checkout.',
-            style: TextStyle(color: Color(0xFF64748B)),
+            style: TextStyle(color: Color(0xFFB8C4E6)),
           ),
         ],
       ),
@@ -562,9 +592,16 @@ class _EmptyCart extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        color: const Color(0xFF0B1024),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.30),
+            blurRadius: 28,
+            offset: const Offset(0, 16),
+          ),
+        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -575,7 +612,7 @@ class _EmptyCart extends StatelessWidget {
           const Text(
             'Your cart is empty',
             style: TextStyle(
-              color: Color(0xFF0B1B3A),
+              color: Colors.white,
               fontSize: 28,
               fontWeight: FontWeight.w900,
             ),
@@ -584,7 +621,7 @@ class _EmptyCart extends StatelessWidget {
           const Text(
             'Add listings from the marketplace to build a Pokoin Card Reserve shipment.',
             textAlign: TextAlign.center,
-            style: TextStyle(color: Color(0xFF64748B)),
+            style: TextStyle(color: Color(0xFFB8C4E6)),
           ),
           const SizedBox(height: 22),
           FilledButton.icon(
@@ -622,14 +659,14 @@ class _SidePanel extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        color: const Color(0xFF0B1024),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 16,
-            offset: const Offset(0, 10),
+            color: Colors.black.withValues(alpha: 0.30),
+            blurRadius: 24,
+            offset: const Offset(0, 14),
           ),
         ],
       ),
@@ -661,7 +698,7 @@ class _SummaryLine extends StatelessWidget {
             child: Text(
               label,
               style: TextStyle(
-                color: const Color(0xFF334155),
+                color: const Color(0xFF93A4C8),
                 fontSize: large ? 16 : 14,
                 fontWeight: large ? FontWeight.w900 : FontWeight.w600,
               ),
@@ -671,7 +708,7 @@ class _SummaryLine extends StatelessWidget {
             value,
             style: TextStyle(
               color:
-                  positive ? const Color(0xFF16A34A) : const Color(0xFF0B1B3A),
+                  positive ? const Color(0xFF34D399) : const Color(0xFFFACC15),
               fontSize: large ? 22 : 14,
               fontWeight: FontWeight.w900,
             ),
@@ -739,16 +776,25 @@ class _ConditionChip extends StatelessWidget {
 }
 
 class _LanguageDot extends StatelessWidget {
-  const _LanguageDot();
+  const _LanguageDot({required this.label});
+
+  final String label;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 10,
-      height: 10,
-      decoration: const BoxDecoration(
-        color: Color(0xFFDC2626),
-        shape: BoxShape.circle,
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+      decoration: BoxDecoration(
+        color: const Color(0xFFDC2626),
+        borderRadius: BorderRadius.circular(3),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.w900,
+        ),
       ),
     );
   }
@@ -770,7 +816,7 @@ class _DelayBadge extends StatelessWidget {
       child: Text(
         text,
         style: const TextStyle(
-          color: Colors.white,
+          color: Color(0xFF111827),
           fontSize: 10,
           fontWeight: FontWeight.w900,
         ),

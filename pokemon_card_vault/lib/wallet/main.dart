@@ -59,8 +59,7 @@ class _WalletScreenState extends State<WalletScreen> {
   static const rpcUrl = 'https://rpc.pokoin.com/rpc';
   static const nativeSymbol = 'PKN';
   static const recentRecipientLimit = 5;
-  static const nativeBankAddress =
-      '0xb4029F68E360280aa4Ad21D8aE5AD8896b8768B2';
+  static const nativeBankAddress = '0xb4029F68E360280aa4Ad21D8aE5AD8896b8768B2';
   static const wpknSettlementAddress =
       '0x74466c3a204429B22CE8558F3F18f3C59F67fCB3';
 
@@ -215,6 +214,26 @@ class _WalletScreenState extends State<WalletScreen> {
       });
       await _loadLinkedWallet();
       await _record('Wallet connected', account, ActivityKind.inbound);
+    });
+  }
+
+  Future<void> _addPokoinNetwork() async {
+    if (!_wallet.hasProvider) {
+      if (_wallet.openMetaMaskDapp()) {
+        _showMessage(
+          'Opening this page in MetaMask. Tap Add Pokoin network again there.',
+        );
+        return;
+      }
+      _showMessage(
+          'Open this page in MetaMask or install an EVM wallet first.');
+      return;
+    }
+
+    await _runTask(() async {
+      await _wallet.addNetwork();
+      await _wallet.switchNetwork();
+      _showMessage('PokoinPoS network added or selected.');
     });
   }
 
@@ -538,7 +557,8 @@ class _WalletScreenState extends State<WalletScreen> {
   Future<void> _topUpAccountBalance() async {
     final from = _address?.trim();
     if (from == null || from.isEmpty) {
-      _showMessage('Connect MetaMask with your linked wallet before topping up.');
+      _showMessage(
+          'Connect MetaMask with your linked wallet before topping up.');
       return;
     }
     final linked = _linkedAddress?.trim().toLowerCase();
@@ -575,7 +595,8 @@ class _WalletScreenState extends State<WalletScreen> {
   Future<void> _openTopUpSheet() async {
     final from = _address?.trim();
     if (from == null || from.isEmpty) {
-      _showMessage('Connect MetaMask with your linked wallet before topping up.');
+      _showMessage(
+          'Connect MetaMask with your linked wallet before topping up.');
       return;
     }
     final linked = _linkedAddress?.trim().toLowerCase();
@@ -805,7 +826,8 @@ class _WalletScreenState extends State<WalletScreen> {
           await _auth.requestPknWithdraw(toAddress: to, amountPkn: amount);
       await _loadAccountBalance();
       _amountController.clear();
-      await _record('Requested $amount PKN withdraw', to, ActivityKind.outbound);
+      await _record(
+          'Requested $amount PKN withdraw', to, ActivityKind.outbound);
       _showMessage(_withdrawMessage(result));
       await _loadActivity();
     });
@@ -1164,8 +1186,7 @@ class _WalletScreenState extends State<WalletScreen> {
             blockNumber: block,
             transactionIndex: index,
           ),
-      timestampLabel:
-          explicitDate == null && block > 0 ? 'Block $block' : null,
+      timestampLabel: explicitDate == null && block > 0 ? 'Block $block' : null,
     );
   }
 
@@ -1176,7 +1197,9 @@ class _WalletScreenState extends State<WalletScreen> {
       return name.isEmpty ? 'Sent $abs PKN' : 'Sent $abs PKN to $name';
     }
     if (type == 'account_transfer_received') {
-      return name.isEmpty ? 'Received $abs PKN' : 'Received $abs PKN from $name';
+      return name.isEmpty
+          ? 'Received $abs PKN'
+          : 'Received $abs PKN from $name';
     }
     if (type == 'account_transfer_payout_pending' ||
         type == 'account_transfer_payout_sent') {
@@ -1230,7 +1253,8 @@ class _WalletScreenState extends State<WalletScreen> {
     if (blockNumber <= 0) {
       return base.add(Duration(milliseconds: transactionIndex));
     }
-    return base.add(Duration(seconds: blockNumber, milliseconds: transactionIndex));
+    return base
+        .add(Duration(seconds: blockNumber, milliseconds: transactionIndex));
   }
 
   static String _formatWholePkn(int amount) {
@@ -1519,11 +1543,7 @@ class _WalletScreenState extends State<WalletScreen> {
                   ),
                 ),
                 OutlinedButton.icon(
-                  onPressed: () => _runTask(() async {
-                    await _wallet.addNetwork();
-                    await _wallet.switchNetwork();
-                    _showMessage('PokoinPoS network added or selected.');
-                  }),
+                  onPressed: _addPokoinNetwork,
                   icon: const Icon(Icons.add_link),
                   label: const Text('Add Pokoin network'),
                   style: OutlinedButton.styleFrom(

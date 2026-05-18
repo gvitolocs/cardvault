@@ -38,10 +38,14 @@ reconstructing commands from chat history.
 
 ## Standard Workflows
 
-1. Deploy web:
+1. Deploy web after app code changes:
    ```bash
-   workflows/deploy-web.sh
+   ./deploy-pokoin-web.sh
    ```
+   `workflows/deploy-web.sh` is only a thin wrapper around this command. If a
+   user asks whether a UI change is live, run a production deploy and verify
+   `https://pokoin.com/main.dart.js`; pushing git or updating workflow docs does
+   not update the live Flutter app.
 
 2. Verify canonical account redirects:
    ```bash
@@ -105,6 +109,9 @@ reconstructing commands from chat history.
 - Do not use plain `vercel deploy` from the project root. It can publish an
   incomplete output. Always use `deploy-pokoin-web.sh` or
   `workflows/deploy-web.sh`.
+- Do not confuse workflow/documentation commits with app deployment. Workflow
+  commits help future agents, but user-visible marketplace/search fixes require
+  `./deploy-pokoin-web.sh` after checks pass.
 - Do not expose wallet/auth/profile on alternate origins. Account routes should
   canonicalize to `pokoin.com` to keep Firebase, Google auth, and MetaMask
   behavior consistent.

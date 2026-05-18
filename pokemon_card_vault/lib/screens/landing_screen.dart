@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../constants/project_links.dart';
 import '../widgets/site_footer.dart';
 
@@ -26,11 +25,10 @@ class LandingScreen extends StatelessWidget {
                 _HeroSection(),
                 _MetricStrip(),
                 _SectionTitle(
-                  eyebrow: 'Marketplace thesis',
-                  title:
-                      'Instant international liquidity for collectible cards.',
+                  eyebrow: 'Pokoin today',
+                  title: 'Card marketplace, reserve analytics and PKN wallet.',
                   body:
-                      'CardVault connects Pokémon card buyers and sellers across borders, using PKN and wPKN as crypto rails for fast settlement, transparent reserves, and an open path to DeFi liquidity.',
+                      'Pokoin now centers on Card Reserve: real card discovery from the catalog, seller listings, cart and watchlist flows, wallet-linked accounts, and a dedicated marketplace signal page for reserve analytics.',
                 ),
                 Wrap(
                   spacing: 18,
@@ -38,25 +36,25 @@ class LandingScreen extends StatelessWidget {
                   children: [
                     _FeatureCard(
                       icon: Icons.style,
-                      title: 'Global card market',
+                      title: 'Live card marketplace',
                       body:
-                          'A marketplace for collectors to buy, sell, and exchange cards without waiting on slow cross-border payment rails.',
+                          'Browse Pokémon card inventory with real card images, card detail pages, seller offers, no-seller states, and listing-aware cart flows.',
                     ),
                     _FeatureCard(
-                      icon: Icons.currency_bitcoin,
-                      title: 'PKN-native payments',
+                      icon: Icons.storefront_outlined,
+                      title: 'Seller listings',
                       body:
-                          'PokoinPoS powers native PKN transfers with EVM-style wallet compatibility and a public RPC endpoint.',
+                          'Logged-in users can create listings with condition, language, reverse holo, grading company, grade, certification ID, shipping and NFT options.',
                     ),
                     _FeatureCard(
-                      icon: Icons.hub,
-                      title: 'wPKN on BNB Chain',
+                      icon: Icons.query_stats,
+                      title: 'Marketplace signal',
                       body:
-                          'wPKN brings PKN into the BNB ecosystem with a verified BEP-20 contract and PancakeSwap liquidity.',
+                          'Reserve analytics track listed value, floor and median ask, price depth, rarity concentration, reserve coverage and readiness signals.',
                     ),
                   ],
                 ),
-                _TokenPanel(),
+                _MarketplacePanel(),
                 _RoadmapSection(),
                 _CtaSection(),
                 SiteFooter(),
@@ -66,10 +64,6 @@ class LandingScreen extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  static Future<void> _open(String url) async {
-    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
   }
 }
 
@@ -140,17 +134,17 @@ class _TopBar extends StatelessWidget {
                       const SizedBox(width: 12),
                     ],
                     _TopBarCta(
-                      label: 'Buy PKN',
-                      icon: Icons.add_card_outlined,
+                      label: 'Marketplace',
+                      icon: Icons.storefront,
                       primary: false,
-                      onPressed: () => context.go('/wallet'),
+                      onPressed: () => context.go('/marketplace'),
                     ),
                     const SizedBox(width: 10),
                     _TopBarCta(
-                      label: 'Trade wPKN',
-                      icon: Icons.swap_horiz,
+                      label: 'Signal',
+                      icon: Icons.query_stats,
                       primary: true,
-                      onPressed: () => LandingScreen._open(ProjectLinks.pancakeSwap),
+                      onPressed: () => context.go('/marketplace/signal'),
                     ),
                   ],
                 ),
@@ -218,10 +212,19 @@ class _NavPill extends StatelessWidget {
       child: const Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _NavAction(label: 'Marketplace', path: '/marketplace', icon: Icons.storefront),
-          _NavAction(label: 'Wallet', path: '/wallet', icon: Icons.account_balance_wallet_outlined),
+          _NavAction(
+              label: 'Marketplace',
+              path: '/marketplace',
+              icon: Icons.storefront),
+          _NavAction(
+              label: 'Wallet',
+              path: '/wallet',
+              icon: Icons.account_balance_wallet_outlined),
           _NavAction(label: 'Scan', path: '/scan', icon: Icons.query_stats),
-          _NavAction(label: 'Health', path: '/health', icon: Icons.health_and_safety_outlined),
+          _NavAction(
+              label: 'Health',
+              path: '/health',
+              icon: Icons.health_and_safety_outlined),
         ],
       ),
     );
@@ -248,14 +251,18 @@ class _TopBarCta extends StatelessWidget {
       icon: Icon(icon, size: 18),
       label: Text(label),
       style: FilledButton.styleFrom(
-        backgroundColor: primary ? const Color(0xFFFACC15) : const Color(0xFF111936),
-        foregroundColor: primary ? const Color(0xFF111827) : const Color(0xFFE2E8F0),
+        backgroundColor:
+            primary ? const Color(0xFFFACC15) : const Color(0xFF111936),
+        foregroundColor:
+            primary ? const Color(0xFF111827) : const Color(0xFFE2E8F0),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         textStyle: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(999),
           side: BorderSide(
-            color: primary ? Colors.transparent : Colors.white.withValues(alpha: 0.10),
+            color: primary
+                ? Colors.transparent
+                : Colors.white.withValues(alpha: 0.10),
           ),
         ),
       ),
@@ -309,7 +316,7 @@ class _HeroSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'CardVault is building the crypto marketplace for Pokémon card collectors.',
+          'Card collector and crypto market.',
           style: Theme.of(context).textTheme.displayMedium?.copyWith(
                 color: Colors.white,
                 fontWeight: FontWeight.w800,
@@ -318,7 +325,7 @@ class _HeroSection extends StatelessWidget {
         ),
         const SizedBox(height: 22),
         const Text(
-          'Buy, sell, and exchange cards instantly across borders using native PKN and wrapped wPKN on BNB Chain. Built for collectors who want speed, transparency, and open-market liquidity.',
+          'Find cards, compare seller listings, watch market signals and use crypto rails built for collectors who want faster settlement and transparent pricing.',
           style: TextStyle(color: Color(0xFFB8C4E6), fontSize: 18, height: 1.6),
         ),
         const SizedBox(height: 28),
@@ -327,20 +334,20 @@ class _HeroSection extends StatelessWidget {
           runSpacing: 12,
           children: [
             FilledButton(
-              onPressed: () => LandingScreen._open(ProjectLinks.pancakeSwap),
-              child: const Text('Trade wPKN'),
+              onPressed: () => context.go('/marketplace'),
+              child: const Text('Open marketplace'),
             ),
             OutlinedButton(
-              onPressed: () => context.go('/health'),
-              child: const Text('View network health'),
+              onPressed: () => context.go('/marketplace/signal'),
+              child: const Text('View marketplace signal'),
             ),
             OutlinedButton(
-              onPressed: () => context.go('/scan'),
-              child: const Text('Open Pokoin Scan'),
+              onPressed: () => context.go('/wallet'),
+              child: const Text('Open wallet'),
             ),
             TextButton(
-              onPressed: () => context.go('/marketplace'),
-              child: const Text('Open marketplace preview'),
+              onPressed: () => context.go('/scan'),
+              child: const Text('Open Pokoin Scan'),
             ),
           ],
         ),
@@ -410,20 +417,20 @@ class _HeroTokenCard extends StatelessWidget {
           ),
           const SizedBox(height: 22),
           const Text(
-            'wPKN',
+            'Card Reserve',
             style: TextStyle(
                 color: Colors.white, fontSize: 32, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 8),
           const Text(
-            'Verified BEP-20 on BNB Chain',
+            'Buy, sell, track and settle with PKN',
             textAlign: TextAlign.center,
             style: TextStyle(color: Color(0xFFB8C4E6)),
           ),
           const SizedBox(height: 24),
-          const _InfoRow(label: 'Supply', value: '2,000,000'),
-          const _InfoRow(label: 'Backing', value: '1:1 native PKN reserve'),
-          const _InfoRow(label: 'Pool', value: 'wPKN / BNB'),
+          const _InfoRow(label: 'Discover', value: 'Real card images'),
+          const _InfoRow(label: 'Trade', value: 'Seller offers'),
+          const _InfoRow(label: 'Track', value: 'Price signals'),
         ],
       ),
     );
@@ -439,10 +446,10 @@ class _MetricStrip extends StatelessWidget {
       spacing: 14,
       runSpacing: 14,
       children: [
-        _Metric(label: 'Native chain', value: 'PokoinPoS'),
-        _Metric(label: 'Chain ID', value: '26062026'),
-        _Metric(label: 'wPKN chain', value: 'BNB Chain'),
-        _Metric(label: 'Reserve', value: '2M PKN'),
+        _Metric(label: 'Marketplace', value: 'Live'),
+        _Metric(label: 'Listings', value: 'User-created'),
+        _Metric(label: 'Cart', value: 'Listing-aware'),
+        _Metric(label: 'Analytics', value: 'Signal page'),
       ],
     );
   }
@@ -518,8 +525,8 @@ class _FeatureCard extends StatelessWidget {
   }
 }
 
-class _TokenPanel extends StatelessWidget {
-  const _TokenPanel();
+class _MarketplacePanel extends StatelessWidget {
+  const _MarketplacePanel();
 
   @override
   Widget build(BuildContext context) {
@@ -535,27 +542,27 @@ class _TokenPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _SectionTitle(
-            eyebrow: 'Token rails',
-            title: 'PKN at the core. wPKN where liquidity lives.',
+            eyebrow: 'Marketplace stack',
+            title:
+                'Catalog data, seller offers and reserve analytics in one flow.',
             body:
-                'Native PKN powers the PokoinPoS network. wPKN mirrors the reserve on BNB Chain so collectors and traders can access PancakeSwap liquidity while the backing remains publicly documented.',
+                'Pokoin uses Supabase for the card catalog, Firebase for user listings, carts and orders, and PKN wallet rails for settlement. The marketplace signal page turns reserve data into useful trading-style analytics without cluttering the shopping home.',
           ),
           SizedBox(height: 22),
           Wrap(
             spacing: 12,
             runSpacing: 12,
             children: [
-              _LinkButton(label: 'BscScan token', url: ProjectLinks.bscToken),
-              _LinkButton(
-                  label: 'Verified contract', url: ProjectLinks.bscContract),
-              _LinkButton(label: 'Reserve proof', url: ProjectLinks.reserve),
-              _LinkButton(
-                  label: 'PancakeSwap pool', url: ProjectLinks.pancakePair),
+              _RouteButton(label: 'Open marketplace', path: '/marketplace'),
+              _RouteButton(
+                  label: 'Marketplace signal', path: '/marketplace/signal'),
+              _RouteButton(label: 'Wallet', path: '/wallet'),
+              _RouteButton(label: 'Pokoin Scan', path: '/scan'),
             ],
           ),
           SizedBox(height: 20),
           SelectableText(
-            'wPKN contract: ${ProjectLinks.wpknContract}',
+            'Current focus: Card Reserve marketplace UX, seller view, cart, watchlist, order flow and reserve analytics.',
             style: TextStyle(color: Color(0xFFCBD5E1), fontFamily: 'monospace'),
           ),
         ],
@@ -574,22 +581,22 @@ class _RoadmapSection extends StatelessWidget {
       runSpacing: 18,
       children: [
         _FeatureCard(
-          icon: Icons.swap_horiz,
-          title: 'wPKN trades live',
+          icon: Icons.shopping_bag_outlined,
+          title: 'Cart and checkout',
           body:
-              'Collectors and crypto users access wPKN on BNB Chain with a verified contract, reserve proof, and PancakeSwap liquidity.',
+              'Cart items keep the selected seller listing, condition, language, reverse holo, grading and certification data through checkout.',
         ),
         _FeatureCard(
           icon: Icons.query_stats,
-          title: 'Live chain transparency',
+          title: 'Signal dashboard',
           body:
-              'PokoinScan shows blocks, transactions, validators, RPC status, reserve links, and wallet setup in one public dashboard.',
+              'A dedicated marketplace signal page shows listed value, depth, floor and median asks, rarity concentration and readiness metrics.',
         ),
         _FeatureCard(
-          icon: Icons.style,
-          title: 'Collector commerce',
+          icon: Icons.account_balance_wallet_outlined,
+          title: 'Wallet-linked accounts',
           body:
-              'CardVault connects premium card discovery with Pokoin profiles, PKN balances, wallet linking, and crypto settlement rails.',
+              'Pokoin profiles connect Firebase auth, wallet linking, balances, orders, watchlists and marketplace actions.',
         ),
       ],
     );
@@ -616,7 +623,7 @@ class _CtaSection extends StatelessWidget {
           const SizedBox(
             width: 620,
             child: Text(
-              'Ready to explore the live rails? Check network health, inspect the token, or trade wPKN on PancakeSwap.',
+              'Ready to use the current Pokoin product? Start with the marketplace, then open the signal dashboard for reserve analytics.',
               style: TextStyle(
                   color: Color(0xFF111827),
                   fontSize: 22,
@@ -626,8 +633,8 @@ class _CtaSection extends StatelessWidget {
           FilledButton(
             style: FilledButton.styleFrom(
                 backgroundColor: const Color(0xFF111827)),
-            onPressed: () => context.go('/health'),
-            child: const Text('Open health page'),
+            onPressed: () => context.go('/marketplace'),
+            child: const Text('Open marketplace'),
           ),
         ],
       ),
@@ -716,17 +723,17 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-class _LinkButton extends StatelessWidget {
+class _RouteButton extends StatelessWidget {
   final String label;
-  final String url;
+  final String path;
 
-  const _LinkButton({required this.label, required this.url});
+  const _RouteButton({required this.label, required this.path});
 
   @override
   Widget build(BuildContext context) {
     return OutlinedButton.icon(
-      onPressed: () => LandingScreen._open(url),
-      icon: const Icon(Icons.open_in_new, size: 18),
+      onPressed: () => context.go(path),
+      icon: const Icon(Icons.arrow_forward, size: 18),
       label: Text(label),
     );
   }

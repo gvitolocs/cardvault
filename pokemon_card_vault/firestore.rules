@@ -85,17 +85,82 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    match /card_listings/{listingId} {
+      allow read: if resource.data.status == 'active';
+      allow create: if signedIn()
+        && request.resource.data.sellerUid == request.auth.uid
+        && request.resource.data.cardId is string
+        && request.resource.data.cardId.size() > 0
+        && request.resource.data.sellerName is string
+        && request.resource.data.sellerName.size() > 0
+        && request.resource.data.pricePkn is number
+        && request.resource.data.pricePkn > 0
+        && request.resource.data.quantityAvailable is int
+        && request.resource.data.quantityAvailable > 0
+        && request.resource.data.quantityAvailable <= 99
+        && request.resource.data.condition in ['NM', 'SP', 'MP', 'PL', 'Poor']
+        && request.resource.data.language in ['EN', 'IT', 'FR', 'DE', 'ES', 'JP']
+        && request.resource.data.status == 'active'
+        && request.resource.data.reverse is bool
+        && request.resource.data.graded is bool
+        && (!request.resource.data.graded
+          || (request.resource.data.gradingCompany is string
+            && request.resource.data.gradingCompany.size() > 0
+            && request.resource.data.grade is string
+            && request.resource.data.grade.size() > 0
+            && request.resource.data.certificationId is string
+            && request.resource.data.certificationId.size() > 0))
+        && request.resource.data.shippingAvailable is bool
+        && request.resource.data.nftAvailable is bool;
+      allow update: if signedIn()
+        && resource.data.sellerUid == request.auth.uid
+        && request.resource.data.sellerUid == resource.data.sellerUid
+        && request.resource.data.cardId == resource.data.cardId
+        && request.resource.data.pricePkn is number
+        && request.resource.data.pricePkn > 0
+        && request.resource.data.quantityAvailable is int
+        && request.resource.data.quantityAvailable >= 0
+        && request.resource.data.quantityAvailable <= 99
+        && request.resource.data.condition in ['NM', 'SP', 'MP', 'PL', 'Poor']
+        && request.resource.data.language in ['EN', 'IT', 'FR', 'DE', 'ES', 'JP']
+        && request.resource.data.reverse is bool
+        && request.resource.data.graded is bool
+        && (!request.resource.data.graded
+          || (request.resource.data.gradingCompany is string
+            && request.resource.data.gradingCompany.size() > 0
+            && request.resource.data.grade is string
+            && request.resource.data.grade.size() > 0
+            && request.resource.data.certificationId is string
+            && request.resource.data.certificationId.size() > 0))
+        && request.resource.data.status in ['active', 'inactive', 'sold_out'];
+      allow delete: if false;
+    }
+
     match /user_carts/{uid} {
-      allow read, create, update: if owns(uid)
+      allow read: if owns(uid);
+      allow create, update: if owns(uid)
         && request.resource.data.items is list
         && request.resource.data.items.size() <= 100;
       allow delete: if owns(uid);
     }
 
     match /user_card_watchlists/{uid} {
-      allow read, create, update: if owns(uid)
+      allow read: if owns(uid);
+      allow create, update: if owns(uid)
         && request.resource.data.cardIds is list
-        && request.resource.data.cardIds.size() <= 1000;
+        && request.resource.data.cardIds.size() <= 1000
+        && request.resource.data.expiresAt is timestamp;
+      allow delete: if owns(uid);
+    }
+
+    match /user_card_recent_views/{uid} {
+      allow read: if owns(uid);
+      allow create, update: if owns(uid)
+        && request.resource.data.cardIds is list
+        && request.resource.data.cardIds.size() <= 60
+        && request.resource.data.cards is list
+        && request.resource.data.cards.size() <= 60
+        && request.resource.data.expiresAt is timestamp;
       allow delete: if owns(uid);
     }
 

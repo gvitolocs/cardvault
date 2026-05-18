@@ -1,6 +1,6 @@
-# CardVault - Pokoin Marketplace And Wallet
+# Pokoin Marketplace And Wallet
 
-CardVault is a Flutter web app for the Pokoin ecosystem. It combines a crypto-native Pokemon card marketplace with the Pokoin Wallet in one deployed web application.
+Pokoin is a Flutter web app for the Pokoin ecosystem. It combines a crypto-native Pokemon card marketplace with the Pokoin Wallet in one deployed web application.
 
 ## Live App
 
@@ -9,7 +9,7 @@ CardVault is a Flutter web app for the Pokoin ecosystem. It combines a crypto-na
 - PokoinPoS RPC: `https://rpc.pokoin.com/rpc`
 - Explorer: `https://explorer.pokoin.com`
 
-The site and wallet are no longer separate Vercel apps or separate Flutter deployments. Vercel serves one Flutter SPA, and `/wallet` is handled by the same router and bundle as the main CardVault site.
+The site and wallet are no longer separate Vercel apps or separate Flutter deployments. Vercel serves one Flutter SPA, and `/wallet` is handled by the same router and bundle as the main Pokoin site.
 
 ## ✨ Features
 
@@ -68,8 +68,8 @@ The site and wallet are no longer separate Vercel apps or separate Flutter deplo
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/GiuseppeVitolo17/cardvault.git
-   cd cardvault/pokemon_card_vault
+   git clone https://github.com/GiuseppeVitolo17/pokoin.git
+   cd pokoin/pokemon_card_vault
    ```
 
 2. **Install dependencies**

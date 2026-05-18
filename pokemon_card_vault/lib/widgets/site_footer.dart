@@ -59,11 +59,16 @@ class SiteFooter extends StatelessWidget {
               _FooterColumn(
                 title: 'Network',
                 links: [
-                  _FooterLink('RPC endpoint', () => _openExternal(ProjectLinks.rpc)),
-                  _FooterLink('Reserve proof', () => _openExternal(ProjectLinks.reserve)),
-                  _FooterLink('wPKN contract', () => _openExternal(ProjectLinks.bscContract)),
-                  _FooterLink('PancakeSwap', () => _openExternal(ProjectLinks.pancakeSwap)),
-                  _FooterLink('CoinMarketCap', () => _openExternal(ProjectLinks.coinMarketCap)),
+                  _FooterLink(
+                      'RPC endpoint', () => _openExternal(ProjectLinks.rpc)),
+                  _FooterLink('Reserve proof',
+                      () => _openExternal(ProjectLinks.reserve)),
+                  _FooterLink('wPKN contract',
+                      () => _openExternal(ProjectLinks.bscContract)),
+                  _FooterLink('PancakeSwap',
+                      () => _openExternal(ProjectLinks.pancakeSwap)),
+                  _FooterLink('CoinMarketCap',
+                      () => _openExternal(ProjectLinks.coinMarketCap)),
                 ],
               ),
               const _FooterSignal(),
@@ -78,12 +83,15 @@ class SiteFooter extends StatelessWidget {
             alignment: WrapAlignment.spaceBetween,
             children: [
               Text(
-                '© $year Pokoin. CardVault, PokoinPoS and wPKN are part of the Pokoin ecosystem.',
+                '© $year Pokoin. Card Reserve, PokoinPoS and wPKN are part of the Pokoin ecosystem.',
                 style: const TextStyle(color: Color(0xFF93A4C8), fontSize: 12),
               ),
               const Text(
                 'Built for transparent collectible commerce and on-chain settlement.',
-                style: TextStyle(color: Color(0xFFFDE68A), fontSize: 12, fontWeight: FontWeight.w700),
+                style: TextStyle(
+                    color: Color(0xFFFDE68A),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700),
               ),
             ],
           ),
@@ -102,7 +110,6 @@ class _FooterBrand extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
-          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               width: 46,
@@ -126,23 +133,25 @@ class _FooterBrand extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Pokoin',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.3,
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Pokoin',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.3,
+                    ),
                   ),
-                ),
-                Text(
-                  'Permissioned PoS + collector rails',
-                  style: TextStyle(color: Color(0xFF93A4C8), fontSize: 12),
-                ),
-              ],
+                  Text(
+                    'Permissioned PoS + collector rails',
+                    style: TextStyle(color: Color(0xFF93A4C8), fontSize: 12),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -220,7 +229,8 @@ class _FooterSignal extends StatelessWidget {
           SizedBox(height: 12),
           Text(
             'Public by design',
-            style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900),
+            style: TextStyle(
+                color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900),
           ),
           SizedBox(height: 8),
           Text(

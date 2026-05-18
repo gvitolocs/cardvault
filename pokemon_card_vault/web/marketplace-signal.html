@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <base href="/">
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Pokoin Marketplace Signal tracks Card Reserve analytics for collectors: listed value, floor ask, median ask, price depth, rarity concentration, reserve coverage, and marketplace readiness.">
+  <meta name="keywords" content="Pokoin marketplace signal, Card Reserve analytics, Pokemon card market analytics, card collector crypto market, PKN marketplace, Pokemon card price signals">
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+  <meta name="author" content="Pokoin">
+  <meta name="application-name" content="Pokoin Marketplace Signal">
+  <meta name="theme-color" content="#050816">
+  <link rel="canonical" href="https://pokoin.com/marketplace/signal">
+  <link rel="sitemap" type="application/xml" href="/sitemap.xml">
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Pokoin">
+  <meta property="og:title" content="Pokoin Marketplace Signal - Card Reserve Analytics">
+  <meta property="og:description" content="Track Card Reserve market signals for collectors: listed value, price depth, floor ask, median ask, rarity concentration, and settlement readiness.">
+  <meta property="og:url" content="https://pokoin.com/marketplace/signal">
+  <meta property="og:image" content="https://pokoin.com/pokoin-1024.png">
+  <meta property="og:image:alt" content="Pokoin Marketplace Signal logo">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Pokoin Marketplace Signal - Card Reserve Analytics">
+  <meta name="twitter:description" content="Card Reserve analytics for collectors: listed value, price depth, floor ask, median ask, rarity concentration, and marketplace readiness.">
+  <meta name="twitter:image" content="https://pokoin.com/pokoin-1024.png">
+
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/pokoin-192.png">
+
+  <title>Pokoin Marketplace Signal - Card Reserve Analytics</title>
+  <link rel="manifest" href="/manifest.json">
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebPage",
+      "name": "Pokoin Marketplace Signal",
+      "url": "https://pokoin.com/marketplace/signal",
+      "description": "Marketplace analytics for Pokoin Card Reserve, including listed value, price depth, floor ask, median ask, rarity concentration, reserve coverage, and marketplace readiness.",
+      "isPartOf": {
+        "@type": "WebSite",
+        "name": "Pokoin",
+        "url": "https://pokoin.com/"
+      }
+    }
+  </script>
+  <script>
+    window.pokoinClearFlutterCache = async function () {
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map((registration) => registration.unregister()));
+      }
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map((cacheName) => caches.delete(cacheName)));
+      }
+    };
+  </script>
+</head>
+<body>
+  <noscript>
+    <main>
+      <h1>Pokoin Marketplace Signal</h1>
+      <p>
+        Card Reserve analytics for collectors: listed value, price depth, floor
+        ask, median ask, rarity concentration, reserve coverage and marketplace
+        readiness.
+      </p>
+      <nav>
+        <a href="/marketplace">Open marketplace</a>
+        <a href="/wallet">Open wallet</a>
+        <a href="/scan">Open Pokoin Scan</a>
+      </nav>
+    </main>
+  </noscript>
+  <script>
+    window.pokoinClearFlutterCache()
+      .catch(() => {})
+      .finally(() => {
+        const script = document.createElement('script');
+        script.src = `/flutter_bootstrap.js?v=${Date.now()}`;
+        script.async = true;
+        document.body.appendChild(script);
+      });
+  </script>
+</body>
+</html>

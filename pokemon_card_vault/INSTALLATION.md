@@ -1,8 +1,8 @@
-# 🚀 Installation Guide - Pokemon Card Vault
+# Installation Guide - Pokoin
 
 ## Prerequisites
 
-Before installing the Pokemon Card Vault app, make sure you have the following installed:
+Before installing the Pokoin app, make sure you have the following installed:
 
 ### Required Software
 - **Flutter SDK** (3.0.0 or higher)
@@ -20,8 +20,8 @@ Before installing the Pokemon Card Vault app, make sure you have the following i
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/GiuseppeVitolo17/cardvault.git
-cd cardvault/pokemon_card_vault
+git clone https://github.com/GiuseppeVitolo17/pokoin.git
+cd pokoin/pokemon_card_vault
 ```
 
 ### 2. Install Dependencies
@@ -217,8 +217,8 @@ If you encounter any issues:
 
 1. Check the [Flutter documentation](https://docs.flutter.dev/)
 2. Search for solutions on [Stack Overflow](https://stackoverflow.com/)
-3. Open an issue on the [GitHub repository](https://github.com/GiuseppeVitolo17/cardvault)
-4. Contact support at support@pokemoncardvault.com
+3. Open an issue on the [GitHub repository](https://github.com/GiuseppeVitolo17/pokoin)
+4. Contact support at support@pokoin.com
 
 ## Contributing
 

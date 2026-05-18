@@ -6,9 +6,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../models/card_listing.dart';
 import '../models/pokemon_card.dart';
+import '../providers/auth_provider.dart';
+import '../providers/card_listing_provider.dart';
 import '../providers/card_provider.dart';
 import '../providers/cart_provider.dart';
+import '../providers/favorites_provider.dart';
+import '../providers/recent_views_provider.dart';
+import '../services/card_service.dart';
 import '../utils/price_format.dart';
 
 class CardDetailScreen extends ConsumerWidget {
@@ -23,22 +29,46 @@ class CardDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final cardState = ref.watch(cardProvider);
     final card = _findCard(cardState.cards, cardId);
+    final directCardState =
+        card == null ? ref.watch(_cardDetailByIdProvider(cardId)) : null;
+    final directCard = directCardState?.valueOrNull;
+    final resolvedCard = card ?? directCard;
 
-    if (cardState.isLoading && card == null) {
+    if ((cardState.isLoading || (directCardState?.isLoading ?? false)) &&
+        resolvedCard == null) {
       return const _DetailScaffold(child: _LoadingDetail());
     }
 
-    if (card == null) {
+    if (resolvedCard == null) {
       return _DetailScaffold(
         child: _NotFoundDetail(
           cardId: cardId,
-          onBack: () => context.go('/marketplace'),
+          onBack: () => _goBackOr(context, '/marketplace'),
         ),
       );
     }
 
-    final market = _CardMarketData.forCard(card);
-    final isInCart = ref.watch(cartProvider).isInCart(card.id);
+    final listingsState = ref.watch(cardListingsProvider(resolvedCard.id));
+    final listings = listingsState.valueOrNull ?? const <CardListing>[];
+    final market = _CardMarketData.forCard(resolvedCard, listings);
+    final bestListing = market.bestListing;
+    final cartState = ref.watch(cartProvider);
+    final isInCart = bestListing == null
+        ? cartState.isInCart(resolvedCard.id)
+        : cartState.isListingInCart(bestListing.id);
+    final expansionCardsState =
+        ref.watch(_expansionVersionCardsProvider(resolvedCard));
+    final expansionCards = expansionCardsState.valueOrNull ?? const [];
+    final previousId = _adjacentExpansionCardId(
+      expansionCards,
+      resolvedCard.id,
+      direction: -1,
+    );
+    final nextId = _adjacentExpansionCardId(
+      expansionCards,
+      resolvedCard.id,
+      direction: 1,
+    );
 
     return Scaffold(
       backgroundColor: const Color(0xFF050816),
@@ -48,10 +78,10 @@ class CardDetailScreen extends ConsumerWidget {
             pinned: true,
             backgroundColor: const Color(0xF20A1026),
             leading: IconButton(
-              onPressed: () => context.go('/marketplace'),
+              onPressed: () => _goBackOr(context, '/marketplace'),
               icon: const Icon(Icons.arrow_back),
             ),
-            title: Text(card.name, overflow: TextOverflow.ellipsis),
+            title: Text(resolvedCard.name, overflow: TextOverflow.ellipsis),
             actions: [
               TextButton.icon(
                 onPressed: () => context.go('/wallet'),
@@ -70,19 +100,48 @@ class CardDetailScreen extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _AssetHeader(card: card, market: market),
+                      _AssetHeader(
+                        card: resolvedCard,
+                        market: market,
+                        onSell: () =>
+                            _openSellDialog(context, ref, resolvedCard),
+                        onWishlist: () => ref
+                            .read(favoritesProvider.notifier)
+                            .toggleFavorite(resolvedCard.id),
+                      ),
                       const SizedBox(height: 18),
                       _TopTerminal(
-                        card: card,
+                        card: resolvedCard,
                         market: market,
                         isInCart: isInCart,
+                        onSell: () =>
+                            _openSellDialog(context, ref, resolvedCard),
+                        onPrevious: previousId == null
+                            ? null
+                            : () => context.go('/card/$previousId'),
+                        onNext: nextId == null
+                            ? null
+                            : () => context.go('/card/$nextId'),
+                        onViewAllVersions: () => context.go(
+                          Uri(
+                            path: '/marketplace/search',
+                            queryParameters: {'q': resolvedCard.name},
+                          ).toString(),
+                        ),
                       ),
                       const SizedBox(height: 18),
                       _MarketStatsGrid(market: market),
                       const SizedBox(height: 18),
-                      _ListingsTerminal(card: card, market: market),
-                      const SizedBox(height: 18),
-                      _Fundamentals(card: card, market: market),
+                      _ListingsTerminal(
+                        card: resolvedCard,
+                        market: market,
+                        isLoading: listingsState.isLoading,
+                        onSell: () =>
+                            _openSellDialog(context, ref, resolvedCard),
+                        onWishlist: () => ref
+                            .read(favoritesProvider.notifier)
+                            .toggleFavorite(resolvedCard.id),
+                      ),
                     ],
                   ),
                 ),
@@ -102,6 +161,75 @@ class CardDetailScreen extends ConsumerWidget {
     }
     return null;
   }
+
+  String? _adjacentExpansionCardId(
+    List<PokemonCard> expansionCards,
+    String currentId, {
+    required int direction,
+  }) {
+    if (expansionCards.length < 2) {
+      return null;
+    }
+    final index = expansionCards.indexWhere((card) => card.id == currentId);
+    if (index < 0) {
+      return null;
+    }
+    final adjacentIndex = (index + direction) % expansionCards.length;
+    final adjacent = expansionCards[
+        adjacentIndex < 0 ? expansionCards.length - 1 : adjacentIndex];
+    return adjacent.id == currentId ? null : adjacent.id;
+  }
+
+  void _openSellDialog(
+    BuildContext context,
+    WidgetRef ref,
+    PokemonCard card,
+  ) {
+    final user = ref.read(authStateProvider).valueOrNull;
+    if (user == null) {
+      context.go('/auth');
+      return;
+    }
+    final profile = ref.read(userProfileProvider).valueOrNull;
+    showDialog(
+      context: context,
+      builder: (context) => _SellListingDialog(
+        card: card,
+        sellerUid: user.uid,
+        sellerName: profile?.displayName.trim().isNotEmpty == true
+            ? profile!.displayName
+            : user.displayName ?? user.email ?? 'Pokoin seller',
+      ),
+    );
+  }
+}
+
+final _cardDetailByIdProvider =
+    FutureProvider.family<PokemonCard?, String>((ref, cardId) {
+  return ref.read(cardProvider.notifier).loadCardById(cardId).then((card) {
+    if (card != null) {
+      ref.read(cardProvider.notifier).recordCardInteraction(
+            card,
+            'view',
+            source: 'card_detail',
+          );
+      ref.read(recentViewsProvider.notifier).remember(card);
+    }
+    return card;
+  });
+});
+
+final _expansionVersionCardsProvider =
+    FutureProvider.family<List<PokemonCard>, PokemonCard>((ref, card) {
+  return CardService().getExpansionVersionCards(card);
+});
+
+void _goBackOr(BuildContext context, String fallbackPath) {
+  if (context.canPop()) {
+    context.pop();
+    return;
+  }
+  context.go(fallbackPath);
 }
 
 class _DetailScaffold extends StatelessWidget {
@@ -202,10 +330,14 @@ class _AssetHeader extends StatelessWidget {
   const _AssetHeader({
     required this.card,
     required this.market,
+    required this.onSell,
+    required this.onWishlist,
   });
 
   final PokemonCard card;
   final _CardMarketData market;
+  final VoidCallback onSell;
+  final VoidCallback onWishlist;
 
   @override
   Widget build(BuildContext context) {
@@ -218,6 +350,8 @@ class _AssetHeader extends StatelessWidget {
         children: [
           const _Badge(text: 'Pokémon', color: Color(0xFF38BDF8)),
           _Badge(text: card.rarity, color: const Color(0xFFFACC15)),
+          if (card.itemKind == 'product')
+            _Badge(text: card.type, color: const Color(0xFFA78BFA)),
           if (card.isHolo) const _Badge(text: 'Holo', color: Color(0xFFA78BFA)),
           SizedBox(
             width: 520,
@@ -232,18 +366,50 @@ class _AssetHeader extends StatelessWidget {
                       ),
                 ),
                 const SizedBox(height: 6),
-                Text(
-                  '${card.set} #${card.number} · ${card.condition} · ${card.type}',
-                  style: const TextStyle(color: Color(0xFFB8C4E6)),
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    InkWell(
+                      borderRadius: BorderRadius.circular(6),
+                      onTap: () => context.go(
+                        '/marketplace/search?expansion=${Uri.encodeQueryComponent(card.set)}',
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Text(
+                          card.set,
+                          style: const TextStyle(
+                            color: Color(0xFF38BDF8),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Text(
+                      ' #${card.number} · ${card.condition} · ${card.type}',
+                      style: const TextStyle(color: Color(0xFFB8C4E6)),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
-          _QuotePill(label: 'Floor', value: formatPkn(market.floorPrice)),
+          _QuotePill(
+              label: 'Floor',
+              value: market.hasListings ? formatPkn(market.floorPrice) : '—'),
           _QuotePill(
               label: '24h', value: market.change24hLabel, positive: true),
+          FilledButton.icon(
+            onPressed: onSell,
+            icon: const Icon(Icons.sell_outlined, size: 18),
+            label: const Text('Sell'),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF38BDF8),
+              foregroundColor: const Color(0xFF07111F),
+            ),
+          ),
           IconButton.filledTonal(
-            onPressed: () {},
+            onPressed: onWishlist,
             icon: const Icon(Icons.favorite_border),
             tooltip: 'Add to wishlist',
           ),
@@ -263,17 +429,34 @@ class _TopTerminal extends StatelessWidget {
     required this.card,
     required this.market,
     required this.isInCart,
+    required this.onSell,
+    required this.onPrevious,
+    required this.onNext,
+    required this.onViewAllVersions,
   });
 
   final PokemonCard card;
   final _CardMarketData market;
   final bool isInCart;
+  final VoidCallback onSell;
+  final VoidCallback? onPrevious;
+  final VoidCallback? onNext;
+  final VoidCallback onViewAllVersions;
 
   @override
   Widget build(BuildContext context) {
     final wide = MediaQuery.sizeOf(context).width > 960;
-    final artwork = _ArtworkPanel(card: card);
-    final center = _MarketCenterPanel(card: card, market: market);
+    final artwork = _ArtworkPanel(
+      card: card,
+      onPrevious: onPrevious,
+      onNext: onNext,
+      onViewAllVersions: onViewAllVersions,
+    );
+    final center = _MarketCenterPanel(
+      card: card,
+      market: market,
+      onSell: onSell,
+    );
     final deal = _BestDealPanel(card: card, market: market, isInCart: isInCart);
 
     if (!wide) {
@@ -302,9 +485,17 @@ class _TopTerminal extends StatelessWidget {
 }
 
 class _ArtworkPanel extends StatelessWidget {
-  const _ArtworkPanel({required this.card});
+  const _ArtworkPanel({
+    required this.card,
+    required this.onPrevious,
+    required this.onNext,
+    required this.onViewAllVersions,
+  });
 
   final PokemonCard card;
+  final VoidCallback? onPrevious;
+  final VoidCallback? onNext;
+  final VoidCallback onViewAllVersions;
 
   @override
   Widget build(BuildContext context) {
@@ -316,27 +507,41 @@ class _ArtworkPanel extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               IconButton.filledTonal(
-                  onPressed: () {}, icon: const Icon(Icons.chevron_left)),
-              _Badge(text: '#${card.number}', color: const Color(0xFF38BDF8)),
+                onPressed: onPrevious,
+                icon: const Icon(Icons.chevron_left),
+                tooltip: 'Previous card',
+              ),
+              Flexible(
+                child: _Badge(
+                  text: card.number,
+                  color: const Color(0xFF38BDF8),
+                ),
+              ),
               IconButton.filledTonal(
-                  onPressed: () {}, icon: const Icon(Icons.chevron_right)),
+                onPressed: onNext,
+                icon: const Icon(Icons.chevron_right),
+                tooltip: 'Next card',
+              ),
             ],
           ),
           const SizedBox(height: 12),
           AspectRatio(
             aspectRatio: 0.72,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(22),
-              child: Container(
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
                 color: const Color(0xFF111936),
-                child: CachedNetworkImage(
-                  imageUrl: card.imageUrl,
-                  fit: BoxFit.contain,
-                  errorWidget: (_, __, ___) => const Icon(
-                    Icons.style,
-                    color: Color(0xFFFACC15),
-                    size: 72,
-                  ),
+                borderRadius: BorderRadius.circular(22),
+              ),
+              clipBehavior: Clip.none,
+              child: CachedNetworkImage(
+                imageUrl: card.imageUrl,
+                fit: BoxFit.contain,
+                alignment: Alignment.center,
+                errorWidget: (_, __, ___) => const Icon(
+                  Icons.style,
+                  color: Color(0xFFFACC15),
+                  size: 72,
                 ),
               ),
             ),
@@ -345,7 +550,7 @@ class _ArtworkPanel extends StatelessWidget {
           _SelectorLike(label: '${card.set} #${card.number}'),
           const SizedBox(height: 8),
           TextButton(
-            onPressed: () {},
+            onPressed: onViewAllVersions,
             child: const Text('View all versions'),
           ),
         ],
@@ -358,10 +563,12 @@ class _MarketCenterPanel extends StatelessWidget {
   const _MarketCenterPanel({
     required this.card,
     required this.market,
+    required this.onSell,
   });
 
   final PokemonCard card;
   final _CardMarketData market;
+  final VoidCallback onSell;
 
   @override
   Widget build(BuildContext context) {
@@ -370,32 +577,35 @@ class _MarketCenterPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              _TabPill(text: 'Info', active: true),
-              SizedBox(width: 8),
-              _TabPill(text: 'Sell', active: false),
-              SizedBox(width: 8),
-              _TabPill(text: 'Markets', active: false),
+              const _TabPill(text: 'Info', active: true),
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: onSell,
+                borderRadius: BorderRadius.circular(999),
+                child: const _TabPill(text: 'Sell', active: false),
+              ),
+              const SizedBox(width: 8),
+              const _TabPill(text: 'Markets', active: false),
             ],
           ),
           const SizedBox(height: 18),
-          Wrap(
-            spacing: 14,
-            runSpacing: 14,
-            children: [
-              _MetricTile(
-                  title: 'CT Min Price',
-                  value: formatPkn(market.floorPrice),
-                  accent: true),
-              _MetricTile(
-                  title: 'CT Market Price',
-                  value: formatPkn(market.marketPrice)),
-              _MetricTile(
-                  title: 'US Market Price', value: market.usMarketLabel),
-            ],
-          ),
-          const SizedBox(height: 20),
+          if (market.hasListings) ...[
+            Wrap(
+              spacing: 14,
+              runSpacing: 14,
+              children: [
+                _MetricTile(
+                  title: 'Best ask',
+                  value: formatPkn(market.bestDeal),
+                  accent: true,
+                ),
+                _MetricTile(title: 'US market', value: market.usMarketLabel),
+              ],
+            ),
+            const SizedBox(height: 20),
+          ],
           SizedBox(height: 220, child: _PriceChart(market: market)),
           const SizedBox(height: 20),
           const Text(
@@ -424,6 +634,7 @@ class _BestDealPanel extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final bestListing = market.bestListing;
     return Column(
       children: [
         _Panel(
@@ -436,7 +647,7 @@ class _BestDealPanel extends ConsumerWidget {
                       color: Colors.white70, fontWeight: FontWeight.w800)),
               const SizedBox(height: 8),
               Text(
-                formatPkn(market.bestDeal),
+                market.hasListings ? formatPkn(market.bestDeal) : '—',
                 style: const TextStyle(
                     color: Colors.white,
                     fontSize: 34,
@@ -444,17 +655,35 @@ class _BestDealPanel extends ConsumerWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                '~${market.fiatLabel} · spread ${market.spreadLabel}',
+                market.hasListings
+                    ? '~${market.fiatLabel} · spread ${market.spreadLabel}'
+                    : 'No sellers yet. Be the first to list this card.',
                 style: const TextStyle(color: Color(0xFF93A4C8)),
               ),
               const SizedBox(height: 16),
-              const _SelectorLike(label: 'EN · English'),
+              _SelectorLike(
+                  label: bestListing == null
+                      ? 'Select language'
+                      : '${bestListing.language} · ${_languageName(bestListing.language)}'),
               const SizedBox(height: 8),
-              const _SelectorLike(label: 'NM · Near Mint'),
+              _SelectorLike(
+                  label: bestListing == null
+                      ? 'Select condition'
+                      : '${bestListing.condition} · ${_conditionName(bestListing.condition)}'),
               const SizedBox(height: 14),
               FilledButton.icon(
-                onPressed: () =>
-                    ref.read(cartProvider.notifier).addToCart(card),
+                onPressed: bestListing == null
+                    ? null
+                    : () {
+                        ref
+                            .read(cartProvider.notifier)
+                            .addListingToCart(card, bestListing);
+                        ref.read(cardProvider.notifier).recordCardInteraction(
+                              card,
+                              'cart_add',
+                              source: 'detail_buy_box',
+                            );
+                      },
                 icon: Icon(
                     isInCart ? Icons.shopping_bag : Icons.add_shopping_cart),
                 label: Text(isInCart ? 'In cart' : 'Add to cart'),
@@ -468,7 +697,8 @@ class _BestDealPanel extends ConsumerWidget {
               ),
               const SizedBox(height: 12),
               _DexLine(
-                  label: 'Estimated total', value: formatPkn(market.bestDeal)),
+                  label: 'Estimated total',
+                  value: market.hasListings ? formatPkn(market.bestDeal) : '—'),
               const _DexLine(label: 'Network / escrow fee', value: '0.30%'),
               const _DexLine(label: 'Slippage guard', value: '1.00%'),
             ],
@@ -506,12 +736,24 @@ class _MarketStatsGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final stats = [
-      ('Market cap', formatPkn(market.marketCap), '+4.2%'),
-      ('Volume 24h', formatPkn(market.volume24h), '+18.6%'),
+      (
+        'Market cap',
+        market.hasListings ? formatPkn(market.marketCap) : '—',
+        market.hasListings ? '+4.2%' : 'empty'
+      ),
+      (
+        'Volume 24h',
+        market.hasListings ? formatPkn(market.volume24h) : '—',
+        market.hasListings ? '+18.6%' : 'empty'
+      ),
       ('Listings', '${market.listings.length}', 'live'),
-      ('Liquidity', market.liquidityLabel, 'depth'),
-      ('Best bid', formatPkn(market.bestBid), 'PKN'),
-      ('Best ask', formatPkn(market.bestDeal), market.spreadLabel),
+      ('Liquidity', market.hasListings ? market.liquidityLabel : '—', 'depth'),
+      ('Best bid', market.hasListings ? formatPkn(market.bestBid) : '—', 'PKN'),
+      (
+        'Best ask',
+        market.hasListings ? formatPkn(market.bestDeal) : '—',
+        market.spreadLabel
+      ),
     ];
 
     return LayoutBuilder(
@@ -541,20 +783,85 @@ class _MarketStatsGrid extends StatelessWidget {
   }
 }
 
-class _ListingsTerminal extends StatelessWidget {
+class _ListingsTerminal extends StatefulWidget {
   const _ListingsTerminal({
     required this.card,
     required this.market,
+    required this.isLoading,
+    required this.onSell,
+    required this.onWishlist,
   });
 
   final PokemonCard card;
   final _CardMarketData market;
+  final bool isLoading;
+  final VoidCallback onSell;
+  final VoidCallback onWishlist;
+
+  @override
+  State<_ListingsTerminal> createState() => _ListingsTerminalState();
+}
+
+class _ListingsTerminalState extends State<_ListingsTerminal> {
+  final TextEditingController _minPriceController = TextEditingController();
+  final TextEditingController _maxPriceController = TextEditingController();
+  final Set<String> _conditions = <String>{};
+  final Set<String> _languages = <String>{};
+  bool _shippingOnly = false;
+  bool _nftOnly = false;
+  bool _gradedOnly = false;
+  bool _signedOnly = false;
+  bool _reverseOnly = false;
+  String _sort = 'price_asc';
+
+  @override
+  void dispose() {
+    _minPriceController.dispose();
+    _maxPriceController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final wide = MediaQuery.sizeOf(context).width > 900;
-    final filters = _ListingFilters(market: market);
-    final table = _ListingsTable(market: market);
+    final visibleListings = _filteredListings();
+    final filters = _ListingFilters(
+      market: widget.market,
+      minPriceController: _minPriceController,
+      maxPriceController: _maxPriceController,
+      selectedConditions: _conditions,
+      selectedLanguages: _languages,
+      shippingOnly: _shippingOnly,
+      nftOnly: _nftOnly,
+      gradedOnly: _gradedOnly,
+      signedOnly: _signedOnly,
+      reverseOnly: _reverseOnly,
+      onPriceChanged: () => setState(() {}),
+      onToggleCondition: (value) => setState(() {
+        _toggle(_conditions, value);
+      }),
+      onToggleLanguage: (value) => setState(() {
+        _toggle(_languages, value);
+      }),
+      onShippingOnlyChanged: (value) => setState(() => _shippingOnly = value),
+      onNftOnlyChanged: (value) => setState(() => _nftOnly = value),
+      onGradedOnlyChanged: (value) => setState(() => _gradedOnly = value),
+      onSignedOnlyChanged: (value) => setState(() => _signedOnly = value),
+      onReverseOnlyChanged: (value) => setState(() => _reverseOnly = value),
+      onClear: _clearFilters,
+    );
+    final table = _ListingsTable(
+      card: widget.card,
+      market: widget.market,
+      listings: visibleListings,
+      totalListings: widget.market.listings.length,
+      isLoading: widget.isLoading,
+      sort: _sort,
+      onSortChanged: (value) => setState(() => _sort = value),
+      onSell: widget.onSell,
+      onWishlist: widget.onWishlist,
+      onClearFilters: _clearFilters,
+    );
 
     if (!wide) {
       return Column(
@@ -575,12 +882,121 @@ class _ListingsTerminal extends StatelessWidget {
       ],
     );
   }
+
+  List<CardListing> _filteredListings() {
+    final minPrice = double.tryParse(_minPriceController.text.trim());
+    final maxPrice = double.tryParse(_maxPriceController.text.trim());
+    final filtered = widget.market.listings.where((listing) {
+      if (minPrice != null && listing.pricePkn < minPrice) {
+        return false;
+      }
+      if (maxPrice != null && listing.pricePkn > maxPrice) {
+        return false;
+      }
+      if (_conditions.isNotEmpty && !_conditions.contains(listing.condition)) {
+        return false;
+      }
+      if (_languages.isNotEmpty && !_languages.contains(listing.language)) {
+        return false;
+      }
+      if (_shippingOnly && !listing.shippingAvailable) {
+        return false;
+      }
+      if (_nftOnly && !listing.nftAvailable) {
+        return false;
+      }
+      if (_gradedOnly && !listing.graded) {
+        return false;
+      }
+      if (_signedOnly && !listing.signed) {
+        return false;
+      }
+      if (_reverseOnly && !listing.reverse) {
+        return false;
+      }
+      return true;
+    }).toList();
+
+    filtered.sort((a, b) {
+      switch (_sort) {
+        case 'price_desc':
+          return b.pricePkn.compareTo(a.pricePkn);
+        case 'qty_desc':
+          return b.quantityAvailable.compareTo(a.quantityAvailable);
+        case 'seller':
+          return a.sellerName.compareTo(b.sellerName);
+        case 'price_asc':
+        default:
+          return a.pricePkn.compareTo(b.pricePkn);
+      }
+    });
+    return filtered;
+  }
+
+  void _clearFilters() {
+    setState(() {
+      _minPriceController.clear();
+      _maxPriceController.clear();
+      _conditions.clear();
+      _languages.clear();
+      _shippingOnly = false;
+      _nftOnly = false;
+      _gradedOnly = false;
+      _signedOnly = false;
+      _reverseOnly = false;
+      _sort = 'price_asc';
+    });
+  }
+
+  void _toggle(Set<String> values, String value) {
+    if (!values.add(value)) {
+      values.remove(value);
+    }
+  }
 }
 
 class _ListingFilters extends StatelessWidget {
-  const _ListingFilters({required this.market});
+  const _ListingFilters({
+    required this.market,
+    required this.minPriceController,
+    required this.maxPriceController,
+    required this.selectedConditions,
+    required this.selectedLanguages,
+    required this.shippingOnly,
+    required this.nftOnly,
+    required this.gradedOnly,
+    required this.signedOnly,
+    required this.reverseOnly,
+    required this.onPriceChanged,
+    required this.onToggleCondition,
+    required this.onToggleLanguage,
+    required this.onShippingOnlyChanged,
+    required this.onNftOnlyChanged,
+    required this.onGradedOnlyChanged,
+    required this.onSignedOnlyChanged,
+    required this.onReverseOnlyChanged,
+    required this.onClear,
+  });
 
   final _CardMarketData market;
+  final TextEditingController minPriceController;
+  final TextEditingController maxPriceController;
+  final Set<String> selectedConditions;
+  final Set<String> selectedLanguages;
+  final bool shippingOnly;
+  final bool nftOnly;
+  final bool gradedOnly;
+  final bool signedOnly;
+  final bool reverseOnly;
+  final VoidCallback onPriceChanged;
+  final ValueChanged<String> onToggleCondition;
+  final ValueChanged<String> onToggleLanguage;
+  final ValueChanged<bool> onShippingOnlyChanged;
+  final ValueChanged<bool> onNftOnlyChanged;
+  final ValueChanged<bool> onGradedOnlyChanged;
+  final ValueChanged<bool> onSignedOnlyChanged;
+  final ValueChanged<bool> onReverseOnlyChanged;
+  final VoidCallback onClear;
 
   @override
   Widget build(BuildContext context) {
@@ -595,53 +1011,109 @@ class _ListingFilters extends StatelessWidget {
                   fontSize: 18,
                   fontWeight: FontWeight.w900)),
           const SizedBox(height: 16),
-          const _FilterGroup(title: 'Price (PKN)', children: [
-            _InputGhost(text: 'min'),
-            SizedBox(height: 8),
-            _InputGhost(text: 'max'),
+          _FilterGroup(title: 'Price (PKN)', children: [
+            _PriceInput(
+              controller: minPriceController,
+              hint: 'min',
+              onChanged: onPriceChanged,
+            ),
+            const SizedBox(height: 8),
+            _PriceInput(
+              controller: maxPriceController,
+              hint: 'max',
+              onChanged: onPriceChanged,
+            ),
           ]),
           const SizedBox(height: 16),
-          const _FilterGroup(
+          _FilterGroup(
             title: 'Condition',
             children: [
-              _CheckGhost(text: 'Near Mint', checked: true),
-              _CheckGhost(text: 'Slightly Played'),
-              _CheckGhost(text: 'Moderately Played'),
-              _CheckGhost(text: 'Played'),
-              _CheckGhost(text: 'Poor'),
+              _FilterCheck(
+                text: 'Near Mint',
+                checked: selectedConditions.contains('NM'),
+                onChanged: () => onToggleCondition('NM'),
+              ),
+              _FilterCheck(
+                text: 'Slightly Played',
+                checked: selectedConditions.contains('SP'),
+                onChanged: () => onToggleCondition('SP'),
+              ),
+              _FilterCheck(
+                text: 'Moderately Played',
+                checked: selectedConditions.contains('MP'),
+                onChanged: () => onToggleCondition('MP'),
+              ),
+              _FilterCheck(
+                text: 'Played',
+                checked: selectedConditions.contains('PL'),
+                onChanged: () => onToggleCondition('PL'),
+              ),
+              _FilterCheck(
+                text: 'Poor',
+                checked: selectedConditions.contains('Poor'),
+                onChanged: () => onToggleCondition('Poor'),
+              ),
             ],
           ),
           const SizedBox(height: 16),
-          const _FilterGroup(
+          _FilterGroup(
             title: 'Language',
             children: [
               Wrap(
                 spacing: 10,
                 runSpacing: 8,
                 children: [
-                  _CheckGhost(text: 'EN', checked: true),
-                  _CheckGhost(text: 'IT'),
-                  _CheckGhost(text: 'FR'),
-                  _CheckGhost(text: 'DE'),
-                  _CheckGhost(text: 'ES'),
-                  _CheckGhost(text: 'JP'),
+                  for (final language in const [
+                    'EN',
+                    'IT',
+                    'FR',
+                    'DE',
+                    'ES',
+                    'JP'
+                  ])
+                    _FilterCheck(
+                      text: language,
+                      checked: selectedLanguages.contains(language),
+                      onChanged: () => onToggleLanguage(language),
+                    ),
                 ],
               ),
             ],
           ),
           const SizedBox(height: 16),
-          const _FilterGroup(
+          _FilterGroup(
             title: 'Extra',
             children: [
-              _CheckGhost(text: 'Signed'),
-              _CheckGhost(text: 'Altered/misprint'),
-              _CheckGhost(text: 'Graded'),
-              _CheckGhost(text: 'Pokoin Card Reserve', checked: true),
+              _FilterCheck(
+                text: 'Reverse holo',
+                checked: reverseOnly,
+                onChanged: () => onReverseOnlyChanged(!reverseOnly),
+              ),
+              _FilterCheck(
+                text: 'Signed',
+                checked: signedOnly,
+                onChanged: () => onSignedOnlyChanged(!signedOnly),
+              ),
+              _FilterCheck(
+                text: 'Graded',
+                checked: gradedOnly,
+                onChanged: () => onGradedOnlyChanged(!gradedOnly),
+              ),
+              _FilterCheck(
+                text: 'Shipping',
+                checked: shippingOnly,
+                onChanged: () => onShippingOnlyChanged(!shippingOnly),
+              ),
+              _FilterCheck(
+                text: 'NFT available',
+                checked: nftOnly,
+                onChanged: () => onNftOnlyChanged(!nftOnly),
+              ),
             ],
           ),
           const SizedBox(height: 18),
           OutlinedButton(
-            onPressed: () {},
+            onPressed: onClear,
             style: OutlinedButton.styleFrom(
                 minimumSize: const Size.fromHeight(44)),
             child: const Text('Clear filters'),
@@ -653,9 +1125,29 @@ class _ListingFilters extends StatelessWidget {
 }
 
 class _ListingsTable extends StatelessWidget {
-  const _ListingsTable({required this.market});
+  const _ListingsTable({
+    required this.card,
+    required this.market,
+    required this.listings,
+    required this.totalListings,
+    required this.isLoading,
+    required this.sort,
+    required this.onSortChanged,
+    required this.onSell,
+    required this.onWishlist,
+    required this.onClearFilters,
+  });
 
+  final PokemonCard card;
   final _CardMarketData market;
+  final List<CardListing> listings;
+  final int totalListings;
+  final bool isLoading;
+  final String sort;
+  final ValueChanged<String> onSortChanged;
+  final VoidCallback onSell;
+  final VoidCallback onWishlist;
+  final VoidCallback onClearFilters;
 
   @override
   Widget build(BuildContext context) {
@@ -663,6 +1155,48 @@ class _ListingsTable extends StatelessWidget {
       clip: true,
       child: Column(
         children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    totalListings == 0
+                        ? 'No sellers yet'
+                        : '${listings.length} of $totalListings seller listings',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                DropdownButton<String>(
+                  value: sort,
+                  dropdownColor: const Color(0xFF111936),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                  ),
+                  underline: const SizedBox.shrink(),
+                  items: const [
+                    DropdownMenuItem(
+                        value: 'price_asc', child: Text('Lowest price')),
+                    DropdownMenuItem(
+                        value: 'price_desc', child: Text('Highest price')),
+                    DropdownMenuItem(
+                        value: 'qty_desc', child: Text('Most quantity')),
+                    DropdownMenuItem(value: 'seller', child: Text('Seller')),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      onSortChanged(value);
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             color: const Color(0xFF111B3F),
@@ -672,24 +1206,40 @@ class _ListingsTable extends StatelessWidget {
                 Expanded(flex: 3, child: _HeaderText('Product')),
                 Expanded(flex: 2, child: _HeaderText('Price')),
                 Expanded(child: _HeaderText('Qty')),
-                SizedBox(width: 126, child: _HeaderText('RESERVE')),
+                SizedBox(width: 188, child: _HeaderText('SHIPPING')),
               ],
             ),
           ),
-          for (final listing in market.listings) _ListingRow(listing: listing),
+          if (isLoading)
+            const Padding(
+              padding: EdgeInsets.all(32),
+              child: CircularProgressIndicator(color: Color(0xFFFACC15)),
+            )
+          else if (market.listings.isEmpty)
+            _NoListingsState(onSell: onSell, onWishlist: onWishlist)
+          else if (listings.isEmpty)
+            _NoFilteredListingsState(onClear: onClearFilters)
+          else
+            for (final listing in listings)
+              _ListingRow(card: card, listing: listing),
         ],
       ),
     );
   }
 }
 
-class _ListingRow extends StatelessWidget {
-  const _ListingRow({required this.listing});
+class _ListingRow extends ConsumerWidget {
+  const _ListingRow({
+    required this.card,
+    required this.listing,
+  });
 
-  final _Listing listing;
+  final PokemonCard card;
+  final CardListing listing;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final inCart = ref.watch(cartProvider).isListingInCart(listing.id);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -705,11 +1255,12 @@ class _ListingRow extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text(listing.flag, style: const TextStyle(fontSize: 16)),
+                    Text(_countryFlag(listing.sellerCountry),
+                        style: const TextStyle(fontSize: 16)),
                     const SizedBox(width: 6),
                     Flexible(
                       child: Text(
-                        listing.seller,
+                        listing.sellerName,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                             color: Colors.white, fontWeight: FontWeight.w800),
@@ -718,7 +1269,7 @@ class _ListingRow extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 3),
-                Text('★ ${listing.reputation}',
+                Text('★ ${listing.sellerReputationLabel}',
                     style: const TextStyle(
                         color: Color(0xFF93A4C8), fontSize: 12)),
               ],
@@ -732,30 +1283,78 @@ class _ListingRow extends StatelessWidget {
               children: [
                 _TinyBadge(text: listing.condition),
                 _TinyBadge(text: listing.language),
+                if (listing.reverse) const _TinyBadge(text: 'Reverse'),
                 if (listing.signed) const _TinyBadge(text: 'Signed'),
-                if (listing.reserve) const _TinyBadge(text: 'Reserve'),
+                if (listing.graded)
+                  _TinyBadge(
+                    text: [
+                      listing.gradingCompany ?? 'Graded',
+                      if ((listing.grade ?? '').isNotEmpty) listing.grade!,
+                      if ((listing.certificationId ?? '').isNotEmpty)
+                        '#${listing.certificationId!}',
+                    ].join(' '),
+                  ),
               ],
             ),
           ),
           Expanded(
             flex: 2,
             child: Text(
-              formatPkn(listing.price),
+              formatPkn(listing.pricePkn),
               style: const TextStyle(
                   color: Color(0xFFFACC15), fontWeight: FontWeight.w900),
             ),
           ),
           Expanded(
             child: Text(
-              '1 of ${listing.quantity}',
+              '1 of ${listing.quantityAvailable}',
               style: const TextStyle(color: Color(0xFFB8C4E6)),
             ),
           ),
           SizedBox(
-            width: 126,
+            width: 188,
             child: Row(
               children: [
-                if (listing.reserve)
+                IconButton.filledTonal(
+                  onPressed: () {
+                    ref
+                        .read(cartProvider.notifier)
+                        .addListingToCart(card, listing);
+                    ref.read(cardProvider.notifier).recordCardInteraction(
+                          card,
+                          'cart_add',
+                          source: 'listing_row',
+                        );
+                  },
+                  icon: Icon(
+                    inCart ? Icons.shopping_bag : Icons.shopping_cart_outlined,
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  height: 40,
+                  child: OutlinedButton(
+                    onPressed: listing.nftAvailable ? () {} : null,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFFACC15),
+                      side: BorderSide(
+                        color: const Color(0xFFFACC15).withValues(alpha: 0.55),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      textStyle: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    child: const Text('NFT'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                if (listing.shippingAvailable)
                   Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
@@ -763,19 +1362,14 @@ class _ListingRow extends StatelessWidget {
                       color: const Color(0xFFFACC15),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Text('RESERVE',
+                    child: const Text('SHIPPING',
                         style: TextStyle(
                             color: Color(0xFF111827),
                             fontSize: 11,
                             fontWeight: FontWeight.w900)),
                   )
                 else
-                  const SizedBox(width: 48),
-                const SizedBox(width: 8),
-                IconButton.filledTonal(
-                  onPressed: () {},
-                  icon: const Icon(Icons.shopping_cart_outlined, size: 18),
-                ),
+                  const SizedBox(width: 78),
               ],
             ),
           ),
@@ -785,53 +1379,446 @@ class _ListingRow extends StatelessWidget {
   }
 }
 
-class _Fundamentals extends StatelessWidget {
-  const _Fundamentals({
-    required this.card,
-    required this.market,
+class _NoListingsState extends StatelessWidget {
+  const _NoListingsState({
+    required this.onSell,
+    required this.onWishlist,
   });
 
-  final PokemonCard card;
-  final _CardMarketData market;
+  final VoidCallback onSell;
+  final VoidCallback onWishlist;
 
   @override
   Widget build(BuildContext context) {
-    return _Panel(
-      padding: const EdgeInsets.all(18),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 42),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Card metadata',
-              style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900)),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              _Fundamental(label: 'Set', value: card.set),
-              _Fundamental(label: 'Number', value: card.number),
-              _Fundamental(label: 'Rarity', value: card.rarity),
-              const _Fundamental(label: 'Game', value: 'Pokémon'),
-              _Fundamental(label: 'Blueprint ID', value: card.id),
-              const _Fundamental(
-                  label: 'Condition model', value: 'NM / SP / MP / PL / Poor'),
-              const _Fundamental(
-                  label: 'Languages', value: 'EN, IT, FR, DE, ES +'),
-              _Fundamental(
-                  label: 'Reserve asset', value: 'PKN-RESERVE-${card.id}'),
-            ],
+          Container(
+            width: 70,
+            height: 70,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(Icons.priority_high,
+                color: Color(0xFFCBD5E1), size: 42),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           const Text(
-            'This panel only shows metadata available from the imported CardTrader blueprint catalog. Artist, release date, card text and social watchlist metrics are intentionally omitted until a verified source is connected.',
-            style: TextStyle(color: Color(0xFFB8C4E6), height: 1.55),
+            'No items found',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'No seller has listed this card yet. Add it to your wishlist or be the first seller.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Color(0xFF93A4C8), height: 1.45),
+          ),
+          const SizedBox(height: 18),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            alignment: WrapAlignment.center,
+            children: [
+              OutlinedButton.icon(
+                onPressed: onWishlist,
+                icon: const Icon(Icons.favorite_border),
+                label: const Text('Add to wishlist'),
+              ),
+              FilledButton.icon(
+                onPressed: onSell,
+                icon: const Icon(Icons.sell_outlined),
+                label: const Text('Sell this card'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFFACC15),
+                  foregroundColor: const Color(0xFF111827),
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
+  }
+}
+
+class _NoFilteredListingsState extends StatelessWidget {
+  const _NoFilteredListingsState({required this.onClear});
+
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 38),
+      child: Column(
+        children: [
+          const Icon(Icons.filter_alt_off_outlined,
+              color: Color(0xFFFACC15), size: 44),
+          const SizedBox(height: 12),
+          const Text(
+            'No listings match these filters',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Try widening the price range, language, condition or extras.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Color(0xFF93A4C8), height: 1.45),
+          ),
+          const SizedBox(height: 16),
+          OutlinedButton.icon(
+            onPressed: onClear,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Clear filters'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SellListingDialog extends ConsumerStatefulWidget {
+  const _SellListingDialog({
+    required this.card,
+    required this.sellerUid,
+    required this.sellerName,
+  });
+
+  final PokemonCard card;
+  final String sellerUid;
+  final String sellerName;
+
+  @override
+  ConsumerState<_SellListingDialog> createState() => _SellListingDialogState();
+}
+
+class _SellListingDialogState extends ConsumerState<_SellListingDialog> {
+  final TextEditingController _priceController = TextEditingController();
+  final TextEditingController _quantityController =
+      TextEditingController(text: '1');
+  final TextEditingController _gradingCompanyController =
+      TextEditingController(text: 'PSA');
+  final TextEditingController _gradeController = TextEditingController();
+  final TextEditingController _certificationIdController =
+      TextEditingController();
+  String _condition = 'NM';
+  String _language = 'EN';
+  bool _reverse = true;
+  bool _signed = false;
+  bool _graded = false;
+  bool _shippingAvailable = true;
+  bool _nftAvailable = false;
+  bool _isSaving = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _priceController.text =
+        widget.card.price > 0 ? widget.card.price.toStringAsFixed(0) : '1000';
+  }
+
+  @override
+  void dispose() {
+    _priceController.dispose();
+    _quantityController.dispose();
+    _gradingCompanyController.dispose();
+    _gradeController.dispose();
+    _certificationIdController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dialogTheme = Theme.of(context).copyWith(
+      colorScheme: const ColorScheme.dark(
+        primary: Color(0xFFFACC15),
+        surface: Color(0xFF0B1024),
+        onSurface: Colors.white,
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        labelStyle: const TextStyle(color: Color(0xFF93A4C8)),
+        hintStyle: const TextStyle(color: Color(0xFF64748B)),
+        filled: true,
+        fillColor: const Color(0xFF111936),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.10)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFFACC15)),
+        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? const Color(0xFF111827)
+              : const Color(0xFF94A3B8),
+        ),
+        trackColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? const Color(0xFFFACC15)
+              : const Color(0xFF1E2A4A),
+        ),
+      ),
+    );
+
+    return Theme(
+      data: dialogTheme,
+      child: AlertDialog(
+        backgroundColor: const Color(0xFF0B1024),
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        content: SizedBox(
+          width: 460,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.card.name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: _priceController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Price in PKN',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _quantityController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Quantity available',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        initialValue: _condition,
+                        decoration: const InputDecoration(
+                          labelText: 'Condition',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: const ['NM', 'SP', 'MP', 'PL', 'Poor']
+                            .map(
+                              (value) => DropdownMenuItem(
+                                value: value,
+                                child: Text(value),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (value) =>
+                            setState(() => _condition = value ?? _condition),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        initialValue: _language,
+                        decoration: const InputDecoration(
+                          labelText: 'Language',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: const ['EN', 'IT', 'FR', 'DE', 'ES', 'JP']
+                            .map(
+                              (value) => DropdownMenuItem(
+                                value: value,
+                                child: Text(value),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (value) =>
+                            setState(() => _language = value ?? _language),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SwitchListTile(
+                  value: _reverse,
+                  onChanged: (value) => setState(() => _reverse = value),
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Reverse holo'),
+                ),
+                SwitchListTile(
+                  value: _shippingAvailable,
+                  onChanged: (value) =>
+                      setState(() => _shippingAvailable = value),
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Shipping available'),
+                ),
+                SwitchListTile(
+                  value: _nftAvailable,
+                  onChanged: (value) => setState(() => _nftAvailable = value),
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('NFT claim available'),
+                ),
+                SwitchListTile(
+                  value: _signed,
+                  onChanged: (value) => setState(() => _signed = value),
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Signed card'),
+                ),
+                SwitchListTile(
+                  value: _graded,
+                  onChanged: (value) => setState(() => _graded = value),
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Graded card'),
+                ),
+                if (_graded) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _gradingCompanyController,
+                          decoration: const InputDecoration(
+                            labelText: 'Grading company',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextField(
+                          controller: _gradeController,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'Grade',
+                            hintText: '10',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _certificationIdController,
+                    decoration: const InputDecoration(
+                      labelText: 'Certification ID',
+                      hintText: 'e.g. 12345678',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+                if (_error != null) ...[
+                  const SizedBox(height: 10),
+                  Text(_error!, style: const TextStyle(color: Colors.red)),
+                ],
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: _isSaving ? null : () => Navigator.pop(context),
+            style:
+                TextButton.styleFrom(foregroundColor: const Color(0xFF93A4C8)),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: _isSaving ? null : _saveListing,
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFFACC15),
+              foregroundColor: const Color(0xFF111827),
+            ),
+            child: _isSaving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('List card'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _saveListing() async {
+    final price = double.tryParse(_priceController.text.trim());
+    final quantity = int.tryParse(_quantityController.text.trim());
+    if (price == null || price <= 0 || quantity == null || quantity <= 0) {
+      setState(() => _error = 'Enter a valid price and quantity.');
+      return;
+    }
+    if (_graded &&
+        (_gradingCompanyController.text.trim().isEmpty ||
+            _gradeController.text.trim().isEmpty ||
+            _certificationIdController.text.trim().isEmpty)) {
+      setState(
+          () => _error = 'Enter grading company, grade and certification ID.');
+      return;
+    }
+    setState(() {
+      _isSaving = true;
+      _error = null;
+    });
+    try {
+      final listing = CardListing.draft(
+        card: widget.card,
+        sellerUid: widget.sellerUid,
+        sellerName: widget.sellerName,
+        sellerCountry: 'EU',
+        sellerReputationLabel: 'New seller',
+        condition: _condition,
+        language: _language,
+        pricePkn: price,
+        quantityAvailable: quantity.clamp(1, 99),
+        signed: _signed,
+        reverse: _reverse,
+        graded: _graded,
+        gradingCompany: _graded ? _gradingCompanyController.text.trim() : null,
+        grade: _graded ? _gradeController.text.trim() : null,
+        certificationId:
+            _graded ? _certificationIdController.text.trim() : null,
+        shippingAvailable: _shippingAvailable,
+        nftAvailable: _nftAvailable,
+      );
+      await ref.read(cardListingServiceProvider).createListing(listing);
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Listing created.')),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = error.toString();
+          _isSaving = false;
+        });
+      }
+    }
   }
 }
 
@@ -842,6 +1829,21 @@ class _PriceChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!market.hasChart) {
+      return Container(
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: const Color(0xFF111936),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        child: const Text(
+          'No price history yet. The chart will populate after seller listings and completed purchases.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Color(0xFF93A4C8), height: 1.45),
+        ),
+      );
+    }
     return LineChart(
       LineChartData(
         minY: market.chartMin,
@@ -908,101 +1910,126 @@ class _CardMarketData {
   final double volume24h;
   final double marketCap;
   final List<double> chart;
-  final List<_Listing> listings;
+  final List<CardListing> listings;
 
-  String get fiatLabel => '\$${(bestDeal / 16.3).toStringAsFixed(2)}';
-  String get usMarketLabel => '\$${(marketPrice / 16.1).toStringAsFixed(2)}';
-  String get change24hLabel =>
-      '+${((marketPrice - floorPrice) / floorPrice * 100).toStringAsFixed(2)}%';
-  String get spreadLabel =>
-      '${((bestDeal - bestBid) / bestDeal * 100).toStringAsFixed(2)}%';
+  bool get hasListings => listings.isNotEmpty;
+  bool get hasChart => chart.isNotEmpty;
+  CardListing? get bestListing => hasListings ? listings.first : null;
+  String get fiatLabel =>
+      hasListings ? '\$${(bestDeal / 16.3).toStringAsFixed(2)}' : '—';
+  String get usMarketLabel =>
+      hasListings ? '\$${(marketPrice / 16.1).toStringAsFixed(2)}' : '—';
+  String get change24hLabel => hasListings
+      ? '+${((marketPrice - floorPrice) / floorPrice * 100).toStringAsFixed(2)}%'
+      : '—';
+  String get spreadLabel => hasListings
+      ? '${((bestDeal - bestBid) / bestDeal * 100).toStringAsFixed(2)}%'
+      : '—';
   String get liquidityLabel => '${(listings.length * 2.4).toStringAsFixed(1)}x';
-  double get chartMin => chart.reduce(math.min) * 0.96;
-  double get chartMax => chart.reduce(math.max) * 1.04;
+  double get chartMin => hasChart ? chart.reduce(math.min) * 0.96 : 0;
+  double get chartMax => hasChart ? chart.reduce(math.max) * 1.04 : 1;
 
-  static _CardMarketData forCard(PokemonCard card) {
-    final seed = _seed(card.id);
-    final base = math.max(card.price, 500) * (0.92 + (seed % 13) / 100);
-    final listings = _buildListings(base, seed);
-    final floor = listings.map((listing) => listing.price).reduce(math.min);
-    final market = base * 1.08;
+  static _CardMarketData forCard(
+    PokemonCard card,
+    List<CardListing> listings,
+  ) {
+    final sortedListings = [...listings]
+      ..sort((a, b) => a.pricePkn.compareTo(b.pricePkn));
+    final floor = sortedListings.isEmpty
+        ? 0.0
+        : sortedListings.map((listing) => listing.pricePkn).reduce(math.min);
+    final market = sortedListings.isEmpty
+        ? 0.0
+        : sortedListings.fold<double>(
+              0,
+              (sum, listing) => sum + listing.pricePkn,
+            ) /
+            sortedListings.length;
 
     return _CardMarketData(
       floorPrice: floor,
       marketPrice: market,
       bestDeal: floor,
-      bestBid: floor * 0.964,
-      volume24h: market * (7 + seed % 11),
-      marketCap: market * (850 + seed % 400),
-      chart: _buildChart(market, seed),
-      listings: listings,
+      bestBid: sortedListings.isEmpty ? 0 : floor * 0.964,
+      volume24h: sortedListings.fold<double>(
+        0,
+        (sum, listing) => sum + listing.pricePkn * listing.quantityAvailable,
+      ),
+      marketCap: sortedListings.fold<double>(
+        0,
+        (sum, listing) => sum + listing.pricePkn * listing.quantityAvailable,
+      ),
+      chart: _buildChart(sortedListings),
+      listings: sortedListings,
     );
   }
 
-  static int _seed(String value) {
-    return value.codeUnits.fold(17, (sum, unit) => sum + unit * 31);
-  }
-
-  static List<double> _buildChart(double base, int seed) {
-    return List.generate(32, (index) {
-      final wave = math.sin((index + seed % 7) / 3.1) * 0.06;
-      final drift = (index - 16) * 0.002;
-      final shock = index == 23 ? -0.08 : 0.0;
-      return base * (1 + wave + drift + shock);
-    });
-  }
-
-  static List<_Listing> _buildListings(double base, int seed) {
-    final sellers = [
-      ('YamiWolf', '🇮🇹', '22K'),
-      ('OnyTCG', '🇮🇹', '2.3K'),
-      ('Nick-04', '🇫🇷', '1K'),
-      ('KrakenCards', '🇮🇹', '5.3K'),
-      ('Magic Maze', '🇫🇷', '8.8K'),
-      ('Pixelpartita', '🇮🇹', '2.7K'),
-      ('PokoinDesk', '🇪🇺', '31K'),
-      ('ManaStore', '🇩🇪', '5.6K'),
-    ];
-
-    return List.generate(sellers.length, (index) {
-      final seller = sellers[index];
-      return _Listing(
-        seller: seller.$1,
-        flag: seller.$2,
-        reputation: seller.$3,
-        condition: index == 5 ? 'SP' : 'NM',
-        language: ['EN', 'IT', 'FR', 'DE'][index % 4],
-        price: base * (1 + index * 0.018 + (seed % 5) / 1000),
-        quantity: 1 + (index % 2),
-        reserve: index % 3 != 2,
-        signed: index == 4,
-      );
-    });
+  static List<double> _buildChart(List<CardListing> listings) {
+    if (listings.isEmpty) {
+      return const [];
+    }
+    final values = <double>[];
+    for (final listing in listings) {
+      final pointCount = math.max(1, math.min(listing.quantityAvailable, 8));
+      values.addAll(List<double>.filled(pointCount, listing.pricePkn));
+    }
+    values.sort();
+    return values;
   }
 }
 
-class _Listing {
-  const _Listing({
-    required this.seller,
-    required this.flag,
-    required this.reputation,
-    required this.condition,
-    required this.language,
-    required this.price,
-    required this.quantity,
-    required this.reserve,
-    required this.signed,
-  });
+String _languageName(String code) {
+  switch (code) {
+    case 'IT':
+      return 'Italian';
+    case 'FR':
+      return 'French';
+    case 'DE':
+      return 'German';
+    case 'ES':
+      return 'Spanish';
+    case 'JP':
+      return 'Japanese';
+    case 'EN':
+    default:
+      return 'English';
+  }
+}
 
-  final String seller;
-  final String flag;
-  final String reputation;
-  final String condition;
-  final String language;
-  final double price;
-  final int quantity;
-  final bool reserve;
-  final bool signed;
+String _conditionName(String code) {
+  switch (code) {
+    case 'SP':
+      return 'Slightly Played';
+    case 'MP':
+      return 'Moderately Played';
+    case 'PL':
+      return 'Played';
+    case 'Poor':
+      return 'Poor';
+    case 'NM':
+    default:
+      return 'Near Mint';
+  }
+}
+
+String _countryFlag(String country) {
+  switch (country.toUpperCase()) {
+    case 'IT':
+      return '🇮🇹';
+    case 'FR':
+      return '🇫🇷';
+    case 'DE':
+      return '🇩🇪';
+    case 'ES':
+      return '🇪🇸';
+    case 'US':
+      return '🇺🇸';
+    case 'JP':
+      return '🇯🇵';
+    case 'EU':
+    default:
+      return '🇪🇺';
+  }
 }
 
 class _Panel extends StatelessWidget {
@@ -1055,6 +2082,8 @@ class _Badge extends StatelessWidget {
       ),
       child: Text(
         text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
         style:
             TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 12),
       ),
@@ -1356,47 +2385,79 @@ class _FilterGroup extends StatelessWidget {
   }
 }
 
-class _InputGhost extends StatelessWidget {
-  const _InputGhost({required this.text});
+class _PriceInput extends StatelessWidget {
+  const _PriceInput({
+    required this.controller,
+    required this.hint,
+    required this.onChanged,
+  });
 
-  final String text;
+  final TextEditingController controller;
+  final String hint;
+  final VoidCallback onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 38,
-      alignment: Alignment.centerLeft,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF111936),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+    return SizedBox(
+      height: 42,
+      child: TextField(
+        controller: controller,
+        onChanged: (_) => onChanged(),
+        keyboardType: TextInputType.number,
+        style: const TextStyle(color: Colors.white),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: const TextStyle(color: Color(0xFF64748B)),
+          filled: true,
+          fillColor: const Color(0xFF111936),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+          ),
+        ),
       ),
-      child: Text(text, style: const TextStyle(color: Color(0xFF64748B))),
     );
   }
 }
 
-class _CheckGhost extends StatelessWidget {
-  const _CheckGhost({required this.text, this.checked = false});
+class _FilterCheck extends StatelessWidget {
+  const _FilterCheck({
+    required this.text,
+    required this.checked,
+    required this.onChanged,
+  });
 
   final String text;
   final bool checked;
+  final VoidCallback onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          checked ? Icons.check_box : Icons.check_box_outline_blank,
-          color: checked ? const Color(0xFFFACC15) : const Color(0xFF64748B),
-          size: 17,
+    return InkWell(
+      onTap: onChanged,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              checked ? Icons.check_box : Icons.check_box_outline_blank,
+              color:
+                  checked ? const Color(0xFFFACC15) : const Color(0xFF64748B),
+              size: 17,
+            ),
+            const SizedBox(width: 5),
+            Text(text,
+                style: const TextStyle(color: Color(0xFFB8C4E6), fontSize: 13)),
+          ],
         ),
-        const SizedBox(width: 5),
-        Text(text,
-            style: const TextStyle(color: Color(0xFFB8C4E6), fontSize: 13)),
-      ],
+      ),
     );
   }
 }
@@ -1411,32 +2472,5 @@ class _HeaderText extends StatelessWidget {
     return Text(text,
         style: const TextStyle(
             color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13));
-  }
-}
-
-class _Fundamental extends StatelessWidget {
-  const _Fundamental({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 170,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label,
-              style: const TextStyle(color: Color(0xFF93A4C8), fontSize: 12)),
-          const SizedBox(height: 4),
-          Text(value,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                  color: Colors.white, fontWeight: FontWeight.w800)),
-        ],
-      ),
-    );
   }
 }

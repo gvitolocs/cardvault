@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/cart_provider.dart';
+import '../providers/auth_provider.dart';
+import '../providers/marketplace_account_provider.dart';
 import '../constants/app_colors.dart';
 import '../widgets/shop_chain_account_card.dart';
 import '../utils/price_format.dart';
@@ -64,7 +66,7 @@ class CheckoutScreen extends ConsumerWidget {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () {
-                  _showOrderConfirmation(context, ref);
+                  _showOrderConfirmation(context, ref, cartState);
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
@@ -164,7 +166,24 @@ class CheckoutScreen extends ConsumerWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Qty: ${item.quantity}',
+                            [
+                              'Qty: ${item.quantity}',
+                              if (item.sellerName != null)
+                                'Seller: ${item.sellerName}',
+                              if (item.condition != null) item.condition!,
+                              if (item.language != null) item.language!,
+                              if (item.reverse) 'Reverse',
+                              if (item.graded)
+                                [
+                                  item.gradingCompany ?? 'Graded',
+                                  if ((item.grade ?? '').isNotEmpty)
+                                    item.grade!,
+                                  if ((item.certificationId ?? '').isNotEmpty)
+                                    '#${item.certificationId!}',
+                                ].join(' '),
+                              if (item.nftAvailable) 'NFT',
+                              if (item.shippingAvailable) 'Shipping',
+                            ].join(' · '),
                             style: TextStyle(
                               fontSize: 14,
                               color: Colors.grey[600],
@@ -442,7 +461,11 @@ class CheckoutScreen extends ConsumerWidget {
     }
   }
 
-  void _showOrderConfirmation(BuildContext context, WidgetRef ref) {
+  void _showOrderConfirmation(
+    BuildContext context,
+    WidgetRef ref,
+    CartState cartState,
+  ) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -454,11 +477,47 @@ class CheckoutScreen extends ConsumerWidget {
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              // TODO: Implement order placement
-              ref.read(cartProvider.notifier).clearCart();
-              context.go('/orders');
+              final user = ref.read(authStateProvider).valueOrNull;
+              if (user == null) {
+                context.go('/auth');
+                return;
+              }
+              final items = cartState.items
+                  .map(
+                    (item) => {
+                      'card': item.card.toJson(),
+                      'quantity': item.quantity,
+                      'listingId': item.listingId,
+                      'sellerUid': item.sellerUid,
+                      'sellerName': item.sellerName,
+                      'condition': item.condition,
+                      'language': item.language,
+                      'unitPricePkn': item.unitPrice,
+                      'totalPricePkn': item.totalPrice,
+                      'reverse': item.reverse,
+                      'graded': item.graded,
+                      'gradingCompany': item.gradingCompany,
+                      'grade': item.grade,
+                      'certificationId': item.certificationId,
+                      'shippingAvailable': item.shippingAvailable,
+                      'nftAvailable': item.nftAvailable,
+                    },
+                  )
+                  .toList();
+              await ref
+                  .read(marketplaceAccountServiceProvider)
+                  .createPendingOrder(
+                    uid: user.uid,
+                    items: items,
+                    subtotalPkn: cartState.subtotal,
+                    totalPkn: cartState.total,
+                  );
+              await ref.read(cartProvider.notifier).clearCart();
+              if (context.mounted) {
+                context.go('/orders');
+              }
             },
             child: const Text('Confirm'),
           ),
@@ -480,7 +539,7 @@ class CheckoutScreen extends ConsumerWidget {
                 labelText: 'Full Name',
                 border: OutlineInputBorder(),
               ),
-              controller: TextEditingController(text: 'CardVault Shop'),
+              controller: TextEditingController(text: 'Pokoin'),
             ),
             const SizedBox(height: 16),
             TextField(

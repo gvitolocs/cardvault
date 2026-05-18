@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
+import '../models/card_listing.dart';
 import '../models/pokemon_card.dart';
 
 final cartProvider = StateNotifierProvider<CartNotifier, CartState>((ref) {
@@ -13,21 +14,84 @@ final cartProvider = StateNotifierProvider<CartNotifier, CartState>((ref) {
 class CartItem {
   final PokemonCard card;
   final int quantity;
+  final String? listingId;
+  final String? sellerUid;
+  final String? sellerName;
+  final String? condition;
+  final String? language;
+  final double? unitPricePkn;
+  final int? quantityAvailable;
+  final bool reverse;
+  final bool graded;
+  final String? gradingCompany;
+  final String? grade;
+  final String? certificationId;
+  final bool shippingAvailable;
+  final bool nftAvailable;
 
   CartItem({
     required this.card,
     required this.quantity,
+    this.listingId,
+    this.sellerUid,
+    this.sellerName,
+    this.condition,
+    this.language,
+    this.unitPricePkn,
+    this.quantityAvailable,
+    this.reverse = false,
+    this.graded = false,
+    this.gradingCompany,
+    this.grade,
+    this.certificationId,
+    this.shippingAvailable = false,
+    this.nftAvailable = false,
   });
 
-  double get totalPrice => card.price * quantity;
+  String get cartKey =>
+      listingId == null || listingId!.isEmpty ? card.id : listingId!;
+
+  double get unitPrice => unitPricePkn ?? card.price;
+
+  int get maxQuantity => quantityAvailable ?? card.stock;
+
+  double get totalPrice => unitPrice * quantity;
 
   CartItem copyWith({
     PokemonCard? card,
     int? quantity,
+    String? listingId,
+    String? sellerUid,
+    String? sellerName,
+    String? condition,
+    String? language,
+    double? unitPricePkn,
+    int? quantityAvailable,
+    bool? reverse,
+    bool? graded,
+    String? gradingCompany,
+    String? grade,
+    String? certificationId,
+    bool? shippingAvailable,
+    bool? nftAvailable,
   }) {
     return CartItem(
       card: card ?? this.card,
       quantity: quantity ?? this.quantity,
+      listingId: listingId ?? this.listingId,
+      sellerUid: sellerUid ?? this.sellerUid,
+      sellerName: sellerName ?? this.sellerName,
+      condition: condition ?? this.condition,
+      language: language ?? this.language,
+      unitPricePkn: unitPricePkn ?? this.unitPricePkn,
+      quantityAvailable: quantityAvailable ?? this.quantityAvailable,
+      reverse: reverse ?? this.reverse,
+      graded: graded ?? this.graded,
+      gradingCompany: gradingCompany ?? this.gradingCompany,
+      grade: grade ?? this.grade,
+      certificationId: certificationId ?? this.certificationId,
+      shippingAvailable: shippingAvailable ?? this.shippingAvailable,
+      nftAvailable: nftAvailable ?? this.nftAvailable,
     );
   }
 
@@ -35,6 +99,20 @@ class CartItem {
     return {
       'card': card.toJson(),
       'quantity': quantity,
+      'listingId': listingId,
+      'sellerUid': sellerUid,
+      'sellerName': sellerName,
+      'condition': condition,
+      'language': language,
+      'unitPricePkn': unitPricePkn,
+      'quantityAvailable': quantityAvailable,
+      'reverse': reverse,
+      'graded': graded,
+      'gradingCompany': gradingCompany,
+      'grade': grade,
+      'certificationId': certificationId,
+      'shippingAvailable': shippingAvailable,
+      'nftAvailable': nftAvailable,
     };
   }
 
@@ -43,6 +121,49 @@ class CartItem {
       card: PokemonCard.fromJson(
           Map<String, dynamic>.from(json['card'] as Map? ?? {})),
       quantity: (json['quantity'] as num?)?.toInt() ?? 1,
+      listingId: json['listingId'] as String?,
+      sellerUid: json['sellerUid'] as String?,
+      sellerName: json['sellerName'] as String?,
+      condition: json['condition'] as String?,
+      language: json['language'] as String?,
+      unitPricePkn: (json['unitPricePkn'] as num?)?.toDouble(),
+      quantityAvailable: (json['quantityAvailable'] as num?)?.toInt(),
+      reverse: json['reverse'] == true,
+      graded: json['graded'] == true,
+      gradingCompany: json['gradingCompany'] as String?,
+      grade: json['grade'] as String?,
+      certificationId: json['certificationId'] as String?,
+      shippingAvailable: json['shippingAvailable'] == true,
+      nftAvailable: json['nftAvailable'] == true,
+    );
+  }
+
+  factory CartItem.fromListing({
+    required PokemonCard card,
+    required CardListing listing,
+    int quantity = 1,
+  }) {
+    return CartItem(
+      card: card.copyWith(
+        price: listing.pricePkn,
+        stock: listing.quantityAvailable,
+        condition: listing.condition,
+      ),
+      quantity: quantity.clamp(1, listing.quantityAvailable),
+      listingId: listing.id,
+      sellerUid: listing.sellerUid,
+      sellerName: listing.sellerName,
+      condition: listing.condition,
+      language: listing.language,
+      unitPricePkn: listing.pricePkn,
+      quantityAvailable: listing.quantityAvailable,
+      reverse: listing.reverse,
+      graded: listing.graded,
+      gradingCompany: listing.gradingCompany,
+      grade: listing.grade,
+      certificationId: listing.certificationId,
+      shippingAvailable: listing.shippingAvailable,
+      nftAvailable: listing.nftAvailable,
     );
   }
 }
@@ -70,6 +191,9 @@ class CartState {
   int get itemCount => items.fold(0, (total, item) => total + item.quantity);
 
   bool isInCart(String cardId) => items.any((item) => item.card.id == cardId);
+
+  bool isListingInCart(String listingId) =>
+      items.any((item) => item.listingId == listingId);
 
   int getQuantity(String cardId) {
     for (final item in items) {
@@ -159,9 +283,56 @@ class CartNotifier extends StateNotifier<CartState> {
     await _persist(items);
   }
 
+  Future<void> addListingToCart(
+    PokemonCard card,
+    CardListing listing, {
+    int quantity = 1,
+  }) async {
+    if (!listing.isActive) {
+      state = state.copyWith(error: '${card.name} is currently unavailable');
+      return;
+    }
+    final items = [...state.items];
+    final index = items.indexWhere((item) => item.cartKey == listing.id);
+    if (index == -1) {
+      items.add(CartItem.fromListing(
+        card: card,
+        listing: listing,
+        quantity: quantity,
+      ));
+    } else {
+      final existing = items[index];
+      items[index] = existing.copyWith(
+        card: card.copyWith(
+          price: listing.pricePkn,
+          stock: listing.quantityAvailable,
+          condition: listing.condition,
+        ),
+        quantity:
+            (existing.quantity + quantity).clamp(1, listing.quantityAvailable),
+        listingId: listing.id,
+        sellerUid: listing.sellerUid,
+        sellerName: listing.sellerName,
+        condition: listing.condition,
+        language: listing.language,
+        unitPricePkn: listing.pricePkn,
+        quantityAvailable: listing.quantityAvailable,
+        reverse: listing.reverse,
+        graded: listing.graded,
+        gradingCompany: listing.gradingCompany,
+        grade: listing.grade,
+        certificationId: listing.certificationId,
+        shippingAvailable: listing.shippingAvailable,
+        nftAvailable: listing.nftAvailable,
+      );
+    }
+    await _persist(items);
+  }
+
   Future<void> removeFromCart(String cardId) async {
-    await _persist(
-        state.items.where((item) => item.card.id != cardId).toList());
+    await _persist(state.items
+        .where((item) => item.card.id != cardId && item.cartKey != cardId)
+        .toList());
   }
 
   Future<void> updateQuantity(String cardId, int quantity) async {
@@ -173,7 +344,7 @@ class CartNotifier extends StateNotifier<CartState> {
       if (item.card.id != cardId) {
         return item;
       }
-      return item.copyWith(quantity: quantity.clamp(1, item.card.stock));
+      return item.copyWith(quantity: quantity.clamp(1, item.maxQuantity));
     }).toList();
     await _persist(items);
   }
@@ -237,16 +408,16 @@ class CartNotifier extends StateNotifier<CartState> {
 
   List<CartItem> _mergeItems(List<CartItem> remote, List<CartItem> local) {
     final byId = <String, CartItem>{
-      for (final item in remote) item.card.id: item,
+      for (final item in remote) item.cartKey: item,
     };
     for (final item in local) {
-      final existing = byId[item.card.id];
+      final existing = byId[item.cartKey];
       if (existing == null) {
-        byId[item.card.id] = item;
+        byId[item.cartKey] = item;
       } else {
-        byId[item.card.id] = existing.copyWith(
-          quantity:
-              (existing.quantity + item.quantity).clamp(1, existing.card.stock),
+        byId[item.cartKey] = existing.copyWith(
+          quantity: (existing.quantity + item.quantity)
+              .clamp(1, existing.maxQuantity),
         );
       }
     }
@@ -258,10 +429,10 @@ class CartNotifier extends StateNotifier<CartState> {
     if (a.length != b.length) {
       return false;
     }
-    final aSorted = [...a]..sort((x, y) => x.card.id.compareTo(y.card.id));
-    final bSorted = [...b]..sort((x, y) => x.card.id.compareTo(y.card.id));
+    final aSorted = [...a]..sort((x, y) => x.cartKey.compareTo(y.cartKey));
+    final bSorted = [...b]..sort((x, y) => x.cartKey.compareTo(y.cartKey));
     for (var index = 0; index < aSorted.length; index++) {
-      if (aSorted[index].card.id != bSorted[index].card.id ||
+      if (aSorted[index].cartKey != bSorted[index].cartKey ||
           aSorted[index].quantity != bSorted[index].quantity) {
         return false;
       }

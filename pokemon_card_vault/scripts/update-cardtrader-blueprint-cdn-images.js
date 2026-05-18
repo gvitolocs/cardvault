@@ -95,8 +95,13 @@ async function existingBlueprintIds(env, ids) {
 
 async function main() {
   const env = readEnv('.env.local');
-  const bucket = env.CARDVAULT_IMAGES_BUCKET || 'cardvault-images';
-  const cdnBase = (env.CARDVAULT_CDN_BASE_URL || 'https://cdn.pokoin.com').replace(/\/$/, '');
+  const bucket =
+    env.POKOIN_CARD_IMAGES_BUCKET ||
+    'cardvault-images';
+  const cdnBase = (
+    env.POKOIN_CARD_CDN_BASE_URL ||
+    'https://cdn.pokoin.com'
+  ).replace(/\/$/, '');
 
   const keysById = await listKeysByBlueprintId(env, bucket);
   console.log(`matched CDN object keys by id: ${keysById.size}`);

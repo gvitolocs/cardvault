@@ -46,6 +46,24 @@ class MarketplaceAccountService {
     );
   }
 
+  Future<String> createPendingOrder({
+    required String uid,
+    required List<Map<String, dynamic>> items,
+    required double subtotalPkn,
+    required double totalPkn,
+  }) async {
+    final doc = await _firestore.collection('orders').add({
+      'uid': uid,
+      'items': items,
+      'subtotalPkn': subtotalPkn,
+      'totalPkn': totalPkn,
+      'status': 'pending',
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+    return doc.id;
+  }
+
   DateTime _readTimestamp(Object? value) {
     if (value is Timestamp) {
       return value.toDate();

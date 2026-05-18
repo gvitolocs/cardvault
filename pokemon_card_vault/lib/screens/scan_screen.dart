@@ -103,7 +103,8 @@ class _ScanScreenState extends State<ScanScreen> {
                       FutureBuilder<SearchResult?>(
                         future: _search,
                         builder: (context, result) => _SearchPanel(
-                          loading: result.connectionState != ConnectionState.done,
+                          loading:
+                              result.connectionState != ConnectionState.done,
                           result: result.data,
                           error: result.error,
                         ),
@@ -114,11 +115,13 @@ class _ScanScreenState extends State<ScanScreen> {
                     const SizedBox(height: 18),
                     _ResponsiveColumns(
                       left: _BlocksPanel(blocks: data?.blocks ?? const []),
-                      right: _TransactionsPanel(transactions: data?.transactions ?? const []),
+                      right: _TransactionsPanel(
+                          transactions: data?.transactions ?? const []),
                     ),
                     const SizedBox(height: 18),
                     _ResponsiveColumns(
-                      left: _ValidatorsPanel(validators: data?.validators ?? const []),
+                      left: _ValidatorsPanel(
+                          validators: data?.validators ?? const []),
                       right: _LotteryPanel(status: data?.status),
                     ),
                     const SizedBox(height: 18),
@@ -163,30 +166,38 @@ class ExplorerSnapshot {
       _getJson('${ProjectLinks.rpcBase}/chain/status'),
       _getJson('${ProjectLinks.rpcBase}/explorer/blocks?limit=12'),
       _getJson('${ProjectLinks.rpcBase}/chain/validators'),
-      _getJson('${ProjectLinks.rpcBase}/explorer/address/${ProjectLinks.nativeTreasury}'),
+      _getJson(
+          '${ProjectLinks.rpcBase}/explorer/address/${ProjectLinks.nativeTreasury}'),
       _getJson(ProjectLinks.bootstrapPeers),
       _getJson(ProjectLinks.reserve),
       _getText('${ProjectLinks.rpcBase}/chain/supply/total.txt'),
       _getText('${ProjectLinks.rpcBase}/chain/supply/circulating.txt'),
     ]);
 
-    final status = responses[0] as Map<String, dynamic>? ?? const <String, dynamic>{};
-    final blockPayload = responses[1] as Map<String, dynamic>? ?? const <String, dynamic>{};
-    final validatorPayload = responses[2] as Map<String, dynamic>? ?? const <String, dynamic>{};
-    final treasuryPayload = responses[3] as Map<String, dynamic>? ?? const <String, dynamic>{};
+    final status =
+        responses[0] as Map<String, dynamic>? ?? const <String, dynamic>{};
+    final blockPayload =
+        responses[1] as Map<String, dynamic>? ?? const <String, dynamic>{};
+    final validatorPayload =
+        responses[2] as Map<String, dynamic>? ?? const <String, dynamic>{};
+    final treasuryPayload =
+        responses[3] as Map<String, dynamic>? ?? const <String, dynamic>{};
 
     final blocks = ((blockPayload['blocks'] as List?) ?? const [])
         .whereType<Map<String, dynamic>>()
         .map(ExplorerBlock.fromJson)
         .toList();
-    final validators = ((validatorPayload['validators'] as List?) ?? const [])
-        .whereType<Map<String, dynamic>>()
-        .map(ValidatorInfo.fromJson)
-        .toList();
-    final transactions = ((treasuryPayload['transactions'] as List?) ?? const [])
-        .whereType<Map<String, dynamic>>()
-        .map(ExplorerTransaction.fromJson)
-        .toList();
+    final validators = _dedupeValidators(
+      ((validatorPayload['validators'] as List?) ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .map(ValidatorInfo.fromJson)
+          .toList(),
+    );
+    final transactions =
+        ((treasuryPayload['transactions'] as List?) ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .map(ExplorerTransaction.fromJson)
+            .toList();
     transactions.sort((a, b) {
       final blockCompare = b.blockNumber.compareTo(a.blockNumber);
       if (blockCompare != 0) {
@@ -203,13 +214,34 @@ class ExplorerSnapshot {
       bootstrapRegistry: responses[4] as Map<String, dynamic>?,
       reserve: responses[5] as Map<String, dynamic>?,
       totalSupply: int.tryParse((responses[6] as String? ?? '').trim()) ?? 0,
-      circulatingSupply: int.tryParse((responses[7] as String? ?? '').trim()) ?? 0,
+      circulatingSupply:
+          int.tryParse((responses[7] as String? ?? '').trim()) ?? 0,
       refreshedAt: DateTime.now(),
     );
   }
 
+  static List<ValidatorInfo> _dedupeValidators(List<ValidatorInfo> validators) {
+    final byIdentity = <String, ValidatorInfo>{};
+    for (final validator in validators) {
+      final key = validator.validator.trim().isNotEmpty
+          ? validator.validator.trim()
+          : validator.peerId.trim();
+      if (key.isEmpty) {
+        continue;
+      }
+      final current = byIdentity[key];
+      if (current == null || validator.isBetterDisplayThan(current)) {
+        byIdentity[key] = validator;
+      }
+    }
+    final unique = byIdentity.values.toList()
+      ..sort((a, b) => b.stake.compareTo(a.stake));
+    return unique;
+  }
+
   static Future<Map<String, dynamic>?> _getJson(String url) async {
-    final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
+    final response =
+        await http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
     if (response.statusCode < 200 || response.statusCode >= 300) {
       return null;
     }
@@ -217,7 +249,8 @@ class ExplorerSnapshot {
   }
 
   static Future<String?> _getText(String url) async {
-    final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
+    final response =
+        await http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
     if (response.statusCode < 200 || response.statusCode >= 300) {
       return null;
     }
@@ -355,9 +388,18 @@ class _ExplorerNavPill extends StatelessWidget {
       child: const Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _ExplorerNavAction(label: 'Marketplace', path: '/marketplace', icon: Icons.storefront),
-          _ExplorerNavAction(label: 'Wallet', path: '/wallet', icon: Icons.account_balance_wallet_outlined),
-          _ExplorerNavAction(label: 'Health', path: '/health', icon: Icons.health_and_safety_outlined),
+          _ExplorerNavAction(
+              label: 'Marketplace',
+              path: '/marketplace',
+              icon: Icons.storefront),
+          _ExplorerNavAction(
+              label: 'Wallet',
+              path: '/wallet',
+              icon: Icons.account_balance_wallet_outlined),
+          _ExplorerNavAction(
+              label: 'Health',
+              path: '/health',
+              icon: Icons.health_and_safety_outlined),
         ],
       ),
     );
@@ -419,14 +461,18 @@ class _ExplorerCta extends StatelessWidget {
       icon: Icon(icon, size: 18),
       label: Text(label),
       style: FilledButton.styleFrom(
-        backgroundColor: primary ? const Color(0xFFFACC15) : const Color(0xFF111936),
-        foregroundColor: primary ? const Color(0xFF111827) : const Color(0xFFE2E8F0),
+        backgroundColor:
+            primary ? const Color(0xFFFACC15) : const Color(0xFF111936),
+        foregroundColor:
+            primary ? const Color(0xFF111827) : const Color(0xFFE2E8F0),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         textStyle: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(999),
           side: BorderSide(
-            color: primary ? Colors.transparent : Colors.white.withValues(alpha: 0.10),
+            color: primary
+                ? Colors.transparent
+                : Colors.white.withValues(alpha: 0.10),
           ),
         ),
       ),
@@ -559,6 +605,19 @@ class ValidatorInfo {
       connected: json['connected'] == true,
     );
   }
+
+  bool isBetterDisplayThan(ValidatorInfo other) {
+    if (stake != other.stake) {
+      return stake > other.stake;
+    }
+    if ((connected || local) != (other.connected || other.local)) {
+      return connected || local;
+    }
+    if (authorized != other.authorized) {
+      return authorized;
+    }
+    return peerId.length > other.peerId.length;
+  }
 }
 
 class _HeroSearch extends StatelessWidget {
@@ -621,9 +680,8 @@ class _StatsGrid extends StatelessWidget {
     final status = snapshot?.status ?? const <String, dynamic>{};
     final validators = snapshot?.validators ?? const <ValidatorInfo>[];
     final registryNodes = _bootstrapNodes(snapshot?.bootstrapRegistry);
-    final matureValidators = registryNodes
-        .where((node) => _nodeStatus(node) == 'bootstrap')
-        .length;
+    final matureValidators =
+        registryNodes.where((node) => _nodeStatus(node) == 'bootstrap').length;
     final vettingNodes =
         registryNodes.where((node) => _nodeStatus(node) == 'vetting').length;
     final authorizedValidators = validators.where((v) => v.authorized).length;
@@ -639,7 +697,8 @@ class _StatsGrid extends StatelessWidget {
     final cards = [
       _StatCard(
         label: 'Chain Height',
-        value: latestHeight == 0 ? '...' : '#${_formatWholeNumber(latestHeight)}',
+        value:
+            latestHeight == 0 ? '...' : '#${_formatWholeNumber(latestHeight)}',
         icon: Icons.view_in_ar,
       ),
       _StatCard(
@@ -649,7 +708,8 @@ class _StatsGrid extends StatelessWidget {
       ),
       _StatCard(
         label: 'Total Supply',
-        value: totalSupply == 0 ? '...' : '${_formatWholeNumber(totalSupply)} PKN',
+        value:
+            totalSupply == 0 ? '...' : '${_formatWholeNumber(totalSupply)} PKN',
         icon: Icons.toll_outlined,
       ),
       _StatCard(
@@ -761,7 +821,8 @@ class _BlocksPanel extends StatelessWidget {
               title: 'Slot ${block.slot} · ${block.transactionCount} tx',
               subtitle: 'Miner ${_short(block.miner, head: 18, tail: 10)}',
               trailing: block.finalized ? 'Finalized' : 'Tip',
-              onTap: () => _open('${ProjectLinks.rpcBase}/explorer/blocks/${block.number}'),
+              onTap: () => _open(
+                  '${ProjectLinks.rpcBase}/explorer/blocks/${block.number}'),
             ),
           if (blocks.isEmpty) const _EmptyLine('No blocks loaded yet.'),
         ],
@@ -790,12 +851,14 @@ class _TransactionsPanel extends StatelessWidget {
           for (final tx in transactions.take(12))
             _ListRow(
               leading: tx.kind.toUpperCase(),
-              title: '${_formatAmount(tx.amount)} PKN · block ${tx.blockNumber}',
+              title:
+                  '${_formatAmount(tx.amount)} PKN · block ${tx.blockNumber}',
               subtitle: '${_short(tx.from)} → ${_short(tx.to)}',
               trailing: tx.finalized ? 'Final' : 'Pending',
               onTap: () => context.go('/tx/${tx.hash}'),
             ),
-          if (transactions.isEmpty) const _EmptyLine('No recent treasury transactions loaded.'),
+          if (transactions.isEmpty)
+            const _EmptyLine('No recent treasury transactions loaded.'),
         ],
       ),
     );
@@ -824,8 +887,9 @@ class _ValidatorsPanel extends StatelessWidget {
               leading: validator.peerId,
               title: '${validator.stake} PKN stake',
               subtitle: _short(validator.validator, head: 22, tail: 14),
-              trailing:
-                  validator.connected || validator.local ? 'Connected' : 'Offline',
+              trailing: validator.connected || validator.local
+                  ? 'Connected'
+                  : 'Offline',
               trailingColor: validator.connected || validator.local
                   ? const Color(0xFF22C55E)
                   : const Color(0xFFEF4444),
@@ -855,10 +919,13 @@ class _LotteryPanel extends StatelessWidget {
             icon: Icons.casino_outlined,
           ),
           const SizedBox(height: 12),
-          _ProgressLine(label: 'Attempts', value: _display(data['lotteryAttempts'])),
+          _ProgressLine(
+              label: 'Attempts', value: _display(data['lotteryAttempts'])),
           _ProgressLine(label: 'Wins', value: _display(data['lotteryWins'])),
-          _ProgressLine(label: 'Misses', value: _display(data['lotteryMisses'])),
-          _ProgressLine(label: 'No ticket', value: _display(data['lotteryNoTicket'])),
+          _ProgressLine(
+              label: 'Misses', value: _display(data['lotteryMisses'])),
+          _ProgressLine(
+              label: 'No ticket', value: _display(data['lotteryNoTicket'])),
           const SizedBox(height: 12),
           const Text(
             'Positive-balance validators share 97% of mining weight. Zero-balance validators share the remaining 3%.',
@@ -894,10 +961,21 @@ class _WPKNPanel extends StatelessWidget {
             spacing: 14,
             runSpacing: 14,
             children: [
-              _InfoBox(label: 'Contract', value: wrapped?['contractAddress'] ?? ProjectLinks.wpknContract),
-              _InfoBox(label: 'Supply', value: '${wrapped?['totalSupply'] ?? '2000000'} wPKN'),
-              _InfoBox(label: 'Native reserve', value: '${nativeTreasury?['reservedAmount'] ?? '2000000'} PKN'),
-              _InfoBox(label: 'Pancake pair', value: pancake?['poolAddress'] ?? ProjectLinks.pancakePairAddress),
+              _InfoBox(
+                  label: 'Contract',
+                  value:
+                      wrapped?['contractAddress'] ?? ProjectLinks.wpknContract),
+              _InfoBox(
+                  label: 'Supply',
+                  value: '${wrapped?['totalSupply'] ?? '2000000'} wPKN'),
+              _InfoBox(
+                  label: 'Native reserve',
+                  value:
+                      '${nativeTreasury?['reservedAmount'] ?? '2000000'} PKN'),
+              _InfoBox(
+                  label: 'Pancake pair',
+                  value: pancake?['poolAddress'] ??
+                      ProjectLinks.pancakePairAddress),
             ],
           ),
           const SizedBox(height: 16),
@@ -908,7 +986,10 @@ class _WPKNPanel extends StatelessWidget {
               _LinkButton(label: 'BscScan token', url: ProjectLinks.bscToken),
               _LinkButton(label: 'PancakeSwap', url: ProjectLinks.pancakeSwap),
               _LinkButton(label: 'Reserve manifest', url: ProjectLinks.reserve),
-              _LinkButton(label: 'Native treasury', url: '${ProjectLinks.rpcBase}/explorer/address/${ProjectLinks.nativeTreasury}'),
+              _LinkButton(
+                  label: 'Native treasury',
+                  url:
+                      '${ProjectLinks.rpcBase}/explorer/address/${ProjectLinks.nativeTreasury}'),
             ],
           ),
         ],
@@ -922,7 +1003,8 @@ class _SearchPanel extends StatelessWidget {
   final SearchResult? result;
   final Object? error;
 
-  const _SearchPanel({required this.loading, required this.result, required this.error});
+  const _SearchPanel(
+      {required this.loading, required this.result, required this.error});
 
   @override
   Widget build(BuildContext context) {
@@ -933,7 +1015,8 @@ class _SearchPanel extends StatelessWidget {
       return _Notice(title: 'Search failed', body: error.toString());
     }
     if (result == null) {
-      return const _Notice(title: 'No result', body: 'Nothing matched that query.');
+      return const _Notice(
+          title: 'No result', body: 'Nothing matched that query.');
     }
     final rows = result!.result.entries.take(10).map((e) {
       return _InfoBox(label: e.key, value: e.value.toString());
@@ -1002,7 +1085,8 @@ class _PanelHeader extends StatelessWidget {
   final String subtitle;
   final IconData icon;
 
-  const _PanelHeader({required this.title, required this.subtitle, required this.icon});
+  const _PanelHeader(
+      {required this.title, required this.subtitle, required this.icon});
 
   @override
   Widget build(BuildContext context) {
@@ -1017,7 +1101,10 @@ class _PanelHeader extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900),
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900),
               ),
               const SizedBox(height: 4),
               Text(subtitle, style: const TextStyle(color: Color(0xFF94A3B8))),
@@ -1070,7 +1157,8 @@ class _ListRow extends StatelessWidget {
               child: Text(
                 leading,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Color(0xFFFACC15), fontWeight: FontWeight.w900),
+                style: const TextStyle(
+                    color: Color(0xFFFACC15), fontWeight: FontWeight.w900),
               ),
             ),
             const SizedBox(width: 12),
@@ -1078,17 +1166,21 @@ class _ListRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                  Text(title,
+                      style: const TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.w800)),
                   const SizedBox(height: 4),
                   SelectableText(
                     subtitle,
-                    style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                    style:
+                        const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
                   ),
                 ],
               ),
             ),
             const SizedBox(width: 10),
-            Text(trailing, style: TextStyle(color: trailingColor, fontSize: 12)),
+            Text(trailing,
+                style: TextStyle(color: trailingColor, fontSize: 12)),
           ],
         ),
       ),
@@ -1114,11 +1206,13 @@ class _InfoBox extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+          Text(label,
+              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
           const SizedBox(height: 6),
           SelectableText(
             value,
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+            style: const TextStyle(
+                color: Colors.white, fontWeight: FontWeight.w700),
           ),
         ],
       ),
@@ -1138,8 +1232,12 @@ class _ProgressLine extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
-          Expanded(child: Text(label, style: const TextStyle(color: Color(0xFFCBD5E1)))),
-          Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+          Expanded(
+              child: Text(label,
+                  style: const TextStyle(color: Color(0xFFCBD5E1)))),
+          Text(value,
+              style: const TextStyle(
+                  color: Colors.white, fontWeight: FontWeight.w900)),
         ],
       ),
     );
@@ -1191,7 +1289,9 @@ class _Notice extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+          Text(title,
+              style: const TextStyle(
+                  color: Colors.white, fontWeight: FontWeight.w900)),
           const SizedBox(height: 6),
           Text(body, style: const TextStyle(color: Color(0xFFFFEDD5))),
         ],

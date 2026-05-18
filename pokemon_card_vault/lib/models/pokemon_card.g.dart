@@ -40,13 +40,16 @@ class PokemonCardAdapter extends TypeAdapter<PokemonCard> {
       isGraded: fields[20] as bool,
       grade: fields[21] as String?,
       gradingCompany: fields[22] as String?,
+      previewImageUrl: fields[23] as String?,
+      itemKind: fields[24] as String? ?? 'single',
+      productType: fields[25] as String? ?? 'card',
     );
   }
 
   @override
   void write(BinaryWriter writer, PokemonCard obj) {
     writer
-      ..writeByte(23)
+      ..writeByte(26)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -92,7 +95,13 @@ class PokemonCardAdapter extends TypeAdapter<PokemonCard> {
       ..writeByte(21)
       ..write(obj.grade)
       ..writeByte(22)
-      ..write(obj.gradingCompany);
+      ..write(obj.gradingCompany)
+      ..writeByte(23)
+      ..write(obj.previewImageUrl)
+      ..writeByte(24)
+      ..write(obj.itemKind)
+      ..writeByte(25)
+      ..write(obj.productType);
   }
 
   @override

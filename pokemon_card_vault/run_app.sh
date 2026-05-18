@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "🎴 Starting Pokemon Card Vault Ecommerce App..."
+echo "Starting Pokoin app..."
 echo "=============================================="
 
 # Check if Flutter is installed
@@ -11,7 +11,7 @@ fi
 
 # Check if we're in the right directory
 if [ ! -f "pubspec.yaml" ]; then
-    echo "❌ Please run this script from the pokemon_card_vault directory"
+    echo "Please run this script from the Pokoin app directory"
     exit 1
 fi
 

@@ -8,9 +8,13 @@ search, Supabase blueprint schema, or CDN preview thumbnails.
 The marketplace search should behave like CardTrader:
 
 - Typing in `/marketplace` opens an autocomplete panel.
-- Results show a small preview image, card name, number, set and action text.
-- Search previews are seeded from the loaded Flutter catalog, then merged with
-  Supabase projection results.
+- Results show a small preview image, card name plus expansion/collector number,
+  set and action text. Example: `Mew ex #Special Illustration Rare | 232/091`.
+- Search previews may be seeded from the loaded Flutter catalog, then merged
+  with Supabase projection results.
+- Numeric searches such as `mew 232` should wait for full Supabase projection
+  results instead of showing weak local-cache-only suggestions from the capped
+  home catalog.
 - The full `/marketplace/search` page must query Supabase projections directly.
   Do not limit it to the 500-card marketplace/home catalog loaded in
   `CardState.cards`.
@@ -144,7 +148,9 @@ select public.refresh_marketplace_card_versions();
 
 ## Verify Fuzzy Search
 
-Run a small projection-search check with the anon key:
+Run app-shaped projection-search checks with the anon key. Do not add DB-side
+ordering to active search queries unless it has been tested with compound
+numeric searches; client ranking should sort active search results.
 
 ```bash
 python3 - <<'PY'
@@ -164,12 +170,17 @@ def env_value(key):
 url = env_value('SUPABASE_URL').rstrip('/')
 key = env_value('SUPABASE_ANON_KEY')
 
-for term in ['pik', 'char', 'Unified Minds Booster']:
+checks = {
+    'pika uni': '(or(name.ilike.*pika*,expansion_name.ilike.*pika*,expansion_number.ilike.*pika*),or(name.ilike.*uni*,expansion_name.ilike.*uni*,expansion_number.ilike.*uni*))',
+    'mew 232': '(or(name.ilike.*mew*,expansion_name.ilike.*mew*,expansion_number.ilike.*mew*),or(name.ilike.*232*,expansion_name.ilike.*232*,expansion_number.ilike.*232*))',
+}
+
+for term, and_filter in checks.items():
     params = urllib.parse.urlencode({
         'select': 'card_id,name,expansion_name,expansion_number',
-        'or': f'(name.ilike.*{term}*,expansion_name.ilike.*{term}*,expansion_number.ilike.*{term}*)',
-        'limit': '5',
-    })
+        'and': and_filter,
+        'limit': '20',
+    }, safe='(),.*')
     req = urllib.request.Request(
         f'{url}/rest/v1/marketplace_card_versions?{params}',
         headers={
@@ -185,7 +196,9 @@ PY
 ```
 
 Known healthy result: terms return rows in hundreds of milliseconds and do not
-depend on the capped Flutter home catalog.
+depend on the capped Flutter home catalog. `pika uni` should include
+`Pikachu | Unified Minds`; `mew 232` should include
+`Mew ex | Paldean Fates | Special Illustration Rare | 232/091`.
 
 The older `search_cardtrader_pokemon_blueprints` RPC may still exist for
 fallbacks, but new UI work should prefer `marketplace_cards` and
@@ -270,7 +283,7 @@ Expected:
 
 ## Deploy Web Changes
 
-Always use the project deploy script:
+Always use the project deploy script after changing Flutter/app/API code:
 
 ```bash
 ./deploy-pokoin-web.sh
@@ -278,6 +291,7 @@ Always use the project deploy script:
 
 Do not run plain `vercel deploy` from the project root. It can deploy an
 incomplete output without the Flutter build, API files, or Dart defines.
+Do not assume a git push or workflow/doc commit updates `pokoin.com`.
 
 ## Verification Checklist
 
@@ -300,10 +314,11 @@ python3 - <<'PY'
 from pathlib import Path
 text = Path('/tmp/pokoin-main-search.js').read_text(errors='ignore')
 for marker in [
-    'View all results for',
     'marketplace_card_versions',
     'marketplace_cards',
     'preview_image_url',
+    'expansion_number',
+    'isSearchingPreviews',
     '/card-images',
 ]:
     print(f'{marker}={marker in text}')
@@ -319,6 +334,12 @@ curl -L -I "https://pokoin.com/card-images/<known-card-image>"
 curl -L -I "https://pokoin.com/card-images/previews/<known-preview-image>"
 ```
 
+Then open `https://pokoin.com/marketplace`, hard refresh if needed, and verify:
+
+- Search suggestions for `mew 232` include Mew ex `232/091`.
+- Search suggestions show card name plus collector/expansion number.
+- Search suggestions for `pika uni` include Pikachu from Unified Minds.
+
 ## Important Failure Modes
 
 - `supabase db push --db-url "$SUPABASE_DB_URL"` can fail with IPv6
@@ -332,9 +353,14 @@ curl -L -I "https://pokoin.com/card-images/previews/<known-preview-image>"
   unless `PREVIEW_FORCE=1` is set.
 - The Flutter app must tolerate missing `preview_image_url`. Do not remove the
   fallback to `imageUrl`.
-- Search preview rows should use the card name as the main title. Avoid appending
-  raw numbers or CardTrader IDs in the primary row title because product names
-  and championship variants can overflow.
+- Search preview rows should include the collector/expansion number next to the
+  card name when present. Do not show opaque CardTrader blueprint IDs as if they
+  were collector numbers for real singles.
+- If `mew 232` returns rows in a direct Supabase check but the UI shows nothing,
+  inspect the app request shape and deployed bundle before changing the ranking.
+  Common causes are stale production builds, browser cache, DB-side ordering on
+  active search, or local cached suggestions masking the remote full-catalog
+  result.
 - The full search page is intentionally separate from the home catalog. If it
   returns only a few cards while Supabase has more matches, check that it is
   calling `CardService.searchMarketplaceCards(...)` instead of filtering

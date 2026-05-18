@@ -1,0 +1,16 @@
+{
+  "rewrites": [
+    {
+      "source": "/marketplace/signal",
+      "destination": "/marketplace-signal.html"
+    },
+    {
+      "source": "/card-images/:path*",
+      "destination": "https://cdn.pokoin.com/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

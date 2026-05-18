@@ -46,6 +46,7 @@ class FavoritesNotifier extends StateNotifier<FavoritesState> {
   }
 
   static const String _favoritesBoxName = 'favorites';
+  static const Duration _retentionWindow = Duration(days: 30);
   dynamic _authSubscription;
 
   FirebaseFirestore get _firestore => FirebaseFirestore.instance;
@@ -73,14 +74,32 @@ class FavoritesNotifier extends StateNotifier<FavoritesState> {
       }
 
       final doc = await _favoriteDoc(user.uid).get();
-      final remoteIds = _idsFromDoc(doc.data());
+      final data = doc.data();
+      if (_isExpired(data)) {
+        await _favoriteDoc(user.uid).set({
+          'cardIds': const <String>[],
+          'updatedAt': FieldValue.serverTimestamp(),
+          'expiresAt': _expiresAt(),
+        }, SetOptions(merge: true));
+        await _saveLocal(const []);
+        state = state.copyWith(
+          favoriteCardIds: const [],
+          isLoading: false,
+          error: null,
+        );
+        return;
+      }
+      final remoteIds = _idsFromDoc(data);
       final localIds = await _localFavoriteIds();
       final merged = {...remoteIds, ...localIds}.toList()..sort();
       if (merged.length != remoteIds.length || !_sameIds(merged, remoteIds)) {
         await _favoriteDoc(user.uid).set({
           'cardIds': merged,
           'updatedAt': FieldValue.serverTimestamp(),
+          'expiresAt': _expiresAt(),
         }, SetOptions(merge: true));
+      } else if (merged.isNotEmpty) {
+        await _touchRemote(user.uid);
       }
       await _saveLocal(merged);
       state = state.copyWith(
@@ -124,6 +143,7 @@ class FavoritesNotifier extends StateNotifier<FavoritesState> {
         await _favoriteDoc(user.uid).set({
           'cardIds': ids,
           'updatedAt': FieldValue.serverTimestamp(),
+          'expiresAt': _expiresAt(),
         }, SetOptions(merge: true));
       }
       state = state.copyWith(
@@ -159,6 +179,25 @@ class FavoritesNotifier extends StateNotifier<FavoritesState> {
         .toSet()
         .toList()
       ..sort();
+  }
+
+  Future<void> _touchRemote(String uid) {
+    return _favoriteDoc(uid).set({
+      'updatedAt': FieldValue.serverTimestamp(),
+      'expiresAt': _expiresAt(),
+    }, SetOptions(merge: true));
+  }
+
+  Timestamp _expiresAt() {
+    return Timestamp.fromDate(DateTime.now().add(_retentionWindow));
+  }
+
+  bool _isExpired(Map<String, dynamic>? data) {
+    final value = data?['expiresAt'];
+    if (value is Timestamp) {
+      return value.toDate().isBefore(DateTime.now());
+    }
+    return false;
   }
 
   bool _sameIds(List<String> a, List<String> b) {

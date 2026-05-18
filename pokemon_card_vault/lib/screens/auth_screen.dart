@@ -80,8 +80,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     }
     setState(() => _isVerifyingSignup = true);
     try {
-      final redirectPath =
-          await ref.read(authServiceProvider).verifyEmailSignupToken(signupToken);
+      final redirectPath = await ref
+          .read(authServiceProvider)
+          .verifyEmailSignupToken(signupToken);
       ref.invalidate(authStateProvider);
       ref.invalidate(userProfileProvider);
       ref.invalidate(pknBalanceProvider);
@@ -159,7 +160,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                             formKey: _formKey,
                             emailController: _emailController,
                             passwordController: _passwordController,
-                            confirmPasswordController: _confirmPasswordController,
+                            confirmPasswordController:
+                                _confirmPasswordController,
                             usernameController: _usernameController,
                             isLogin: _isLogin,
                             isLoading: _isLoading,
@@ -317,8 +319,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
 
     try {
       await WalletSignInCoordinator.run(() async {
-        final account =
-            requestAccount ? await _wallet.requestAccount() : await _wallet.currentAccount();
+        final account = requestAccount
+            ? await _wallet.requestAccount()
+            : await _wallet.currentAccount();
         final address = account?.trim().toLowerCase();
         if (address == null || address.isEmpty) {
           throw StateError('No wallet account selected.');
@@ -444,7 +447,7 @@ class _AuthStoryPanel extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'CardVault',
+                    'Pokoin',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 24,
@@ -497,7 +500,7 @@ class _AuthStoryPanel extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           const Text(
-            'Your account unlocks CardVault marketplace features, persistent wallet access, PKN withdraw requests and PokoinScan activity from the same session.',
+            'Your account unlocks Card Reserve features, persistent wallet access, PKN withdraw requests and PokoinScan activity from the same session.',
             style:
                 TextStyle(color: Color(0xFFB8C4E6), fontSize: 15, height: 1.55),
           ),
