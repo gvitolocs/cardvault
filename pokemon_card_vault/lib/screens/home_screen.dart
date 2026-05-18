@@ -696,7 +696,15 @@ class _SearchLanguageMenu extends StatelessWidget {
         for (final entry in _languages.entries)
           PopupMenuItem(
             value: entry.key,
-            child: Text(entry.value),
+            child: Text(
+              entry.value,
+              style: TextStyle(
+                color: entry.key == normalized
+                    ? const Color(0xFFFACC15)
+                    : const Color(0xFFE2E8F0),
+                fontWeight: FontWeight.w900,
+              ),
+            ),
           ),
       ],
       child: Container(
