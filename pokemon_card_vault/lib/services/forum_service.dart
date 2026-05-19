@@ -1,4 +1,8 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:http/http.dart' as http;
 
 class ForumCategory {
   const ForumCategory({
@@ -19,18 +23,17 @@ class ForumCategory {
   final int topicCount;
   final int postCount;
 
-  factory ForumCategory.fromFirestore(
-    DocumentSnapshot<Map<String, dynamic>> snapshot,
-  ) {
-    final data = snapshot.data() ?? {};
+  factory ForumCategory.fromJson(Map<String, dynamic> data) {
     return ForumCategory(
-      id: snapshot.id,
-      title: data['title'] as String? ?? snapshot.id,
+      id: data['id'] as String? ?? '',
+      title: data['title'] as String? ?? data['id'] as String? ?? '',
       description: data['description'] as String? ?? '',
-      iconName: data['iconName'] as String? ?? 'forum',
-      order: data['order'] as int? ?? 999,
-      topicCount: data['topicCount'] as int? ?? 0,
-      postCount: data['postCount'] as int? ?? 0,
+      iconName: data['icon_name'] as String? ??
+          data['iconName'] as String? ??
+          'forum',
+      order: _readInt(data['sort_order'] ?? data['order'], 999),
+      topicCount: _readInt(data['topic_count'] ?? data['topicCount'], 0),
+      postCount: _readInt(data['post_count'] ?? data['postCount'], 0),
     );
   }
 }
@@ -48,6 +51,7 @@ class ForumTopic {
     required this.status,
     required this.createdAt,
     required this.updatedAt,
+    this.media = const [],
   });
 
   final String id;
@@ -61,23 +65,44 @@ class ForumTopic {
   final String status;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final List<ForumMedia> media;
 
-  factory ForumTopic.fromFirestore(
-    DocumentSnapshot<Map<String, dynamic>> snapshot,
-  ) {
-    final data = snapshot.data() ?? {};
+  factory ForumTopic.fromJson(Map<String, dynamic> data) {
     return ForumTopic(
-      id: snapshot.id,
-      categoryId: data['categoryId'] as String? ?? '',
+      id: data['id'] as String? ?? '',
+      categoryId:
+          data['category_id'] as String? ?? data['categoryId'] as String? ?? '',
       title: data['title'] as String? ?? 'Untitled topic',
       body: data['body'] as String? ?? '',
-      authorUid: data['authorUid'] as String? ?? '',
-      authorName: data['authorName'] as String? ?? 'Pokoin user',
-      authorPhotoUrl: data['authorPhotoUrl'] as String?,
-      replyCount: data['replyCount'] as int? ?? 0,
+      authorUid:
+          data['author_uid'] as String? ?? data['authorUid'] as String? ?? '',
+      authorName: data['author_name'] as String? ??
+          data['authorName'] as String? ??
+          'Pokoin user',
+      authorPhotoUrl: data['author_photo_url'] as String? ??
+          data['authorPhotoUrl'] as String?,
+      replyCount: _readInt(data['reply_count'] ?? data['replyCount'], 0),
       status: data['status'] as String? ?? 'open',
-      createdAt: _readDate(data['createdAt']),
-      updatedAt: _readDate(data['updatedAt']),
+      createdAt: _readDate(data['created_at'] ?? data['createdAt']),
+      updatedAt: _readDate(data['updated_at'] ?? data['updatedAt']),
+      media: _readMediaList(data['media']),
+    );
+  }
+
+  ForumTopic copyWith({List<ForumMedia>? media}) {
+    return ForumTopic(
+      id: id,
+      categoryId: categoryId,
+      title: title,
+      body: body,
+      authorUid: authorUid,
+      authorName: authorName,
+      authorPhotoUrl: authorPhotoUrl,
+      replyCount: replyCount,
+      status: status,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+      media: media ?? this.media,
     );
   }
 }
@@ -91,6 +116,7 @@ class ForumPost {
     required this.authorName,
     required this.authorPhotoUrl,
     required this.createdAt,
+    this.media = const [],
   });
 
   final String id;
@@ -100,91 +126,78 @@ class ForumPost {
   final String authorName;
   final String? authorPhotoUrl;
   final DateTime createdAt;
+  final List<ForumMedia> media;
 
-  factory ForumPost.fromFirestore(
-    DocumentSnapshot<Map<String, dynamic>> snapshot,
-  ) {
-    final data = snapshot.data() ?? {};
+  factory ForumPost.fromJson(Map<String, dynamic> data) {
     return ForumPost(
-      id: snapshot.id,
-      topicId: data['topicId'] as String? ?? '',
+      id: data['id'] as String? ?? '',
+      topicId: data['topic_id'] as String? ?? data['topicId'] as String? ?? '',
       body: data['body'] as String? ?? '',
-      authorUid: data['authorUid'] as String? ?? '',
-      authorName: data['authorName'] as String? ?? 'Pokoin user',
-      authorPhotoUrl: data['authorPhotoUrl'] as String?,
-      createdAt: _readDate(data['createdAt']),
+      authorUid:
+          data['author_uid'] as String? ?? data['authorUid'] as String? ?? '',
+      authorName: data['author_name'] as String? ??
+          data['authorName'] as String? ??
+          'Pokoin user',
+      authorPhotoUrl: data['author_photo_url'] as String? ??
+          data['authorPhotoUrl'] as String?,
+      createdAt: _readDate(data['created_at'] ?? data['createdAt']),
+      media: _readMediaList(data['media']),
+    );
+  }
+
+  ForumPost copyWith({List<ForumMedia>? media}) {
+    return ForumPost(
+      id: id,
+      topicId: topicId,
+      body: body,
+      authorUid: authorUid,
+      authorName: authorName,
+      authorPhotoUrl: authorPhotoUrl,
+      createdAt: createdAt,
+      media: media ?? this.media,
     );
   }
 }
 
 class ForumService {
-  ForumService({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+  ForumService({http.Client? client, FirebaseAuth? auth})
+      : _client = client ?? http.Client(),
+        _auth = auth ?? FirebaseAuth.instance;
 
-  final FirebaseFirestore _firestore;
+  final http.Client _client;
+  final FirebaseAuth _auth;
 
-  Stream<List<ForumCategory>> categories() {
-    return _firestore
-        .collection('forum_categories')
-        .orderBy('order')
-        .limit(20)
-        .snapshots()
-        .map((snapshot) {
-      final items = snapshot.docs.map(ForumCategory.fromFirestore).toList();
+  Future<List<ForumCategory>> categories() async {
+    try {
+      final snapshot = await _homeSnapshot();
+      final items = snapshot.categories;
       return items.isEmpty ? defaultForumCategories : items;
-    });
-  }
-
-  Stream<List<ForumTopic>> topics({String? categoryId}) {
-    Query<Map<String, dynamic>> query = _firestore
-        .collection('forum_topics')
-        .where('status', isEqualTo: 'open')
-        .limit(25);
-
-    if (categoryId != null && categoryId.isNotEmpty) {
-      query = _firestore
-          .collection('forum_topics')
-          .where('categoryId', isEqualTo: categoryId)
-          .where('status', isEqualTo: 'open')
-          .limit(25);
+    } catch (_) {
+      return defaultForumCategories;
     }
-
-    return query.snapshots().map(
-      (snapshot) {
-        final items = snapshot.docs.map(ForumTopic.fromFirestore).toList();
-        items.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-        return items;
-      },
-    );
   }
 
-  Stream<ForumTopic?> topic(String topicId) {
-    return _firestore.collection('forum_topics').doc(topicId).snapshots().map(
-          (snapshot) =>
-              snapshot.exists ? ForumTopic.fromFirestore(snapshot) : null,
-        );
+  Future<List<ForumTopic>> topics({String? categoryId}) async {
+    try {
+      final snapshot = await _homeSnapshot(categoryId: categoryId);
+      return snapshot.topics;
+    } catch (_) {
+      return const [];
+    }
   }
 
-  Stream<List<ForumPost>> posts(String topicId) {
-    return _firestore
-        .collection('forum_posts')
-        .where('topicId', isEqualTo: topicId)
-        .limit(100)
-        .snapshots()
-        .map((snapshot) {
-      final items = snapshot.docs.map(ForumPost.fromFirestore).toList();
-      items.sort((a, b) => a.createdAt.compareTo(b.createdAt));
-      return items;
-    });
+  Future<ForumTopic?> topic(String topicId) async {
+    return _topicSnapshot(topicId).then((snapshot) => snapshot.topic);
+  }
+
+  Future<List<ForumPost>> posts(String topicId) async {
+    return _topicSnapshot(topicId).then((snapshot) => snapshot.posts);
   }
 
   Future<String> createTopic({
     required String categoryId,
     required String title,
     required String body,
-    required String authorUid,
-    required String authorName,
-    required String? authorPhotoUrl,
   }) async {
     final cleanTitle = title.trim();
     final cleanBody = body.trim();
@@ -195,105 +208,98 @@ class ForumService {
       throw ArgumentError('Topic body must be at least 12 characters.');
     }
 
-    final categoryRef =
-        _firestore.collection('forum_categories').doc(categoryId);
-    final topicRef = _firestore.collection('forum_topics').doc();
-    final now = FieldValue.serverTimestamp();
-
-    await _firestore.runTransaction((transaction) async {
-      final category = await transaction.get(categoryRef);
-      if (!category.exists) {
-        final defaultCategory = _defaultCategoryById(categoryId);
-        if (defaultCategory == null) {
-          throw StateError('Choose a valid forum category.');
-        }
-        transaction.set(categoryRef, {
-          'title': defaultCategory.title,
-          'description': defaultCategory.description,
-          'iconName': defaultCategory.iconName,
-          'order': defaultCategory.order,
-          'topicCount': 1,
-          'postCount': 1,
-          'createdAt': now,
-          'updatedAt': now,
-        });
-      } else {
-        transaction.update(categoryRef, {
-          'topicCount': FieldValue.increment(1),
-          'postCount': FieldValue.increment(1),
-          'updatedAt': now,
-        });
-      }
-
-      transaction.set(topicRef, {
-        'categoryId': categoryId,
-        'title': cleanTitle,
-        'body': cleanBody,
-        'authorUid': authorUid,
-        'authorName': authorName,
-        'authorPhotoUrl': authorPhotoUrl,
-        'replyCount': 0,
-        'status': 'open',
-        'createdAt': now,
-        'updatedAt': now,
-      });
+    final data = await _postJson('/api/forum-create-topic', {
+      'categoryId': categoryId,
+      'title': cleanTitle,
+      'body': cleanBody,
     });
-
-    return topicRef.id;
+    final topic = ForumTopic.fromJson(
+      Map<String, dynamic>.from(data['topic'] as Map? ?? const {}),
+    );
+    return topic.id;
   }
 
-  Future<void> createPost({
+  Future<String> createPost({
     required String topicId,
     required String body,
-    required String authorUid,
-    required String authorName,
-    required String? authorPhotoUrl,
   }) async {
     final cleanBody = body.trim();
     if (cleanBody.length < 3) {
       throw ArgumentError('Reply must be at least 3 characters.');
     }
 
-    final topicRef = _firestore.collection('forum_topics').doc(topicId);
-    final postRef = _firestore.collection('forum_posts').doc();
-    final now = FieldValue.serverTimestamp();
-
-    await _firestore.runTransaction((transaction) async {
-      final topic = await transaction.get(topicRef);
-      if (!topic.exists || topic.data()?['status'] != 'open') {
-        throw StateError('This topic is no longer open.');
-      }
-      final categoryId = topic.data()?['categoryId'] as String? ?? '';
-
-      transaction.set(postRef, {
-        'topicId': topicId,
-        'categoryId': categoryId,
-        'body': cleanBody,
-        'authorUid': authorUid,
-        'authorName': authorName,
-        'authorPhotoUrl': authorPhotoUrl,
-        'createdAt': now,
-        'updatedAt': now,
-      });
-      transaction.update(topicRef, {
-        'replyCount': FieldValue.increment(1),
-        'updatedAt': now,
-      });
-      if (categoryId.isNotEmpty) {
-        transaction
-            .update(_firestore.collection('forum_categories').doc(categoryId), {
-          'postCount': FieldValue.increment(1),
-          'updatedAt': now,
-        });
-      }
+    final data = await _postJson('/api/forum-create-post', {
+      'topicId': topicId,
+      'body': cleanBody,
     });
+    final post = ForumPost.fromJson(
+      Map<String, dynamic>.from(data['post'] as Map? ?? const {}),
+    );
+    return post.id;
+  }
+
+  Future<ForumMedia> uploadMedia({
+    required String topicId,
+    String? postId,
+    required Uint8List imageBytes,
+  }) async {
+    final data = await _postJson('/api/forum-upload-media', {
+      'topicId': topicId,
+      if (postId != null && postId.isNotEmpty) 'postId': postId,
+      'imageBase64': base64Encode(imageBytes),
+    });
+    return ForumMedia.fromJson(
+      Map<String, dynamic>.from(data['media'] as Map? ?? const {}),
+    );
+  }
+
+  Future<_ForumHomeSnapshot> _homeSnapshot({String? categoryId}) async {
+    final uri = Uri.base.resolve('/api/forum').replace(
+      queryParameters: {
+        if (categoryId != null && categoryId.isNotEmpty)
+          'categoryId': categoryId,
+      },
+    );
+    final response =
+        await _client.get(uri).timeout(const Duration(seconds: 10));
+    final data = _decodeResponse(response);
+    return _ForumHomeSnapshot.fromJson(data);
+  }
+
+  Future<_ForumTopicSnapshot> _topicSnapshot(String topicId) async {
+    final uri = Uri.base.resolve('/api/forum').replace(
+      queryParameters: {'topicId': topicId},
+    );
+    final response =
+        await _client.get(uri).timeout(const Duration(seconds: 10));
+    final data = _decodeResponse(response);
+    return _ForumTopicSnapshot.fromJson(data);
+  }
+
+  Future<Map<String, dynamic>> _postJson(
+    String path,
+    Map<String, dynamic> body,
+  ) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw StateError('Sign in to post in the forum.');
+    }
+    final token = await user.getIdToken();
+    final response = await _client
+        .post(
+          Uri.base.resolve(path),
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode(body),
+        )
+        .timeout(const Duration(seconds: 20));
+    return _decodeResponse(response);
   }
 }
 
 DateTime _readDate(Object? value) {
-  if (value is Timestamp) {
-    return value.toDate();
-  }
   if (value is DateTime) {
     return value;
   }
@@ -301,6 +307,130 @@ DateTime _readDate(Object? value) {
     return DateTime.tryParse(value) ?? DateTime.fromMillisecondsSinceEpoch(0);
   }
   return DateTime.fromMillisecondsSinceEpoch(0);
+}
+
+int _readInt(Object? value, int fallback) {
+  if (value is int) {
+    return value;
+  }
+  if (value is num) {
+    return value.toInt();
+  }
+  return fallback;
+}
+
+Map<String, dynamic> _decodeResponse(http.Response response) {
+  final decoded = response.body.isEmpty
+      ? <String, dynamic>{}
+      : jsonDecode(response.body) as Map<String, dynamic>;
+  if (response.statusCode >= 400) {
+    throw StateError(decoded['error'] as String? ?? 'Forum request failed.');
+  }
+  return decoded;
+}
+
+class ForumMedia {
+  const ForumMedia({
+    required this.id,
+    required this.url,
+    required this.mimeType,
+    required this.byteSize,
+    this.topicId,
+    this.postId,
+  });
+
+  final String id;
+  final String url;
+  final String mimeType;
+  final int byteSize;
+  final String? topicId;
+  final String? postId;
+
+  factory ForumMedia.fromJson(Map<String, dynamic> data) {
+    return ForumMedia(
+      id: data['id'] as String? ?? '',
+      url: data['public_url'] as String? ?? data['url'] as String? ?? '',
+      mimeType: data['mime_type'] as String? ?? 'image/webp',
+      byteSize: _readInt(data['byte_size'], 0),
+      topicId: data['topic_id'] as String?,
+      postId: data['post_id'] as String?,
+    );
+  }
+}
+
+class _ForumHomeSnapshot {
+  const _ForumHomeSnapshot({required this.categories, required this.topics});
+
+  final List<ForumCategory> categories;
+  final List<ForumTopic> topics;
+
+  factory _ForumHomeSnapshot.fromJson(Map<String, dynamic> data) {
+    return _ForumHomeSnapshot(
+      categories: (data['categories'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map((row) => ForumCategory.fromJson(Map<String, dynamic>.from(row)))
+          .toList(),
+      topics: (data['topics'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map((row) => ForumTopic.fromJson(Map<String, dynamic>.from(row)))
+          .toList(),
+    );
+  }
+}
+
+class _ForumTopicSnapshot {
+  const _ForumTopicSnapshot({
+    required this.topic,
+    required this.posts,
+    required this.media,
+  });
+
+  final ForumTopic? topic;
+  final List<ForumPost> posts;
+  final List<ForumMedia> media;
+
+  factory _ForumTopicSnapshot.fromJson(Map<String, dynamic> data) {
+    final topicData = data['topic'];
+    final media = _readMediaList(data['media']);
+    return _ForumTopicSnapshot(
+      topic: _topicWithMedia(topicData, media),
+      posts: _postsWithMedia(data['posts'], media),
+      media: media,
+    );
+  }
+
+  static ForumTopic? _topicWithMedia(
+      Object? topicData, List<ForumMedia> media) {
+    if (topicData is! Map) {
+      return null;
+    }
+    final topic = ForumTopic.fromJson(Map<String, dynamic>.from(topicData));
+    return topic.copyWith(
+      media: media.where((item) => item.postId == null).toList(),
+    );
+  }
+
+  static List<ForumPost> _postsWithMedia(
+    Object? postData,
+    List<ForumMedia> media,
+  ) {
+    return (postData as List<dynamic>? ?? const [])
+        .whereType<Map>()
+        .map((row) => ForumPost.fromJson(Map<String, dynamic>.from(row)))
+        .map(
+          (post) => post.copyWith(
+            media: media.where((item) => item.postId == post.id).toList(),
+          ),
+        )
+        .toList();
+  }
+}
+
+List<ForumMedia> _readMediaList(Object? value) {
+  return (value as List<dynamic>? ?? const [])
+      .whereType<Map>()
+      .map((row) => ForumMedia.fromJson(Map<String, dynamic>.from(row)))
+      .toList();
 }
 
 const defaultForumCategories = [
@@ -341,12 +471,3 @@ const defaultForumCategories = [
     postCount: 0,
   ),
 ];
-
-ForumCategory? _defaultCategoryById(String id) {
-  for (final category in defaultForumCategories) {
-    if (category.id == id) {
-      return category;
-    }
-  }
-  return null;
-}

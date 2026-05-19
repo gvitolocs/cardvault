@@ -5,6 +5,10 @@
 Production policy: Pokoin must serve card images from our own CDN
 (`https://cdn.pokoin.com`) through the app `/card-images/...` route. CardTrader
 URLs are source inputs only and should not be used directly by the Flutter app.
+Full card images must come from CardTrader's full source (`blueprint.image.url`
+first, then `blueprint.image.show.url`) whenever that source exists. Do not keep
+or regenerate full-image rows from CardTrader preview URLs just because a CDN
+object already exists; preview URLs are only for thumbnail/preview fields.
 
 The full-image importer in `scripts/import-cardtrader-full-images.js` now treats
 each CardTrader blueprint row as a set of possible full-image candidates, not as
@@ -27,8 +31,10 @@ Rules saved from the fix:
 - Detect actual image format from bytes first, then response content type, then
   URL extension. Some CardTrader `.jpg` URLs return WebP bytes.
 - Upload to R2 using the existing `<blueprint_id>_<slug>.<ext>` key format.
-- Update `cardtrader_pokemon_blueprints`, `marketplace_cards`, and
-  `marketplace_card_versions` for each imported row.
+- Update Oracle `cardtrader_pokemon_blueprints`, `marketplace_cards`, and
+  `marketplace_card_versions` for each imported row. The existing importer was
+  originally Supabase-era; port database writes to Oracle before running it
+  again.
 - Do not run full projection refreshes during normal image-only import chunks;
   row-by-row projection updates are safer and avoid known timeout risks.
 - Full card images are used for card detail and normal marketplace cards.
@@ -50,6 +56,21 @@ Recommended repair run for missing CDN images:
 ```bash
 FULL_IMAGE_MISSING_ONLY=1 FULL_IMAGE_NEWEST_FIRST=1 FULL_IMAGE_BATCH_SIZE=50 FULL_IMAGE_MAX_ROWS=1000 node scripts/import-cardtrader-full-images.js
 ```
+
+Oracle full-source repair/reimport run:
+
+```bash
+ORACLE_IMAGE_MODE=full \
+ORACLE_IMAGE_FORCE_FULL=1 \
+ORACLE_IMAGE_FULL_KEY_SUFFIX=full-v3 \
+ORACLE_IMAGE_BATCH_SIZE=50 \
+ORACLE_IMAGE_MAX_ROWS=500 \
+ORACLE_IMAGE_CURSOR_ID=-1 \
+node scripts/import-oracle-cardtrader-images.js
+```
+
+Use a fresh `ORACLE_IMAGE_FULL_KEY_SUFFIX` when overwriting previously imported
+low-resolution CDN rows so immutable CDN cache cannot serve the old object.
 
 Resume from the printed cursor:
 
@@ -142,10 +163,10 @@ PTCG_ASSETS_DIR=../ptcg-assets node scripts/import-ptcg-expansion-symbols.js
 That job reads `symbol.png` from `https://github.com/1niceroli/ptcg-assets`,
 maps CardTrader expansion codes such as `bs`, `ju`, `blw`, `ssh`, and `svi` to
 asset folder codes such as `base1`, `base2`, `bw1`, `swsh1`, and `sv1`, uploads
-to R2 under `expansions/symbols/<expansion-name>.png`, and upserts
-`public.cardtrader_pokemon_expansions`.
+to R2 under `expansions/symbols/<expansion-name>.png`, and should upsert Oracle
+`public.cardtrader_pokemon_expansions` after the cutover.
 
 The first production symbol run uploaded 182 symbols. Direct HTTP checks against
 `https://cdn.pokoin.com/...` returned `403` from this machine for both new symbol
-paths and older image paths, so verify symbol imports through Supabase rows and
+paths and older image paths, so verify symbol imports through Oracle rows and
 direct R2 `HeadObject` checks before assuming an object is missing.

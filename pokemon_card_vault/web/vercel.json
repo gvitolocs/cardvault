@@ -1,8 +1,81 @@
 {
   "rewrites": [
     {
+      "source": "/marketplace",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(.*bot.*|.*Bot.*|.*crawler.*|.*Crawler.*|.*spider.*|.*Spider.*|.*Google-InspectionTool.*|.*facebookexternalhit.*|.*Twitterbot.*|.*LinkedInBot.*|.*WhatsApp.*|.*Discordbot.*|.*TelegramBot.*)"
+        }
+      ],
+      "destination": "/marketplace.html"
+    },
+    {
       "source": "/marketplace/signal",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(.*bot.*|.*Bot.*|.*crawler.*|.*Crawler.*|.*spider.*|.*Spider.*|.*Google-InspectionTool.*|.*facebookexternalhit.*|.*Twitterbot.*|.*LinkedInBot.*|.*WhatsApp.*|.*Discordbot.*|.*TelegramBot.*)"
+        }
+      ],
       "destination": "/marketplace-signal.html"
+    },
+    {
+      "source": "/forum",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(.*bot.*|.*Bot.*|.*crawler.*|.*Crawler.*|.*spider.*|.*Google-InspectionTool.*|.*facebookexternalhit.*|.*Twitterbot.*|.*LinkedInBot.*|.*WhatsApp.*|.*Discordbot.*|.*TelegramBot.*)"
+        }
+      ],
+      "destination": "/forum.html"
+    },
+    {
+      "source": "/wallet",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(.*bot.*|.*Bot.*|.*crawler.*|.*Crawler.*|.*spider.*|.*Spider.*|.*Google-InspectionTool.*|.*facebookexternalhit.*|.*Twitterbot.*|.*LinkedInBot.*|.*WhatsApp.*|.*Discordbot.*|.*TelegramBot.*)"
+        }
+      ],
+      "destination": "/wallet.html"
+    },
+    {
+      "source": "/scan",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(.*bot.*|.*Bot.*|.*crawler.*|.*Crawler.*|.*spider.*|.*Spider.*|.*Google-InspectionTool.*|.*facebookexternalhit.*|.*Twitterbot.*|.*LinkedInBot.*|.*WhatsApp.*|.*Discordbot.*|.*TelegramBot.*)"
+        }
+      ],
+      "destination": "/scan.html"
+    },
+    {
+      "source": "/health",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(.*bot.*|.*Bot.*|.*crawler.*|.*Crawler.*|.*spider.*|.*Spider.*|.*Google-InspectionTool.*|.*facebookexternalhit.*|.*Twitterbot.*|.*LinkedInBot.*|.*WhatsApp.*|.*Discordbot.*|.*TelegramBot.*)"
+        }
+      ],
+      "destination": "/health.html"
+    },
+    {
+      "source": "/docs",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(.*bot.*|.*Bot.*|.*crawler.*|.*Crawler.*|.*spider.*|.*Spider.*|.*Google-InspectionTool.*|.*facebookexternalhit.*|.*Twitterbot.*|.*LinkedInBot.*|.*WhatsApp.*|.*Discordbot.*|.*TelegramBot.*)"
+        }
+      ],
+      "destination": "/docs.html"
     },
     {
       "source": "/card-images/:path*",

@@ -6,7 +6,8 @@ especially `/marketplace`, `/card/:id`, seller listings, cart, and checkout.
 ## Product Direction
 
 - The card page must not regress to a static mockup.
-- Card identity and images come from the Supabase CardTrader blueprint catalog.
+- Card identity and images come from Oracle marketplace projections populated
+  from CardTrader blueprint data.
 - Seller listings, cart entries, and pending orders live in Firebase/Firestore.
 - The UI should stay dark and Pokoin-branded, not white shop-template styling.
 - Pricing is Pokoin-first. Show PKN clearly; fiat can be secondary context.
@@ -16,16 +17,15 @@ especially `/marketplace`, `/card/:id`, seller listings, cart, and checkout.
 ## Current Data Flow
 
 - `lib/services/card_service.dart`
-  - Loads lightweight marketplace projections before the heavy blueprint table.
-  - Uses `marketplace_cards` for homepage/catalog/search preview card rows.
+  - Uses Oracle-backed Vercel APIs for marketplace card data.
+  - Uses `/api/marketplace-cards` for homepage/catalog/search preview rows.
   - Uses `/api/marketplace-home` for dynamic carousel sections. That endpoint
     returns both section IDs and a card payload; merge `snapshot.cards` into
     `CardState.cards` before resolving carousel IDs, otherwise Best sellers and
     Featured can render empty when their IDs are not in the capped catalog load.
-  - Uses `marketplace_card_versions` for expansion-scoped navigation and full
-    search result rows.
-  - Fetches a single `cardtrader_pokemon_blueprints` row only when `/card/:id`
-    needs full card detail not already loaded.
+  - Uses `/api/marketplace-card-versions` for expansion-scoped navigation and
+    full search result rows.
+  - Does not read Supabase marketplace tables directly. Supabase is forum-only.
   - Falls back to Hive cache and then local sample cards only when remote data is
     unavailable.
 - `lib/providers/card_listing_provider.dart`
@@ -52,7 +52,7 @@ especially `/marketplace`, `/card/:id`, seller listings, cart, and checkout.
   - Must not show completed sales, 24h volume, or historical charts until
     settled order/event aggregates exist.
 
-## Supabase Projection Tables
+## Oracle Projection Tables
 
 - `public.marketplace_cards`
   - Lightweight marketplace card rows for home, search preview, and catalog
@@ -66,8 +66,9 @@ especially `/marketplace`, `/card/:id`, seller listings, cart, and checkout.
     `card_id`, `name`, `expansion_name`, `expansion_number`,
     `expansion_number_int`, `blueprint_id`, and image URLs.
   - Refreshed by `public.refresh_marketplace_card_versions()`.
-  - Use this table for `/card/:id` previous/next and version search. Do not
-    parse the heavy blueprint JSON in the client for navigation.
+  - Use this table through `/api/marketplace-card-versions` for `/card/:id`
+    previous/next and version search. Do not parse heavy blueprint JSON in the
+    client for navigation.
 
 ## Required Checks Before Editing
 
@@ -99,8 +100,8 @@ especially `/marketplace`, `/card/:id`, seller listings, cart, and checkout.
 - The marketplace home carousel sections must not depend only on the capped
   catalog. Use the `MarketplaceHomeSnapshot.cards` payload to hydrate section
   IDs, then fall back per section if some IDs are unavailable.
-- Full search and "View all versions" style results must call Supabase projection
-  data directly, not just filter the loaded home catalog.
+- Full search and "View all versions" style results must call Oracle-backed
+  marketplace APIs, not just filter the loaded home catalog.
 - Previous/next must stay within the exact same expansion name. Load the whole
   expansion list once and calculate next/previous locally; do not call an
   adjacent-card RPC for every arrow click.
@@ -116,7 +117,8 @@ especially `/marketplace`, `/card/:id`, seller listings, cart, and checkout.
 
 When changing `lib/screens/card_detail_screen.dart`, verify:
 
-- `/card/:id` loads the real card image from Supabase/CDN when available.
+- `/card/:id` loads the real card image from Oracle projections/CDN when
+  available.
 - Previous/next arrows appear when the current expansion has neighboring rows in
   `marketplace_card_versions`.
 - Pressing previous/next after the first page load does not create a new
@@ -168,17 +170,11 @@ the change on `pokoin.com`, deploy after the checks:
 ./deploy-pokoin-web.sh
 ```
 
-For version/navigation changes, also verify the projection data with the anon
-key or SQL editor:
+For version/navigation changes, also verify Oracle projection data:
 
-```sql
-select public.refresh_marketplace_card_versions();
-
-select card_id, name, expansion_name, expansion_number
-from public.marketplace_card_versions
-where expansion_name = 'Unified Minds'
-order by expansion_number_int nulls last, expansion_number, blueprint_id
-limit 20;
+```bash
+node scripts/oracle-marketplace-migrate.js refresh
+node scripts/oracle-marketplace-migrate.js verify
 ```
 
 If Firestore rules changed:
@@ -211,4 +207,4 @@ PY
 
 Expected: non-zero `cards`, `bestSellerIds`, and `featuredIds`. If the API is
 healthy but Flutter carousels are empty, check the provider merge path before
-changing Supabase data.
+changing Oracle data.

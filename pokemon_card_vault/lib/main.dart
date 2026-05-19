@@ -10,6 +10,7 @@ import 'firebase_options.dart';
 import 'providers/auth_provider.dart';
 import 'wallet/main.dart' show WalletScreen;
 import 'screens/home_screen.dart';
+import 'screens/inventory_screen.dart';
 import 'screens/landing_screen.dart';
 import 'screens/health_screen.dart';
 import 'screens/scan_screen.dart';
@@ -17,16 +18,23 @@ import 'screens/cart_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/favorites_screen.dart';
 import 'screens/card_detail_screen.dart';
+import 'screens/card_versions_screen.dart';
 import 'screens/marketplace_signal_screen.dart';
+import 'screens/marketplace_admin_edit_screen.dart';
+import 'screens/admin_screen.dart';
 import 'screens/checkout_screen.dart';
 import 'screens/orders_screen.dart';
 import 'screens/auth_screen.dart';
 import 'screens/buy_pkn_screen.dart';
 import 'screens/docs_screen.dart';
 import 'screens/forum_screen.dart';
+import 'screens/nft_screen.dart';
+import 'screens/collection_screen.dart';
+import 'screens/product_landing_screen.dart';
 import 'constants/app_colors.dart';
 import 'constants/project_links.dart';
 import 'providers/marketplace_account_provider.dart';
+import 'services/card_service.dart';
 import 'utils/card_url.dart';
 import 'wallet/wallet_bridge_stub.dart';
 
@@ -269,6 +277,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isProtectedRoute = {
         '/wallet',
         '/profile',
+        '/inventory',
+        '/collection',
+        '/nft',
         '/checkout',
         '/orders',
       }.contains(state.matchedLocation);
@@ -381,9 +392,43 @@ final routerProvider = Provider<GoRouter>((ref) {
             ),
           ),
           GoRoute(
+            path: '/marketplace/:lang/cards/:cardPage/versions',
+            pageBuilder: (context, state) {
+              final cardId = cardIdFromSlug(state.pathParameters['cardPage']!);
+              return _appPage(
+                state,
+                CardVersionsScreen(cardId: cardId),
+              );
+            },
+          ),
+          GoRoute(
+            path: '/marketplace/:lang/cards/:cardPage',
+            pageBuilder: (context, state) {
+              final cardId = cardIdFromSlug(state.pathParameters['cardPage']!);
+              return _appPage(
+                state,
+                CardDetailScreen(
+                  cardId: cardId,
+                  heroTag:
+                      state.extra is String ? state.extra! as String : null,
+                ),
+              );
+            },
+          ),
+          GoRoute(
             path: '/marketplace/signal',
             pageBuilder: (context, state) =>
                 _appPage(state, const MarketplaceSignalScreen()),
+          ),
+          GoRoute(
+            path: '/marketplace/admin/edit',
+            pageBuilder: (context, state) =>
+                _appPage(state, const MarketplaceAdminEditScreen()),
+          ),
+          GoRoute(
+            path: '/admin',
+            pageBuilder: (context, state) =>
+                _appPage(state, const AdminScreen()),
           ),
           GoRoute(
             path: '/cart',
@@ -396,23 +441,44 @@ final routerProvider = Provider<GoRouter>((ref) {
                 _appPage(state, const FavoritesScreen()),
           ),
           GoRoute(
+            path: '/inventory',
+            pageBuilder: (context, state) =>
+                _appPage(state, const InventoryScreen()),
+          ),
+          GoRoute(
+            path: '/collection',
+            pageBuilder: (context, state) =>
+                _appPage(state, const CollectionScreen()),
+          ),
+          GoRoute(
+            path: '/collection/:expansionSlug',
+            pageBuilder: (context, state) => _appPage(
+              state,
+              CollectionExpansionScreen(
+                expansionSlug: state.pathParameters['expansionSlug']!,
+              ),
+            ),
+          ),
+          GoRoute(
+            path: '/nft',
+            pageBuilder: (context, state) => _appPage(
+              state,
+              NftScreen(cardId: state.uri.queryParameters['card']),
+            ),
+          ),
+          GoRoute(
+            path: '/product/:kind',
+            pageBuilder: (context, state) => _appPage(
+              state,
+              ProductLandingScreen(
+                kind: state.pathParameters['kind'] ?? '',
+              ),
+            ),
+          ),
+          GoRoute(
             path: '/profile',
             pageBuilder: (context, state) =>
                 _appPage(state, const ProfileScreen()),
-          ),
-          GoRoute(
-            path: '/card/:id',
-            pageBuilder: (context, state) {
-              final cardId = cardIdFromSlug(state.pathParameters['id']!);
-              return _appPage(state, CardDetailScreen(cardId: cardId));
-            },
-          ),
-          GoRoute(
-            path: '/:cardSlug',
-            pageBuilder: (context, state) {
-              final cardId = cardIdFromSlug(state.pathParameters['cardSlug']!);
-              return _appPage(state, CardDetailScreen(cardId: cardId));
-            },
           ),
           GoRoute(
             path: '/checkout',
@@ -437,20 +503,43 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/forum',
             pageBuilder: (context, state) =>
-                _appPage(state, const ForumScreen()),
+                _instantAppPage(state, const ForumScreen()),
           ),
           GoRoute(
             path: '/forum/category/:id',
-            pageBuilder: (context, state) => _appPage(
+            pageBuilder: (context, state) => _instantAppPage(
               state,
               ForumScreen(categoryId: state.pathParameters['id']),
             ),
           ),
           GoRoute(
             path: '/forum/topic/:id',
-            pageBuilder: (context, state) => _appPage(
+            pageBuilder: (context, state) => _instantAppPage(
               state,
               ForumScreen(topicId: state.pathParameters['id']),
+            ),
+          ),
+          GoRoute(
+            path: '/card/:id',
+            pageBuilder: (context, state) {
+              final cardId = cardIdFromSlug(state.pathParameters['id']!);
+              return _appPage(
+                state,
+                CardDetailScreen(
+                  cardId: cardId,
+                  heroTag:
+                      state.extra is String ? state.extra! as String : null,
+                ),
+              );
+            },
+          ),
+          GoRoute(
+            path: '/:cardSlug',
+            pageBuilder: (context, state) => _appPage(
+              state,
+              ExpansionOrCardSlugScreen(
+                slug: state.pathParameters['cardSlug']!,
+              ),
             ),
           ),
         ],
@@ -488,6 +577,16 @@ CustomTransitionPage<void> _appPage(GoRouterState state, Widget child) {
         ),
       );
     },
+  );
+}
+
+NoTransitionPage<void> _instantAppPage(GoRouterState state, Widget child) {
+  final path = state.uri.path;
+  _lastRouteDepth = _routeDepth(path);
+  _lastRouteOrder = _routeOrder(path);
+  return NoTransitionPage<void>(
+    key: state.pageKey,
+    child: child,
   );
 }
 
@@ -657,3 +756,32 @@ class GoRouterRefreshStream extends ChangeNotifier {
     super.dispose();
   }
 }
+
+class ExpansionOrCardSlugScreen extends ConsumerWidget {
+  const ExpansionOrCardSlugScreen({super.key, required this.slug});
+
+  final String slug;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final expansion = ref.watch(_expansionBySlugProvider(slug));
+    return expansion.when(
+      data: (value) {
+        if (value != null && value.name.isNotEmpty) {
+          return CollectionExpansionScreen(expansionSlug: value.slug);
+        }
+        return CardDetailScreen(cardId: cardIdFromSlug(slug));
+      },
+      loading: () => const Scaffold(
+        backgroundColor: Color(0xFF050816),
+        body: Center(child: CircularProgressIndicator()),
+      ),
+      error: (_, __) => CardDetailScreen(cardId: cardIdFromSlug(slug)),
+    );
+  }
+}
+
+final _expansionBySlugProvider =
+    FutureProvider.family<MarketplaceExpansion?, String>((ref, slug) {
+  return CardService().getMarketplaceExpansionBySlug(slug);
+});

@@ -15,3 +15,8 @@ final cardListingsProvider =
     StreamProvider.family<List<CardListing>, String>((ref, cardId) {
   return ref.watch(cardListingServiceProvider).activeListingsForCard(cardId);
 });
+
+final sellerListingsProvider =
+    StreamProvider.family<List<CardListing>, String>((ref, sellerUid) {
+  return ref.watch(cardListingServiceProvider).listingsForSeller(sellerUid);
+});

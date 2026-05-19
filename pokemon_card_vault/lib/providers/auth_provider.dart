@@ -31,6 +31,10 @@ final userProfileProvider = StreamProvider<AppUserProfile?>((ref) {
   return ref.watch(authServiceProvider).profileStream(user.uid);
 });
 
+final isAdminProvider = Provider<bool>((ref) {
+  return ref.watch(userProfileProvider).valueOrNull?.hasAdminAccess ?? false;
+});
+
 final cachedPknBalanceProvider = FutureProvider<int?>((ref) async {
   final user = ref.watch(authStateProvider).valueOrNull;
   if (user == null || Firebase.apps.isEmpty) {

@@ -28,6 +28,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   bool _hasConnectedMetaMask = false;
   bool _autoWalletSignInStarted = false;
   bool _isVerifyingSignup = false;
+  bool _isCompletingWalletLink = false;
 
   String get _returnPath {
     final from = GoRouterState.of(context).uri.queryParameters['from'];
@@ -43,6 +44,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_hasSignupVerificationToken) {
         _handleSignupVerificationLink();
+        return;
+      }
+      if (_walletLinkSessionId != null) {
+        _completeWalletLinkSession();
         return;
       }
       _redirectIfAlreadyLoggedIn();
@@ -72,6 +77,15 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     return signupToken != null && signupToken.isNotEmpty;
   }
 
+  String? get _walletLinkSessionId {
+    final sessionId =
+        GoRouterState.of(context).uri.queryParameters['walletLinkSession'];
+    if (sessionId == null || sessionId.isEmpty) {
+      return null;
+    }
+    return sessionId;
+  }
+
   Future<void> _handleSignupVerificationLink() async {
     final signupToken =
         GoRouterState.of(context).uri.queryParameters['signupToken'];
@@ -80,14 +94,13 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     }
     setState(() => _isVerifyingSignup = true);
     try {
-      final redirectPath = await ref
-          .read(authServiceProvider)
-          .verifyEmailSignupToken(signupToken);
+      final redirectPath =
+          await ref.read(authServiceProvider).verifyEmailSignupToken(signupToken);
       ref.invalidate(authStateProvider);
       ref.invalidate(userProfileProvider);
       ref.invalidate(pknBalanceProvider);
       if (mounted) {
-        context.go(redirectPath == '/wallet' ? '/wallet' : '/');
+        context.go(_safeReturnPath(redirectPath, fallback: _returnPath));
       }
     } catch (error) {
       if (mounted) {
@@ -119,7 +132,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       }
     });
 
-    if (_isVerifyingSignup) {
+    if (_isVerifyingSignup || _isCompletingWalletLink) {
       return const Scaffold(
         backgroundColor: Color(0xFF050816),
         body: Center(child: CircularProgressIndicator()),
@@ -212,7 +225,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
           email: _emailController.text,
           password: _passwordController.text,
           username: _usernameController.text,
-          redirectPath: _returnPath == '/wallet' ? '/wallet' : '/',
+          redirectPath: _returnPath,
         );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -289,7 +302,121 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   }
 
   Future<void> _handleCryptoWallet() async {
+    final user = ref.read(authStateProvider).valueOrNull;
+    if (user != null && !_wallet.hasProvider && _wallet.isMobile) {
+      await _openMetaMaskWalletLink();
+      return;
+    }
     await _signInWithWallet(requestAccount: true);
+  }
+
+  Future<void> _openMetaMaskWalletLink() async {
+    setState(() => _isWalletLoading = true);
+    try {
+      final auth = ref.read(authServiceProvider);
+      final session = await auth.createWalletLinkSession(returnPath: _returnPath);
+      final sessionId = session['sessionId'] as String? ?? '';
+      if (sessionId.isEmpty) {
+        throw StateError('Wallet link session was empty.');
+      }
+      final url = Uri(
+        path: '/auth',
+        queryParameters: {
+          'walletLinkSession': sessionId,
+          'from': _returnPath,
+        },
+      ).toString();
+      if (!_wallet.openMetaMaskDappUrl(url)) {
+        throw StateError('Open this page in MetaMask to connect your wallet.');
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Opening MetaMask to link this wallet...'),
+            backgroundColor: Color(0xFFFACC15),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Wallet link failed: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isWalletLoading = false);
+      }
+    }
+  }
+
+  Future<void> _completeWalletLinkSession() async {
+    final sessionId = _walletLinkSessionId;
+    if (sessionId == null || _isCompletingWalletLink) {
+      return;
+    }
+    if (!_wallet.hasProvider) {
+      _wallet.openMetaMaskDapp();
+      return;
+    }
+    setState(() => _isCompletingWalletLink = true);
+    try {
+      await WalletSignInCoordinator.run(() async {
+        final account = await _wallet.requestAccount();
+        final address = account?.trim().toLowerCase();
+        if (address == null || address.isEmpty) {
+          throw StateError('No wallet account selected.');
+        }
+        final auth = ref.read(authServiceProvider);
+        final nonce = await auth.requestWalletNonce(address);
+        final message = nonce['message'] as String? ?? '';
+        if (message.isEmpty) {
+          throw StateError('Wallet sign-in nonce was empty.');
+        }
+        final signature = await _wallet.signMessage(
+          address: address,
+          message: message,
+        );
+        final result = await auth.completeWalletLinkSession(
+          sessionId: sessionId,
+          address: address,
+          signature: signature,
+        );
+        final token = result['customToken'] as String? ?? '';
+        if (token.isEmpty) {
+          throw StateError('Wallet link token was empty.');
+        }
+        await auth.signInWithCustomToken(token);
+        ref.invalidate(authStateProvider);
+        ref.invalidate(userProfileProvider);
+        ref.invalidate(pknBalanceProvider);
+        final returnPath = _safeReturnPath(
+          result['returnPath'] as String?,
+          fallback: _returnPath,
+        );
+        if (mounted) {
+          context.go(returnPath);
+        }
+      });
+    } catch (e) {
+      if (mounted) {
+        _autoWalletSignInStarted = true;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Wallet link failed: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        context.go('/auth?from=${Uri.encodeComponent(_returnPath)}');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isCompletingWalletLink = false);
+      }
+    }
   }
 
   Future<void> _signInWithWallet({required bool requestAccount}) async {
@@ -410,6 +537,18 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     final account = await _wallet.currentAccount();
     final normalized = account?.trim().toLowerCase();
     return normalized == null || normalized.isEmpty ? null : normalized;
+  }
+
+  String _safeReturnPath(String? path, {String fallback = '/profile'}) {
+    final clean = path?.trim();
+    if (clean == null ||
+        clean.isEmpty ||
+        !clean.startsWith('/') ||
+        clean.startsWith('//') ||
+        clean.startsWith('/auth')) {
+      return fallback;
+    }
+    return clean;
   }
 }
 

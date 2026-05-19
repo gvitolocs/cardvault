@@ -121,7 +121,9 @@ class _ScanScreenState extends State<ScanScreen> {
                     const SizedBox(height: 18),
                     _ResponsiveColumns(
                       left: _ValidatorsPanel(
-                          validators: data?.validators ?? const []),
+                        validators: data?.validators ?? const [],
+                        bootstrapRegistry: data?.bootstrapRegistry,
+                      ),
                       right: _LotteryPanel(status: data?.status),
                     ),
                     const SizedBox(height: 18),
@@ -682,12 +684,9 @@ class _StatsGrid extends StatelessWidget {
     final registryNodes = _bootstrapNodes(snapshot?.bootstrapRegistry);
     final matureValidators =
         registryNodes.where((node) => _nodeStatus(node) == 'bootstrap').length;
-    final vettingNodes =
-        registryNodes.where((node) => _nodeStatus(node) == 'vetting').length;
     final authorizedValidators = validators.where((v) => v.authorized).length;
-    final connectedValidators =
+    final bootstrapValidators =
         matureValidators == 0 ? authorizedValidators : matureValidators;
-    final totalNetworkNodes = connectedValidators + vettingNodes;
     final reserve = snapshot?.reserve;
     final latestHeight = _asInt(status['height']);
     final reserveAmount =
@@ -720,8 +719,8 @@ class _StatsGrid extends StatelessWidget {
         icon: Icons.public,
       ),
       _StatCard(
-        label: 'Network',
-        value: '${_formatWholeNumber(totalNetworkNodes)} nodes',
+        label: 'Bootstrap Validators',
+        value: '${_formatWholeNumber(bootstrapValidators)} active',
         icon: Icons.verified_user_outlined,
       ),
       _StatCard(
@@ -867,18 +866,30 @@ class _TransactionsPanel extends StatelessWidget {
 
 class _ValidatorsPanel extends StatelessWidget {
   final List<ValidatorInfo> validators;
+  final Map<String, dynamic>? bootstrapRegistry;
 
-  const _ValidatorsPanel({required this.validators});
+  const _ValidatorsPanel({
+    required this.validators,
+    required this.bootstrapRegistry,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final registryNodes = _bootstrapNodes(bootstrapRegistry);
+    final bootstrapNodes =
+        registryNodes.where((node) => _nodeStatus(node) == 'bootstrap').length;
+    final vettingNodes =
+        registryNodes.where((node) => _nodeStatus(node) == 'vetting').length;
+    final authorizedValidators = validators.where((v) => v.authorized).length;
     return _Panel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _PanelHeader(
-            title: 'Validators',
-            subtitle: 'Public P2P validator identities',
+          _PanelHeader(
+            title: 'Authorized peer identities',
+            subtitle: registryNodes.isEmpty
+                ? 'Public P2P identities reported by the node'
+                : '$bootstrapNodes bootstrap validators · $vettingNodes vetting nodes · $authorizedValidators authorized identities',
             icon: Icons.security_outlined,
           ),
           const SizedBox(height: 12),

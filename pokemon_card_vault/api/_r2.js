@@ -20,6 +20,26 @@ function getR2Config() {
   };
 }
 
+function getForumMediaR2Config() {
+  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+  const accessKeyId = process.env.R2_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
+  const bucket = process.env.R2_FORUM_MEDIA_BUCKET || 'pokoin-forum-media';
+  const publicBaseUrl = process.env.R2_FORUM_MEDIA_PUBLIC_URL;
+
+  if (!accountId || !accessKeyId || !secretAccessKey || !bucket || !publicBaseUrl) {
+    return null;
+  }
+
+  return {
+    accountId,
+    accessKeyId,
+    secretAccessKey,
+    bucket,
+    publicBaseUrl: publicBaseUrl.replace(/\/+$/, ''),
+  };
+}
+
 function getR2Client(config) {
   return new S3Client({
     region: 'auto',
@@ -58,6 +78,29 @@ async function uploadProfilePictureToR2({ key, body }) {
   };
 }
 
+async function uploadForumMediaToR2({ key, body, contentType = 'image/webp' }) {
+  const config = getForumMediaR2Config();
+  if (!config || typeof key !== 'string' || !key.startsWith('forum-media/')) {
+    return null;
+  }
+
+  const client = getR2Client(config);
+  await client.send(
+    new PutObjectCommand({
+      Bucket: config.bucket,
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+      CacheControl: 'public, max-age=31536000, immutable',
+    }),
+  );
+
+  return {
+    key,
+    url: publicUrlForKey(config, key),
+  };
+}
+
 async function deleteProfilePictureFromR2(key) {
   const config = getR2Config();
   if (!config || typeof key !== 'string' || !key.startsWith('profile-pictures/')) {
@@ -75,5 +118,6 @@ async function deleteProfilePictureFromR2(key) {
 
 module.exports = {
   deleteProfilePictureFromR2,
+  uploadForumMediaToR2,
   uploadProfilePictureToR2,
 };

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../constants/project_links.dart';
 import '../providers/auth_provider.dart';
@@ -80,6 +81,7 @@ class ForumScreen extends ConsumerWidget {
   ) {
     final title = TextEditingController();
     final body = TextEditingController();
+    XFile? selectedImage;
     String selectedCategory = categoryId ?? 'general';
 
     showDialog<void>(
@@ -100,7 +102,12 @@ class ForumScreen extends ConsumerWidget {
               children: [
                 DropdownButtonFormField<String>(
                   initialValue: selectedCategory,
-                  dropdownColor: const Color(0xFF111936),
+                  dropdownColor: const Color(0xFF0B1020),
+                  iconEnabledColor: const Color(0xFFFACC15),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                  ),
                   decoration: _forumInputDecoration(
                     'Category',
                     Icons.folder_open_outlined,
@@ -109,7 +116,13 @@ class ForumScreen extends ConsumerWidget {
                     for (final category in categories)
                       DropdownMenuItem(
                         value: category.id,
-                        child: Text(category.title),
+                        child: Text(
+                          category.title,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
                       ),
                   ],
                   onChanged: (value) {
@@ -131,6 +144,20 @@ class ForumScreen extends ConsumerWidget {
                   icon: Icons.notes_outlined,
                   maxLines: 5,
                 ),
+                const SizedBox(height: 12),
+                _ForumMediaPicker(
+                  selectedImage: selectedImage,
+                  onPick: () async {
+                    final image = await ImagePicker().pickImage(
+                      source: ImageSource.gallery,
+                      imageQuality: 92,
+                    );
+                    if (image != null) {
+                      setDialogState(() => selectedImage = image);
+                    }
+                  },
+                  onRemove: () => setDialogState(() => selectedImage = null),
+                ),
               ],
             ),
             actions: [
@@ -141,15 +168,22 @@ class ForumScreen extends ConsumerWidget {
               FilledButton(
                 onPressed: () async {
                   try {
+                    final image = selectedImage;
                     final topicId =
                         await ref.read(forumServiceProvider).createTopic(
                               categoryId: selectedCategory,
                               title: title.text,
                               body: body.text,
-                              authorUid: uid,
-                              authorName: _authorName(profile),
-                              authorPhotoUrl: profile?.photoUrl as String?,
                             );
+                    if (image != null) {
+                      await ref.read(forumServiceProvider).uploadMedia(
+                            topicId: topicId,
+                            imageBytes: await image.readAsBytes(),
+                          );
+                    }
+                    ref.invalidate(forumCategoriesProvider);
+                    ref.invalidate(forumTopicsProvider(null));
+                    ref.invalidate(forumTopicsProvider(selectedCategory));
                     if (dialogContext.mounted) {
                       Navigator.pop(dialogContext);
                       context.go('/forum/topic/$topicId');
@@ -180,51 +214,78 @@ class ForumScreen extends ConsumerWidget {
     dynamic profile,
   ) {
     final body = TextEditingController();
+    XFile? selectedImage;
 
     showDialog<void>(
       context: context,
-      builder: (dialogContext) => _ForumDialog(
-        title: 'Reply',
-        body: _ForumTextField(
-          controller: body,
-          label: 'Write your reply',
-          icon: Icons.reply_outlined,
-          maxLines: 5,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => _ForumDialog(
+          title: 'Reply',
+          body: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _ForumTextField(
+                controller: body,
+                label: 'Write your reply',
+                icon: Icons.reply_outlined,
+                maxLines: 5,
+              ),
+              const SizedBox(height: 12),
+              _ForumMediaPicker(
+                selectedImage: selectedImage,
+                onPick: () async {
+                  final image = await ImagePicker().pickImage(
+                    source: ImageSource.gallery,
+                    imageQuality: 92,
+                  );
+                  if (image != null) {
+                    setDialogState(() => selectedImage = image);
+                  }
+                },
+                onRemove: () => setDialogState(() => selectedImage = null),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                try {
+                  final image = selectedImage;
+                  final postId =
+                      await ref.read(forumServiceProvider).createPost(
+                            topicId: topicId,
+                            body: body.text,
+                          );
+                  if (image != null) {
+                    await ref.read(forumServiceProvider).uploadMedia(
+                          topicId: topicId,
+                          postId: postId,
+                          imageBytes: await image.readAsBytes(),
+                        );
+                  }
+                  ref.invalidate(forumTopicProvider(topicId));
+                  ref.invalidate(forumPostsProvider(topicId));
+                  ref.invalidate(forumCategoriesProvider);
+                  ref.invalidate(forumTopicsProvider(null));
+                  if (dialogContext.mounted) {
+                    Navigator.pop(dialogContext);
+                  }
+                } catch (error) {
+                  if (dialogContext.mounted) {
+                    _showForumMessage(dialogContext, error.toString());
+                  }
+                }
+              },
+              child: const Text('Reply'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              try {
-                await ref.read(forumServiceProvider).createPost(
-                      topicId: topicId,
-                      body: body.text,
-                      authorUid: uid,
-                      authorName: _authorName(profile),
-                      authorPhotoUrl: profile?.photoUrl as String?,
-                    );
-                if (dialogContext.mounted) {
-                  Navigator.pop(dialogContext);
-                }
-              } catch (error) {
-                if (dialogContext.mounted) {
-                  _showForumMessage(dialogContext, error.toString());
-                }
-              }
-            },
-            child: const Text('Reply'),
-          ),
-        ],
       ),
     ).whenComplete(body.dispose);
-  }
-
-  String _authorName(dynamic profile) {
-    final name = profile?.displayName as String?;
-    return name == null || name.trim().isEmpty ? 'Pokoin user' : name.trim();
   }
 }
 
@@ -315,6 +376,10 @@ class _TopicDetail extends ConsumerWidget {
                       fontSize: 15,
                     ),
                   ),
+                  if (topic.media.isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    _ForumMediaGallery(media: topic.media),
+                  ],
                   const SizedBox(height: 18),
                   FilledButton.icon(
                     onPressed: onReply,
@@ -415,20 +480,15 @@ class _CategoryRail extends StatelessWidget {
         spacing: 12,
         runSpacing: 12,
         children: [
-          _CategoryChip(
-            title: 'All discussions',
-            description: 'Latest across Pokoin',
-            icon: Icons.auto_awesome,
-            active: selected == null,
-            onTap: () => context.go('/forum'),
-          ),
           for (final category in items)
             _CategoryChip(
               title: category.title,
               description: '${category.topicCount} topics',
               icon: _iconFor(category.iconName),
               active: selected == category.id,
-              onTap: () => context.go('/forum/category/${category.id}'),
+              onTap: () => selected == category.id
+                  ? context.go('/forum')
+                  : context.go('/forum/category/${category.id}'),
             ),
         ],
       ),
@@ -562,6 +622,10 @@ class _Replies extends StatelessWidget {
                       style: const TextStyle(
                           color: Color(0xFFCBD5E1), height: 1.5),
                     ),
+                    if (post.media.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      _ForumMediaGallery(media: post.media),
+                    ],
                   ],
                 ),
               ),
@@ -764,13 +828,20 @@ class _ForumDialog extends StatelessWidget {
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.all(22),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560),
+        constraints: const BoxConstraints(maxWidth: 680),
         child: Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: const Color(0xF20B1020),
+            color: const Color(0xFF071024),
             borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+            border: Border.all(color: const Color(0xFF334155)),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0xCC000000),
+                blurRadius: 28,
+                offset: Offset(0, 18),
+              ),
+            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -818,8 +889,95 @@ class _ForumTextField extends StatelessWidget {
     return TextField(
       controller: controller,
       maxLines: maxLines,
-      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+      cursorColor: const Color(0xFFFACC15),
+      style: const TextStyle(
+        color: Colors.white,
+        fontWeight: FontWeight.w800,
+      ),
       decoration: _forumInputDecoration(label, icon),
+    );
+  }
+}
+
+class _ForumMediaPicker extends StatelessWidget {
+  const _ForumMediaPicker({
+    required this.selectedImage,
+    required this.onPick,
+    required this.onRemove,
+  });
+
+  final XFile? selectedImage;
+  final VoidCallback onPick;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final imageName = selectedImage?.name;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111B3F),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0x4DFFFFFF)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.image_outlined, color: Color(0xFFFACC15)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              imageName == null || imageName.isEmpty
+                  ? 'Attach an image for collectors to inspect'
+                  : imageName,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Color(0xFFCBD5E1),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: selectedImage == null ? onPick : onRemove,
+            child: Text(selectedImage == null ? 'Choose' : 'Remove'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ForumMediaGallery extends StatelessWidget {
+  const _ForumMediaGallery({required this.media});
+
+  final List<ForumMedia> media;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: [
+        for (final item in media)
+          ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Image.network(
+              item.url,
+              width: 220,
+              height: 220,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                width: 220,
+                height: 120,
+                alignment: Alignment.center,
+                color: const Color(0xFF111936),
+                child: const Icon(
+                  Icons.broken_image_outlined,
+                  color: Color(0xFFFACC15),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -828,16 +986,21 @@ InputDecoration _forumInputDecoration(String label, IconData icon) {
   return InputDecoration(
     labelText: label,
     labelStyle: const TextStyle(color: Color(0xFF93A4C8)),
+    floatingLabelStyle: const TextStyle(
+      color: Color(0xFFFDE68A),
+      fontWeight: FontWeight.w800,
+    ),
     prefixIcon: Icon(icon, color: const Color(0xFFFACC15)),
     filled: true,
-    fillColor: const Color(0xFF111936),
+    fillColor: const Color(0xFF111B3F),
+    hintStyle: const TextStyle(color: Color(0xFFCBD5E1)),
     enabledBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(16),
-      borderSide: const BorderSide(color: Color(0x1AFFFFFF)),
+      borderSide: const BorderSide(color: Color(0x4DFFFFFF)),
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(16),
-      borderSide: const BorderSide(color: Color(0xFFFACC15)),
+      borderSide: const BorderSide(color: Color(0xFFFACC15), width: 2),
     ),
   );
 }
@@ -1013,7 +1176,7 @@ class _ForumNavPill extends StatelessWidget {
               path: '/marketplace',
               icon: Icons.storefront_outlined),
           _ForumNavAction(
-              label: 'Scan', path: '/scan', icon: Icons.query_stats_outlined),
+              label: 'Profile', path: '/profile', icon: Icons.person_outline),
         ],
       ),
     );

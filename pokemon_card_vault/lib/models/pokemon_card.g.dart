@@ -43,13 +43,18 @@ class PokemonCardAdapter extends TypeAdapter<PokemonCard> {
       previewImageUrl: fields[23] as String?,
       itemKind: fields[24] as String? ?? 'single',
       productType: fields[25] as String? ?? 'card',
+      trainerName: fields[26] as String? ?? '',
+      expansionSymbolUrl: fields[27] as String? ?? '',
+      cardPalette:
+          (fields[28] as Map?)?.cast<String, dynamic>() ?? const {},
+      emoji: fields[29] as String? ?? '',
     );
   }
 
   @override
   void write(BinaryWriter writer, PokemonCard obj) {
     writer
-      ..writeByte(26)
+      ..writeByte(30)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -101,7 +106,15 @@ class PokemonCardAdapter extends TypeAdapter<PokemonCard> {
       ..writeByte(24)
       ..write(obj.itemKind)
       ..writeByte(25)
-      ..write(obj.productType);
+      ..write(obj.productType)
+      ..writeByte(26)
+      ..write(obj.trainerName)
+      ..writeByte(27)
+      ..write(obj.expansionSymbolUrl)
+      ..writeByte(28)
+      ..write(obj.cardPalette)
+      ..writeByte(29)
+      ..write(obj.emoji);
   }
 
   @override

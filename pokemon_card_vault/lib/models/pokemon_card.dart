@@ -82,6 +82,18 @@ class PokemonCard extends HiveObject {
   @HiveField(25)
   final String productType;
 
+  @HiveField(26)
+  final String trainerName;
+
+  @HiveField(27)
+  final String expansionSymbolUrl;
+
+  @HiveField(28)
+  final Map<String, dynamic> cardPalette;
+
+  @HiveField(29)
+  final String emoji;
+
   PokemonCard({
     required this.id,
     required this.name,
@@ -109,7 +121,12 @@ class PokemonCard extends HiveObject {
     this.gradingCompany,
     this.itemKind = 'single',
     this.productType = 'card',
-  }) : previewImageUrl = previewImageUrl ?? imageUrl;
+    this.trainerName = '',
+    this.expansionSymbolUrl = '',
+    Map<String, dynamic>? cardPalette,
+    this.emoji = '',
+  })  : previewImageUrl = previewImageUrl ?? imageUrl,
+        cardPalette = Map<String, dynamic>.from(cardPalette ?? const {});
 
   factory PokemonCard.fromJson(Map<String, dynamic> json) {
     return PokemonCard(
@@ -140,6 +157,11 @@ class PokemonCard extends HiveObject {
       gradingCompany: json['gradingCompany'],
       itemKind: json['itemKind'] ?? 'single',
       productType: json['productType'] ?? json['product_type'] ?? 'card',
+      trainerName: json['trainerName'] ?? json['trainer_name'] ?? '',
+      expansionSymbolUrl:
+          json['expansionSymbolUrl'] ?? json['expansion_symbol_url'] ?? '',
+      cardPalette: _readCardPalette(json),
+      emoji: json['emoji'] ?? '',
     );
   }
 
@@ -171,6 +193,10 @@ class PokemonCard extends HiveObject {
       'gradingCompany': gradingCompany,
       'itemKind': itemKind,
       'productType': productType,
+      'trainerName': trainerName,
+      'expansionSymbolUrl': expansionSymbolUrl,
+      'cardPalette': cardPalette,
+      'emoji': emoji,
     };
   }
 
@@ -201,6 +227,10 @@ class PokemonCard extends HiveObject {
     String? gradingCompany,
     String? itemKind,
     String? productType,
+    String? trainerName,
+    String? expansionSymbolUrl,
+    Map<String, dynamic>? cardPalette,
+    String? emoji,
   }) {
     return PokemonCard(
       id: id ?? this.id,
@@ -229,6 +259,21 @@ class PokemonCard extends HiveObject {
       gradingCompany: gradingCompany ?? this.gradingCompany,
       itemKind: itemKind ?? this.itemKind,
       productType: productType ?? this.productType,
+      trainerName: trainerName ?? this.trainerName,
+      expansionSymbolUrl: expansionSymbolUrl ?? this.expansionSymbolUrl,
+      cardPalette: cardPalette ?? this.cardPalette,
+      emoji: emoji ?? this.emoji,
     );
+  }
+
+  static Map<String, dynamic> _readCardPalette(Map<String, dynamic> json) {
+    final value = json['cardPalette'] ?? json['card_palette'];
+    if (value is Map<String, dynamic>) {
+      return value;
+    }
+    if (value is Map) {
+      return Map<String, dynamic>.from(value);
+    }
+    return const {};
   }
 }

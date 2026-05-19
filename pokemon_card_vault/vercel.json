@@ -180,8 +180,81 @@
       "destination": "/pokoin-crypto.html"
     },
     {
+      "source": "/marketplace",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(.*bot.*|.*Bot.*|.*crawler.*|.*Crawler.*|.*spider.*|.*Spider.*|.*Google-InspectionTool.*|.*facebookexternalhit.*|.*Twitterbot.*|.*LinkedInBot.*|.*WhatsApp.*|.*Discordbot.*|.*TelegramBot.*)"
+        }
+      ],
+      "destination": "/marketplace.html"
+    },
+    {
       "source": "/marketplace/signal",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(.*bot.*|.*Bot.*|.*crawler.*|.*Crawler.*|.*spider.*|.*Spider.*|.*Google-InspectionTool.*|.*facebookexternalhit.*|.*Twitterbot.*|.*LinkedInBot.*|.*WhatsApp.*|.*Discordbot.*|.*TelegramBot.*)"
+        }
+      ],
       "destination": "/marketplace-signal.html"
+    },
+    {
+      "source": "/forum",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(.*bot.*|.*Bot.*|.*crawler.*|.*Crawler.*|.*spider.*|.*Spider.*|.*Google-InspectionTool.*|.*facebookexternalhit.*|.*Twitterbot.*|.*LinkedInBot.*|.*WhatsApp.*|.*Discordbot.*|.*TelegramBot.*)"
+        }
+      ],
+      "destination": "/forum.html"
+    },
+    {
+      "source": "/wallet",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(.*bot.*|.*Bot.*|.*crawler.*|.*Crawler.*|.*spider.*|.*Spider.*|.*Google-InspectionTool.*|.*facebookexternalhit.*|.*Twitterbot.*|.*LinkedInBot.*|.*WhatsApp.*|.*Discordbot.*|.*TelegramBot.*)"
+        }
+      ],
+      "destination": "/wallet.html"
+    },
+    {
+      "source": "/scan",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(.*bot.*|.*Bot.*|.*crawler.*|.*Crawler.*|.*spider.*|.*Spider.*|.*Google-InspectionTool.*|.*facebookexternalhit.*|.*Twitterbot.*|.*LinkedInBot.*|.*WhatsApp.*|.*Discordbot.*|.*TelegramBot.*)"
+        }
+      ],
+      "destination": "/scan.html"
+    },
+    {
+      "source": "/health",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(.*bot.*|.*Bot.*|.*crawler.*|.*Crawler.*|.*spider.*|.*Spider.*|.*Google-InspectionTool.*|.*facebookexternalhit.*|.*Twitterbot.*|.*LinkedInBot.*|.*WhatsApp.*|.*Discordbot.*|.*TelegramBot.*)"
+        }
+      ],
+      "destination": "/health.html"
+    },
+    {
+      "source": "/docs",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(.*bot.*|.*Bot.*|.*crawler.*|.*Crawler.*|.*spider.*|.*Spider.*|.*Google-InspectionTool.*|.*facebookexternalhit.*|.*Twitterbot.*|.*LinkedInBot.*|.*WhatsApp.*|.*Discordbot.*|.*TelegramBot.*)"
+        }
+      ],
+      "destination": "/docs.html"
     },
     {
       "source": "/api/supply/total.txt",
@@ -248,8 +321,28 @@
       "destination": "/api/wallet-link.js"
     },
     {
+      "source": "/api/wallet-link/session",
+      "destination": "/api/wallet-link-session.js"
+    },
+    {
+      "source": "/api/wallet-link/complete",
+      "destination": "/api/wallet-link-complete.js"
+    },
+    {
       "source": "/api/create-pkn-checkout-session",
       "destination": "/api/create-pkn-checkout-session.js"
+    },
+    {
+      "source": "/api/cardtrader-redirect",
+      "destination": "/api/cardtrader-redirect.js"
+    },
+    {
+      "source": "/api/cardmarket-redirect",
+      "destination": "/api/cardmarket-redirect.js"
+    },
+    {
+      "source": "/api/unlock-silver",
+      "destination": "/api/unlock-silver.js"
     },
     {
       "source": "/api/marketplace-home",
@@ -258,6 +351,38 @@
     {
       "source": "/api/marketplace-event",
       "destination": "/api/marketplace-event.js"
+    },
+    {
+      "source": "/api/marketplace-autocomplete",
+      "destination": "/api/marketplace-autocomplete.js"
+    },
+    {
+      "source": "/api/marketplace-search-candidates",
+      "destination": "/api/marketplace-search-candidates.js"
+    },
+    {
+      "source": "/api/marketplace-expansion-symbols",
+      "destination": "/api/marketplace-expansion-symbols.js"
+    },
+    {
+      "source": "/api/marketplace-expansions",
+      "destination": "/api/marketplace-expansions.js"
+    },
+    {
+      "source": "/api/forum",
+      "destination": "/api/forum.js"
+    },
+    {
+      "source": "/api/forum-create-topic",
+      "destination": "/api/forum-create-topic.js"
+    },
+    {
+      "source": "/api/forum-create-post",
+      "destination": "/api/forum-create-post.js"
+    },
+    {
+      "source": "/api/forum-upload-media",
+      "destination": "/api/forum-upload-media.js"
     },
     {
       "source": "/api/stripe-webhook",

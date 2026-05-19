@@ -1208,6 +1208,12 @@ class _WalletScreenState extends State<WalletScreen> {
     if (type == 'pkn_purchase_credit') {
       return 'Bought $abs PKN';
     }
+    if (type == 'silver_unlock_payment_sent') {
+      return 'Silver unlock $abs PKN';
+    }
+    if (type == 'silver_unlock_payment_received') {
+      return 'Silver unlock received $abs PKN';
+    }
     if (type.contains('withdraw') || type.contains('conversion')) {
       return 'Requested $abs PKN payout';
     }
@@ -1596,6 +1602,11 @@ class _WalletScreenState extends State<WalletScreen> {
           icon: Icons.currency_exchange,
           label: 'wPKN',
           onTap: _openWpknExchangeSheet,
+        ),
+        _QuickActionButton(
+          icon: Icons.token_outlined,
+          label: 'NFT',
+          onTap: () => _openUrl('https://pokoin.com/nft'),
         ),
         _QuickActionButton(
           icon: Icons.shopping_cart_checkout,

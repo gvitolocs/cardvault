@@ -19,6 +19,14 @@ final userOrdersProvider = StreamProvider<List<Map<String, dynamic>>>((ref) {
   return ref.watch(marketplaceAccountServiceProvider).ordersForUser(user.uid);
 });
 
+final sellerOrdersProvider = StreamProvider<List<Map<String, dynamic>>>((ref) {
+  final user = ref.watch(authStateProvider).valueOrNull;
+  if (user == null) {
+    return Stream.value(const []);
+  }
+  return ref.watch(marketplaceAccountServiceProvider).ordersForSeller(user.uid);
+});
+
 final withdrawRequestsProvider =
     StreamProvider<List<Map<String, dynamic>>>((ref) {
   final user = ref.watch(authStateProvider).valueOrNull;

@@ -7,6 +7,31 @@ VERCEL_ORG_ID="team_WIppHrH49qzR3JDOj6AynDiC"
 
 cd "$ROOT_DIR"
 
+require_vercel_env() {
+  local key="$1"
+  local env_list
+  if ! env_list="$(vercel env ls 2>/dev/null)"; then
+    echo "ERROR: unable to read Vercel environment variables." >&2
+    exit 1
+  fi
+  if ! VERCEL_ENV_LIST="$env_list" python3 - "$key" <<'PY'
+import os
+import sys
+
+key = sys.argv[1]
+for line in os.environ.get("VERCEL_ENV_LIST", "").splitlines():
+    parts = line.split()
+    if parts and parts[0] == key:
+        sys.exit(0)
+sys.exit(1)
+PY
+  then
+    echo "ERROR: ${key} is missing in Vercel production env." >&2
+    echo "Add it before deploying marketplace APIs that use Oracle Postgres." >&2
+    exit 1
+  fi
+}
+
 read_env_value() {
   local key="$1"
   local file="$ROOT_DIR/.env.local"
@@ -40,18 +65,33 @@ if [[ -n "${SUPABASE_ANON_KEY:-}" ]]; then
   FLUTTER_DEFINES+=(--dart-define="SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY")
 fi
 
+require_vercel_env MARKETPLACE_DATABASE_URL
+
 flutter build web --release --pwa-strategy=none "${FLUTTER_DEFINES[@]}"
 
 rm -rf "$ROOT_DIR/build/web/api"
 mkdir -p "$ROOT_DIR/build/web/api"
 mkdir -p "$ROOT_DIR/build/web/server"
-for helper in _email _firebase _native_pkn _pending_signup _pkn_purchase _r2 _username _wpkn_exchange; do
+for helper in _email _firebase _marketplace_db _native_pkn _pending_signup _pkn_purchase _r2 _supabase _username _wpkn_exchange; do
   cp "$ROOT_DIR/api/${helper}.js" "$ROOT_DIR/build/web/server/${helper}.js"
 done
 for endpoint in \
+  cache-google-profile-picture \
+  cardmarket-redirect \
+  cardtrader-redirect \
   create-pkn-checkout-session \
+  forum \
+  forum-create-post \
+  forum-create-topic \
+  forum-upload-media \
+  marketplace-card-versions \
+  marketplace-cards \
   marketplace-event \
+  marketplace-expansion-symbols \
+  marketplace-expansions \
+  marketplace-autocomplete \
   marketplace-home \
+  marketplace-search-candidates \
   register-email \
   remove-profile-picture \
   request-pkn-withdraw \
@@ -60,13 +100,23 @@ for endpoint in \
   stripe-webhook \
   top-up-account-balance \
   transfer-account-balance \
+  unlock-silver \
   upload-profile-picture \
   verify-email-signup \
   wallet-auth-nonce \
   wallet-auth-verify \
   wallet-link \
+  wallet-link-complete \
+  wallet-link-session \
   wpkn-exchange; do
   cp "$ROOT_DIR/api/${endpoint}.js" "$ROOT_DIR/build/web/api/${endpoint}.js"
+done
+for marketplace_endpoint in cardmarket-redirect marketplace-card-versions marketplace-cards marketplace-event marketplace-expansion-symbols marketplace-expansions marketplace-home marketplace-search-candidates; do
+  sed -i.bak "s|require('./_marketplace_db')|require('../server/_marketplace_db')|" \
+    "$ROOT_DIR/build/web/api/${marketplace_endpoint}.js"
+  sed -i.bak "s|require('./_firebase')|require('../server/_firebase')|" \
+    "$ROOT_DIR/build/web/api/${marketplace_endpoint}.js"
+  rm -f "$ROOT_DIR/build/web/api/${marketplace_endpoint}.js.bak"
 done
 cp "$ROOT_DIR/package.json" "$ROOT_DIR/build/web/package.json"
 cp "$ROOT_DIR/vercel.json" "$ROOT_DIR/build/web/vercel.json"

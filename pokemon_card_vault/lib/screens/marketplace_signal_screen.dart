@@ -186,9 +186,9 @@ class _SignalMetrics extends StatelessWidget {
           icon: Icons.inventory_2_outlined,
         ),
         _MetricCard(
-          label: 'Image coverage',
+          label: 'Cards with images',
           value: signal.imageCoverageLabel,
-          detail: '${signal.withImages} rows with CDN/proxy image',
+          detail: '${signal.withImages} items you can visually check',
           icon: Icons.image_outlined,
         ),
         _MetricCard(

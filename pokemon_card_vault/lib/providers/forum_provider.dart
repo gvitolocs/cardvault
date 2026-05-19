@@ -4,21 +4,21 @@ import '../services/forum_service.dart';
 
 final forumServiceProvider = Provider<ForumService>((ref) => ForumService());
 
-final forumCategoriesProvider = StreamProvider<List<ForumCategory>>((ref) {
+final forumCategoriesProvider = FutureProvider<List<ForumCategory>>((ref) {
   return ref.watch(forumServiceProvider).categories();
 });
 
 final forumTopicsProvider =
-    StreamProvider.family<List<ForumTopic>, String?>((ref, categoryId) {
+    FutureProvider.family<List<ForumTopic>, String?>((ref, categoryId) {
   return ref.watch(forumServiceProvider).topics(categoryId: categoryId);
 });
 
 final forumTopicProvider =
-    StreamProvider.family<ForumTopic?, String>((ref, topicId) {
+    FutureProvider.family<ForumTopic?, String>((ref, topicId) {
   return ref.watch(forumServiceProvider).topic(topicId);
 });
 
 final forumPostsProvider =
-    StreamProvider.family<List<ForumPost>, String>((ref, topicId) {
+    FutureProvider.family<List<ForumPost>, String>((ref, topicId) {
   return ref.watch(forumServiceProvider).posts(topicId);
 });

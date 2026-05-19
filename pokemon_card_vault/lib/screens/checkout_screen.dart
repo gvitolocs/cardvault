@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/cart_provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/card_listing_provider.dart';
 import '../providers/marketplace_account_provider.dart';
 import '../constants/app_colors.dart';
 import '../widgets/shop_chain_account_card.dart';
@@ -481,7 +482,7 @@ class CheckoutScreen extends ConsumerWidget {
               Navigator.pop(context);
               final user = ref.read(authStateProvider).valueOrNull;
               if (user == null) {
-                context.go('/auth');
+                context.go('/auth?from=/checkout');
                 return;
               }
               final items = cartState.items
@@ -510,10 +511,22 @@ class CheckoutScreen extends ConsumerWidget {
                   .read(marketplaceAccountServiceProvider)
                   .createPendingOrder(
                     uid: user.uid,
+                    buyerEmail: user.email ?? '',
                     items: items,
                     subtotalPkn: cartState.subtotal,
                     totalPkn: cartState.total,
                   );
+              for (final item in cartState.items) {
+                final listingId = item.listingId;
+                if (listingId != null && listingId.isNotEmpty) {
+                  await ref
+                      .read(cardListingServiceProvider)
+                      .decrementListingQuantity(
+                        listingId: listingId,
+                        quantity: item.quantity,
+                      );
+                }
+              }
               await ref.read(cartProvider.notifier).clearCart();
               if (context.mounted) {
                 context.go('/orders');

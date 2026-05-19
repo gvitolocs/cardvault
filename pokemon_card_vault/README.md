@@ -27,6 +27,9 @@ The site and wallet are no longer separate Vercel apps or separate Flutter deplo
 - **Live Balance**: Read native PKN balances from the public RPC
 - **Send Flow**: Submit wallet transactions through a browser wallet
 - **wPKN Link**: Shortcut to the PancakeSwap wPKN market
+- **Native NFTs**: PokoinPoS exposes first-class chain NFTs through RPC APIs;
+  inventory should be rendered by Pokoin/Card Vault or explorer UI, not
+  MetaMask's NFT tab. See `docs/native-nfts.md`.
 
 ### Advanced Features
 - **Smart Search**: Real-time search with filters by type, rarity, set, price
@@ -149,6 +152,12 @@ Required Firebase services:
 4. Firestore rules from `firestore.rules` deployed.
 
 Data model details are documented in `docs/firebase-data-model.md`.
+
+### Native NFT Runtime
+
+Native Pokoin NFTs are documented in `docs/native-nfts.md`. They are ledger
+objects exposed by the PokoinPoS RPC, with ownership on-chain and card metadata
+referenced by URI/hash fields.
 
 ## 📦 Dependencies
 

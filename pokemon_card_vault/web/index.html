@@ -19,8 +19,8 @@
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Pokoin is a card collector and crypto market for finding Pokémon cards, comparing seller listings, tracking market signals, and using PKN wallet rails for faster collector settlement.">
-  <meta name="keywords" content="Pokoin, card collector crypto market, Card Reserve, Pokemon card marketplace, Pokemon card listings, Pokemon card analytics, PKN wallet, graded Pokemon cards">
+  <meta name="description" content="Pokoin is the official PKN Card Reserve marketplace and crypto collector platform for Pokémon card listings, native PKN wallet rails, wPKN liquidity, Pokoin Scan, marketplace signals and native Pokoin NFTs.">
+  <meta name="keywords" content="Pokoin, Pokoin official, Pokoin crypto, PKN, wPKN, Card Reserve, Pokemon card marketplace, Pokemon card listings, Pokemon card analytics, Pokoin wallet, Pokoin Scan, native Pokoin NFTs">
   <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
   <meta name="googlebot" content="index, follow">
   <meta name="author" content="Pokoin">
@@ -31,15 +31,15 @@
 
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Pokoin">
-  <meta property="og:title" content="Pokoin - Card Collector and Crypto Market">
-  <meta property="og:description" content="Find Pokémon cards, compare seller listings, track market signals, and use PKN wallet rails for faster collector settlement.">
+  <meta property="og:title" content="Pokoin - Official PKN Card Reserve Marketplace">
+  <meta property="og:description" content="Official Pokoin site for Card Reserve listings, PKN wallet rails, wPKN liquidity, Pokoin Scan, marketplace signals and native Pokoin NFTs.">
   <meta property="og:url" content="https://pokoin.com/">
   <meta property="og:image" content="https://pokoin.com/pokoin-1024.png">
   <meta property="og:image:alt" content="Pokoin PKN crypto logo">
 
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="Pokoin - Card Collector and Crypto Market">
-  <meta name="twitter:description" content="Find cards, compare seller listings, track price signals, and use PKN wallet rails for collector settlement.">
+  <meta name="twitter:title" content="Pokoin - Official PKN Card Reserve Marketplace">
+  <meta name="twitter:description" content="Official Pokoin site for Card Reserve listings, PKN wallet rails, wPKN liquidity, Pokoin Scan and marketplace signals.">
   <meta name="twitter:image" content="https://pokoin.com/pokoin-1024.png">
 
   <!-- iOS meta tags & icons -->
@@ -55,14 +55,14 @@
   <link rel="icon" type="image/png" sizes="192x192" href="pokoin-192.png"/>
   <link rel="shortcut icon" href="favicon.ico"/>
 
-  <title>Pokoin - Card Collector and Crypto Market</title>
+  <title>Pokoin Official - PKN Card Reserve Marketplace, Wallet and Scan</title>
   <link rel="manifest" href="manifest.json">
   <script type="application/ld+json">
     {
       "@context": "https://schema.org",
       "@type": "Organization",
       "name": "Pokoin",
-      "alternateName": ["PKN", "wPKN", "Pokoin Crypto", "Pokeon Crypto", "Card Reserve"],
+      "alternateName": ["PKN", "wPKN", "Pokoin Crypto", "Pokeon Crypto", "Card Reserve", "Pokoin Card Reserve"],
       "url": "https://pokoin.com/",
       "logo": "https://pokoin.com/pokoin-1024.png",
       "sameAs": [
@@ -72,7 +72,12 @@
         "https://coinmarketcap.com/",
         "https://coinmarketcap.com/dexscan/bsc/0x86294c008542c2707b9f67e3e4ba2d03b7bf7451/"
       ],
-      "description": "Pokoin is a Pokémon card marketplace for collectors, combining Card Reserve inventory, seller listings, cart and watchlist flows, marketplace signal analytics, PKN wallet rails, and blockchain explorer infrastructure."
+      "description": "Pokoin is the official PKN Card Reserve marketplace and crypto collector platform, combining Pokémon card inventory, seller listings, marketplace signal analytics, native PKN wallet rails, wPKN liquidity, Pokoin Scan and native Pokoin NFTs.",
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "email": "contact@pokoin.com",
+        "contactType": "customer support"
+      }
     }
   </script>
   <script type="application/ld+json">
@@ -80,12 +85,12 @@
       "@context": "https://schema.org",
       "@type": "WebSite",
       "name": "Pokoin",
-      "alternateName": "Pokoin Crypto",
+      "alternateName": ["Pokoin Crypto", "PKN", "Card Reserve"],
       "url": "https://pokoin.com/",
-      "description": "Pokoin website for the Card Reserve marketplace, marketplace signal analytics, wallet-linked accounts, Pokoin Scan explorer, and network health.",
+      "description": "Official Pokoin website for the Card Reserve marketplace, marketplace signal analytics, wallet-linked accounts, Pokoin Scan explorer, native NFTs and network health.",
       "potentialAction": {
         "@type": "SearchAction",
-        "target": "https://pokoin.com/scan?q={search_term_string}",
+        "target": "https://pokoin.com/marketplace/search?q={search_term_string}",
         "query-input": "required name=search_term_string"
       }
     }
@@ -103,6 +108,14 @@
     };
   </script>
   <script>
+    window.va =
+      window.va ||
+      function () {
+        (window.vaq = window.vaq || []).push(arguments);
+      };
+  </script>
+  <script defer src="/_vercel/insights/script.js"></script>
+  <script>
     window.pokoinWallet = {
       hasProvider: function () {
         return typeof window.ethereum !== 'undefined';
@@ -116,6 +129,14 @@
         }
         const target = `${window.location.host}${window.location.pathname}${window.location.search}${window.location.hash}`;
         window.location.href = `https://metamask.app.link/dapp/${target}`;
+        return true;
+      },
+      openMetaMaskDappUrl: function (url) {
+        if (!window.pokoinWallet.isMobile()) {
+          return false;
+        }
+        const target = new URL(url, window.location.origin);
+        window.location.href = `https://metamask.app.link/dapp/${target.host}${target.pathname}${target.search}${target.hash}`;
         return true;
       },
       requestAccounts: function () {

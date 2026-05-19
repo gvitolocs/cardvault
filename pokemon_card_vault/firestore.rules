@@ -80,13 +80,16 @@ service cloud.firestore {
     }
 
     match /orders/{orderId} {
-      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+      allow read: if signedIn()
+        && (resource.data.uid == request.auth.uid
+          || request.auth.uid in resource.data.sellerUids);
       allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
       allow update, delete: if false;
     }
 
     match /card_listings/{listingId} {
-      allow read: if resource.data.status == 'active';
+      allow read: if resource.data.status == 'active'
+        || (signedIn() && resource.data.sellerUid == request.auth.uid);
       allow create: if signedIn()
         && request.resource.data.sellerUid == request.auth.uid
         && request.resource.data.cardId is string

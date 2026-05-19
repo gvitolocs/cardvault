@@ -5,6 +5,16 @@ const { deleteProfilePictureFromR2, uploadProfilePictureToR2 } = require('../ser
 
 const maxUploadBytes = 6 * 1024 * 1024;
 
+async function assertPublicAvatarUrl(url) {
+  const response = await fetch(url, { method: 'GET' });
+  if (!response.ok) {
+    throw Object.assign(
+      new Error(`Uploaded profile picture is not publicly readable (${response.status}).`),
+      { statusCode: 502 },
+    );
+  }
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
@@ -47,6 +57,7 @@ module.exports = async function handler(req, res) {
       });
     }
     const photoUrl = uploaded.url;
+    await assertPublicAvatarUrl(photoUrl);
 
     if (uploaded && typeof previousStoragePath === 'string' && previousStoragePath !== storagePath) {
       await deleteProfilePictureFromR2(previousStoragePath).catch(() => {});
@@ -57,6 +68,8 @@ module.exports = async function handler(req, res) {
         photoUrl,
         photoStoragePath: uploaded.key,
         photoInlineId: null,
+        photoSource: 'custom',
+        googlePhotoUrlHash: null,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       },
       { merge: true },

@@ -38,7 +38,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ref.invalidate(withdrawRequestsProvider);
       }
       if (!next.isLoading && next.valueOrNull == null && mounted) {
-        context.go('/auth');
+        context.go('/auth?from=/profile');
       }
     });
 
@@ -53,7 +53,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     if (user == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          context.go('/auth');
+          context.go('/auth?from=/profile');
         }
       });
       return const Scaffold(
@@ -81,7 +81,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ref.invalidate(userOrdersProvider);
           ref.invalidate(withdrawRequestsProvider);
           if (context.mounted) {
-            context.go('/auth');
+            context.go('/auth?from=/profile');
           }
         },
       ),
@@ -102,64 +102,127 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  profile.when(
-                    data: (profile) => _UserHeader(
-                      username: profile?.username ?? '',
-                      photoUrl: profile?.photoUrl,
-                      photoVersion: profile?.updatedAt.millisecondsSinceEpoch
-                          .toString(),
-                      walletAddress: profile?.walletAddress,
-                      balance: balance,
-                      walletBalance: walletBalanceState.valueOrNull,
-                      walletBalanceLoading: walletBalanceState.isLoading,
-                      ordersCount: orders.length,
-                      onEditUsername: () => _showUsernameDialog(
-                        context,
-                        ref,
-                        profile?.username ?? '',
-                      ),
-                      onEditPhoto: () => _showPhotoDialog(
-                        context,
-                        ref,
-                        user.uid,
-                        profile?.photoUrl,
-                      ),
-                      onConnectWallet: () => _connectMetaMaskWallet(
-                        context,
-                        ref,
-                      ),
-                      switchingWalletAccount: _switchingWalletAccount,
-                    ),
-                    loading: () => const _LoadingPanel(),
-                    error: (error, _) => _ErrorPanel(message: error.toString()),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final compact = constraints.maxWidth < 860;
+                      final content = Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          profile.when(
+                            data: (profile) => _UserHeader(
+                              username: profile?.username ?? '',
+                              photoUrl: profile?.photoUrl,
+                              photoVersion: profile
+                                  ?.updatedAt.millisecondsSinceEpoch
+                                  .toString(),
+                              walletAddress: profile?.walletAddress,
+                              hasSilverAccess:
+                                  profile?.hasSilverAccess == true,
+                              silverUntil: profile?.silverUntil,
+                              balance: balance,
+                              walletBalance: walletBalanceState.valueOrNull,
+                              walletBalanceLoading:
+                                  walletBalanceState.isLoading,
+                              ordersCount: orders.length,
+                              onEditUsername: () => _showUsernameDialog(
+                                context,
+                                ref,
+                                profile?.username ?? '',
+                              ),
+                              onEditPhoto: () => _showPhotoDialog(
+                                context,
+                                ref,
+                                user.uid,
+                                profile?.photoUrl,
+                              ),
+                              onConnectWallet: () => _connectMetaMaskWallet(
+                                context,
+                                ref,
+                              ),
+                              switchingWalletAccount: _switchingWalletAccount,
+                            ),
+                            loading: () => const _LoadingPanel(),
+                            error: (error, _) =>
+                                _ErrorPanel(message: error.toString()),
+                          ),
+                          const SizedBox(height: 22),
+                          _MarketplaceInventoryPanel(
+                            ordersCount: orders.length,
+                            onInventory: () => context.go('/orders'),
+                            onFavorites: () => context.go('/favorites'),
+                            onSell: () => context.go('/marketplace'),
+                          ),
+                          const SizedBox(height: 22),
+                          _WalletPreferencesPanel(
+                            balance: balance,
+                            walletAddress: profile.valueOrNull?.walletAddress,
+                            walletBalance: walletBalanceState.valueOrNull,
+                            walletBalanceLoading: walletBalanceState.isLoading,
+                            onWallet: () => context.go('/wallet'),
+                            onConnectWallet: () =>
+                                _connectMetaMaskWallet(context, ref),
+                            onWithdraw: () => _showWithdrawDialog(
+                              context,
+                              ref,
+                              profile.valueOrNull?.walletAddress,
+                            ),
+                          ),
+                          const SizedBox(height: 22),
+                          const _ForumActivityPanel(),
+                          const SizedBox(height: 22),
+                          _QuickActions(
+                            onWallet: () => context.go('/wallet'),
+                            onWithdraw: () => _showWithdrawDialog(
+                              context,
+                              ref,
+                              profile.valueOrNull?.walletAddress,
+                            ),
+                          ),
+                          const SizedBox(height: 22),
+                          _OrdersPanel(state: ordersState),
+                          const SizedBox(height: 22),
+                          _AccountSecurityPanel(
+                            providerIds: ref
+                                .read(authServiceProvider)
+                                .currentProviderIds,
+                            email:
+                                user.email ?? profile.valueOrNull?.email ?? '',
+                            walletAddress: profile.valueOrNull?.walletAddress,
+                            onConnectGoogle: () => _connectGoogleAccount(
+                              context,
+                              ref,
+                            ),
+                            onSetPassword: () => _showPasswordDialog(
+                              context,
+                              ref,
+                              user.email ?? profile.valueOrNull?.email ?? '',
+                            ),
+                          ),
+                        ],
+                      );
+                      if (compact) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const _ProfileSideMenu(compact: true),
+                            const SizedBox(height: 18),
+                            content,
+                          ],
+                        );
+                      }
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(
+                            width: 260,
+                            child: _ProfileSideMenu(),
+                          ),
+                          const SizedBox(width: 22),
+                          Expanded(child: content),
+                        ],
+                      );
+                    },
                   ),
-                  const SizedBox(height: 22),
-                  _QuickActions(
-                    onWallet: () => context.go('/wallet'),
-                    onWithdraw: () => _showWithdrawDialog(
-                      context,
-                      ref,
-                      profile.valueOrNull?.walletAddress,
-                    ),
-                  ),
-                  const SizedBox(height: 22),
-                  _AccountSecurityPanel(
-                    providerIds:
-                        ref.read(authServiceProvider).currentProviderIds,
-                    email: user.email ?? profile.valueOrNull?.email ?? '',
-                    walletAddress: profile.valueOrNull?.walletAddress,
-                    onConnectGoogle: () => _connectGoogleAccount(
-                      context,
-                      ref,
-                    ),
-                    onSetPassword: () => _showPasswordDialog(
-                      context,
-                      ref,
-                      user.email ?? profile.valueOrNull?.email ?? '',
-                    ),
-                  ),
-                  const SizedBox(height: 22),
-                  _OrdersPanel(state: ordersState),
                   const SiteFooter(),
                 ],
               ),
@@ -226,10 +289,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 if (amount == null) {
                   throw ArgumentError('Enter a whole PKN amount.');
                 }
-                final result = await ref.read(authServiceProvider).requestWithdraw(
-                      toAddress: linkedAddress,
-                      amountPkn: amount,
-                    );
+                final result =
+                    await ref.read(authServiceProvider).requestWithdraw(
+                          toAddress: linkedAddress,
+                          amountPkn: amount,
+                        );
                 ref.invalidate(pknBalanceProvider);
                 ref.invalidate(withdrawRequestsProvider);
                 if (context.mounted) {
@@ -270,13 +334,56 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       BuildContext context, WidgetRef ref) async {
     final bridge = createWalletBridge();
     if (!bridge.hasProvider) {
+      if (bridge.isMobile) {
+        try {
+          final session = await ref
+              .read(authServiceProvider)
+              .createWalletLinkSession(returnPath: '/profile');
+          final sessionId = session['sessionId'] as String? ?? '';
+          if (sessionId.isEmpty) {
+            throw StateError('Wallet link session was empty.');
+          }
+          final url = Uri(
+            path: '/auth',
+            queryParameters: {
+              'walletLinkSession': sessionId,
+              'from': '/profile',
+            },
+          ).toString();
+          if (bridge.openMetaMaskDappUrl(url)) {
+            if (!context.mounted) {
+              return;
+            }
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Opening MetaMask to link this wallet...'),
+                backgroundColor: Color(0xFFFACC15),
+              ),
+            );
+            return;
+          }
+        } catch (e) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+            );
+          }
+          return;
+        }
+      }
       if (bridge.openMetaMaskDapp()) {
+        if (!context.mounted) {
+          return;
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Opening this page in MetaMask...'),
             backgroundColor: Color(0xFFFACC15),
           ),
         );
+        return;
+      }
+      if (!context.mounted) {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
@@ -319,17 +426,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       final signature =
           await bridge.signMessage(address: account, message: message);
       await ref.read(authServiceProvider).linkSignedWallet(
-        address: account,
-        signature: signature,
-      );
+            address: account,
+            signature: signature,
+          );
       ref.invalidate(userProfileProvider);
       ref.invalidate(pknBalanceProvider);
       ref.invalidate(linkedWalletBalanceProvider);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content:
-                Text('Wallet connected. Top up and withdraw are now available.'),
+            content: Text(
+                'Wallet connected. Top up and withdraw are now available.'),
             backgroundColor: Color(0xFFFACC15),
           ),
         );
@@ -779,7 +886,7 @@ class _ProfileNavPill extends StatelessWidget {
               path: '/wallet',
               icon: Icons.account_balance_wallet_outlined),
           _ProfileNavAction(
-              label: 'Scan', path: '/scan', icon: Icons.query_stats),
+              label: 'Forum', path: '/forum', icon: Icons.forum_outlined),
           _ProfileNavAction(
               label: 'Health',
               path: '/health',
@@ -860,6 +967,8 @@ class _UserHeader extends StatelessWidget {
   final String? photoUrl;
   final String? photoVersion;
   final String? walletAddress;
+  final bool hasSilverAccess;
+  final DateTime? silverUntil;
   final int balance;
   final String? walletBalance;
   final bool walletBalanceLoading;
@@ -874,6 +983,8 @@ class _UserHeader extends StatelessWidget {
     required this.photoUrl,
     required this.photoVersion,
     required this.walletAddress,
+    required this.hasSilverAccess,
+    required this.silverUntil,
     required this.balance,
     required this.walletBalance,
     required this.walletBalanceLoading,
@@ -950,6 +1061,10 @@ class _UserHeader extends StatelessWidget {
                         fontWeight: FontWeight.w800,
                       ),
                     ),
+                    if (hasSilverAccess) ...[
+                      const SizedBox(height: 10),
+                      _SilverProfileBadge(silverUntil: silverUntil),
+                    ],
                     if (switchingWalletAccount) ...[
                       const SizedBox(height: 8),
                       const Row(
@@ -1002,6 +1117,46 @@ class _UserHeader extends StatelessWidget {
                 value: '$ordersCount recent',
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SilverProfileBadge extends StatelessWidget {
+  const _SilverProfileBadge({required this.silverUntil});
+
+  final DateTime? silverUntil;
+
+  @override
+  Widget build(BuildContext context) {
+    final expiry = silverUntil;
+    final subtitle = expiry == null
+        ? 'Silver member'
+        : 'Silver until ${expiry.year}-${expiry.month.toString().padLeft(2, '0')}-${expiry.day.toString().padLeft(2, '0')}';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFE5E7EB), Color(0xFF94A3B8)],
+        ),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.workspace_premium,
+              color: Color(0xFF111827), size: 16),
+          const SizedBox(width: 6),
+          Text(
+            subtitle,
+            style: const TextStyle(
+              color: Color(0xFF111827),
+              fontWeight: FontWeight.w900,
+              fontSize: 12,
+            ),
           ),
         ],
       ),
@@ -1169,6 +1324,314 @@ class _MetricChip extends StatelessWidget {
   }
 }
 
+class _ProfileSideMenu extends StatelessWidget {
+  const _ProfileSideMenu({this.compact = false});
+
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final items = [
+      _ProfileMenuItem(
+        icon: Icons.inventory_2_outlined,
+        title: 'Market inventory',
+        subtitle: 'Listings, orders, saved cards',
+        onTap: () => context.go('/inventory'),
+      ),
+      _ProfileMenuItem(
+        icon: Icons.collections_bookmark_outlined,
+        title: 'My collection',
+        subtitle: 'Owned cards, expansions, NFT and trade shortcuts',
+        onTap: () => context.go('/collection'),
+      ),
+      _ProfileMenuItem(
+        icon: Icons.account_balance_wallet_outlined,
+        title: 'Wallet preferences',
+        subtitle: 'PKN, withdrawals, linked wallet',
+        onTap: () => context.go('/wallet'),
+      ),
+      _ProfileMenuItem(
+        icon: Icons.forum_outlined,
+        title: 'Forum recent activities',
+        subtitle: 'Topics, replies and community',
+        onTap: () => context.go('/forum'),
+      ),
+      _ProfileMenuItem(
+        icon: Icons.favorite_border,
+        title: 'Watchlist',
+        subtitle: 'Favorite cards and products',
+        onTap: () => context.go('/favorites'),
+      ),
+      _ProfileMenuItem(
+        icon: Icons.security_outlined,
+        title: 'Login and security',
+        subtitle: 'Google, password, wallet login',
+        onTap: () {},
+      ),
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xDD0B1020),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: compact
+          ? Wrap(spacing: 10, runSpacing: 10, children: items)
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Account menu',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ...items,
+              ],
+            ),
+    );
+  }
+}
+
+class _ProfileMenuItem extends StatelessWidget {
+  const _ProfileMenuItem({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        width: 228,
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(13),
+        decoration: BoxDecoration(
+          color: const Color(0x99111936),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: const Color(0xFFFACC15), size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF93A4C8),
+                      fontSize: 11,
+                      height: 1.25,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MarketplaceInventoryPanel extends StatelessWidget {
+  const _MarketplaceInventoryPanel({
+    required this.ordersCount,
+    required this.onInventory,
+    required this.onFavorites,
+    required this.onSell,
+  });
+
+  final int ordersCount;
+  final VoidCallback onInventory;
+  final VoidCallback onFavorites;
+  final VoidCallback onSell;
+
+  @override
+  Widget build(BuildContext context) {
+    return _SectionPanel(
+      title: 'Market inventory',
+      icon: Icons.inventory_2_outlined,
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 12,
+        children: [
+          _ProfileAction(
+            icon: Icons.receipt_long_outlined,
+            title: 'Orders and purchases',
+            subtitle: '$ordersCount recent marketplace orders.',
+            onTap: onInventory,
+          ),
+          _ProfileAction(
+            icon: Icons.inventory_2_outlined,
+            title: 'Seller inventory',
+            subtitle: 'Manage listings, stock, and seller order flow.',
+            onTap: () => context.go('/inventory'),
+          ),
+          _ProfileAction(
+            icon: Icons.favorite_border,
+            title: 'Watchlist',
+            subtitle: 'Review favorite singles, products, and saved items.',
+            onTap: onFavorites,
+          ),
+          _ProfileAction(
+            icon: Icons.collections_bookmark_outlined,
+            title: 'My collection',
+            subtitle: 'Browse expansions with unowned cards grayed out.',
+            onTap: () => context.go('/collection'),
+          ),
+          _ProfileAction(
+            icon: Icons.add_business_outlined,
+            title: 'Seller tools',
+            subtitle: 'Start from a card page to list inventory for sale.',
+            onTap: onSell,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WalletPreferencesPanel extends StatelessWidget {
+  const _WalletPreferencesPanel({
+    required this.balance,
+    required this.walletAddress,
+    required this.walletBalance,
+    required this.walletBalanceLoading,
+    required this.onWallet,
+    required this.onConnectWallet,
+    required this.onWithdraw,
+  });
+
+  final int balance;
+  final String? walletAddress;
+  final String? walletBalance;
+  final bool walletBalanceLoading;
+  final VoidCallback onWallet;
+  final VoidCallback onConnectWallet;
+  final VoidCallback onWithdraw;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasWallet = (walletAddress ?? '').trim().isNotEmpty;
+    return _SectionPanel(
+      title: 'Wallet preferences',
+      icon: Icons.account_balance_wallet_outlined,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              _MetricChip(
+                label: 'Marketplace balance',
+                value: formatPkn(balance, decimals: 0),
+              ),
+              _MetricChip(
+                label: 'Linked wallet',
+                value: hasWallet ? walletAddress!.trim() : 'Not linked yet',
+                actionLabel: hasWallet ? 'Reconnect' : 'Connect',
+                onTap: onConnectWallet,
+              ),
+              if (hasWallet)
+                _MetricChip(
+                  label: 'On-chain wallet',
+                  value: walletBalanceLoading
+                      ? 'Loading...'
+                      : walletBalance == null
+                          ? 'Unavailable'
+                          : '$walletBalance PKN',
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              FilledButton.icon(
+                onPressed: onWallet,
+                icon: const Icon(Icons.open_in_new),
+                label: const Text('Open wallet'),
+              ),
+              OutlinedButton.icon(
+                onPressed: onWithdraw,
+                icon: const Icon(Icons.payments_outlined),
+                label: const Text('Withdraw PKN'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ForumActivityPanel extends StatelessWidget {
+  const _ForumActivityPanel();
+
+  @override
+  Widget build(BuildContext context) {
+    return _SectionPanel(
+      title: 'Forum recent activities',
+      icon: Icons.forum_outlined,
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 12,
+        children: [
+          _ProfileAction(
+            icon: Icons.auto_awesome,
+            title: 'Latest discussions',
+            subtitle:
+                'Browse market talk, trading strategy, and Pokoin updates.',
+            onTap: () => context.go('/forum'),
+          ),
+          _ProfileAction(
+            icon: Icons.edit_note_outlined,
+            title: 'Start a topic',
+            subtitle: 'Ask the community or share a marketplace signal.',
+            onTap: () => context.go('/forum'),
+          ),
+          _ProfileAction(
+            icon: Icons.groups_outlined,
+            title: 'Community categories',
+            subtitle: 'Jump into products, singles, DeFi, or support threads.',
+            onTap: () => context.go('/forum'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _AccountSecurityPanel extends StatelessWidget {
   const _AccountSecurityPanel({
     required this.providerIds,
@@ -1246,7 +1709,8 @@ class _AccountSecurityPanel extends StatelessWidget {
                         ? 'Not configured'
                         : email,
                 connected: hasPassword,
-                actionLabel: hasPassword ? 'Update password' : 'Create password',
+                actionLabel:
+                    hasPassword ? 'Update password' : 'Create password',
                 onTap: onSetPassword,
               ),
             ],
@@ -1294,7 +1758,8 @@ class _LoginMethodChip extends StatelessWidget {
         children: [
           Icon(
             icon,
-            color: connected ? const Color(0xFF38D39F) : const Color(0xFFFACC15),
+            color:
+                connected ? const Color(0xFF38D39F) : const Color(0xFFFACC15),
           ),
           const SizedBox(width: 12),
           Expanded(

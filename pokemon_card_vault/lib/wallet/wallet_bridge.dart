@@ -25,6 +25,8 @@ class WalletBridge {
 
   bool openMetaMaskDapp() => false;
 
+  bool openMetaMaskDappUrl(String url) => false;
+
   Future<String?> currentAccount() async => null;
 
   void onAccountsChanged(void Function(String? address) callback) {}

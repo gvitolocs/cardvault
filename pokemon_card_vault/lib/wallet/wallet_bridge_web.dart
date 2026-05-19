@@ -10,6 +10,9 @@ external bool _isMobile();
 @JS('window.pokoinWallet.openMetaMaskDapp')
 external bool _openMetaMaskDapp();
 
+@JS('window.pokoinWallet.openMetaMaskDappUrl')
+external bool _openMetaMaskDappUrl(JSString url);
+
 @JS('window.pokoinWallet.requestAccounts')
 external JSPromise<JSArray<JSString>> _requestAccounts();
 
@@ -93,6 +96,14 @@ class WalletBridge {
   bool openMetaMaskDapp() {
     try {
       return _openMetaMaskDapp();
+    } catch (_) {
+      return false;
+    }
+  }
+
+  bool openMetaMaskDappUrl(String url) {
+    try {
+      return _openMetaMaskDappUrl(url.toJS);
     } catch (_) {
       return false;
     }

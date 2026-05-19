@@ -23,6 +23,8 @@ module.exports = async function handler(req, res) {
         photoUrl: null,
         photoStoragePath: null,
         photoInlineId: null,
+        photoSource: null,
+        googlePhotoUrlHash: null,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       },
       { merge: true },

@@ -150,6 +150,7 @@ class AuthService {
         });
       final credential = await _auth.signInWithPopup(provider);
       await ensureUserProfile(credential.user);
+      await cacheGoogleProfilePicture();
       await _markFreshLogin(credential.user);
       if (credential.additionalUserInfo?.isNewUser == true) {
         await sendSignupNotification(provider: 'google');
@@ -172,6 +173,7 @@ class AuthService {
     );
     final userCredential = await _auth.signInWithCredential(credential);
     await ensureUserProfile(userCredential.user);
+    await cacheGoogleProfilePicture();
     await _markFreshLogin(userCredential.user);
     if (userCredential.additionalUserInfo?.isNewUser == true) {
       await sendSignupNotification(provider: 'google');
@@ -241,6 +243,7 @@ class AuthService {
     await credential.user?.reload();
     final refreshed = _auth.currentUser ?? credential.user;
     await ensureUserProfile(refreshed);
+    await cacheGoogleProfilePicture();
     await _markFreshLogin(refreshed);
     return credential;
   }
@@ -286,18 +289,31 @@ class AuthService {
   }
 
   Future<void> signOut() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid != null && uid.isNotEmpty) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_profileCacheKey(uid));
+      await prefs.remove(_balanceCacheKey(uid));
+    }
     await Future.wait([
       _auth.signOut(),
       _googleSignIn.signOut(),
     ]);
   }
 
-  Stream<AppUserProfile?> profileStream(String uid) {
-    return _firestore.collection('users').doc(uid).snapshots().map((snapshot) {
+  Stream<AppUserProfile?> profileStream(String uid) async* {
+    final cached = await cachedProfile(uid);
+    if (cached != null) {
+      yield cached;
+    }
+
+    yield* _firestore.collection('users').doc(uid).snapshots().map((snapshot) {
       if (!snapshot.exists) {
         return null;
       }
-      return AppUserProfile.fromFirestore(snapshot);
+      final profile = AppUserProfile.fromFirestore(snapshot);
+      _cacheProfile(profile);
+      return profile;
     });
   }
 
@@ -320,12 +336,40 @@ class AuthService {
     return prefs.getInt(_balanceCacheKey(uid));
   }
 
+  Future<AppUserProfile?> cachedProfile(String uid) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_profileCacheKey(uid));
+    if (raw == null || raw.isEmpty) {
+      return null;
+    }
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map<String, dynamic>) {
+        final profile = AppUserProfile.fromCache(decoded);
+        return profile.uid == uid ? profile : null;
+      }
+    } catch (_) {
+      await prefs.remove(_profileCacheKey(uid));
+    }
+    return null;
+  }
+
   Future<void> _cacheBalance(String uid, int balance) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_balanceCacheKey(uid), balance);
   }
 
+  Future<void> _cacheProfile(AppUserProfile profile) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _profileCacheKey(profile.uid),
+      jsonEncode(profile.toCache()),
+    );
+  }
+
   String _balanceCacheKey(String uid) => 'pokoin_account_balance:$uid';
+
+  String _profileCacheKey(String uid) => 'pokoin_user_profile:$uid';
 
   Future<void> ensureUserProfile(User? user) async {
     if (user == null) {
@@ -420,6 +464,26 @@ class AuthService {
     return payload;
   }
 
+  Future<Map<String, dynamic>> unlockSilver() async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw StateError('Log in before unlocking Silver.');
+    }
+    final token = await user.getIdToken();
+    final response = await http.post(
+      Uri.parse('/api/unlock-silver'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+    );
+    final payload = _decodeJsonResponse(response.body);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError(payload['error'] as String? ?? 'Silver unlock failed.');
+    }
+    return payload;
+  }
+
   Future<Map<String, dynamic>> requestWalletNonce(String address) async {
     final response = await http.post(
       Uri.parse('/api/wallet-auth/nonce'),
@@ -479,6 +543,52 @@ class AuthService {
         'Content-Type': 'application/json',
       },
       body: jsonEncode({
+        'address': address.trim().toLowerCase(),
+        'signature': signature,
+      }),
+    );
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError(payload['error'] as String? ?? 'Wallet link failed.');
+    }
+    return payload;
+  }
+
+  Future<Map<String, dynamic>> createWalletLinkSession({
+    required String returnPath,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw StateError('Log in before connecting a wallet.');
+    }
+    final token = await user.getIdToken();
+    final response = await http.post(
+      Uri.parse('/api/wallet-link/session'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({'returnPath': returnPath}),
+    );
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError(
+        payload['error'] as String? ?? 'Wallet link session failed.',
+      );
+    }
+    return payload;
+  }
+
+  Future<Map<String, dynamic>> completeWalletLinkSession({
+    required String sessionId,
+    required String address,
+    required String signature,
+  }) async {
+    final response = await http.post(
+      Uri.parse('/api/wallet-link/complete'),
+      headers: const {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'sessionId': sessionId.trim(),
         'address': address.trim().toLowerCase(),
         'signature': signature,
       }),
@@ -574,6 +684,35 @@ class AuthService {
     }
     final photoUrl = payload['photoUrl'] as String? ?? '';
     return photoUrl;
+  }
+
+  Future<String?> cacheGoogleProfilePicture() async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      return null;
+    }
+    final token = await user.getIdToken();
+    try {
+      final response = await http.post(
+        Uri.parse('/api/cache-google-profile-picture'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'photoUrl': user.photoURL}),
+      );
+      final payload = _decodeJsonResponse(response.body);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        debugPrint(
+          'Google profile picture cache failed: ${payload['error'] ?? response.body}',
+        );
+        return null;
+      }
+      return payload['photoUrl'] as String?;
+    } catch (error) {
+      debugPrint('Google profile picture cache failed: $error');
+      return null;
+    }
   }
 
   Future<void> removeProfilePicture() async {
