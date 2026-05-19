@@ -23,11 +23,14 @@ reconstructing commands from chat history.
   - `/api/marketplace-home` for home snapshot and carousel payloads.
   - `/api/marketplace-cards` for catalog/product rows.
   - `/api/marketplace-card-versions` for expansion-scoped navigation.
+  - `/api/marketplace-hot-blueprints` for rolling hot blueprint analytics.
   - `/api/marketplace-search-candidates` and `/api/marketplace-autocomplete`
     for tokenized search.
 - Oracle projection tables behind those APIs:
   - `public.marketplace_cards` for home/search/catalog card rows.
   - `public.marketplace_card_events` for rolling marketplace analytics.
+  - `public.marketplace_hot_blueprints` for 1h/24h/7d hotness rollups used by
+    the homepage and future search boosts.
   - `public.marketplace_card_versions` for expansion-scoped navigation.
   - `public.marketplace_search_candidates` and token dimension tables for
     autocomplete/search.
@@ -126,8 +129,9 @@ reconstructing commands from chat history.
    This workflow documents the current production search path: Vercel calls
    Oracle Postgres tokenized search, Flutter caches a broad pool, continued
    typing narrows locally, variation tokens such as `v`, `ex`, `gx`, `vmax`,
-   and `lv x` are weighted as structured dimensions, and the UI highlights both
-   full terms and ordered single-character matches.
+   and `lv x` are weighted as structured dimensions, single-token variation
+   queries filter to real variant tokens, and the UI highlights both full terms
+   and ordered single-character matches.
 
 12. Map Pokoin/CardTrader blueprint IDs to Cardmarket products:
    ```bash
@@ -197,17 +201,37 @@ reconstructing commands from chat history.
   catalog is intentionally capped for performance; full search must query
   Oracle-backed marketplace APIs directly.
 - New search work should preserve the candidate-pool model documented in
-  `workflows/cardtrader-search-preview-workflow.md`: remote indexed search at 3
-  characters, cached/popularity-ranked subpools, and local narrowing after that.
+  `workflows/cardtrader-search-preview-workflow.md`: debounced warmup at 2
+  characters, visible autocomplete at 3 characters, loaded-card ranking before
+  remote enrichment, cached/popularity-ranked subpools, and local narrowing
+  after that.
+- Do not make the search page mutate `/marketplace/search?q=...` on every
+  keystroke. The page results should update dynamically while the user types,
+  but the route should remain static until an explicit submit/navigation.
+- Single-token card names are first-class search intent. Keep `Lapras`, `Misty`,
+  and similar card-name queries stronger than product/set noise unless the query
+  explicitly asks for sealed products.
 - Variation search work should update Oracle schema files and refresh
   projections. Exact `v` must remain a meaningful variation token, but do not
   let one-letter variation queries match every card from set/search text.
 - Do not make `/marketplace` carousels depend only on the capped catalog either.
   Merge `/api/marketplace-home` snapshot cards into the provider state so
   Best sellers and Featured can resolve their section IDs.
+- Homepage Best sellers and Featured are real Oracle snapshot sections. Do not
+  hardcode a specific expansion or rarity list in Flutter; use
+  `sections.bestSellerIds` and `sections.featuredIds`, backed by
+  `marketplace_hot_blueprints` and `get_marketplace_home_snapshot(...)`.
+- Flutter marketplace events should send safe bounded metadata only: card
+  identity dimensions and search context, never user identifiers or secrets.
 - The marketplace top bar is shared in spirit across home, search, and card
   detail. Keep logo/search/navigation/wallet/cart behavior consistent when
   changing one surface.
+- PokoinSwap UI changes live in the CardVault wallet surface
+  (`lib/wallet/main.dart`) even though the AMM protocol is documented in the
+  PokoinPoS repo. Keep the swap screen as a focused exchange interface:
+  amount panels, token selectors, flip action, quote details, and one primary
+  swap action. Do not reintroduce marketing copy, decorative graphs, or feature
+  cards into the swap form.
 - The homepage top bar should not duplicate primary actions. Keep `Shop` as the
   primary CTA and avoid repeating `Forum` or `Shop` inside adjacent controls.
 - `/marketplace/signal` now shows real loaded catalog metrics and active

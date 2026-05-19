@@ -7,24 +7,28 @@ search, Oracle marketplace schema, or CDN preview thumbnails.
 
 The marketplace search should behave like CardTrader:
 
-- Typing in `/marketplace` starts warming autocomplete candidates from the first
-  meaningful character, but the visible autocomplete panel opens only after 3
+- Typing in `/marketplace` starts debounced autocomplete candidate warmup after
+  2 meaningful characters, but the visible autocomplete panel opens only after 3
   meaningful characters.
 - The panel must be anchored to the top-bar search field and use the field
   width. Do not let it stretch across the viewport or cover the whole page.
-- The preview candidate pool is a background working set, currently capped at
-  `searchPreviewPoolLimit` (`1000` rows in Flutter). The popup renders only the
-  best `searchPreviewLimit` (`20`) rows from that pool, with about 9 rows
-  visible at a time and the rest reachable by scrolling.
+- The preview candidate pool is a background working set, currently requested as
+  `searchPreviewPoolLimit` (`420` rows in Flutter, with the server enforcing a
+  safe minimum remote pool). The popup renders only the best
+  `searchPreviewLimit` (`20`) rows, with about 9 rows visible at a time and the
+  rest reachable by scrolling.
 - Results show a small preview image, card name plus collector/expansion number,
   set and action text. Example: `Mew ex #232/091`, not the rarity as the
   hashtag. Typed query terms should be highlighted inside the result title/set
   text.
-- Search previews may be seeded from the loaded Flutter catalog, then merged
-  with Oracle projection results through Vercel APIs.
-- Numeric searches such as `mew 232` should wait for full Oracle projection
-  results instead of showing weak local-cache-only suggestions from the capped
-  home catalog.
+- Search previews must be seeded from already loaded Flutter cards first, then
+  merged with Oracle projection results through Vercel APIs. This lets visible
+  cards such as `Mew ex #232/091` appear immediately for typo queries like
+  `mee 23` even when the remote pool initially returns literal set-code noise.
+- Numeric searches such as `mew 232` should combine strong loaded-card matches
+  with Oracle projection results. Do not show weak local-cache-only suggestions
+  from the capped home catalog, but do not suppress a strong loaded exact/fuzzy
+  name plus number match while waiting for Oracle either.
 - Compound searches should still show similar results. `mew 232` should rank the
   exact `Mew ex #232/091` match first, then fall back to the strongest text term
   (`mew`) so related singles/products can fill the 9-result panel.
@@ -45,9 +49,9 @@ then improve it with marketplace-specific signals.
 
 ### Stage 1: Warm Candidate Pool Before Reveal
 
-- Start a quiet background candidate search from the first meaningful character.
-  Do not render the visible autocomplete panel until the user has typed 3
-  meaningful characters, except for explicit route/search-page loads.
+- Start a quiet debounced background candidate search from 2 meaningful
+  characters. Do not render the visible autocomplete panel until the user has
+  typed 3 meaningful characters, except for explicit route/search-page loads.
 - At 3 characters, reveal autocomplete from the warmed pool and continue querying
   indexed Oracle projections. Search fields should include:
   - `name`
@@ -64,15 +68,16 @@ then improve it with marketplace-specific signals.
   - `marketplace_card_versions` for expansion navigation and single-card search.
   - Never parse full blueprint JSON during active typing.
 - Use trigram/text indexes and small selected columns. The first pool should be
-  larger than the UI limit but still bounded. Current production asks for up to
-  1000 ranked autocomplete rows, stores them in Flutter, and displays only the
-  best 20.
+  larger than the UI limit but still bounded. Current production asks Flutter for
+  a 420-row preview pool, while the Vercel autocomplete endpoint enforces a safe
+  minimum remote pool before ranking. The popup displays only the best 20.
 
 ### Stage 2: Narrow The Pool Locally
 
 - While the user keeps typing past the initial 3-character prefix, narrow the
-  existing candidate pool locally first. Flutter is expected to handle the
-  1000-row pool in memory and re-rank/filter it character by character.
+  loaded-card matches and existing candidate pool locally first. Flutter should
+  re-rank/filter the pool character by character and merge in remote candidates
+  as enrichment, not as the only source of truth.
 - Do not show a loading reset or swap the popup surface on every keystroke after
   the 3-character prefix is loaded. The popup should remain stable and only
   become more accurate as the existing pool is filtered.
@@ -164,26 +169,30 @@ continue to improve results as the user types.
 
 ## Current Production Workflow
 
-As of 2026-05-19, marketplace autocomplete uses a broad remote seed plus local
-refinement:
+As of 2026-05-20, marketplace autocomplete uses loaded-card ranking plus remote
+enrichment:
 
 ```text
-User types 1-2 meaningful chars
-  -> Flutter starts warming a candidate pool quietly from the first meaningful char
+User types 1 meaningful char
+  -> visible popup stays closed
+
+User types 2 meaningful chars
+  -> Flutter starts debounced candidate warmup
   -> visible popup stays closed
 
 User types 3 meaningful chars
-  -> Flutter requests `/api/marketplace-autocomplete` with result_limit=1000
-     and pool_limit=1000
+  -> Flutter ranks already loaded cards immediately
+  -> Flutter requests `/api/marketplace-autocomplete` with result_limit=420
+     and pool_limit=420
   -> autocomplete calls Oracle tokenized search through
      `/api/marketplace-search-candidates` helpers, ranks the database pool, and
-     returns up to 1000 candidates
-  -> Flutter caches the returned 1000-row pool under the normalized
-     3-character key
+     returns the background candidates
+  -> Flutter merges strong loaded-card matches with the remote pool under the
+     normalized 3-character key
   -> the popup renders the best `searchPreviewLimit` rows
 
 User keeps typing
-  -> Flutter narrows and re-ranks the cached 1000-row pool locally
+  -> Flutter narrows and re-ranks loaded-card matches plus the cached pool locally
   -> no new remote request is needed while the prefix pool is useful
   -> character coverage and typo tolerance affect ranking
   -> the highlighter marks both full terms and ordered single-character matches
@@ -193,7 +202,8 @@ The remote fuzzy search is not the final ranker for every keystroke. Its job is
 to identify and roughly order a useful background candidate pool from the
 lightweight `public.marketplace_search_candidates` projection. After that, the
 app performs fast interactive narrowing locally in Dart and only renders the top
-20 visible suggestions.
+20 visible suggestions. A backend miss must not hide a strong already-loaded
+card-name match.
 
 ### Vercel Aggregation Endpoint
 
@@ -212,16 +222,18 @@ Request body used by Flutter preview warmup:
 ```json
 {
   "search_term": "miraidon",
-  "result_limit": 1000,
-  "pool_limit": 1000,
+  "result_limit": 420,
+  "pool_limit": 420,
   "search_language": "en"
 }
 ```
 
-The endpoint ranks the Oracle candidate pool server-side, prioritizing Pokemon
-identity/name matches before expansion, set, product, or rarity-only noise. It
-returns the background pool to Flutter; Flutter stores it and shows only the
-best 20 rows after local narrowing.
+The endpoint ranks the Oracle candidate pool server-side, prioritizing
+single-card name intent before expansion, set, product, or rarity-only noise.
+Exact/prefix card names must beat product rows for single-token queries such as
+`lapras`; trainer card names such as `misty` are first-class single-card names.
+The endpoint returns the background pool to Flutter; Flutter stores it and shows
+only the best 20 rows after local narrowing.
 
 Production raw candidate endpoint:
 
@@ -271,11 +283,19 @@ visible in the popup.
 
 Relevant behavior:
 
-- `lib/services/card_service.dart` fetches the broad autocomplete candidate pool
-  from `/api/marketplace-autocomplete`.
-- `lib/providers/card_provider.dart` stores the 1000-row preview pool and
-  narrows it locally as the query grows. `state.searchPreviews` should contain
-  only the currently visible top 20, not the full background pool.
+- `lib/services/card_service.dart` fetches the autocomplete candidate pool from
+  `/api/marketplace-autocomplete`.
+- `lib/providers/card_provider.dart` ranks already loaded cards first, stores
+  the preview pool, and narrows it locally as the query grows.
+  `state.searchPreviews` should contain only the currently visible top 20, not
+  the full background pool.
+- Single-token card-name intent is strong. For `lapras`, singles should beat
+  loaded products and set-name noise. Product rows should only lead when the
+  query is product-like, for example `box`, `pack`, `deck`, or `tin`.
+- Typo thresholds must apply to card names, not only exact Oracle candidates.
+  `mee` is close enough to `mew`; when paired with `23`, a loaded
+  `Mew ex #232/091` must be eligible even if the remote pool first returns
+  literal `MEE` set-code rows.
 - `lib/screens/home_screen.dart` renders title/set highlights. It must merge
   full-term ranges with ordered single-character ranges; do not only highlight
   complete words.
@@ -300,6 +320,12 @@ Important ranking rules:
 
 - A standalone `v` token is meaningful and should be weighted like other exact
   variation tokens such as `ex`, `gx`, and `vmax`.
+- Single-token variation queries (`v`, `ex`, `gx`, `vmax`, `mega`, `shining`,
+  etc.) should filter immediately to real card variant tokens. Do not allow
+  substring matches such as `ex` -> `Exeggutor` or `v` -> `Venusaur`.
+- `vstar` is both a card variant and a set token. Single `vstar` should rank
+  real VSTAR cards first, but it may also include cards whose set has an exact
+  `VSTAR` token, such as `VSTAR Universe`.
 - Avoid broad one-letter prefix matching for names, translated names, or
   expansions. Otherwise query `v` can match almost every name/set starting with
   `v` and drown out actual `... V` cards.
@@ -313,15 +339,17 @@ Important ranking rules:
 
 ### Candidate Pool Size
 
-`searchPreviewPoolLimit` is currently `1000` in
-`lib/providers/card_provider.dart`. This is the background pool size, not the
-number of rows shown in the UI.
+`searchPreviewPoolLimit` is currently `420` in
+`lib/providers/card_provider.dart`. This is the requested background pool size,
+not the number of rows shown in the UI. The Vercel autocomplete endpoint may
+internally use a larger safe minimum while building and ranking the remote pool,
+but Flutter should still render only the top 20.
 
-For a query like `pillu`, production returned 888 candidates during smoke
-testing because the SQL function found 888 candidates that matched its filters.
-The endpoint can ask for 1000, but it cannot invent rows outside the SQL
-candidate definition. If Oracle returns fewer matches, Flutter caches the
-smaller returned pool.
+For a query like `pillu`, production can return fewer candidates than requested
+because the SQL function only returns rows that match its filters. The endpoint
+cannot invent rows outside the SQL candidate definition. If Oracle returns fewer
+matches, Flutter caches the smaller returned pool and merges it with strong
+loaded-card matches.
 
 If the user asks for lower latency, reduce the pool cap first or add a
 popularity/prefix cache. Do not remove local narrowing; that is what keeps
@@ -334,12 +362,12 @@ continued typing responsive.
     `CompositedTransformFollower`, the search field width, and a short delayed
     close so row clicks are not swallowed by focus loss.
 - `lib/providers/card_provider.dart`
-  - Local preview ranking, async search preview state, 1000-row background pool,
-    20-row visible previews, and stale request guard.
+  - Loaded-card-first preview ranking, async search preview state, bounded
+    background pool, 20-row visible previews, and stale request guard.
 - `lib/services/card_service.dart`
   - Oracle-backed marketplace API loading, projection search, preview image
-    mapping and fallback behavior. `searchCardPreviews` uses
-    `/api/marketplace-search-candidates` for broad pools.
+    mapping and fallback behavior. Marketplace card-version and row searches
+    should run in parallel where possible.
 - `lib/models/pokemon_card.dart`
   - `previewImageUrl`, defaulting to `imageUrl`, plus structured marketplace
     fields such as `itemKind`, `productType`, and `trainerName`.
@@ -350,6 +378,9 @@ continued typing responsive.
   - Server-side autocomplete ranking over the Oracle candidate pool. It should
     be able to return the full background pool requested by Flutter, not only
     the visible row count.
+  - Keep `api/marketplace-autocomplete.test.js` updated for typo ranking,
+    strict single-token variation filters, aliases such as `&`/tag team and
+    `ill`/illustration rare, and broad-query side effects.
 - `api/marketplace-cards.js` and `api/marketplace-card-versions.js`
   - Oracle-backed catalog/product and expansion/version rows used by Flutter.
 - `vercel.json`
