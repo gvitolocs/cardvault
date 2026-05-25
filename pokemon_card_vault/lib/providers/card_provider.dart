@@ -1,98 +1,151 @@
-import 'dart:math' as math;
-
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/pokemon_card.dart';
+import 'recent_views_provider.dart';
 import '../services/card_service.dart';
+import '../services/flutter_debug_log.dart';
+import '../services/search_debug_trace.dart';
+import '../utils/card_url.dart';
+import '../constants/first_char_token_suggestions.dart';
 
 final cardProvider = StateNotifierProvider<CardNotifier, CardState>((ref) {
   return CardNotifier();
 });
 
 const int searchPreviewLimit = 20;
-const int searchPreviewPoolLimit = 1000;
 const int searchPreviewVisibleRows = 9;
 const int searchPreviewWarmupChars = 1;
 const int searchPreviewVisibleChars = 3;
-
-const Map<String, String> _raritySearchAliases = {
-  'goldstar': 'gold star',
-  'shiningrare': 'shining rare',
-  'shinystar': 'shiny star',
-  'illustrationrare': 'illustration rare',
-  'specialillustrationrare': 'special illustration rare',
-  'amazingerare': 'amazing rare',
-  'radiantrare': 'radiant rare',
-  'ultrarare': 'ultra rare',
-  'secretrare': 'secret rare',
-  'hyperrare': 'hyper rare',
-  'doublerare': 'double rare',
-  'rareholo': 'rare holo',
-  'holographicrare': 'holographic rare',
-  'holorare': 'holo rare',
-};
-
-const Map<String, String> _trainerSearchAliases = {
-  'camilla': 'cynthia',
-  'cynthia': 'cynthia',
-  'shirona': 'cynthia',
-  'n': 'n',
-  'lance': 'lance',
-  'camus': 'lance',
-  'misty': 'misty',
-  'ondine': 'misty',
-  'kasumi': 'misty',
-  'brock': 'brock',
-  'pierre': 'brock',
-  'takeshi': 'brock',
-  'erika': 'erika',
-  'giovanni': 'giovanni',
-  'sabrina': 'sabrina',
-  'sandra': 'clair',
-  'clair': 'clair',
-  'iris': 'iris',
-  'steven': 'steven',
-  'rochard': 'steven',
-  'diantha': 'diantha',
-  'lilia': 'lillie',
-  'lillie': 'lillie',
-  'gladio': 'gladion',
-  'gladion': 'gladion',
-  'marnie': 'marnie',
-  'mary': 'marnie',
-  'hop': 'hop',
-  'dandel': 'leon',
-  'leon': 'leon',
-  'roy': 'raihan',
-  'raihan': 'raihan',
-  'nemona': 'nemona',
-  'peonia': 'peonia',
-  'iono': 'iono',
-  'kissara': 'iono',
-};
-
-const Set<String> _ownershipStopWords = {
-  'di',
+const int searchPreviewHotCacheLimit = 1000;
+const int _searchPreviewMaxPrefixPools = 16;
+const int _searchPreviewMaxAggregatePrefixIds = 20000;
+const String _searchLanguagePreferenceKey = 'marketplace.search_language';
+const Set<String> _supportedSearchLanguages = {
+  'en',
+  'it',
+  'fr',
   'de',
-  'del',
-  'della',
-  'da',
-  'du',
-  'des',
-  'of',
-  'the',
-  'owned',
-  'owner',
+  'es',
+  'pt',
+  'nl',
+  'pl',
+  'ru',
+  'ko',
+  'id',
+  'th',
+  'ja',
+  'zh-cn',
+  'zh-tw',
 };
+
+List<PokemonCard> emptyFocusPreviewsForTest(
+  List<PokemonCard> hotCards,
+  List<RecentCardView> recentViews,
+) {
+  return _emptyFocusPreviews(hotCards, recentViews.take(2).toList());
+}
+
+List<PokemonCard> remoteSearchResultsForTest(
+  List<PokemonCard> results, {
+  int? limit,
+}) {
+  return _remoteSearchResults(results, limit: limit);
+}
+
+List<PokemonCard> searchPreviewFallbackRowsForTest({
+  required String query,
+  List<PokemonCard> retainedRows = const [],
+  List<SearchCandidateLabel> labels = const [],
+  SearchAutocompleteContext? context,
+  Map<String, int> latestDepths = const {},
+  Map<String, int> depthScores = const {},
+  Map<String, int> latestOrders = const {},
+  int limit = searchPreviewLimit,
+}) {
+  return _searchPreviewFallbackRows(
+    query: query,
+    retainedRows: retainedRows,
+    labels: labels,
+    context: context,
+    latestDepths: latestDepths,
+    depthScores: depthScores,
+    latestOrders: latestOrders,
+    limit: limit,
+  );
+}
+
+SearchAutocompleteContext? autocompleteContextFromResponseForTest({
+  required SearchAutocompleteContext? context,
+  required List<PokemonCard> previews,
+  required String query,
+  String language = 'en',
+}) {
+  final notifier = CardNotifier(autoLoad: false);
+  try {
+    return notifier._autocompleteContextFromResponse(
+      context: context,
+      previews: previews,
+      query: query,
+      language: language,
+    );
+  } finally {
+    notifier.dispose();
+  }
+}
+
+int searchPreviewCandidateIdLimitForTest(String query) {
+  return _searchPreviewCandidateIdLimit(query);
+}
+
+String normalizeSearchLanguage(String value) {
+  final normalized = value.trim().toLowerCase();
+  switch (normalized) {
+    case 'jp':
+      return 'ja';
+    case 'zh':
+      return 'zh-cn';
+    default:
+      return _supportedSearchLanguages.contains(normalized) ? normalized : 'en';
+  }
+}
+
+bool needsMarketplaceDetailHydration(PokemonCard card) {
+  if (card.itemKind == 'product' || card.productType != 'card') {
+    return false;
+  }
+  if (card.number.trim().isEmpty) {
+    return true;
+  }
+  return false;
+}
+
+String? _storedSearchLanguage(String? value) {
+  if (value == null) {
+    return null;
+  }
+  final trimmed = value.trim();
+  if (trimmed.isEmpty) {
+    return null;
+  }
+  final normalized = normalizeSearchLanguage(trimmed);
+  return normalized == 'en' && trimmed.toLowerCase() != 'en'
+      ? null
+      : normalized;
+}
 
 class CardState {
   final List<PokemonCard> cards;
   final List<PokemonCard> filteredCards;
   final List<PokemonCard> searchPreviews;
+  final List<PokemonCard> remoteSearchResults;
+  final List<PokemonCard> spotlightCards;
   final MarketplaceHomeSections? homeSections;
   final bool isLoading;
   final bool isSearchingPreviews;
   final String? error;
   final String searchQuery;
+  final String remoteSearchQuery;
   final String previewQuery;
   final String selectedRarity;
   final String selectedType;
@@ -103,16 +156,23 @@ class CardState {
   final String sortBy;
   final bool sortAscending;
   final String searchLanguage;
+  final String searchCompletion;
+  final double searchCompletionConfidence;
+  final String searchCompletionSource;
+  final bool hasMarketplaceLoadCompleted;
 
   CardState({
     this.cards = const [],
     this.filteredCards = const [],
     this.searchPreviews = const [],
+    this.remoteSearchResults = const [],
+    this.spotlightCards = const [],
     this.homeSections,
     this.isLoading = false,
     this.isSearchingPreviews = false,
     this.error,
     this.searchQuery = '',
+    this.remoteSearchQuery = '',
     this.previewQuery = '',
     this.selectedRarity = '',
     this.selectedType = '',
@@ -120,20 +180,27 @@ class CardState {
     this.minPrice = 0.0,
     this.maxPrice = 5000000.0,
     this.showOnlyInStock = false,
-    this.sortBy = 'name',
+    this.sortBy = 'source',
     this.sortAscending = true,
     this.searchLanguage = 'en',
+    this.searchCompletion = '',
+    this.searchCompletionConfidence = 0,
+    this.searchCompletionSource = '',
+    this.hasMarketplaceLoadCompleted = false,
   });
 
   CardState copyWith({
     List<PokemonCard>? cards,
     List<PokemonCard>? filteredCards,
     List<PokemonCard>? searchPreviews,
+    List<PokemonCard>? remoteSearchResults,
+    List<PokemonCard>? spotlightCards,
     MarketplaceHomeSections? homeSections,
     bool? isLoading,
     bool? isSearchingPreviews,
     String? error,
     String? searchQuery,
+    String? remoteSearchQuery,
     String? previewQuery,
     String? selectedRarity,
     String? selectedType,
@@ -144,16 +211,23 @@ class CardState {
     String? sortBy,
     bool? sortAscending,
     String? searchLanguage,
+    String? searchCompletion,
+    double? searchCompletionConfidence,
+    String? searchCompletionSource,
+    bool? hasMarketplaceLoadCompleted,
   }) {
     return CardState(
       cards: cards ?? this.cards,
       filteredCards: filteredCards ?? this.filteredCards,
       searchPreviews: searchPreviews ?? this.searchPreviews,
+      remoteSearchResults: remoteSearchResults ?? this.remoteSearchResults,
+      spotlightCards: spotlightCards ?? this.spotlightCards,
       homeSections: homeSections ?? this.homeSections,
       isLoading: isLoading ?? this.isLoading,
       isSearchingPreviews: isSearchingPreviews ?? this.isSearchingPreviews,
       error: error ?? this.error,
       searchQuery: searchQuery ?? this.searchQuery,
+      remoteSearchQuery: remoteSearchQuery ?? this.remoteSearchQuery,
       previewQuery: previewQuery ?? this.previewQuery,
       selectedRarity: selectedRarity ?? this.selectedRarity,
       selectedType: selectedType ?? this.selectedType,
@@ -164,56 +238,128 @@ class CardState {
       sortBy: sortBy ?? this.sortBy,
       sortAscending: sortAscending ?? this.sortAscending,
       searchLanguage: searchLanguage ?? this.searchLanguage,
+      searchCompletion: searchCompletion ?? this.searchCompletion,
+      searchCompletionConfidence:
+          searchCompletionConfidence ?? this.searchCompletionConfidence,
+      searchCompletionSource:
+          searchCompletionSource ?? this.searchCompletionSource,
+      hasMarketplaceLoadCompleted:
+          hasMarketplaceLoadCompleted ?? this.hasMarketplaceLoadCompleted,
     );
   }
 }
 
 class CardNotifier extends StateNotifier<CardState> {
-  CardNotifier() : super(CardState()) {
-    _loadCards();
+  CardNotifier({
+    CardService? cardService,
+    bool autoLoad = true,
+  })  : _cardService = cardService ?? CardService(),
+        super(CardState()) {
+    _searchLanguageLoad = _loadStoredSearchLanguage();
+    if (autoLoad) {
+      _initialCacheLoad = _loadCachedCards();
+      _warmSearchPreviews();
+    } else {
+      _initialCacheLoad = Future<void>.value();
+    }
   }
 
-  final CardService _cardService = CardService();
+  final CardService _cardService;
+  late final Future<void> _initialCacheLoad;
+  late final Future<void> _searchLanguageLoad;
+  Future<void> _searchLanguagePersist = Future<void>.value();
+  bool _searchLanguageChangedLocally = false;
   int _searchPreviewRequestId = 0;
   int _searchRequestId = 0;
-  List<PokemonCard> _previewCandidatePool = const [];
-  String _previewPoolKey = '';
-  String _previewPoolLanguage = 'en';
+  int _searchTokenPredictRequestId = 0;
+  bool _marketplaceWarmStarted = false;
+  Timer? _searchPreviewDebounce;
+  Timer? _searchTokenPredictDebounce;
+  SearchAutocompleteContext? _searchAutocompleteContext;
+  String? _searchSessionId;
+  String _lastSearchSessionQuery = '';
+  int _searchSessionSequence = 0;
+  List<PokemonCard> _hotSearchPreviewCache = const [];
+  final Map<String, List<PokemonCard>> _retainedSearchPreviewsByScope = {};
+  final Map<String, SearchCandidateLabel> _searchCandidateLabelsById = {};
+  final Map<String, int> _searchCandidateLatestDepthById = {};
+  final Map<String, int> _searchCandidateDepthScoreById = {};
+  final Map<String, int> _searchCandidateLatestOrderById = {};
+  final Map<String, _SearchPrefixPool> _searchPrefixPoolsByKey = {};
+  List<SearchPredictedNameToken> _searchPredictedNameTokens = const [];
+  SearchTokenPredictionContext? _searchTokenPredictionContext;
 
-  Future<void> _loadCards() async {
+  bool get _hasWarmMarketplaceData =>
+      state.hasMarketplaceLoadCompleted || state.homeSections != null;
+
+  Future<void> ensureSearchLanguageLoaded() => _searchLanguageLoad;
+
+  Future<void> searchLanguagePersistForTest() => _searchLanguagePersist;
+
+  Future<void> _loadStoredSearchLanguage() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final rawLanguage = prefs.getString(_searchLanguagePreferenceKey);
+      final storedLanguage = _storedSearchLanguage(rawLanguage);
+      if (rawLanguage != null && storedLanguage == null) {
+        await prefs.remove(_searchLanguagePreferenceKey);
+      } else if (storedLanguage != null && storedLanguage != rawLanguage) {
+        await prefs.setString(_searchLanguagePreferenceKey, storedLanguage);
+      }
+      if (!mounted ||
+          _searchLanguageChangedLocally ||
+          storedLanguage == null ||
+          storedLanguage == state.searchLanguage) {
+        return;
+      }
+      _changeSearchLanguage(storedLanguage);
+    } catch (_) {
+      // Search stays usable with the default English language if local storage
+      // is unavailable.
+    }
+  }
+
+  Future<void> _saveSearchLanguage(String language) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        _searchLanguagePreferenceKey,
+        normalizeSearchLanguage(language),
+      );
+    } catch (_) {
+      // Preference persistence is best effort and must not block searching.
+    }
+  }
+
+  Future<void> _loadCachedCards() async {
     try {
       final cachedCards = await _cardService.getCachedCards();
       final cachedSnapshot =
           await _cardService.getCachedMarketplaceHomeSnapshot();
+      final cachedSpotlightCards = await _cardService.getCachedSpotlightCards();
       if (cachedCards.isNotEmpty || cachedSnapshot != null) {
         final warmedCards = cachedSnapshot == null
             ? cachedCards
             : _mergeCards(cachedCards, cachedSnapshot.cards);
+        _hotSearchPreviewCache = _hotCardsFromSnapshot(cachedSnapshot) ??
+            _hotCardsFromCards(warmedCards);
         state = state.copyWith(
           cards: warmedCards,
           filteredCards: warmedCards,
+          spotlightCards: _spotlightCardsFromSources(
+            cachedSnapshot,
+            warmedCards,
+            cachedSpotlightCards,
+          ),
           homeSections: cachedSnapshot?.sections,
           isLoading: false,
+          hasMarketplaceLoadCompleted: true,
           error: null,
         );
         _applyFilters();
       } else {
         state = state.copyWith(isLoading: true, error: null);
       }
-
-      final snapshot = await _cardService.getMarketplaceHomeSnapshot();
-      final cards = snapshot == null
-          ? await _cardService.getAllCards()
-          : await _cardService.getCachedCards();
-      final mergedCards =
-          snapshot == null ? cards : _mergeCards(cards, snapshot.cards);
-      state = state.copyWith(
-        cards: mergedCards,
-        filteredCards: mergedCards,
-        homeSections: snapshot?.sections,
-        isLoading: false,
-      );
-      _applyFilters();
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
@@ -222,48 +368,347 @@ class CardNotifier extends StateNotifier<CardState> {
     }
   }
 
+  Future<void> _loadCards({bool preserveCurrent = true}) async {
+    FlutterDebugLog.instance.record(
+      'provider.load_cards.start',
+      category: 'provider',
+      payload: {
+        'currentCardCount': state.cards.length,
+        'hasHomeSections': state.homeSections != null,
+      },
+    );
+    try {
+      await _initialCacheLoad;
+      if (state.cards.isEmpty && !state.isLoading) {
+        state = state.copyWith(isLoading: true, error: null);
+      }
+
+      final snapshot = await _cardService.getMarketplaceHomeSnapshot();
+      final cards = snapshot == null
+          ? await _cardService.getAllCards()
+          : await _cardService.getCachedCards();
+      final loadedCards =
+          snapshot == null ? cards : _mergeCards(cards, snapshot.cards);
+      final mergedCards =
+          preserveCurrent ? _mergeCards(loadedCards, state.cards) : loadedCards;
+      _hotSearchPreviewCache =
+          _hotCardsFromSnapshot(snapshot) ?? _hotCardsFromCards(mergedCards);
+      state = state.copyWith(
+        cards: mergedCards,
+        filteredCards: mergedCards,
+        spotlightCards: _spotlightCardsFromSources(
+          snapshot,
+          mergedCards,
+          await _cardService.getCachedSpotlightCards(),
+        ),
+        homeSections: snapshot?.sections,
+        isLoading: false,
+        hasMarketplaceLoadCompleted: true,
+      );
+      _applyFilters();
+      FlutterDebugLog.instance.record(
+        'provider.load_cards.end',
+        category: 'provider',
+        payload: {
+          'cardCount': mergedCards.length,
+          'snapshotLoaded': snapshot != null,
+          'hotPreviewCount': _hotSearchPreviewCache.length,
+        },
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: e.toString(),
+      );
+      FlutterDebugLog.instance.recordError(
+        'provider.load_cards.error',
+        e,
+        category: 'provider',
+      );
+    }
+  }
+
   void searchCards(String query) {
-    state = state.copyWith(searchQuery: query);
+    final normalizedQuery = query.trim();
+    if (normalizedQuery.isNotEmpty) {
+      _prepareSearchSessionForQuery(normalizedQuery);
+    }
+    final searchSessionId =
+        normalizedQuery.isEmpty ? null : _ensureSearchSession(normalizedQuery);
+    state = state.copyWith(
+      searchQuery: query,
+      remoteSearchResults:
+          normalizedQuery.isEmpty ? const [] : state.remoteSearchResults,
+      remoteSearchQuery: normalizedQuery.isEmpty ? '' : state.remoteSearchQuery,
+      searchCompletion: normalizedQuery.isEmpty
+          ? ''
+          : _validatedSearchCompletion(normalizedQuery),
+      searchCompletionConfidence: normalizedQuery.isEmpty
+          ? 0
+          : _searchCompletionConfidence(normalizedQuery),
+      searchCompletionSource: normalizedQuery.isEmpty
+          ? ''
+          : _searchCompletionSource(normalizedQuery),
+    );
     _applyFilters();
-    _loadSearchPreviews(query);
-    _loadFullSearchResults(query);
+    _loadSearchPreviews(query, searchSessionId: searchSessionId);
+    _loadFullSearchResults(query, searchSessionId: searchSessionId);
     final firstMatch =
         state.filteredCards.isEmpty ? null : state.filteredCards.first;
-    if (query.trim().length >= 2 && firstMatch != null) {
+    if (_meaningfulSearchLength(query.trim()) >= 1 && firstMatch != null) {
       _cardService.recordMarketplaceEvent(
-        firstMatch.id,
+        firstMatch,
         'search',
         source: 'marketplace_search',
+        metadata: {
+          'query': query.trim(),
+          'resultRank': 1,
+          'resultCount': state.filteredCards.length,
+          'language': state.searchLanguage,
+        },
       );
     }
   }
 
   void searchPreviewsOnly(String query) {
     _searchRequestId++;
-    state = state.copyWith(previewQuery: query);
-    _loadSearchPreviews(query);
+    _searchPreviewRequestId++;
+    _searchTokenPredictRequestId++;
+    _searchPreviewDebounce?.cancel();
+    _searchTokenPredictDebounce?.cancel();
+    SearchDebugTrace.instance.record('provider.preview.input', {
+      'query': query,
+      'searchRequestId': _searchRequestId,
+      'previewRequestId': _searchPreviewRequestId,
+    });
+    final wasShowingEmptyFocusPreviews = state.previewQuery.trim().isEmpty &&
+        state.searchPreviews.isNotEmpty &&
+        !state.isSearchingPreviews;
+    final normalizedQuery = query.trim();
+    if (normalizedQuery.isNotEmpty) {
+      _prepareSearchSessionForQuery(normalizedQuery);
+    }
+    final searchSessionId =
+        normalizedQuery.isEmpty ? null : _ensureSearchSession(normalizedQuery);
+    _applyFirstCharCompletionCache(normalizedQuery);
+    final canShowTypedPopup =
+        _meaningfulSearchLength(normalizedQuery) >= searchPreviewVisibleChars;
+    state = state.copyWith(
+      previewQuery: query,
+      searchPreviews: normalizedQuery.isNotEmpty &&
+              (wasShowingEmptyFocusPreviews || !canShowTypedPopup)
+          ? const []
+          : state.searchPreviews,
+      isSearchingPreviews:
+          normalizedQuery.isNotEmpty && wasShowingEmptyFocusPreviews
+              ? canShowTypedPopup
+              : state.isSearchingPreviews && canShowTypedPopup,
+      searchCompletion: _validatedSearchCompletion(normalizedQuery),
+      searchCompletionConfidence: _searchCompletionConfidence(normalizedQuery),
+      searchCompletionSource: _searchCompletionSource(normalizedQuery),
+    );
+    if (normalizedQuery.isEmpty) {
+      _cancelSearchSession(reason: 'clear');
+      _clearSearchPrefixPoolHistory();
+      _searchTokenPredictionContext = null;
+      SearchDebugTrace.instance.record('provider.preview.empty_focus', {
+        'cachedHotCount': _hotSearchPreviewCache.length,
+      });
+      state = state.copyWith(
+        previewQuery: '',
+        searchPreviews: const [],
+        isSearchingPreviews: false,
+        searchCompletion: '',
+        searchCompletionConfidence: 0,
+        searchCompletionSource: '',
+      );
+      return;
+    }
+    if (wasShowingEmptyFocusPreviews) {
+      SearchDebugTrace.instance.record('provider.preview.clear_empty_hot', {
+        'query': normalizedQuery,
+        'reason': 'typed_remote_authoritative',
+      });
+    }
+    final filteredPreviews = _fallbackPreviewsForQuery(normalizedQuery);
+    if (_meaningfulSearchLength(normalizedQuery) < searchPreviewWarmupChars &&
+        !_isStandaloneVariationQuery(normalizedQuery)) {
+      SearchDebugTrace.instance.record('provider.preview.clear_short_query', {
+        'query': normalizedQuery,
+        'meaningfulChars': _meaningfulSearchLength(normalizedQuery),
+      });
+      state = state.copyWith(
+        previewQuery: '',
+        searchPreviews: const [],
+        isSearchingPreviews: false,
+        searchCompletion: '',
+        searchCompletionConfidence: 0,
+        searchCompletionSource: '',
+      );
+      return;
+    }
+    final tokenPredictRequestId = _searchTokenPredictRequestId;
+    _searchTokenPredictDebounce = Timer(
+      const Duration(milliseconds: 35),
+      () => unawaited(_loadSearchTokenPrediction(
+        normalizedQuery,
+        requestId: tokenPredictRequestId,
+        language: state.searchLanguage,
+      )),
+    );
+    state = state.copyWith(
+      searchPreviews: canShowTypedPopup ? filteredPreviews : const [],
+      isSearchingPreviews: canShowTypedPopup,
+    );
+    _searchPreviewDebounce = Timer(
+      const Duration(milliseconds: 120),
+      () {
+        SearchDebugTrace.instance.record('provider.preview.debounce_fire', {
+          'query': normalizedQuery,
+          'delayMs': 120,
+        });
+        _loadSearchPreviews(
+          normalizedQuery,
+          searchSessionId: searchSessionId,
+        );
+      },
+    );
+    SearchDebugTrace.instance.record('provider.preview.debounce_scheduled', {
+      'query': normalizedQuery,
+      'delayMs': 120,
+    });
+  }
+
+  void predictSearchCompletionOnly(String query) {
+    _searchRequestId++;
+    _searchPreviewRequestId++;
+    _searchTokenPredictRequestId++;
+    _searchPreviewDebounce?.cancel();
+    _searchTokenPredictDebounce?.cancel();
+    final normalizedQuery = query.trim();
+    if (normalizedQuery.isNotEmpty) {
+      _prepareSearchSessionForQuery(normalizedQuery);
+      _ensureSearchSession(normalizedQuery);
+    }
+    _applyFirstCharCompletionCache(normalizedQuery);
+    state = state.copyWith(
+      previewQuery: query,
+      searchPreviews: const [],
+      isSearchingPreviews: false,
+      searchCompletion: _validatedSearchCompletion(normalizedQuery),
+      searchCompletionConfidence: _searchCompletionConfidence(normalizedQuery),
+      searchCompletionSource: _searchCompletionSource(normalizedQuery),
+    );
+    if (normalizedQuery.isEmpty) {
+      _cancelSearchSession(reason: 'clear');
+      _clearSearchPrefixPoolHistory();
+      state = state.copyWith(
+        previewQuery: '',
+        searchCompletion: '',
+        searchCompletionConfidence: 0,
+        searchCompletionSource: '',
+      );
+      return;
+    }
+    if (_meaningfulSearchLength(normalizedQuery) < searchPreviewWarmupChars &&
+        !_isStandaloneVariationQuery(normalizedQuery)) {
+      state = state.copyWith(
+        searchCompletion: '',
+        searchCompletionConfidence: 0,
+        searchCompletionSource: '',
+      );
+      return;
+    }
+    final tokenPredictRequestId = _searchTokenPredictRequestId;
+    _searchTokenPredictDebounce = Timer(
+      const Duration(milliseconds: 35),
+      () => unawaited(_loadSearchTokenPrediction(
+        normalizedQuery,
+        requestId: tokenPredictRequestId,
+        language: state.searchLanguage,
+      )),
+    );
+  }
+
+  void clearSearchPreviews() {
+    _searchRequestId++;
+    _searchPreviewRequestId++;
+    _searchTokenPredictRequestId++;
+    _searchPreviewDebounce?.cancel();
+    _searchTokenPredictDebounce?.cancel();
+    _searchAutocompleteContext = null;
+    _searchPredictedNameTokens = const [];
+    _searchTokenPredictionContext = null;
+    _cancelSearchSession(reason: 'clear');
+    _clearSearchPrefixPoolHistory();
+    state = state.copyWith(
+      previewQuery: '',
+      searchPreviews: const [],
+      isSearchingPreviews: false,
+      searchCompletion: '',
+      searchCompletionConfidence: 0,
+      searchCompletionSource: '',
+    );
   }
 
   void setSearchLanguage(String language) {
-    final normalized = language.trim().toLowerCase();
+    final normalized = normalizeSearchLanguage(language);
     if (normalized == state.searchLanguage) {
+      _searchLanguageChangedLocally = true;
+      _searchLanguagePersist = _saveSearchLanguage(normalized);
       return;
     }
-    _clearPreviewPool();
-    state = state.copyWith(searchLanguage: normalized);
+    _searchLanguageChangedLocally = true;
+    _searchLanguagePersist = _saveSearchLanguage(normalized);
+    _changeSearchLanguage(normalized);
+  }
+
+  void _changeSearchLanguage(String normalized) {
+    _searchAutocompleteContext = null;
+    _searchPredictedNameTokens = const [];
+    _searchTokenPredictionContext = null;
+    _cancelSearchSession(reason: 'language_change');
+    _clearSearchPrefixPoolHistory();
+    state = state.copyWith(
+      searchLanguage: normalized,
+      searchCompletion: '',
+      searchCompletionConfidence: 0,
+      searchCompletionSource: '',
+    );
+    final searchSessionId = _meaningfulSearchLength(state.previewQuery) >=
+                searchPreviewWarmupChars ||
+            _meaningfulSearchLength(state.searchQuery.trim()) >= 1 ||
+            _isStandaloneVariationQuery(state.searchQuery)
+        ? _ensureSearchSession(
+            state.previewQuery.trim().isNotEmpty
+                ? state.previewQuery
+                : state.searchQuery,
+          )
+        : null;
     if (_meaningfulSearchLength(state.previewQuery) >=
         searchPreviewWarmupChars) {
-      _loadSearchPreviews(state.previewQuery);
+      _loadSearchPreviews(
+        state.previewQuery,
+        searchSessionId: searchSessionId,
+      );
     }
-    if (state.searchQuery.trim().length >= 2) {
-      _loadFullSearchResults(state.searchQuery);
+    if (_meaningfulSearchLength(state.searchQuery.trim()) >= 1 ||
+        _isStandaloneVariationQuery(state.searchQuery)) {
+      _loadFullSearchResults(
+        state.searchQuery,
+        searchSessionId: searchSessionId,
+      );
     }
   }
 
-  Future<void> _loadFullSearchResults(String query) async {
+  Future<void> _loadFullSearchResults(
+    String query, {
+    String? searchSessionId,
+  }) async {
     final requestId = ++_searchRequestId;
     final normalizedQuery = query.trim();
-    if (normalizedQuery.length < 2) {
+    if (_meaningfulSearchLength(normalizedQuery) < 1 &&
+        !_isStandaloneVariationQuery(normalizedQuery)) {
       return;
     }
 
@@ -271,6 +716,7 @@ class CardNotifier extends StateNotifier<CardState> {
       normalizedQuery,
       limit: 240,
       searchLanguage: state.searchLanguage,
+      searchSessionId: searchSessionId,
     );
     if (requestId != _searchRequestId ||
         normalizedQuery != state.searchQuery.trim()) {
@@ -279,7 +725,12 @@ class CardNotifier extends StateNotifier<CardState> {
     if (results.isEmpty) {
       return;
     }
-    state = state.copyWith(cards: _mergeCards(state.cards, results));
+    final remoteResults = _remoteSearchResults(results, limit: 240);
+    state = state.copyWith(
+      cards: _mergeCards(state.cards, remoteResults),
+      remoteSearchResults: remoteResults,
+      remoteSearchQuery: normalizedQuery,
+    );
     _applyFilters();
   }
 
@@ -287,14 +738,33 @@ class CardNotifier extends StateNotifier<CardState> {
     PokemonCard card,
     String eventType, {
     String source = 'marketplace',
+    Map<String, Object?> metadata = const {},
   }) {
-    _cardService.recordMarketplaceEvent(card.id, eventType, source: source);
+    _cardService.recordMarketplaceEvent(
+      card,
+      eventType,
+      source: source,
+      metadata: metadata,
+    );
   }
 
   Future<PokemonCard?> loadCardById(String id) async {
     final existing = _findLoadedCard(id);
     if (existing != null) {
+      if (_needsDetailHydration(existing)) {
+        final refreshed = await _refreshCardById(id);
+        return refreshed ?? existing;
+      }
+      unawaited(_refreshCardById(id));
       return existing;
+    }
+
+    final cached = await _cardService.getCachedCardById(id);
+    if (cached != null) {
+      state = state.copyWith(cards: _mergeCards(state.cards, [cached]));
+      _applyFilters();
+      unawaited(_refreshCardById(id));
+      return cached;
     }
 
     final card = await _cardService.getCardById(id);
@@ -302,130 +772,486 @@ class CardNotifier extends StateNotifier<CardState> {
       return null;
     }
 
-    if (_findLoadedCard(card.id) == null) {
-      state = state.copyWith(cards: [...state.cards, card]);
-      _applyFilters();
-    }
+    state = state.copyWith(cards: _mergeCards(state.cards, [card]));
+    _applyFilters();
     recordCardInteraction(card, 'view', source: 'card_detail_direct');
     return card;
   }
 
-  Future<void> _loadSearchPreviews(String query) async {
+  Future<PokemonCard?> loadCardByDetailSlug(String slug) async {
+    final normalizedSlug = normalizeCardDetailSlug(slug);
+    final existing = _findLoadedCardBySlug(normalizedSlug);
+    if (existing != null) {
+      if (_needsDetailHydration(existing)) {
+        final refreshed = await _refreshCardById(existing.id);
+        return refreshed ?? existing;
+      }
+      return existing;
+    }
+
+    final cached = await _cardService.getCachedCardByDetailSlug(normalizedSlug);
+    if (cached != null) {
+      state = state.copyWith(cards: _mergeCards(state.cards, [cached]));
+      _applyFilters();
+      return cached;
+    }
+
+    final card = await _cardService.getCardByDetailSlug(normalizedSlug);
+    if (card == null) {
+      return null;
+    }
+
+    state = state.copyWith(cards: _mergeCards(state.cards, [card]));
+    _applyFilters();
+    recordCardInteraction(card, 'view', source: 'card_detail_slug_direct');
+    return card;
+  }
+
+  Future<PokemonCard?> _refreshCardById(String id) async {
+    try {
+      final card = await _cardService.getCardById(id);
+      if (card == null || !mounted) {
+        return null;
+      }
+      state = state.copyWith(cards: _mergeCards(state.cards, [card]));
+      _applyFilters();
+      return card;
+    } catch (_) {
+      // Cached detail pages should not regress if the background refresh fails.
+      return null;
+    }
+  }
+
+  bool _needsDetailHydration(PokemonCard card) {
+    return needsMarketplaceDetailHydration(card);
+  }
+
+  Future<void> _loadSearchPreviews(
+    String query, {
+    String? searchSessionId,
+  }) async {
     final requestId = ++_searchPreviewRequestId;
     final normalizedQuery = query.trim();
     final meaningfulChars = _meaningfulSearchLength(normalizedQuery);
+    final isStandaloneVariationQuery =
+        _isStandaloneVariationQuery(normalizedQuery);
     final canShowAutocomplete = meaningfulChars >= searchPreviewVisibleChars;
-    if (meaningfulChars < searchPreviewWarmupChars) {
-      _clearPreviewPool();
+    SearchDebugTrace.instance.record('provider.preview.load_start', {
+      'query': normalizedQuery,
+      'requestId': requestId,
+      'meaningfulChars': meaningfulChars,
+      'canShowAutocomplete': canShowAutocomplete,
+      'language': state.searchLanguage,
+    });
+    if (meaningfulChars < searchPreviewWarmupChars &&
+        !isStandaloneVariationQuery) {
+      SearchDebugTrace.instance.record('provider.preview.load_clear_short', {
+        'query': normalizedQuery,
+        'requestId': requestId,
+      });
       state = state.copyWith(
         previewQuery: '',
         searchPreviews: const [],
         isSearchingPreviews: false,
+        searchCompletion: '',
+        searchCompletionConfidence: 0,
+        searchCompletionSource: '',
       );
       return;
     }
 
-    final poolKey = _candidatePoolKey(normalizedQuery);
     final requestedLanguage = state.searchLanguage;
-    final hasCurrentPool = _previewCandidatePool.isNotEmpty &&
-        _previewPoolKey == poolKey &&
-        _previewPoolLanguage == requestedLanguage;
-    final candidatePool = _previewCandidatePool;
-    final localPreviews = hasCurrentPool
-        ? _rankLocalPreviews(
-            candidatePool,
-            normalizedQuery,
-            limit: searchPreviewLimit,
-          )
-        : const <PokemonCard>[];
-    final visiblePreviews = canShowAutocomplete
-        ? localPreviews.isNotEmpty
-            ? localPreviews
-            : state.searchPreviews
-        : const <PokemonCard>[];
+    final previousContext = _searchAutocompleteContext?.canRefine(
+              normalizedQuery,
+              requestedLanguage,
+            ) ==
+            true
+        ? _searchAutocompleteContext
+        : null;
+    SearchDebugTrace.instance.record('provider.preview.local_disabled', {
+      'query': normalizedQuery,
+      'requestId': requestId,
+      'reason': 'remote_authoritative',
+      'localHotCount': 0,
+    });
+    final filteredPreviews = _fallbackPreviewsForQuery(normalizedQuery);
     state = state.copyWith(
-      searchPreviews: visiblePreviews,
-      isSearchingPreviews:
-          canShowAutocomplete && !(hasCurrentPool && localPreviews.isNotEmpty),
+      searchPreviews: canShowAutocomplete ? filteredPreviews : const [],
+      isSearchingPreviews: canShowAutocomplete,
     );
 
-    if (hasCurrentPool &&
-        localPreviews.isNotEmpty &&
-        !_isStructuredPreviewQuery(normalizedQuery)) {
+    SearchDebugTrace.instance.record('provider.preview.remote_start', {
+      'query': normalizedQuery,
+      'requestId': requestId,
+      'limit': searchPreviewLimit,
+      'poolLimit': _searchPreviewCandidateIdLimit(normalizedQuery),
+      'language': requestedLanguage,
+      if (searchSessionId?.isNotEmpty == true)
+        'searchSessionId': searchSessionId,
+    });
+    final preciseResult = await _cardService.searchAutocompleteCardsWithContext(
+      normalizedQuery,
+      limit: searchPreviewLimit,
+      poolLimit: _searchPreviewCandidateIdLimit(normalizedQuery),
+      searchLanguage: requestedLanguage,
+      previousSearchContext: previousContext,
+      predictionContext: _searchTokenPredictionContext?.canRefine(
+                normalizedQuery,
+                requestedLanguage,
+              ) ==
+              true
+          ? _searchTokenPredictionContext
+          : null,
+      searchSessionId: searchSessionId,
+    );
+    if (!mounted) {
       return;
     }
-
-    final previews = await _cardService.searchAutocompleteCards(
-      normalizedQuery,
-      limit: searchPreviewPoolLimit,
-      poolLimit: searchPreviewPoolLimit,
-      searchLanguage: requestedLanguage,
+    final effectiveContext = _autocompleteContextFromResponse(
+      context: preciseResult.context,
+      previews: preciseResult.cards,
+      query: normalizedQuery,
+      language: requestedLanguage,
     );
+    final contextIds = effectiveContext?.cardIds ?? const <String>[];
+    final contextIdSet = contextIds.toSet();
+    final previewById = <String, PokemonCard>{
+      for (final card in preciseResult.cards)
+        if (contextIdSet.contains(card.id)) card.id: card,
+    };
+    final previews = contextIds
+        .map((id) => previewById[id])
+        .whereType<PokemonCard>()
+        .take(searchPreviewLimit)
+        .toList(growable: false);
+    final effectivePreviews = previews.isNotEmpty
+        ? previews
+        : preciseResult.cards.take(searchPreviewLimit).toList(growable: false);
     final currentQuery = state.previewQuery.trim();
-    final currentPoolKey = _candidatePoolKey(currentQuery);
     final currentMeaningfulChars = _meaningfulSearchLength(currentQuery);
     final currentCanShowAutocomplete =
         currentMeaningfulChars >= searchPreviewVisibleChars;
-    final responseStillMatchesCurrentPool =
-        poolKey == currentPoolKey && requestedLanguage == state.searchLanguage;
-    if (requestId != _searchPreviewRequestId &&
-        !responseStillMatchesCurrentPool) {
+    final responseStillMatchesCurrentPool = normalizedQuery == currentQuery &&
+        requestedLanguage == state.searchLanguage;
+    final responseCompatibleWithCurrentPool =
+        requestedLanguage == state.searchLanguage &&
+            currentQuery.isNotEmpty &&
+            _prefixPoolQueryExtends(normalizedQuery, currentQuery);
+    SearchDebugTrace.instance.record('provider.preview.remote_response', {
+      'query': normalizedQuery,
+      'requestId': requestId,
+      'previewCount': effectivePreviews.length,
+      'poolSize': preciseResult.poolSize,
+      'poolSource': preciseResult.poolSource,
+      'currentQuery': currentQuery,
+      'responseStillMatchesCurrentPool': responseStillMatchesCurrentPool,
+      'latestRequestId': _searchPreviewRequestId,
+    });
+    if (requestId != _searchPreviewRequestId) {
+      if (responseCompatibleWithCurrentPool) {
+        _rememberSearchPoolResponse(
+          query: normalizedQuery,
+          language: requestedLanguage,
+          context: effectiveContext,
+          previews: effectivePreviews,
+          searchSessionId: searchSessionId,
+        );
+        final pendingFallback = _fallbackPreviewsForQuery(currentQuery);
+        if (currentCanShowAutocomplete && pendingFallback.isNotEmpty) {
+          state = state.copyWith(searchPreviews: pendingFallback);
+        }
+      }
+      SearchDebugTrace.instance.record('provider.preview.remote_drop_stale', {
+        'query': normalizedQuery,
+        'requestId': requestId,
+        'latestRequestId': _searchPreviewRequestId,
+        'responseStillMatchesCurrentPool': responseStillMatchesCurrentPool,
+      });
       return;
     }
-    final nextCandidatePool = previews.isEmpty ? candidatePool : previews;
-    _previewCandidatePool = nextCandidatePool;
-    _previewPoolKey = poolKey;
-    _previewPoolLanguage = requestedLanguage;
+    if (responseStillMatchesCurrentPool) {
+      if (effectiveContext != null) {
+        _searchAutocompleteContext = effectiveContext;
+      } else if (_searchAutocompleteContext?.canRefine(
+            currentQuery,
+            requestedLanguage,
+          ) !=
+          true) {
+        _searchAutocompleteContext = null;
+      }
+      _rememberSearchPoolResponse(
+        query: currentQuery.isEmpty ? normalizedQuery : currentQuery,
+        language: requestedLanguage,
+        context: effectiveContext,
+        previews: effectivePreviews,
+        searchSessionId: searchSessionId,
+      );
+    } else {
+      _searchAutocompleteContext = null;
+      _searchPredictedNameTokens = const [];
+      _searchTokenPredictionContext = null;
+    }
     final shouldShowAutocomplete = responseStillMatchesCurrentPool
         ? currentCanShowAutocomplete
         : canShowAutocomplete;
-    final nextPreviews = nextCandidatePool.isNotEmpty
-        ? _rankLocalPreviews(
-            nextCandidatePool,
-            currentQuery.isEmpty ? normalizedQuery : currentQuery,
-            limit: searchPreviewLimit,
-          )
-        : state.searchPreviews;
+    SearchDebugTrace.instance.record('provider.preview.render', {
+      'query': currentQuery.isEmpty ? normalizedQuery : currentQuery,
+      'requestId': requestId,
+      'renderedPreviews': effectivePreviews.length,
+      'top': effectivePreviews
+          .take(8)
+          .map((card) => {
+                'id': card.id,
+                'name': card.name,
+                'set': card.set,
+                'number': card.number,
+              })
+          .toList(),
+    });
+    if (responseStillMatchesCurrentPool) {
+      _rememberSearchPreviews(
+        currentQuery.isEmpty ? normalizedQuery : currentQuery,
+        requestedLanguage,
+        effectivePreviews,
+        searchSessionId: searchSessionId,
+      );
+    }
+    final fallbackPreviews = responseStillMatchesCurrentPool
+        ? _fallbackPreviewsForQuery(
+            currentQuery.isEmpty ? normalizedQuery : currentQuery)
+        : _fallbackPreviewsForQuery(normalizedQuery);
+    final renderedPreviews =
+        fallbackPreviews.isNotEmpty ? fallbackPreviews : effectivePreviews;
     state = state.copyWith(
-      searchPreviews: shouldShowAutocomplete ? nextPreviews : const [],
+      searchPreviews: shouldShowAutocomplete ? renderedPreviews : const [],
       isSearchingPreviews: requestId == _searchPreviewRequestId
           ? false
           : state.isSearchingPreviews,
+      searchCompletion: responseStillMatchesCurrentPool
+          ? _validatedSearchCompletion(currentQuery)
+          : _validatedSearchCompletion(normalizedQuery),
+      searchCompletionConfidence: responseStillMatchesCurrentPool
+          ? _searchCompletionConfidence(currentQuery)
+          : _searchCompletionConfidence(normalizedQuery),
+      searchCompletionSource: responseStillMatchesCurrentPool
+          ? _searchCompletionSource(currentQuery)
+          : _searchCompletionSource(normalizedQuery),
     );
   }
 
-  void _clearPreviewPool() {
-    _previewCandidatePool = const [];
-    _previewPoolKey = '';
-    _previewPoolLanguage = state.searchLanguage;
+  Future<void> _loadSearchTokenPrediction(
+    String query, {
+    required int requestId,
+    required String language,
+  }) async {
+    final normalizedQuery = query.trim();
+    if (_meaningfulSearchLength(normalizedQuery) < searchPreviewWarmupChars) {
+      return;
+    }
+    SearchDebugTrace.instance.record('provider.completion.fast_start', {
+      'query': normalizedQuery,
+      'requestId': requestId,
+      'language': language,
+    });
+    final previousContext = _searchTokenPredictionContext?.canRefine(
+              normalizedQuery,
+              language,
+            ) ==
+            true
+        ? _searchTokenPredictionContext
+        : null;
+    final result = await _cardService.predictSearchNameTokensWithContext(
+      normalizedQuery,
+      limit: 5,
+      searchLanguage: language,
+      previousPredictionContext: previousContext,
+    );
+    if (!mounted ||
+        requestId != _searchTokenPredictRequestId ||
+        normalizedQuery != state.previewQuery.trim() ||
+        language != state.searchLanguage) {
+      SearchDebugTrace.instance.record('provider.completion.fast_drop_stale', {
+        'query': normalizedQuery,
+        'requestId': requestId,
+        'latestRequestId': _searchTokenPredictRequestId,
+      });
+      return;
+    }
+    final tokens = result.tokens;
+    if (tokens.isEmpty &&
+        _existingPredictionCanComplete(normalizedQuery, language)) {
+      _searchTokenPredictionContext = result.context ?? previousContext;
+    } else {
+      _searchPredictedNameTokens = tokens;
+      _searchTokenPredictionContext = result.context;
+    }
+    SearchDebugTrace.instance.record('provider.completion.fast_tokens', {
+      'query': normalizedQuery,
+      'requestId': requestId,
+      'count': tokens.length,
+      'top': tokens
+          .take(3)
+          .map((token) => {
+                'display': token.display,
+                'confidence': token.confidence,
+                'source': token.source,
+              })
+          .toList(growable: false),
+    });
+    state = state.copyWith(
+      searchCompletion: _validatedSearchCompletion(normalizedQuery),
+      searchCompletionConfidence: _searchCompletionConfidence(normalizedQuery),
+      searchCompletionSource: _searchCompletionSource(normalizedQuery),
+    );
   }
 
-  String _candidatePoolKey(String query) {
-    final terms = _searchTerms(query);
-    if (_isStructuredPreviewQuery(query)) {
-      return terms.join('|');
+  Future<void> _warmSearchPreviews() async {
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+    if (!mounted) {
+      return;
     }
-    final normalized = query.toLowerCase();
-    final buffer = StringBuffer();
-    for (final match
-        in RegExp(r'[a-z0-9]', caseSensitive: false).allMatches(normalized)) {
-      buffer.write(match.group(0));
-      if (buffer.length >= searchPreviewVisibleChars) {
+    try {
+      await _initialCacheLoad;
+      final snapshot = await _cardService.getMarketplaceHomeSnapshot();
+      if (!mounted) {
+        return;
+      }
+      if (snapshot != null) {
+        _hotSearchPreviewCache =
+            _hotCardsFromSnapshot(snapshot) ?? _hotSearchPreviewCache;
+        final warmedCards = _mergeCards(state.cards, snapshot.cards);
+        state = state.copyWith(
+          cards: warmedCards,
+          filteredCards: state.searchQuery.trim().isEmpty
+              ? warmedCards
+              : state.filteredCards,
+          spotlightCards: _spotlightCardsFromSources(
+            snapshot,
+            warmedCards,
+            state.spotlightCards,
+          ),
+          homeSections: snapshot.sections,
+        );
+        _applyFilters();
+      }
+    } catch (_) {
+      // Best-effort warmup only; real searches still handle retries.
+    }
+  }
+
+  void showHotSearchPreviewsForEmptyFocus({
+    List<RecentCardView> recentViews = const [],
+  }) {
+    _searchRequestId++;
+    _searchPreviewRequestId++;
+    _searchTokenPredictRequestId++;
+    _searchPreviewDebounce?.cancel();
+    _searchTokenPredictDebounce?.cancel();
+    _searchAutocompleteContext = null;
+    _searchPredictedNameTokens = const [];
+    _searchTokenPredictionContext = null;
+    _clearSearchPrefixPoolHistory();
+    final requestId = _searchPreviewRequestId;
+    final recentBlueprints = recentViews.take(2).toList(growable: false);
+    final localHotCards = _hotSearchPreviewCache.isNotEmpty
+        ? _hotSearchPreviewCache
+        : _hotCardsFromCards(state.cards);
+    final cached = _emptyFocusPreviews(
+      localHotCards,
+      recentBlueprints,
+    );
+    state = state.copyWith(
+      previewQuery: '',
+      searchPreviews: cached,
+      isSearchingPreviews: false,
+      searchCompletion: '',
+      searchCompletionConfidence: 0,
+      searchCompletionSource: '',
+    );
+    SearchDebugTrace.instance.record('provider.preview.empty_focus_local', {
+      'requestId': requestId,
+      'cachedHotCount': _hotSearchPreviewCache.length,
+      'localHotCount': localHotCards.length,
+      'renderedCount': cached.length,
+      'cacheLimit': searchPreviewHotCacheLimit,
+      'renderLimit': searchPreviewLimit,
+      'recentBlueprintCount': recentBlueprints.length,
+    });
+  }
+
+  List<PokemonCard>? _hotCardsFromSnapshot(MarketplaceHomeSnapshot? snapshot) {
+    if (snapshot == null) {
+      return null;
+    }
+    final byId = {for (final card in snapshot.cards) card.id: card};
+    final ids = [
+      ...snapshot.sections.bestSellerIds,
+      ...snapshot.sections.recentlySeenIds,
+      ...snapshot.sections.featuredIds,
+    ];
+    final cards = <PokemonCard>[];
+    final seen = <String>{};
+    for (final id in ids) {
+      final card = byId[id];
+      if (card == null || !seen.add(card.id)) {
+        continue;
+      }
+      cards.add(card);
+      if (cards.length >= searchPreviewHotCacheLimit) {
         break;
       }
     }
-    return buffer.toString();
+    if (cards.isNotEmpty) {
+      return cards;
+    }
+    return _hotCardsFromCards(snapshot.cards);
   }
 
-  bool _isStructuredPreviewQuery(String query) {
-    final terms = _searchTerms(query);
-    if (terms.length < 2) {
-      return false;
+  List<PokemonCard> _spotlightCardsFromSources(
+    MarketplaceHomeSnapshot? snapshot,
+    List<PokemonCard> cards,
+    List<PokemonCard> cachedSpotlightCards,
+  ) {
+    final byId = <String, PokemonCard>{
+      for (final card in cachedSpotlightCards)
+        if (card.id.isNotEmpty) card.id: card,
+      for (final card in cards)
+        if (card.id.isNotEmpty) card.id: card,
+      for (final card in snapshot?.cards ?? const <PokemonCard>[])
+        if (card.id.isNotEmpty) card.id: card,
+    };
+    final orderedIds = [
+      ...?snapshot?.sections.featuredIds,
+      ...?snapshot?.sections.bestSellerIds,
+      ...?snapshot?.sections.recentlySeenIds,
+      ...cachedSpotlightCards.map((card) => card.id),
+      ...cards.map((card) => card.id),
+    ];
+    final seen = <String>{};
+    final warmed = <PokemonCard>[];
+    for (final id in orderedIds) {
+      final card = byId[id];
+      if (card == null ||
+          !seen.add(id) ||
+          card.itemKind == 'product' ||
+          card.productType != 'card') {
+        continue;
+      }
+      warmed.add(card);
+      if (warmed.length >= 48) {
+        break;
+      }
     }
-    return terms.any((term) => RegExp(r'^[0-9]+$').hasMatch(term)) ||
-        terms.any(_isVariationSearchTerm) ||
-        terms.any(_isRaritySearchTerm) ||
-        terms.any(_isExpansionAliasSearchTerm);
+    return warmed;
+  }
+
+  List<PokemonCard> _hotCardsFromCards(List<PokemonCard> cards) {
+    final deduped = _mergeCards(const [], cards)
+        .where((card) =>
+            card.previewImageUrl.isNotEmpty || card.imageUrl.isNotEmpty)
+        .take(searchPreviewHotCacheLimit)
+        .toList();
+    return deduped;
   }
 
   void filterByRarity(String rarity) {
@@ -462,10 +1288,16 @@ class CardNotifier extends StateNotifier<CardState> {
   }
 
   void _applyFilters() {
-    List<PokemonCard> filtered = List.from(state.cards);
+    final normalizedSearchQuery = state.searchQuery.trim();
+    final hasCurrentRemoteSearch = normalizedSearchQuery.isNotEmpty &&
+        normalizedSearchQuery == state.remoteSearchQuery &&
+        state.remoteSearchResults.isNotEmpty;
+    List<PokemonCard> filtered = hasCurrentRemoteSearch
+        ? List.from(state.remoteSearchResults)
+        : List.from(state.cards);
 
     // Search filter
-    if (state.searchQuery.isNotEmpty) {
+    if (state.searchQuery.isNotEmpty && !hasCurrentRemoteSearch) {
       final terms = _searchTerms(state.searchQuery);
       filtered =
           filtered.where((card) => _matchesSearchTerms(card, terms)).toList();
@@ -498,45 +1330,124 @@ class CardNotifier extends StateNotifier<CardState> {
 
     // Stock filter
     if (state.showOnlyInStock) {
-      filtered = filtered.where((card) => card.stock > 0).toList();
+      filtered = filtered.where((card) => card.isMarketAvailable).toList();
     }
 
-    // Sort
-    filtered.sort((a, b) {
-      int comparison = 0;
-      switch (state.sortBy) {
-        case 'name':
-          comparison = a.name.compareTo(b.name);
-          break;
-        case 'price':
-          comparison = a.price.compareTo(b.price);
-          break;
-        case 'rating':
-          comparison = a.rating.compareTo(b.rating);
-          break;
-        case 'releaseDate':
-          comparison = a.releaseDate.compareTo(b.releaseDate);
-          break;
-        case 'rarity':
-          comparison = a.rarity.compareTo(b.rarity);
-          break;
-        default:
-          comparison = a.name.compareTo(b.name);
-      }
-      return state.sortAscending ? comparison : -comparison;
-    });
+    // Preserve API/cache ranking by default; only reorder when a user-facing
+    // sort option explicitly asks for it.
+    if (state.sortBy != 'source') {
+      filtered.sort((a, b) {
+        int comparison = 0;
+        switch (state.sortBy) {
+          case 'name':
+            comparison = a.name.compareTo(b.name);
+            break;
+          case 'price':
+            comparison = a.price.compareTo(b.price);
+            break;
+          case 'rating':
+            comparison = a.rating.compareTo(b.rating);
+            break;
+          case 'releaseDate':
+            comparison = a.releaseDate.compareTo(b.releaseDate);
+            break;
+          case 'rarity':
+            comparison = a.rarity.compareTo(b.rarity);
+            break;
+          default:
+            comparison = 0;
+        }
+        return state.sortAscending ? comparison : -comparison;
+      });
+    }
 
     state = state.copyWith(filteredCards: filtered);
   }
 
   Future<void> refreshCards() async {
+    await _initialCacheLoad;
+    if (_hasWarmMarketplaceData) {
+      state = state.copyWith(
+        isLoading: false,
+        error: null,
+        hasMarketplaceLoadCompleted: true,
+      );
+      _marketplaceWarmStarted = true;
+      return;
+    }
+    if (_marketplaceWarmStarted) {
+      return;
+    }
+    _marketplaceWarmStarted = true;
+    unawaited(_loadCards());
+  }
+
+  Future<void> warmMarketplaceAfterDetail() async {
+    if (_marketplaceWarmStarted || _hasWarmMarketplaceData) {
+      FlutterDebugLog.instance.record(
+        'provider.warm_after_detail.skipped',
+        category: 'provider',
+        payload: {
+          'reason':
+              _marketplaceWarmStarted ? 'already_started' : 'already_warm',
+          'hasMarketplaceLoadCompleted': state.hasMarketplaceLoadCompleted,
+          'hasHomeSections': state.homeSections != null,
+        },
+      );
+      return;
+    }
+    _marketplaceWarmStarted = true;
+    FlutterDebugLog.instance.record(
+      'provider.warm_after_detail.start',
+      category: 'provider',
+      payload: {
+        'delayMs': 250,
+        'currentCardCount': state.cards.length,
+      },
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+    if (!mounted || _hasWarmMarketplaceData) {
+      FlutterDebugLog.instance.record(
+        'provider.warm_after_detail.skipped',
+        category: 'provider',
+        payload: {
+          'reason': mounted ? 'became_warm_during_delay' : 'disposed',
+          'hasMarketplaceLoadCompleted': state.hasMarketplaceLoadCompleted,
+          'hasHomeSections': state.homeSections != null,
+        },
+      );
+      return;
+    }
+    try {
+      await _loadCards();
+      FlutterDebugLog.instance.record(
+        'provider.warm_after_detail.end',
+        category: 'provider',
+        payload: {'cardCount': state.cards.length},
+      );
+    } catch (error, stackTrace) {
+      FlutterDebugLog.instance.recordError(
+        'provider.warm_after_detail.error',
+        error,
+        stackTrace: stackTrace,
+        category: 'provider',
+      );
+      rethrow;
+    }
+  }
+
+  Future<void> warmMarketplaceFromLanding() async {
+    if (_marketplaceWarmStarted || _hasWarmMarketplaceData) {
+      return;
+    }
+    _marketplaceWarmStarted = true;
     await _loadCards();
   }
 
   Future<void> addCard(PokemonCard card) async {
     try {
       await _cardService.addCard(card);
-      await _loadCards();
+      await _loadCards(preserveCurrent: false);
     } catch (e) {
       state = state.copyWith(error: e.toString());
     }
@@ -550,10 +1461,560 @@ class CardNotifier extends StateNotifier<CardState> {
     state = state.copyWith(cards: _mergeCards(state.cards, incoming));
   }
 
+  Future<void> warmDetailCards(Iterable<PokemonCard> cards) async {
+    final ids = <String>[];
+    final seen = <String>{};
+    for (final card in cards) {
+      final id = card.id.trim();
+      if (id.isEmpty || !seen.add(id)) {
+        continue;
+      }
+      final current = _findLoadedCard(id) ?? card;
+      if (!needsMarketplaceDetailHydration(current)) {
+        continue;
+      }
+      ids.add(id);
+      if (ids.length >= 12) {
+        break;
+      }
+    }
+    for (final id in ids) {
+      if (!mounted) {
+        return;
+      }
+      await _refreshCardById(id);
+    }
+  }
+
+  void _rememberSearchPreviews(
+    String query,
+    String language,
+    List<PokemonCard> previews, {
+    String? searchSessionId,
+  }) {
+    final typedQuery = query.trim();
+    if (typedQuery.isEmpty || previews.isEmpty) {
+      return;
+    }
+    final visible = _remoteSearchResults(previews, limit: searchPreviewLimit);
+    if (visible.isEmpty) {
+      return;
+    }
+    final sessionId = (searchSessionId ?? _searchSessionId ?? '').trim();
+    _retainedSearchPreviewsByScope[_previewRetentionKey(
+      typedQuery,
+      language,
+      sessionId,
+    )] = visible;
+    _rememberCandidateLabels(
+      visible.map(
+        (card) => SearchCandidateLabel(
+          id: card.id,
+          name: card.name,
+          itemKind: card.itemKind,
+          productType: card.productType,
+          setName: card.set,
+          number: card.number,
+          trainerName: card.trainerName,
+        ),
+      ),
+    );
+  }
+
+  void _rememberSearchPoolResponse({
+    required String query,
+    required String language,
+    required SearchAutocompleteContext? context,
+    required List<PokemonCard> previews,
+    String? searchSessionId,
+  }) {
+    _rememberCandidateContext(context);
+    _rememberSearchPrefixPool(
+      query: query,
+      language: language,
+      context: context,
+      previews: previews,
+      searchSessionId: searchSessionId,
+    );
+  }
+
+  SearchAutocompleteContext? _autocompleteContextFromResponse({
+    required SearchAutocompleteContext? context,
+    required List<PokemonCard> previews,
+    required String query,
+    required String language,
+  }) {
+    if (context == null) {
+      return _derivedAutocompleteContextFromRows(
+        query: query,
+        language: language,
+        previews: previews,
+      );
+    }
+    if (context.cardIds.isNotEmpty || previews.isEmpty) {
+      return context;
+    }
+    final derived = _derivedAutocompleteContextFromRows(
+      query: query,
+      language: language,
+      previews: previews,
+    );
+    if (derived == null) {
+      return context;
+    }
+    return SearchAutocompleteContext(
+      query: context.query.trim().isEmpty ? derived.query : context.query,
+      language:
+          context.language.trim().isEmpty ? derived.language : context.language,
+      cardIds: derived.cardIds,
+      createdAtMs:
+          context.createdAtMs > 0 ? context.createdAtMs : derived.createdAtMs,
+      strategy:
+          context.strategy.trim().isEmpty ? derived.strategy : context.strategy,
+      candidateIdLadder: context.candidateIdLadder,
+      depthScores: context.depthScores.isEmpty
+          ? derived.depthScores
+          : context.depthScores,
+      latestDepths: context.latestDepths.isEmpty
+          ? derived.latestDepths
+          : context.latestDepths,
+      latestOrders: context.latestOrders.isEmpty
+          ? derived.latestOrders
+          : context.latestOrders,
+      nonNameContext: context.nonNameContext,
+      candidateLabels: context.candidateLabels.isEmpty
+          ? derived.candidateLabels
+          : context.candidateLabels,
+      predictedNameTokens: context.predictedNameTokens,
+    );
+  }
+
+  SearchAutocompleteContext? _derivedAutocompleteContextFromRows({
+    required String query,
+    required String language,
+    required List<PokemonCard> previews,
+  }) {
+    final normalizedQuery = query.trim();
+    final normalizedLanguage = language.trim().toLowerCase();
+    if (normalizedQuery.isEmpty ||
+        normalizedLanguage.isEmpty ||
+        previews.isEmpty) {
+      return null;
+    }
+    final ids = <String>[];
+    final labels = <SearchCandidateLabel>[];
+    final seen = <String>{};
+    for (final card in previews) {
+      final id = card.id.trim();
+      if (id.isEmpty || !seen.add(id)) {
+        continue;
+      }
+      ids.add(id);
+      labels.add(SearchCandidateLabel(
+        id: id,
+        name: card.name,
+        itemKind: card.itemKind,
+        productType: card.productType,
+        setName: card.set,
+        number: card.number,
+        trainerName: card.trainerName,
+      ));
+    }
+    if (ids.isEmpty) {
+      return null;
+    }
+    final depth = _meaningfulSearchLength(normalizedQuery);
+    return SearchAutocompleteContext(
+      query: normalizedQuery,
+      language: normalizedLanguage,
+      cardIds: List.unmodifiable(ids),
+      createdAtMs: DateTime.now().millisecondsSinceEpoch,
+      strategy: 'derived_from_rows',
+      depthScores: Map.unmodifiable({for (final id in ids) id: depth}),
+      latestDepths: Map.unmodifiable({for (final id in ids) id: depth}),
+      latestOrders: Map.unmodifiable({
+        for (var index = 0; index < ids.length; index += 1) ids[index]: index,
+      }),
+      candidateLabels: List.unmodifiable(labels),
+    );
+  }
+
+  void _rememberCandidateLabels(Iterable<SearchCandidateLabel>? labels) {
+    if (labels == null) {
+      return;
+    }
+    for (final label in labels) {
+      if (label.id.isEmpty || label.name.isEmpty) {
+        continue;
+      }
+      _searchCandidateLabelsById[label.id] = label;
+      if (_searchCandidateLabelsById.length > 10000) {
+        final removedId = _searchCandidateLabelsById.keys.first;
+        _searchCandidateLabelsById.remove(removedId);
+        _searchCandidateLatestDepthById.remove(removedId);
+        _searchCandidateDepthScoreById.remove(removedId);
+        _searchCandidateLatestOrderById.remove(removedId);
+      }
+    }
+  }
+
+  void _rememberCandidateContext(SearchAutocompleteContext? context) {
+    if (context == null) {
+      return;
+    }
+    _rememberCandidateLabels(context.candidateLabels);
+    for (var index = 0; index < context.cardIds.length; index += 1) {
+      final id = context.cardIds[index];
+      final latestDepth = context.latestDepths[id];
+      if (latestDepth != null && latestDepth > 0) {
+        _searchCandidateLatestDepthById[id] = latestDepth;
+      }
+      final depthScore = context.depthScores[id];
+      if (depthScore != null && depthScore > 0) {
+        _searchCandidateDepthScoreById[id] = depthScore;
+      }
+      final latestOrder = context.latestOrders[id] ?? index;
+      _searchCandidateLatestOrderById[id] = latestOrder;
+    }
+  }
+
+  String acceptSearchCompletion(String query, {bool triggerSearch = true}) {
+    final completion = _validatedSearchCompletion(query.trim());
+    if (completion.isEmpty) {
+      return query;
+    }
+    SearchDebugTrace.instance.record('provider.completion.accept', {
+      'query': query.trim(),
+      'completion': completion,
+      'confidence': _searchCompletionConfidence(query.trim()),
+      'source': _searchCompletionSource(query.trim()),
+    });
+    state = state.copyWith(
+      previewQuery: completion,
+      searchQuery:
+          state.searchQuery.trim().isEmpty ? state.searchQuery : completion,
+      searchCompletion: '',
+      searchCompletionConfidence: 0,
+      searchCompletionSource: '',
+    );
+    _searchPredictedNameTokens = const [];
+    _searchTokenPredictionContext = null;
+    if (triggerSearch) {
+      searchPreviewsOnly(completion);
+    }
+    return completion;
+  }
+
+  String _validatedSearchCompletion(String query) {
+    final prediction = _bestSearchCompletionToken(query);
+    if (prediction == null) {
+      return '';
+    }
+    final completion = searchCompletionForQuery(query, prediction.display);
+    return completion == query.trim() ? '' : completion;
+  }
+
+  double _searchCompletionConfidence(String query) {
+    final prediction = _bestSearchCompletionToken(query);
+    return prediction == null ? 0 : prediction.confidence;
+  }
+
+  String _searchCompletionSource(String query) {
+    final prediction = _bestSearchCompletionToken(query);
+    return prediction == null ? '' : prediction.source;
+  }
+
+  bool _existingPredictionCanComplete(String query, String language) {
+    final normalizedQuery = query.trim();
+    if (normalizedQuery.isEmpty || _searchPredictedNameTokens.isEmpty) {
+      return false;
+    }
+    for (final token in _searchPredictedNameTokens) {
+      if (token.language.isNotEmpty &&
+          token.language.toLowerCase() != language.toLowerCase()) {
+        continue;
+      }
+      if (_tokenCanCompleteQuery(normalizedQuery, token)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  void _applyFirstCharCompletionCache(String query) {
+    final token = _firstCharCompletionToken(query, state.searchLanguage);
+    if (token == null) {
+      if (_searchPredictedNameTokens.any(
+        (prediction) => prediction.source == 'first_char_static',
+      )) {
+        _searchPredictedNameTokens = const [];
+      }
+      return;
+    }
+    _searchPredictedNameTokens = [token];
+  }
+
+  SearchPredictedNameToken? _firstCharCompletionToken(
+    String query,
+    String language,
+  ) {
+    if (language.toLowerCase() != 'en') {
+      return null;
+    }
+    final normalizedQuery = query.trim();
+    if (_meaningfulSearchLength(normalizedQuery) != 1) {
+      return null;
+    }
+    final key = _compactSearchCompletionText(normalizedQuery);
+    if (key.length != 1) {
+      return null;
+    }
+    final suggestion = firstCharTokenSuggestions[key];
+    if (suggestion == null || suggestion.language.toLowerCase() != 'en') {
+      return null;
+    }
+    return SearchPredictedNameToken(
+      normalized: suggestion.normalized,
+      display: suggestion.display,
+      confidence: suggestion.confidence,
+      sourceRank: 1,
+      language: suggestion.language,
+      source: 'first_char_static',
+      nameFragment: key,
+    );
+  }
+
+  SearchPredictedNameToken? _bestSearchCompletionToken(String query) {
+    final normalizedQuery = query.trim();
+    if (normalizedQuery.isEmpty || _searchPredictedNameTokens.isEmpty) {
+      return null;
+    }
+    for (final token in _searchPredictedNameTokens) {
+      if (token.language.isNotEmpty &&
+          token.language.toLowerCase() != state.searchLanguage.toLowerCase()) {
+        continue;
+      }
+      if (_tokenCanCompleteQuery(normalizedQuery, token)) {
+        return token;
+      }
+    }
+    return null;
+  }
+
+  bool _tokenCanCompleteQuery(String query, SearchPredictedNameToken token) {
+    final normalizedQuery = query.trim();
+    final completion = searchCompletionForQuery(normalizedQuery, token.display);
+    if (completion.isEmpty || completion == normalizedQuery) {
+      return false;
+    }
+    if (token.isStructuredDimension) {
+      return true;
+    }
+    final compactQuery = _compactSearchCompletionText(normalizedQuery);
+    final compactDisplay = _compactSearchCompletionText(token.display);
+    return compactQuery.isNotEmpty && compactDisplay.startsWith(compactQuery);
+  }
+
+  void _rememberSearchPrefixPool({
+    required String query,
+    required String language,
+    required SearchAutocompleteContext? context,
+    required List<PokemonCard> previews,
+    String? searchSessionId,
+  }) {
+    final normalizedQuery = _normalizePrefixPoolQuery(query);
+    final normalizedLanguage = language.trim().toLowerCase();
+    final sessionId = (searchSessionId ?? _searchSessionId ?? '').trim();
+    final ids = context?.cardIds.isNotEmpty == true
+        ? context!.cardIds
+        : previews.map((card) => card.id).toList(growable: false);
+    if (normalizedQuery.isEmpty ||
+        normalizedLanguage.isEmpty ||
+        sessionId.isEmpty ||
+        ids.isEmpty) {
+      return;
+    }
+
+    final idLimit = _searchPreviewCandidateIdLimit(normalizedQuery);
+    final seen = <String>{};
+    final boundedIds = <String>[];
+    for (final id in ids) {
+      final normalizedId = id.trim();
+      if (normalizedId.isEmpty || !seen.add(normalizedId)) {
+        continue;
+      }
+      boundedIds.add(normalizedId);
+      if (boundedIds.length >= idLimit) {
+        break;
+      }
+    }
+    if (boundedIds.isEmpty) {
+      return;
+    }
+
+    _rememberCandidateLabels(context?.candidateLabels);
+    _rememberCandidateLabels(previews.map(
+      (card) => SearchCandidateLabel(
+        id: card.id,
+        name: card.name,
+        itemKind: card.itemKind,
+        productType: card.productType,
+        setName: card.set,
+        number: card.number,
+        trainerName: card.trainerName,
+      ),
+    ));
+
+    final depth = _meaningfulSearchLength(normalizedQuery);
+    final depthScores = <String, int>{};
+    final latestDepths = <String, int>{};
+    final latestOrders = <String, int>{};
+    for (var index = 0; index < boundedIds.length; index += 1) {
+      final id = boundedIds[index];
+      depthScores[id] =
+          context?.depthScores[id] ?? context?.latestDepths[id] ?? depth;
+      latestDepths[id] = context?.latestDepths[id] ?? depth;
+      latestOrders[id] = context?.latestOrders[id] ?? index;
+    }
+
+    final key = _previewRetentionKey(
+      normalizedQuery,
+      normalizedLanguage,
+      sessionId,
+    );
+    _searchPrefixPoolsByKey[key] = _SearchPrefixPool(
+      key: key,
+      query: normalizedQuery,
+      language: normalizedLanguage,
+      sessionId: sessionId,
+      cardIds: List.unmodifiable(boundedIds),
+      depth: depth,
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch,
+      depthScores: Map.unmodifiable(depthScores),
+      latestDepths: Map.unmodifiable(latestDepths),
+      latestOrders: Map.unmodifiable(latestOrders),
+    );
+    _trimSearchPrefixPools();
+  }
+
+  void _trimSearchPrefixPools() {
+    while (_searchPrefixPoolsByKey.length > _searchPreviewMaxPrefixPools) {
+      _removeOldestSearchPrefixPool();
+    }
+    while (_searchPrefixPoolsByKey.values.fold<int>(
+          0,
+          (sum, pool) => sum + pool.cardIds.length,
+        ) >
+        _searchPreviewMaxAggregatePrefixIds) {
+      if (!_removeOldestSearchPrefixPool()) {
+        break;
+      }
+    }
+  }
+
+  bool _removeOldestSearchPrefixPool() {
+    if (_searchPrefixPoolsByKey.isEmpty) {
+      return false;
+    }
+    String? oldestKey;
+    int? oldestUpdatedAt;
+    for (final entry in _searchPrefixPoolsByKey.entries) {
+      final updatedAt = entry.value.updatedAtMs;
+      if (oldestUpdatedAt == null || updatedAt < oldestUpdatedAt) {
+        oldestUpdatedAt = updatedAt;
+        oldestKey = entry.key;
+      }
+    }
+    if (oldestKey == null) {
+      return false;
+    }
+    _searchPrefixPoolsByKey.remove(oldestKey);
+    _retainedSearchPreviewsByScope.remove(oldestKey);
+    return true;
+  }
+
+  void _clearSearchPrefixPoolHistory() {
+    _searchPrefixPoolsByKey.clear();
+    _retainedSearchPreviewsByScope.clear();
+    _searchCandidateLabelsById.clear();
+    _searchCandidateLatestDepthById.clear();
+    _searchCandidateDepthScoreById.clear();
+    _searchCandidateLatestOrderById.clear();
+    _searchPredictedNameTokens = const [];
+    _searchTokenPredictionContext = null;
+  }
+
+  void _prepareSearchSessionForQuery(String query) {
+    final currentSessionId = _searchSessionId;
+    if (currentSessionId == null || currentSessionId.isEmpty) {
+      return;
+    }
+    final lastQuery = _normalizePrefixPoolQuery(_lastSearchSessionQuery);
+    final nextQuery = _normalizePrefixPoolQuery(query);
+    if (lastQuery.isEmpty ||
+        nextQuery.isEmpty ||
+        _prefixPoolQueryExtends(lastQuery, nextQuery)) {
+      return;
+    }
+    _cancelSearchSession(reason: 'query_branch');
+    _searchAutocompleteContext = null;
+    _clearSearchPrefixPoolHistory();
+  }
+
+  String _previewRetentionKey(
+    String query,
+    String language,
+    String sessionId,
+  ) {
+    return '${language.trim().toLowerCase()}::${sessionId.trim()}::'
+        '${_normalizePrefixPoolQuery(query)}';
+  }
+
+  List<PokemonCard> _fallbackPreviewsForQuery(String query) {
+    final normalizedQuery = query.trim();
+    if (_meaningfulSearchLength(normalizedQuery) < searchPreviewVisibleChars) {
+      return const [];
+    }
+    final language = state.searchLanguage;
+    final sessionId = _searchSessionId ?? '';
+    final prefixPoolPreviews = _searchPreviewFallbackRowsFromPrefixPools(
+      query: normalizedQuery,
+      language: language,
+      sessionId: sessionId,
+      pools: _searchPrefixPoolsByKey.values,
+      retainedRowsByScope: _retainedSearchPreviewsByScope,
+      labelsById: _searchCandidateLabelsById,
+      limit: searchPreviewLimit,
+    );
+    if (prefixPoolPreviews.isNotEmpty) {
+      return prefixPoolPreviews;
+    }
+    final context = _searchAutocompleteContext;
+    if (context == null || context.cardIds.isEmpty) {
+      return const [];
+    }
+    if (context.query != normalizedQuery &&
+        !context.canRefine(normalizedQuery, language)) {
+      return const [];
+    }
+    final retainedRows = _retainedSearchPreviewsByScope[
+            _previewRetentionKey(normalizedQuery, language, sessionId)] ??
+        const <PokemonCard>[];
+    return _searchPreviewFallbackRows(
+      query: normalizedQuery,
+      retainedRows: retainedRows,
+      context: context,
+      latestDepths: _searchCandidateLatestDepthById,
+      depthScores: _searchCandidateDepthScoreById,
+      latestOrders: _searchCandidateLatestOrderById,
+      limit: searchPreviewLimit,
+    );
+  }
+
   Future<void> updateCard(PokemonCard card) async {
     try {
       await _cardService.updateCard(card);
-      await _loadCards();
+      await _loadCards(preserveCurrent: false);
     } catch (e) {
       state = state.copyWith(error: e.toString());
     }
@@ -562,7 +2023,7 @@ class CardNotifier extends StateNotifier<CardState> {
   Future<void> deleteCard(String cardId) async {
     try {
       await _cardService.deleteCard(cardId);
-      await _loadCards();
+      await _loadCards(preserveCurrent: false);
     } catch (e) {
       state = state.copyWith(error: e.toString());
     }
@@ -571,518 +2032,127 @@ class CardNotifier extends StateNotifier<CardState> {
   void clearFilters() {
     _searchRequestId++;
     _searchPreviewRequestId++;
+    _searchTokenPredictRequestId++;
+    _searchPreviewDebounce?.cancel();
+    _searchTokenPredictDebounce?.cancel();
+    _cancelSearchSession(reason: 'clear_filters');
+    _clearSearchPrefixPoolHistory();
+    _searchAutocompleteContext = null;
     state = state.copyWith(
       searchQuery: '',
+      remoteSearchQuery: '',
+      remoteSearchResults: const [],
       previewQuery: '',
       searchPreviews: const [],
       isSearchingPreviews: false,
+      searchCompletion: '',
+      searchCompletionConfidence: 0,
+      searchCompletionSource: '',
       selectedRarity: '',
       selectedType: '',
       selectedSet: '',
       minPrice: 0.0,
       maxPrice: 5000000.0,
       showOnlyInStock: false,
-      sortBy: 'name',
+      sortBy: 'source',
       sortAscending: true,
-      searchLanguage: 'en',
     );
     _applyFilters();
   }
 
-  List<PokemonCard> _rankLocalPreviews(
-    List<PokemonCard> cards,
-    String query, {
-    required int limit,
-  }) {
-    final queryVariants = _searchQueryVariants([query]);
-    final ranked = cards
-        .map((card) => MapEntry(
-              card,
-              queryVariants.fold<int>(
-                0,
-                (score, query) => math.max(
-                  score,
-                  _localSearchScore(card, query.toLowerCase()),
-                ),
-              ),
-            ))
-        .where((entry) => entry.value > 0)
-        .toList()
-      ..sort((a, b) {
-        final score = b.value.compareTo(a.value);
-        if (score != 0) {
-          return score;
-        }
-        return a.key.name.compareTo(b.key.name);
-      });
-    return ranked.map((entry) => entry.key).take(limit).toList();
+  @override
+  void dispose() {
+    _searchPreviewDebounce?.cancel();
+    _searchTokenPredictDebounce?.cancel();
+    _cancelSearchSession(reason: 'dispose');
+    _clearSearchPrefixPoolHistory();
+    super.dispose();
   }
 
-  int _localSearchScore(PokemonCard card, String query) {
-    final name = card.name.toLowerCase();
-    final set = card.set.toLowerCase();
-    final trainerName = card.trainerName.toLowerCase();
-    final isProduct = card.itemKind == 'product';
-    final isPokemonIdentity = _isPokemonIdentityCard(card);
-    final number = isProduct ? '' : card.number.toLowerCase();
-    final tags = card.tags.join(' ').toLowerCase();
-    final haystack = isProduct
-        ? '$name $set $trainerName $tags'
-        : '$name $set $trainerName $number $tags';
-    final terms = _searchTerms(query);
-    final compactQuery = query.replaceAll(RegExp(r'[^a-z0-9]'), '');
-    final compactName = name.replaceAll(RegExp(r'[^a-z0-9]'), '');
-    final compactSet = set.replaceAll(RegExp(r'[^a-z0-9]'), '');
-    final compactNumber = number.replaceAll(RegExp(r'[^a-z0-9]'), '');
-    final compactTrainerName = trainerName.replaceAll(RegExp(r'[^a-z0-9]'), '');
-    final compactTags = tags.replaceAll(RegExp(r'[^a-z0-9]'), '');
-    final compactHaystack = [
-      compactName,
-      compactNumber,
-      compactSet,
-      compactTrainerName,
-      compactTags,
-    ].where((part) => part.isNotEmpty).join();
-    final nameCoverageBonus =
-        _characterCoverageScore(compactName, compactQuery);
-    final coverageBonus = math.max(
-      nameCoverageBonus,
-      _characterCoverageScore(compactHaystack, compactQuery) ~/ 2,
+  void exitSearch({String reason = 'exit'}) {
+    final hadActiveSearch = _searchSessionId?.isNotEmpty == true ||
+        state.previewQuery.isNotEmpty ||
+        state.searchPreviews.isNotEmpty ||
+        state.isSearchingPreviews;
+    if (!hadActiveSearch) {
+      return;
+    }
+    _searchRequestId++;
+    _searchPreviewRequestId++;
+    _searchTokenPredictRequestId++;
+    _searchPreviewDebounce?.cancel();
+    _searchTokenPredictDebounce?.cancel();
+    _searchAutocompleteContext = null;
+    _searchPredictedNameTokens = const [];
+    _cancelSearchSession(reason: reason);
+    _clearSearchPrefixPoolHistory();
+    state = state.copyWith(
+      previewQuery: '',
+      searchPreviews: const [],
+      isSearchingPreviews: false,
+      searchCompletion: '',
+      searchCompletionConfidence: 0,
+      searchCompletionSource: '',
     );
-    int boost(int score) => score + coverageBonus;
-    final hasNumberTerm =
-        terms.any((term) => RegExp(r'^[0-9]+$').hasMatch(term));
-    final hasVariationTerm = terms.any(_isVariationSearchTerm);
-    final hasRarityTerm = terms.any(_isRaritySearchTerm);
-    final hasExpansionAliasTerm = terms.any(_isExpansionAliasSearchTerm);
-    final hasTextTerm = terms.any(
-      (term) =>
-          !RegExp(r'^[0-9]+$').hasMatch(term) &&
-          !_isVariationSearchTerm(term) &&
-          !_isRaritySearchTerm(term) &&
-          !_isExpansionAliasSearchTerm(term),
-    );
-    if (terms.length > 1 &&
-        (hasNumberTerm || hasVariationTerm || hasExpansionAliasTerm) &&
-        hasTextTerm) {
-      var matchedName = false;
-      var matchedNumber = false;
-      var matchedVariation = false;
-      var matchedExpansion = false;
-      var matchedSet = false;
-      var score = 0;
-      for (final term in terms) {
-        final compactTerm = term.replaceAll(RegExp(r'[^a-z0-9]'), '');
-        if (RegExp(r'^[0-9]+$').hasMatch(term)) {
-          final numberTokens = _searchTerms(number);
-          if (number == term ||
-              compactNumber == compactTerm ||
-              numberTokens.contains(term)) {
-            score += 1600;
-            matchedNumber = true;
-          } else if (number.startsWith(term) ||
-              compactNumber.startsWith(compactTerm)) {
-            score += 1300;
-            matchedNumber = true;
-          } else if (number.contains(term) ||
-              compactNumber.contains(compactTerm)) {
-            score += 900;
-            matchedNumber = true;
-          }
-          continue;
-        }
-        if (_isVariationSearchTerm(term)) {
-          if (_cardHasVariation(card, term)) {
-            score += 1500;
-            matchedVariation = true;
-          }
-          continue;
-        }
-        if (_isExpansionAliasSearchTerm(term)) {
-          if (_cardHasExpansionAlias(card, term)) {
-            score += 1550;
-            matchedExpansion = true;
-          }
-          continue;
-        }
-        if (name == term || compactName == compactTerm) {
-          score += 1400;
-          matchedName = true;
-        } else if (name.startsWith(term) ||
-            compactName.startsWith(compactTerm)) {
-          score += 1150;
-          matchedName = true;
-        } else if (_wordStartsWith(name, term)) {
-          score += 980;
-          matchedName = true;
-        } else if (_isLikelyNameTokenTypo(name, term)) {
-          score += 920;
-          matchedName = true;
-        } else if (_isLikelyNameTypo(compactName, compactTerm)) {
-          score += 760;
-          matchedName = true;
-        } else if (name.contains(term) || compactName.contains(compactTerm)) {
-          score += 720;
-          matchedName = true;
-        } else if (set.startsWith(term) || compactSet.startsWith(compactTerm)) {
-          score += 520;
-          matchedSet = true;
-        } else if (set.contains(term) || compactSet.contains(compactTerm)) {
-          score += 360;
-          matchedSet = true;
-        }
-      }
-      if (matchedName && matchedNumber) {
-        return boost(score + 5200);
-      }
-      if (matchedName && matchedVariation) {
-        return boost(score + 4400);
-      }
-      if (matchedName && matchedExpansion) {
-        return boost(score + 4600);
-      }
-      if (matchedName && matchedSet) {
-        return boost(score + 700);
-      }
-      if (matchedNumber || matchedVariation || matchedExpansion) {
-        return 0;
-      }
-    }
-    if (number == query) {
-      return boost(980);
-    }
-    if (number.startsWith(query)) {
-      return boost(880);
-    }
-    if (_wordStartsWith(number, query)) {
-      return boost(840);
-    }
-    if (name == query) {
-      return boost(1000);
-    }
-    if (compactQuery.isNotEmpty) {
-      final nameDistance = _boundedDamerauLevenshtein(
-        compactName,
-        compactQuery,
-        math.max(2, compactQuery.length ~/ 4),
-      );
-      if (nameDistance <= 2 && compactQuery.length >= 5) {
-        return boost(940 - (nameDistance * 70));
-      }
-      if (compactName.startsWith(compactQuery)) {
-        return boost(760);
-      }
-      final fuzzyName = _fuzzyPrefixScore(compactName, compactQuery);
-      if (fuzzyName > 0) {
-        return boost(fuzzyName);
-      }
-      final fuzzySet = _fuzzyPrefixScore(compactSet, compactQuery);
-      if (fuzzySet > 0) {
-        return boost(fuzzySet ~/ 2);
-      }
-    }
-    if (terms.length > 1 && terms.every(haystack.contains)) {
-      var score = 520;
-      var matchedName = false;
-      var matchedSet = false;
-      var matchedNumber = false;
-      for (final term in terms) {
-        if (number == term) {
-          score += 220;
-          matchedNumber = true;
-        } else if (number.startsWith(term)) {
-          score += 190;
-          matchedNumber = true;
-        } else if (_wordStartsWith(number, term)) {
-          score += 170;
-          matchedNumber = true;
-        } else if (number.contains(term)) {
-          score += 140;
-          matchedNumber = true;
-        } else if (name.startsWith(term)) {
-          score += 190;
-          matchedName = true;
-        } else if (_wordStartsWith(name, term)) {
-          score += 150;
-          matchedName = true;
-        } else if (name.contains(term)) {
-          score += 80;
-          matchedName = true;
-        } else if (set.startsWith(term)) {
-          score += 180;
-          matchedSet = true;
-        } else if (_wordStartsWith(set, term)) {
-          score += 160;
-          matchedSet = true;
-        } else if (set.contains(term)) {
-          score += 120;
-          matchedSet = true;
-        } else if (trainerName == term) {
-          score += 210;
-          matchedName = true;
-        } else if (trainerName.startsWith(term)) {
-          score += 170;
-          matchedName = true;
-        } else if (trainerName.contains(term)) {
-          score += 120;
-          matchedName = true;
-        }
-      }
-      if (matchedName && matchedSet) {
-        score += 140;
-      }
-      if (matchedNumber && matchedName) {
-        score += 180;
-      } else if (matchedNumber && matchedSet) {
-        score += 120;
-      }
-      return boost(score);
-    }
-    if (terms.length > 1 && hasRarityTerm && hasTextTerm) {
-      var score = 420;
-      var matchedName = false;
-      var matchedRarity = false;
-      for (final term in terms) {
-        if (_isRaritySearchTerm(term)) {
-          if (_cardHasRarityHint(card, term)) {
-            score += 420;
-            matchedRarity = true;
-          }
-        } else if (name.startsWith(term)) {
-          score += 260;
-          matchedName = true;
-        } else if (_wordStartsWith(name, term)) {
-          score += 220;
-          matchedName = true;
-        } else if (name.contains(term)) {
-          score += 160;
-          matchedName = true;
-        }
-      }
-      if (matchedName && matchedRarity) {
-        return boost(score);
-      }
-    }
-    if (name.startsWith(query)) {
-      return boost(isPokemonIdentity ? 1120 : 800);
-    }
-    if (name.contains(query)) {
-      return boost(600);
-    }
-    if (number.contains(query)) {
-      return boost(700);
-    }
-    if (set.contains(query)) {
-      return boost(isPokemonIdentity ? 260 : 350);
-    }
-    if (trainerName == query) {
-      return boost(760);
-    }
-    if (trainerName.startsWith(query)) {
-      return boost(640);
-    }
-    if (trainerName.contains(query)) {
-      return boost(480);
-    }
-    if (tags.contains(query)) {
-      return boost(180);
-    }
-    if (_canUseLooseCoverageFallback(
-      terms: terms,
-      compactQuery: compactQuery,
-      hasStructuredIntent: hasTextTerm &&
-          (hasNumberTerm ||
-              hasVariationTerm ||
-              hasRarityTerm ||
-              hasExpansionAliasTerm),
-      nameCoverageBonus: nameCoverageBonus,
-      coverageBonus: coverageBonus,
-    )) {
-      return coverageBonus;
-    }
-    return 0;
   }
 
-  bool _isPokemonIdentityCard(PokemonCard card) {
-    if (card.itemKind == 'product') {
-      return false;
+  String _ensureSearchSession(String query) {
+    final trimmedQuery = query.trim();
+    final current = _searchSessionId;
+    if (current != null && current.isNotEmpty) {
+      _lastSearchSessionQuery = trimmedQuery;
+      return current;
     }
-    final type = card.type.toLowerCase();
-    if (type.isEmpty || type == 'card') {
-      return false;
-    }
-    return !RegExp(
-            r'\b(trainer|supporter|item|stadium|energy|accessory|product|sealed)\b')
-        .hasMatch(type);
-  }
-
-  bool _isLikelyNameTokenTypo(String name, String term) {
-    final compactTerm = term.replaceAll(RegExp(r'[^a-z0-9]'), '');
-    if (compactTerm.length < 3) {
-      return false;
-    }
-    return _searchTerms(name).any((word) {
-      final compactWord = word.replaceAll(RegExp(r'[^a-z0-9]'), '');
-      if (compactWord.length < 3) {
-        return false;
-      }
-      if (compactWord.startsWith(compactTerm) ||
-          compactTerm.startsWith(compactWord)) {
-        return true;
-      }
-      final maxDistance = compactTerm.length <= 4 ? 1 : 2;
-      return _boundedDamerauLevenshtein(
-            compactWord,
-            compactTerm,
-            maxDistance,
-          ) <=
-          maxDistance;
+    _searchSessionSequence += 1;
+    final id =
+        'flutter-${DateTime.now().microsecondsSinceEpoch}-$_searchSessionSequence';
+    _searchSessionId = id;
+    _lastSearchSessionQuery = trimmedQuery;
+    SearchDebugTrace.instance.record('provider.search_session.start', {
+      'searchSessionId': id,
+      'query': trimmedQuery,
     });
+    return id;
   }
 
-  bool _canUseLooseCoverageFallback({
-    required List<String> terms,
-    required String compactQuery,
-    required bool hasStructuredIntent,
-    required int nameCoverageBonus,
-    required int coverageBonus,
-  }) {
-    if (coverageBonus < 220 || compactQuery.isEmpty) {
-      return false;
+  void _cancelSearchSession({required String reason}) {
+    final id = _searchSessionId;
+    if (id == null || id.isEmpty) {
+      _lastSearchSessionQuery = '';
+      return;
     }
-
-    // Query parts like "232", "ex", "v", or "sir" are structured intent, not
-    // free text. Do not let ordered-character matching override exact fields.
-    if (hasStructuredIntent) {
-      return false;
-    }
-
-    // For complete single-word names, loose ordered-character coverage across
-    // name + set + tags admits unrelated cards like "Pokemon Communication" for
-    // "porygon". Keep it only for short in-progress typing and strong name hits.
-    if (terms.length <= 1 && compactQuery.length >= 5) {
-      return nameCoverageBonus >= 260;
-    }
-
-    return true;
-  }
-
-  int _fuzzyPrefixScore(String target, String query) {
-    if (query.isEmpty || target.isEmpty) {
-      return 0;
-    }
-    final windowLength = math.min(target.length, math.max(query.length + 2, 3));
-    final window = target.substring(0, windowLength);
-    final subsequence = _orderedCharacterMatchScore(window, query);
-    if (subsequence > 0) {
-      return subsequence;
-    }
-    final prefix = target.substring(0, math.min(target.length, query.length));
-    final prefixDistance = _boundedDamerauLevenshtein(prefix, query, 2);
-    if (prefixDistance <= 1) {
-      return 700 - (prefixDistance * 80);
-    }
-    final distance = _boundedDamerauLevenshtein(window, query, 2);
-    if (distance <= 1) {
-      return 720 - (distance * 80);
-    }
-    if ((target.length - query.length).abs() <= 2) {
-      final fullDistance = _boundedDamerauLevenshtein(target, query, 2);
-      if (fullDistance <= 1) {
-        return 720 - (fullDistance * 80);
-      }
-      if (fullDistance == 2 && query.length >= 5) {
-        return 520;
-      }
-    }
-    if (distance == 2 && query.length >= 3) {
-      return 520;
-    }
-    return 0;
-  }
-
-  int _orderedCharacterMatchScore(String target, String query) {
-    var targetIndex = 0;
-    var gaps = 0;
-    for (final codeUnit in query.codeUnits) {
-      final nextIndex =
-          target.indexOf(String.fromCharCode(codeUnit), targetIndex);
-      if (nextIndex < 0) {
-        return 0;
-      }
-      gaps += nextIndex - targetIndex;
-      targetIndex = nextIndex + 1;
-    }
-    return math.max(420, 700 - (gaps * 40));
-  }
-
-  int _characterCoverageScore(String target, String query) {
-    if (target.isEmpty || query.isEmpty) {
-      return 0;
-    }
-    var targetIndex = 0;
-    var matched = 0;
-    var gaps = 0;
-    for (final codeUnit in query.codeUnits) {
-      final nextIndex =
-          target.indexOf(String.fromCharCode(codeUnit), targetIndex);
-      if (nextIndex < 0) {
-        continue;
-      }
-      matched += 1;
-      gaps += nextIndex - targetIndex;
-      targetIndex = nextIndex + 1;
-    }
-    if (matched == 0) {
-      return 0;
-    }
-    final coverage = matched / query.length;
-    final matchedScore = matched * 34;
-    final coverageScore = (coverage * 180).round();
-    return math.max(0, matchedScore + coverageScore - (gaps * 4));
-  }
-
-  int _boundedDamerauLevenshtein(String a, String b, int maxDistance) {
-    if ((a.length - b.length).abs() > maxDistance) {
-      return maxDistance + 1;
-    }
-    final matrix = List.generate(
-      a.length + 1,
-      (i) => List<int>.filled(b.length + 1, 0),
-    );
-    for (var i = 0; i <= a.length; i += 1) {
-      matrix[i][0] = i;
-    }
-    for (var j = 0; j <= b.length; j += 1) {
-      matrix[0][j] = j;
-    }
-    for (var i = 1; i <= a.length; i += 1) {
-      var rowMin = maxDistance + 1;
-      for (var j = 1; j <= b.length; j += 1) {
-        final cost = a.codeUnitAt(i - 1) == b.codeUnitAt(j - 1) ? 0 : 1;
-        var value = math.min(
-          math.min(matrix[i - 1][j] + 1, matrix[i][j - 1] + 1),
-          matrix[i - 1][j - 1] + cost,
-        );
-        if (i > 1 &&
-            j > 1 &&
-            a.codeUnitAt(i - 1) == b.codeUnitAt(j - 2) &&
-            a.codeUnitAt(i - 2) == b.codeUnitAt(j - 1)) {
-          value = math.min(value, matrix[i - 2][j - 2] + 1);
-        }
-        matrix[i][j] = value;
-        rowMin = math.min(rowMin, value);
-      }
-      if (rowMin > maxDistance) {
-        return maxDistance + 1;
-      }
-    }
-    return matrix[a.length][b.length];
+    final lastQuery = _lastSearchSessionQuery;
+    _searchSessionId = null;
+    _lastSearchSessionQuery = '';
+    SearchDebugTrace.instance.record('provider.search_session.cancel', {
+      'searchSessionId': id,
+      'query': lastQuery,
+      'reason': reason,
+    });
+    unawaited(_cardService.cancelSearchSession(
+      sessionId: id,
+      lastQuery: lastQuery,
+      reason: reason,
+    ));
   }
 
   PokemonCard? _findLoadedCard(String id) {
     for (final card in state.cards) {
       if (card.id == id) {
+        return card;
+      }
+    }
+    return null;
+  }
+
+  PokemonCard? _findLoadedCardBySlug(String slug) {
+    final normalizedSlug = normalizeCardDetailSlug(slug);
+    if (normalizedSlug.isEmpty) {
+      return null;
+    }
+    for (final card in state.cards) {
+      if (cardDetailSlugsMatch(cardDetailSlug(card), normalizedSlug) ||
+          cardDetailSlugsMatch(legacyCardDetailSlug(card), normalizedSlug)) {
         return card;
       }
     }
@@ -1097,14 +2167,112 @@ class CardNotifier extends StateNotifier<CardState> {
       for (final card in current) card.id: card,
     };
     for (final card in incoming) {
-      byId[card.id] = card;
+      final existing = byId[card.id];
+      byId[card.id] = existing == null ? card : _mergeCard(existing, card);
     }
     return byId.values.toList();
+  }
+
+  PokemonCard _mergeCard(PokemonCard existing, PokemonCard incoming) {
+    return incoming.copyWith(
+      imageUrl: _preferRicherText(incoming.imageUrl, existing.imageUrl),
+      previewImageUrl:
+          _preferRicherText(incoming.previewImageUrl, existing.previewImageUrl),
+      homepageImageUrl: _preferRicherText(
+        incoming.homepageImageUrl,
+        existing.homepageImageUrl,
+      ),
+      rarity: _preferRicherLabel(incoming.rarity, existing.rarity, 'Card'),
+      type: _preferRicherLabel(incoming.type, existing.type, 'Card'),
+      description: _preferRicherDescription(
+        incoming.description,
+        existing.description,
+      ),
+      set: _preferRicherText(incoming.set, existing.set),
+      number: _preferRicherText(incoming.number, existing.number),
+      artist: _preferRicherText(incoming.artist, existing.artist),
+      tags: _mergeStringList(existing.tags, incoming.tags),
+      trainerName:
+          _preferRicherText(incoming.trainerName, existing.trainerName),
+      expansionSymbolUrl: _preferRicherText(
+        incoming.expansionSymbolUrl,
+        existing.expansionSymbolUrl,
+      ),
+      expansionLogoUrl: _preferRicherText(
+        incoming.expansionLogoUrl,
+        existing.expansionLogoUrl,
+      ),
+      cardPalette: incoming.cardPalette.isNotEmpty
+          ? incoming.cardPalette
+          : existing.cardPalette,
+      emoji: _preferRicherText(incoming.emoji, existing.emoji),
+    );
+  }
+
+  String _preferRicherText(String incoming, String existing) {
+    return incoming.trim().isNotEmpty ? incoming : existing;
+  }
+
+  String _preferRicherLabel(
+    String incoming,
+    String existing,
+    String generic,
+  ) {
+    final cleanIncoming = incoming.trim();
+    final cleanExisting = existing.trim();
+    if (cleanIncoming.isEmpty) return existing;
+    if (cleanExisting.isNotEmpty &&
+        _isGenericCardLabel(cleanIncoming, generic)) {
+      return existing;
+    }
+    return incoming;
+  }
+
+  bool _isGenericCardLabel(String value, String generic) {
+    final normalized = value.toLowerCase();
+    return normalized == generic.toLowerCase() ||
+        normalized == 'card' ||
+        normalized == 'trading card';
+  }
+
+  String _preferRicherDescription(String incoming, String existing) {
+    final cleanIncoming = incoming.trim();
+    final cleanExisting = existing.trim();
+    if (cleanIncoming.isEmpty) return existing;
+    if (cleanExisting.isNotEmpty && _isLightweightDescription(cleanIncoming)) {
+      return existing;
+    }
+    return incoming;
+  }
+
+  bool _isLightweightDescription(String description) {
+    final normalized = description.toLowerCase();
+    return normalized.contains('full blueprint data is loaded') ||
+        normalized.contains('autocomplete projection') ||
+        normalized.contains('hot marketplace analytics') ||
+        normalized.contains('saved from your recent marketplace views');
+  }
+
+  List<String> _mergeStringList(List<String> existing, List<String> incoming) {
+    final seen = <String>{};
+    final merged = <String>[];
+    for (final value in [...incoming, ...existing]) {
+      final clean = value.trim();
+      if (clean.isEmpty || !seen.add(clean.toLowerCase())) {
+        continue;
+      }
+      merged.add(value);
+    }
+    return merged;
   }
 
   bool _matchesSearchTerms(PokemonCard card, List<String> terms) {
     if (terms.isEmpty) {
       return true;
+    }
+    if (terms.length == 1 && _isVariationSearchTerm(terms.first)) {
+      return _cardHasVariation(card, terms.first) ||
+          (terms.first == 'vstar' && _cardHasSetToken(card, terms.first));
     }
     final haystack = [
       card.name,
@@ -1116,17 +2284,27 @@ class CardNotifier extends StateNotifier<CardState> {
     return terms.every(haystack.contains);
   }
 
+  bool _isStandaloneVariationQuery(String query) {
+    final terms = _searchTerms(query);
+    return terms.length == 1 && _isVariationSearchTerm(terms.first);
+  }
+
   List<String> _searchTerms(String query) {
     return _normalizeVariationSearchPhrases(query)
         .toLowerCase()
+        .replaceAllMapped(
+          RegExp(r'\b([a-z0-9]+)s\b'),
+          (match) => "${match.group(1)}'s",
+        )
         .split(RegExp(r'[^a-z0-9]+'))
         .map((term) => term.trim())
-        .where((term) => term.length >= 2 || term == 'v')
+        .where((term) => term.isNotEmpty)
         .toList();
   }
 
   String _normalizeVariationSearchPhrases(String value) {
     return value
+        .replaceAll('&', ' tagteam ')
         .replaceAll(RegExp(r'\blv\s*\.?\s*x\b', caseSensitive: false), 'lvx')
         .replaceAll(RegExp(r'\blevel\s+x\b', caseSensitive: false), 'lvx')
         .replaceAll(RegExp(r'\bv\s*max\b', caseSensitive: false), 'vmax')
@@ -1150,201 +2328,941 @@ class CardNotifier extends StateNotifier<CardState> {
       'shining',
       'shiny',
       'prime',
+      'tagteam',
     };
     return variations.contains(term.replaceAll(RegExp(r'[^a-z0-9]'), ''));
   }
 
   bool _cardHasVariation(PokemonCard card, String term) {
+    return _previewCardHasVariation(card, term);
+  }
+
+  bool _cardHasSetToken(PokemonCard card, String term) {
     final normalizedTerm = term.replaceAll(RegExp(r'[^a-z0-9]'), '');
-    final text = [
-      card.name,
-      card.rarity,
-      card.type,
-      card.productType,
-      ...card.tags,
-    ].join(' ').toLowerCase();
-    final compact = text.replaceAll(RegExp(r'[^a-z0-9]'), '');
-    switch (normalizedTerm) {
-      case 'lvx':
-        return RegExp(r'(^|[^a-z0-9])(lv\.?x|level x)([^a-z0-9]|$)')
-            .hasMatch(text);
-      case 'lv':
-        return RegExp(r'(^|[^a-z0-9])lv\.?([0-9]+|x)([^a-z0-9]|$)')
-            .hasMatch(text);
-      case 'v':
-        return RegExp(r'(^|[^a-z0-9])v([^a-z0-9]|$)').hasMatch(text);
-      default:
-        return RegExp('(^|[^a-z0-9])$normalizedTerm([^a-z0-9]|\$)')
-                .hasMatch(text) ||
-            compact.contains(normalizedTerm);
-    }
-  }
-
-  bool _isRaritySearchTerm(String term) {
-    const rarities = {
-      'sir',
-      'ir',
-      'ur',
-      'sr',
-      'rare',
-      'ultra',
-      'secret',
-      'illustration',
-      'holo',
-      'shiny',
-    };
-    return rarities.contains(term.replaceAll(RegExp(r'[^a-z0-9]'), ''));
-  }
-
-  bool _cardHasRarityHint(PokemonCard card, String term) {
-    final normalizedTerm = term.replaceAll(RegExp(r'[^a-z0-9]'), '');
-    final text = [
-      card.number,
-      card.rarity,
-      ...card.tags,
-    ].join(' ').toLowerCase();
-    final normalizedText = text.replaceAll(RegExp(r'[^a-z0-9]+'), ' ').trim();
-    switch (normalizedTerm) {
-      case 'sir':
-        return normalizedText.contains('special illustration rare');
-      case 'ir':
-        return normalizedText.contains('illustration rare');
-      case 'ur':
-      case 'ultra':
-        return normalizedText.contains('ultra rare');
-      case 'sr':
-      case 'secret':
-        return normalizedText.contains('secret rare');
-      default:
-        return normalizedText.contains(normalizedTerm);
-    }
-  }
-
-  List<String> _expansionAliasTargets(String term) {
-    const aliases = {
-      'col': ['calloflegends'],
-      'calllegends': ['calloflegends'],
-      'calloflegends': ['calloflegends'],
-      '151': ['151', 'pokemoncard151', 'collect151'],
-      'pokemon151': ['pokemoncard151'],
-      'pokemoncard151': ['pokemoncard151'],
-      'collect151': ['collect151'],
-      'cel': ['celebrations'],
-      'pal': ['paldeaevolved'],
-      'obf': ['obsidianflames'],
-      'obs': ['obsidianflames'],
-      'svi': ['scarletviolet'],
-      'sv': ['scarletviolet'],
-    };
-    return aliases[term.replaceAll(RegExp(r'[^a-z0-9]'), '')] ?? const [];
-  }
-
-  bool _isExpansionAliasSearchTerm(String term) {
-    return _expansionAliasTargets(term).isNotEmpty;
-  }
-
-  bool _cardHasExpansionAlias(PokemonCard card, String term) {
-    final compactSet =
-        card.set.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
-    return _expansionAliasTargets(term).any(
-      (target) =>
-          compactSet == target ||
-          compactSet.startsWith(target) ||
-          target.startsWith(compactSet),
-    );
-  }
-
-  bool _isLikelyNameTypo(String compactName, String compactTerm) {
-    if (compactTerm.length < 5 || compactName.isEmpty) {
+    if (normalizedTerm.isEmpty) {
       return false;
     }
-    return compactName.startsWith(compactTerm.substring(0, 2)) &&
-        _boundedDamerauLevenshtein(compactName, compactTerm, 3) <= 3;
+    return RegExp('(^|[^a-z0-9])$normalizedTerm([^a-z0-9]|\$)')
+        .hasMatch(card.set.toLowerCase());
   }
 
   int _meaningfulSearchLength(String query) {
     return RegExp(r'[a-z0-9]', caseSensitive: false).allMatches(query).length;
   }
+}
 
-  List<String> _searchQueryVariants(Iterable<String> queries) {
-    final variants = <String>[];
-    for (final query in queries) {
-      final normalized = query.trim().toLowerCase();
-      if (normalized.length < 2) {
-        continue;
-      }
-      _addUnique(variants, normalized);
-      _addUnique(variants, _expandCompactSearchAliases(normalized));
-      for (final trainerVariant in _trainerQueryVariants(normalized)) {
-        _addUnique(variants, trainerVariant);
-      }
-      for (final alias in _raritySearchAliases.entries) {
-        if (_containsCompactAlias(normalized, alias.key)) {
-          _addUnique(variants, alias.value);
-          _addUnique(
-            variants,
-            _expandCompactSearchAliases(
-              normalized.replaceAll(alias.key, alias.value),
-            ),
-          );
-        }
-      }
+int _searchPreviewCandidateIdLimit(String query) {
+  final depth =
+      RegExp(r'[a-z0-9]', caseSensitive: false).allMatches(query).length;
+  if (depth <= 1) {
+    return searchPreviewHotCacheLimit;
+  }
+  if (depth == 2) {
+    return 5000;
+  }
+  if (depth == 3) {
+    return 2500;
+  }
+  if (depth == 4) {
+    return 1250;
+  }
+  return 500;
+}
+
+String searchCompletionForQuery(String query, String predictedToken) {
+  final typed = query.trim();
+  final predicted = predictedToken.trim();
+  if (typed.isEmpty || predicted.isEmpty) {
+    return '';
+  }
+  final compactTyped = _compactSearchCompletionText(typed);
+  final compactPredicted = _compactSearchCompletionText(predicted);
+  if (compactTyped.isNotEmpty &&
+      compactTyped.length < compactPredicted.length &&
+      compactPredicted.startsWith(compactTyped)) {
+    return predicted;
+  }
+  final match = RegExp(r"([A-Za-z0-9][A-Za-z0-9'\-]*)\s*$").firstMatch(typed);
+  if (match == null) {
+    return '';
+  }
+  final fragment = match.group(1) ?? '';
+  if (fragment.isEmpty ||
+      fragment.length >= predicted.length ||
+      !predicted.toLowerCase().startsWith(fragment.toLowerCase())) {
+    return '';
+  }
+  return '${typed.substring(0, match.start)}$predicted';
+}
+
+String _compactSearchCompletionText(String value) {
+  return value
+      .replaceAll('&', ' tagteam ')
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9]'), '');
+}
+
+int searchCompletionSuffixStart(String typedQuery, String completionText) {
+  final typed = typedQuery.trim();
+  final completion = completionText.trim();
+  if (typed.isEmpty || completion.isEmpty) {
+    return 0;
+  }
+  final lowerCompletion = completion.toLowerCase();
+  if (lowerCompletion.startsWith(typed.toLowerCase())) {
+    return typed.length;
+  }
+  final compactTyped = _compactSearchCompletionText(typed);
+  final compactCompletion = _compactSearchCompletionText(completion);
+  if (compactTyped.isEmpty ||
+      compactTyped.length >= compactCompletion.length ||
+      !compactCompletion.startsWith(compactTyped)) {
+    return 0;
+  }
+  var compactOffset = 0;
+  for (var index = 0; index < completion.length; index += 1) {
+    final char = completion[index];
+    if (_compactSearchCompletionText(char).isEmpty) {
+      continue;
     }
-    return variants;
-  }
-
-  String _expandCompactSearchAliases(String query) {
-    var expanded = query;
-    for (final alias in _raritySearchAliases.entries) {
-      expanded = expanded.replaceAllMapped(
-        RegExp('(^|[^a-z0-9])${alias.key}([^a-z0-9]|\$)'),
-        (match) => '${match.group(1)}${alias.value}${match.group(2)}',
-      );
+    compactOffset += 1;
+    if (compactOffset >= compactTyped.length) {
+      return index + 1;
     }
-    return expanded.replaceAll(RegExp(r'\s+'), ' ').trim();
+  }
+  return 0;
+}
+
+class _SearchPrefixPool {
+  const _SearchPrefixPool({
+    required this.key,
+    required this.query,
+    required this.language,
+    required this.sessionId,
+    required this.cardIds,
+    required this.depth,
+    required this.updatedAtMs,
+    required this.depthScores,
+    required this.latestDepths,
+    required this.latestOrders,
+  });
+
+  final String key;
+  final String query;
+  final String language;
+  final String sessionId;
+  final List<String> cardIds;
+  final int depth;
+  final int updatedAtMs;
+  final Map<String, int> depthScores;
+  final Map<String, int> latestDepths;
+  final Map<String, int> latestOrders;
+}
+
+List<PokemonCard> _searchPreviewFallbackRowsFromPrefixPools({
+  required String query,
+  required String language,
+  required String sessionId,
+  required Iterable<_SearchPrefixPool> pools,
+  required Map<String, List<PokemonCard>> retainedRowsByScope,
+  required Map<String, SearchCandidateLabel> labelsById,
+  int limit = searchPreviewLimit,
+}) {
+  final normalizedQuery = _normalizePrefixPoolQuery(query);
+  final normalizedLanguage = language.trim().toLowerCase();
+  final normalizedSessionId = sessionId.trim();
+  if (normalizedQuery.isEmpty ||
+      normalizedLanguage.isEmpty ||
+      normalizedSessionId.isEmpty) {
+    return const [];
   }
 
-  bool _containsCompactAlias(String query, String alias) {
-    return RegExp('(^|[^a-z0-9])$alias([^a-z0-9]|\$)').hasMatch(query);
+  final compatiblePools = pools
+      .where(
+        (pool) =>
+            pool.language == normalizedLanguage &&
+            pool.sessionId == normalizedSessionId &&
+            _prefixPoolQueryExtends(pool.query, normalizedQuery),
+      )
+      .toList(growable: false);
+  if (compatiblePools.isEmpty) {
+    return const [];
   }
 
-  List<String> _trainerQueryVariants(String query) {
-    final terms = _searchTerms(query);
-    if (terms.length < 2) {
+  _SearchPrefixPool? latestCompatiblePool;
+  for (final pool in compatiblePools) {
+    final current = latestCompatiblePool;
+    if (current == null ||
+        pool.depth > current.depth ||
+        (pool.depth == current.depth &&
+            pool.updatedAtMs > current.updatedAtMs)) {
+      latestCompatiblePool = pool;
+    }
+  }
+  final pool = latestCompatiblePool;
+  if (pool == null) {
+    return const [];
+  }
+
+  final retainedRowsById = <String, PokemonCard>{};
+  for (final card in retainedRowsByScope[pool.key] ?? const <PokemonCard>[]) {
+    retainedRowsById.putIfAbsent(card.id, () => card);
+  }
+
+  final seen = <String>{};
+  final candidates = <_SearchPreviewFallbackCandidate>[];
+  for (var index = 0; index < pool.cardIds.length; index += 1) {
+    final id = pool.cardIds[index];
+    if (id.isEmpty || !seen.add(id)) {
+      continue;
+    }
+    final card =
+        retainedRowsById[id] ?? _placeholderCardFromLabel(labelsById[id]);
+    if (card == null) {
+      continue;
+    }
+    candidates.add(_SearchPreviewFallbackCandidate(
+      card: card,
+      latestDepth: pool.latestDepths[id] ?? pool.depth,
+      depthScore: pool.depthScores[id] ?? pool.depth,
+      order: pool.latestOrders[id] ?? index,
+    ));
+  }
+
+  final terms = _typedPreviewTerms(normalizedQuery);
+  final filtered = terms.any(_isNumericPreviewTerm)
+      ? _filterPrefixPoolCandidatesByStructuredSuffixes(candidates, terms)
+      : _filterFallbackCandidatesByTerms(candidates, terms);
+  if (filtered.isEmpty) {
+    if (normalizedQuery.length > pool.query.length &&
+        _prefixPoolQueryExtends(pool.query, normalizedQuery)) {
+      return candidates
+          .map((entry) => entry.card)
+          .take(limit)
+          .toList(growable: false);
+    }
+    return const [];
+  }
+
+  filtered.sort((a, b) => a.order.compareTo(b.order));
+  return filtered
+      .map((entry) => entry.card)
+      .take(limit)
+      .toList(growable: false);
+}
+
+String _normalizePrefixPoolQuery(String query) {
+  return query.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+}
+
+bool _prefixPoolQueryExtends(String previousQuery, String nextQuery) {
+  final previous = _normalizePrefixPoolQuery(previousQuery);
+  final next = _normalizePrefixPoolQuery(nextQuery);
+  if (previous.isEmpty || next.isEmpty || previous.length > next.length) {
+    return false;
+  }
+  return next.startsWith(previous);
+}
+
+List<_SearchPreviewFallbackCandidate>
+    _filterPrefixPoolCandidatesByStructuredSuffixes(
+  List<_SearchPreviewFallbackCandidate> candidates,
+  List<String> terms,
+) {
+  var narrowed = candidates;
+  final suffixTerms = terms.isNotEmpty && _isNumericPreviewTerm(terms.first)
+      ? terms
+      : terms.skip(1);
+  for (final term in suffixTerms) {
+    if (_isNumericPreviewTerm(term)) {
+      narrowed = narrowed
+          .where((candidate) => _previewCardMatchesNumber(candidate.card, term))
+          .toList(growable: false);
+    } else {
+      narrowed = _refineFallbackCandidatesByToken(narrowed, term);
+    }
+    if (narrowed.isEmpty) {
       return const [];
     }
-    final variants = <String>[];
-    for (var i = 0; i < terms.length; i += 1) {
-      final canonicalTrainer = _trainerSearchAliases[terms[i]];
-      if (canonicalTrainer == null) {
-        continue;
-      }
-      final pokemonTerms = [
-        for (var j = 0; j < terms.length; j += 1)
-          if (j != i && !_ownershipStopWords.contains(terms[j])) terms[j],
+  }
+  return narrowed;
+}
+
+List<PokemonCard> _searchPreviewFallbackRows({
+  required String query,
+  required List<PokemonCard> retainedRows,
+  required SearchAutocompleteContext? context,
+  List<SearchCandidateLabel> labels = const [],
+  Map<String, int> latestDepths = const {},
+  Map<String, int> depthScores = const {},
+  Map<String, int> latestOrders = const {},
+  int limit = searchPreviewLimit,
+}) {
+  final terms = _typedPreviewTerms(query);
+  if (terms.isEmpty) {
+    return const [];
+  }
+  final contextIds = context?.cardIds ?? const <String>[];
+  if (contextIds.isEmpty) {
+    return const [];
+  }
+  final contextIdSet = contextIds.toSet();
+  final mergedDepthScores = <String, int>{
+    ...depthScores,
+    ...?context?.depthScores,
+  };
+  final mergedLatestDepths = <String, int>{
+    ...latestDepths,
+    ...?context?.latestDepths,
+  };
+  final mergedLatestOrders = <String, int>{
+    ...latestOrders,
+    ...?context?.latestOrders,
+  };
+  final idOrder = <String, int>{
+    for (var index = 0; index < contextIds.length; index += 1)
+      contextIds[index]: index,
+  };
+  final byId = <String, PokemonCard>{};
+  for (final card in retainedRows) {
+    if (contextIdSet.contains(card.id) && !byId.containsKey(card.id)) {
+      byId[card.id] = card;
+    }
+  }
+  final labelsById = <String, SearchCandidateLabel>{};
+  for (final label in [
+    ...?context?.candidateLabels,
+    ...labels,
+  ]) {
+    if (contextIdSet.contains(label.id) && label.name.isNotEmpty) {
+      labelsById[label.id] = label;
+    }
+  }
+  final seen = <String>{};
+  final candidates = <_SearchPreviewFallbackCandidate>[];
+  for (final id in contextIds) {
+    if (id.isEmpty || !seen.add(id)) {
+      continue;
+    }
+    final card = byId[id] ?? _placeholderCardFromLabel(labelsById[id]);
+    if (card == null) {
+      continue;
+    }
+    candidates.add(_SearchPreviewFallbackCandidate(
+      card: card,
+      latestDepth: mergedLatestDepths[id] ?? 0,
+      depthScore: mergedDepthScores[id] ?? 0,
+      order: mergedLatestOrders[id] ??
+          idOrder[id] ??
+          (1 << 20) + candidates.length,
+    ));
+  }
+  final ranked = _rankedPoolCandidatesForNumericTerms(terms, candidates) ??
+      _filterFallbackCandidatesByTerms(candidates, terms);
+  final filtered = terms.any(_isNumericPreviewTerm)
+      ? _filterPrefixPoolCandidatesByStructuredSuffixes(ranked, terms)
+      : ranked;
+  if (filtered.isEmpty) {
+    final contextQuery = _normalizePrefixPoolQuery(context?.query ?? '');
+    final fallbackQuery = _normalizePrefixPoolQuery(query);
+    if (contextQuery.length < fallbackQuery.length &&
+        _prefixPoolQueryExtends(contextQuery, fallbackQuery)) {
+      return candidates
+          .map((entry) => entry.card)
+          .take(limit)
+          .toList(growable: false);
+    }
+    return const [];
+  }
+  return filtered
+      .map((entry) => entry.card)
+      .take(limit)
+      .toList(growable: false);
+}
+
+List<_SearchPreviewFallbackCandidate>? _rankedPoolCandidatesForNumericTerms(
+  List<String> terms,
+  List<_SearchPreviewFallbackCandidate> candidates,
+) {
+  if (terms.isEmpty ||
+      candidates.isEmpty ||
+      !terms.any(_isNumericPreviewTerm)) {
+    return null;
+  }
+  final ranked = candidates
+      .where(
+        (candidate) =>
+            candidate.latestDepth > 0 ||
+            candidate.depthScore > 0 ||
+            candidate.order < (1 << 20),
+      )
+      .toList(growable: false);
+  return ranked.isEmpty ? null : ranked;
+}
+
+bool _isNumericPreviewTerm(String term) {
+  return RegExp(r'^[0-9]+[a-z]*$').hasMatch(term);
+}
+
+class _SearchPreviewFallbackCandidate {
+  const _SearchPreviewFallbackCandidate({
+    required this.card,
+    required this.latestDepth,
+    required this.depthScore,
+    required this.order,
+  });
+
+  final PokemonCard card;
+  final int latestDepth;
+  final int depthScore;
+  final int order;
+}
+
+List<_SearchPreviewFallbackCandidate> _filterFallbackCandidatesByTerms(
+  List<_SearchPreviewFallbackCandidate> candidates,
+  List<String> terms,
+) {
+  if (terms.isEmpty || candidates.isEmpty) {
+    return candidates;
+  }
+  if (terms.length == 1) {
+    return candidates
+        .where(
+          (candidate) => _previewCardMatchesSingleFallbackTerm(
+              candidate.card, terms.first),
+        )
+        .toList(growable: false);
+  }
+  var narrowed = candidates
+      .where(
+        (candidate) =>
+            _previewCardMatchesNameOrBroadTerm(candidate.card, terms.first),
+      )
+      .toList(growable: false);
+  if (narrowed.isEmpty) {
+    return const [];
+  }
+  for (final term in terms.skip(1)) {
+    narrowed = _refineFallbackCandidatesByToken(narrowed, term);
+    if (narrowed.isEmpty) {
+      return const [];
+    }
+  }
+  return narrowed;
+}
+
+List<_SearchPreviewFallbackCandidate> _refineFallbackCandidatesByToken(
+  List<_SearchPreviewFallbackCandidate> candidates,
+  String term,
+) {
+  if (term.isEmpty || candidates.isEmpty) {
+    return candidates;
+  }
+  final completedVariationMatches = _isPreviewVariationSearchTerm(term)
+      ? candidates
+          .where((candidate) => _previewCardHasVariation(candidate.card, term))
+          .toList(growable: false)
+      : const <_SearchPreviewFallbackCandidate>[];
+  if (_isPreviewVariationSearchTerm(term)) {
+    return completedVariationMatches;
+  }
+
+  final layers = [
+    candidates
+        .where(
+            (candidate) => _previewCardHasVariationPrefix(candidate.card, term))
+        .toList(growable: false),
+    candidates
+        .where((candidate) =>
+            _previewCardMatchesOwnerVariation(candidate.card, term))
+        .toList(growable: false),
+    candidates
+        .where((candidate) => _previewCardMatchesNumber(candidate.card, term))
+        .toList(growable: false),
+    candidates
+        .where((candidate) =>
+            _previewCardMatchesExpansionAlias(candidate.card, term))
+        .toList(growable: false),
+    candidates
+        .where((candidate) => _previewCardMatchesSetName(candidate.card, term))
+        .toList(growable: false),
+    candidates
+        .where((candidate) => _previewCardMatchesRarity(candidate.card, term))
+        .toList(growable: false),
+    if (term.length >= 3)
+      candidates
+          .where(
+            (candidate) =>
+                _previewCardMatchesTypedTerms(candidate.card, [term]),
+          )
+          .toList(growable: false),
+  ];
+  for (final layer in layers) {
+    if (layer.isNotEmpty) {
+      return layer;
+    }
+  }
+  return const [];
+}
+
+PokemonCard? _placeholderCardFromLabel(SearchCandidateLabel? label) {
+  if (label == null || label.id.isEmpty || label.name.isEmpty) {
+    return null;
+  }
+  final itemKind = label.itemKind == 'product' ? 'product' : 'single';
+  final productType = label.productType.isEmpty ? 'card' : label.productType;
+  final type = itemKind == 'product' ? _productTypeLabel(productType) : 'Card';
+  return PokemonCard(
+    id: label.id,
+    name: label.name,
+    imageUrl: '',
+    previewImageUrl: '',
+    rarity: itemKind == 'product' ? type : 'Card',
+    type: type,
+    hp: 0,
+    attacks: const [],
+    price: 0,
+    description: 'Lightweight autocomplete preview.',
+    set: label.setName,
+    number: label.number,
+    artist: '',
+    stock: 0,
+    rating: 0,
+    reviewCount: 0,
+    isFoil: false,
+    isHolo: false,
+    releaseDate: DateTime.now(),
+    tags: [
+      type,
+      itemKind,
+      productType,
+      if (label.trainerName.isNotEmpty) label.trainerName,
+    ],
+    condition: 'NM',
+    isGraded: false,
+    itemKind: itemKind,
+    productType: productType,
+    trainerName: label.trainerName,
+  );
+}
+
+bool _previewCardMatchesSingleFallbackTerm(PokemonCard card, String term) {
+  if (term.isEmpty) {
+    return true;
+  }
+  if (_isPreviewVariationSearchTerm(term)) {
+    return _previewCardHasVariation(card, term);
+  }
+  final compactName = _compactPreviewField(card.name);
+  if (term.length >= 5) {
+    return compactName == term || compactName.startsWith(term);
+  }
+  final exactShortName = _previewDisplayTokens(card).any((token) {
+    return token == term ||
+        _compactPreviewField(card.name) == term ||
+        _compactPreviewField(card.trainerName) == term;
+  });
+  if (term.length <= 2) {
+    return exactShortName;
+  }
+  return exactShortName || _previewCardMatchesTypedTerms(card, [term]);
+}
+
+bool _previewCardMatchesNameOrBroadTerm(PokemonCard card, String term) {
+  if (term.isEmpty) {
+    return true;
+  }
+  if (_isPreviewVariationSearchTerm(term)) {
+    return _previewCardHasVariation(card, term);
+  }
+  if (term.length <= 2) {
+    return _previewDisplayTokens(card).any((token) => token == term) ||
+        _compactPreviewField(card.name) == term ||
+        _compactPreviewField(card.trainerName) == term;
+  }
+  return _previewCardMatchesTypedTerms(card, [term]);
+}
+
+bool _previewCardMatchesTypedTerms(PokemonCard card, List<String> terms) {
+  final fields = [
+    card.name,
+    card.set,
+    card.number,
+    card.trainerName,
+    card.rarity,
+    card.type,
+    card.productType,
+    ...card.tags,
+  ].where((field) => field.trim().isNotEmpty).toList();
+  if (fields.isEmpty) {
+    return false;
+  }
+  return terms.every(
+    (term) => fields.any(
+      (field) =>
+          _compactPreviewField(field) == term ||
+          _compactPreviewField(field).startsWith(term) ||
+          _previewFieldWords(field).any((word) => word.startsWith(term)),
+    ),
+  );
+}
+
+bool _previewCardHasVariationPrefix(PokemonCard card, String term) {
+  final normalizedTerm = _compactPreviewField(term);
+  if (normalizedTerm.isEmpty) {
+    return false;
+  }
+  for (final variation in _previewVariationTerms) {
+    if (variation.startsWith(normalizedTerm) &&
+        _previewCardHasVariation(card, variation)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool _previewCardMatchesNumber(PokemonCard card, String term) {
+  if (!RegExp(r'^[0-9]+[a-z]*$').hasMatch(term)) {
+    return false;
+  }
+  return _previewFieldWords(card.number).any(
+    (token) => token == term || token.startsWith(term),
+  );
+}
+
+bool _previewCardMatchesExpansionAlias(PokemonCard card, String term) {
+  final compactSet = _compactPreviewField(card.set);
+  if (compactSet.isEmpty) {
+    return false;
+  }
+  return _previewExpansionAliasTargets(term).any((target) {
+    return compactSet == target ||
+        compactSet.startsWith(target) ||
+        target.startsWith(compactSet);
+  });
+}
+
+bool _previewCardMatchesSetName(PokemonCard card, String term) {
+  return _previewFieldWords(card.set).any(
+    (token) => token == term || token.startsWith(term),
+  );
+}
+
+bool _previewCardMatchesOwnerVariation(PokemonCard card, String term) {
+  final normalizedTerm = _compactPreviewField(term);
+  if (normalizedTerm.isEmpty) {
+    return false;
+  }
+  final trainerTokens = _previewFieldWords(card.trainerName);
+  if (trainerTokens.any((token) => token == term || token.startsWith(term))) {
+    return true;
+  }
+  final name = card.name.toLowerCase();
+  return RegExp('(^|[^a-z0-9])$normalizedTerm\\s*\'s([^a-z0-9]|\$)')
+      .hasMatch(name);
+}
+
+bool _previewCardMatchesRarity(PokemonCard card, String term) {
+  final normalizedTerm = _previewRarityAlias(term);
+  final rarityWords = [
+    ..._previewFieldWords(card.rarity),
+    _compactPreviewField(card.rarity),
+    for (final tag in card.tags) ..._previewFieldWords(tag),
+    for (final tag in card.tags) _compactPreviewField(tag),
+  ].where((token) => token.isNotEmpty).toSet();
+  return rarityWords.any((token) {
+    return token == normalizedTerm ||
+        token.startsWith(normalizedTerm) ||
+        _previewRarityAlias(token) == normalizedTerm;
+  });
+}
+
+String _previewRarityAlias(String term) {
+  switch (_compactPreviewField(term)) {
+    case 'sar':
+    case 'sir':
+      return 'specialillustrationrare';
+    case 'ir':
+      return 'illustrationrare';
+    case 'ur':
+      return 'ultrarare';
+    case 'sr':
+      return 'secretrare';
+    case 'hr':
+      return 'hyperrare';
+    case 'dr':
+      return 'doublerare';
+    case 'ar':
+      return 'art';
+    default:
+      return _compactPreviewField(term);
+  }
+}
+
+bool _previewCardHasVariation(PokemonCard card, String term) {
+  final normalizedTerm = _compactPreviewField(term);
+  if (normalizedTerm.isEmpty) {
+    return false;
+  }
+  final targets = _previewVariationTargets(normalizedTerm);
+  if (targets.isNotEmpty && !targets.contains(normalizedTerm)) {
+    return targets.any((target) => _previewCardHasVariation(card, target));
+  }
+  final text = [
+    card.name,
+    card.rarity,
+    card.type,
+    card.productType,
+  ].join(' ').toLowerCase();
+  switch (normalizedTerm) {
+    case 'lvx':
+      return RegExp(r'(^|[^a-z0-9])(lv\.?x|level x)([^a-z0-9]|$)')
+              .hasMatch(text) ||
+          _previewCardHasExactTag(card, normalizedTerm);
+    case 'lv':
+      return RegExp(r'(^|[^a-z0-9])lv\.?([0-9]+|x)([^a-z0-9]|$)')
+              .hasMatch(text) ||
+          _previewCardHasExactTag(card, normalizedTerm);
+    case 'v':
+      return RegExp(r'(^|[^a-z0-9])v([^a-z0-9]|$)').hasMatch(text) ||
+          _previewCardHasExactTag(card, normalizedTerm);
+    case 'mega':
+      return RegExp(r'(^|[^a-z0-9])(mega|m)([^a-z0-9]|$)').hasMatch(text) ||
+          _previewCardHasExactTag(card, normalizedTerm);
+    case 'tagteam':
+      return RegExp(r'(^|[^a-z0-9])(tag\s*team|tagteam|&)([^a-z0-9]|$)')
+              .hasMatch(text) ||
+          _previewCardHasExactTag(card, normalizedTerm);
+    case 'goldstar':
+      return RegExp(r'(^|[^a-z0-9])(gold\s*star|goldstar)([^a-z0-9]|$)')
+              .hasMatch(text) ||
+          _previewCardHasExactTag(card, normalizedTerm);
+    case 'acespec':
+      return RegExp(r'(^|[^a-z0-9])(ace\s*spec|acespec)([^a-z0-9]|$)')
+              .hasMatch(text) ||
+          _previewCardHasExactTag(card, normalizedTerm);
+    default:
+      return RegExp('(^|[^a-z0-9])$normalizedTerm([^a-z0-9]|\$)')
+              .hasMatch(text) ||
+          _previewCardHasExactTag(card, normalizedTerm);
+  }
+}
+
+bool _previewCardHasExactTag(PokemonCard card, String normalizedTerm) {
+  return card.tags.any((tag) => _compactPreviewField(tag) == normalizedTerm);
+}
+
+bool _isPreviewVariationSearchTerm(String term) {
+  return _previewVariationTargets(term).isNotEmpty;
+}
+
+const Set<String> _previewVariationTerms = {
+  'ex',
+  'v',
+  'vmax',
+  'vstar',
+  'gx',
+  'lvx',
+  'lv',
+  'mega',
+  'break',
+  'radiant',
+  'shining',
+  'shiny',
+  'prime',
+  'tagteam',
+  'delta',
+  'goldstar',
+  'acespec',
+};
+
+List<String> _previewVariationTargets(String term) {
+  final normalizedTerm = _compactPreviewField(term);
+  if (normalizedTerm.isEmpty) {
+    return const [];
+  }
+  if (_previewVariationTerms.contains(normalizedTerm)) {
+    return [normalizedTerm];
+  }
+  if (normalizedTerm == 'g' ||
+      normalizedTerm == 'e' ||
+      normalizedTerm.length >= 2) {
+    return _previewVariationTerms
+        .where((variation) => variation.startsWith(normalizedTerm))
+        .toList(growable: false);
+  }
+  return const [];
+}
+
+List<String> _typedPreviewTerms(String query) {
+  return query
+      .replaceAll(RegExp(r'\bhearth\s+gold\b', caseSensitive: false),
+          'hearthgold')
+      .replaceAll(
+          RegExp(r'\bheart\s+gold\b', caseSensitive: false), 'heartgold')
+      .replaceAll(
+          RegExp(r'\bsoul\s+silver\b', caseSensitive: false), 'soulsilver')
+      .toLowerCase()
+      .split(RegExp(r'[^a-z0-9]+'))
+      .map(_compactPreviewField)
+      .where((term) => term.isNotEmpty)
+      .toList(growable: false);
+}
+
+List<String> _previewExpansionAliasTargets(String term) {
+  switch (_compactPreviewField(term)) {
+    case 'hgss':
+    case 'hgs':
+    case 'heartgold':
+    case 'hearthgold':
+    case 'heartgoldsoulsilver':
+    case 'soulsilver':
+      return const [
+        'heartgoldsoulsilver',
+        'unleashed',
+        'undaunted',
+        'triumphant',
+        'calloflegends',
       ];
-      if (pokemonTerms.isEmpty) {
-        _addUnique(variants, canonicalTrainer);
-        continue;
-      }
-      final pokemonQuery = pokemonTerms.join(' ');
-      _addUnique(variants, '$pokemonQuery $canonicalTrainer');
-      _addUnique(variants, '$canonicalTrainer $pokemonQuery');
-      _addUnique(variants, "$canonicalTrainer's $pokemonQuery");
-    }
-    return variants;
+    default:
+      return const [];
+  }
+}
+
+List<String> _previewDisplayTokens(PokemonCard card) {
+  return [
+    card.name,
+    card.trainerName,
+    card.productType,
+    card.itemKind,
+  ].expand(_previewFieldWords).toList(growable: false);
+}
+
+String _compactPreviewField(String value) {
+  return value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+}
+
+List<String> _previewFieldWords(String value) {
+  return value
+      .toLowerCase()
+      .split(RegExp(r'[^a-z0-9]+'))
+      .map(_compactPreviewField)
+      .where((word) => word.isNotEmpty)
+      .toList(growable: false);
+}
+
+List<PokemonCard> _emptyFocusPreviews(
+  List<PokemonCard> hotCards,
+  List<RecentCardView> recentViews,
+) {
+  if (hotCards.isEmpty && recentViews.isEmpty) {
+    return const [];
   }
 
-  void _addUnique(List<String> values, String value) {
-    final normalized = value.trim().toLowerCase();
-    if (normalized.length >= 2 && !values.contains(normalized)) {
-      values.add(normalized);
+  final byId = {for (final card in hotCards) card.id: card};
+  final previews = <PokemonCard>[];
+  final seen = <String>{};
+  for (final view in recentViews) {
+    final id = view.cardId.trim();
+    if (id.isEmpty || !seen.add(id)) {
+      continue;
+    }
+    previews.add(byId[id] ?? _cardFromRecentView(view));
+    if (previews.length >= searchPreviewLimit) {
+      return previews;
     }
   }
 
-  bool _wordStartsWith(String value, String term) {
-    return value
-        .split(RegExp(r'[^a-z0-9]+'))
-        .any((word) => word.startsWith(term));
+  for (final card in hotCards) {
+    if (card.id.isEmpty || !seen.add(card.id)) {
+      continue;
+    }
+    previews.add(card);
+    if (previews.length >= searchPreviewLimit) {
+      break;
+    }
   }
+  return previews;
+}
+
+List<PokemonCard> _remoteSearchResults(
+  Iterable<PokemonCard> results, {
+  int? limit,
+}) {
+  final seen = <String>{};
+  final ordered = <PokemonCard>[];
+  for (final card in results) {
+    final id = card.id.trim();
+    if (id.isEmpty || !seen.add(id)) {
+      continue;
+    }
+    ordered.add(card);
+    if (limit != null && ordered.length >= limit) {
+      break;
+    }
+  }
+  return ordered;
+}
+
+PokemonCard _cardFromRecentView(RecentCardView view) {
+  final isProduct = view.itemKind == 'product' || view.productType != 'card';
+  final type = isProduct ? _productTypeLabel(view.productType) : 'Card';
+  return PokemonCard(
+    id: view.cardId,
+    name: view.name,
+    imageUrl: view.imageUrl,
+    previewImageUrl: view.previewImageUrl,
+    homepageImageUrl: view.homepageImageUrl,
+    rarity: isProduct ? type : 'Card',
+    type: type,
+    hp: 0,
+    attacks: const [],
+    price: (1000 + (_recentViewSeed(view.cardId) % 120000)).toDouble(),
+    description: 'Saved from your recent marketplace views.',
+    set: view.expansion,
+    number: view.number,
+    artist: '',
+    stock: 0,
+    rating: 0,
+    reviewCount: 0,
+    isFoil: false,
+    isHolo: false,
+    releaseDate: view.viewedAt,
+    tags: [view.expansion, type, view.itemKind, view.productType],
+    condition: 'NM',
+    isGraded: false,
+    itemKind: isProduct ? 'product' : 'single',
+    productType: isProduct ? view.productType : 'card',
+  );
+}
+
+String _productTypeLabel(String productType) {
+  switch (productType) {
+    case 'booster_pack':
+      return 'Booster pack';
+    case 'booster_box':
+      return 'Booster box';
+    case 'booster_bundle':
+      return 'Booster bundle';
+    case 'elite_trainer_box':
+      return 'Elite Trainer Box';
+    case 'tin':
+      return 'Tin';
+    case 'collection_box':
+      return 'Collection box';
+    case 'deck':
+      return 'Deck';
+    case 'championship_deck':
+      return 'Championship deck';
+    case 'accessory':
+      return 'Accessory';
+    case 'sealed_product':
+      return 'Sealed product';
+    default:
+      return 'Card';
+  }
+}
+
+int _recentViewSeed(String value) {
+  return value.codeUnits.fold<int>(0, (sum, unit) => sum + unit * 31);
 }

@@ -1,0 +1,43 @@
+{
+  "generatedAt": "2026-05-23T07:53:54.693Z",
+  "mode": "apply",
+  "options": {
+    "limit": 1,
+    "source": "pocketmonsters",
+    "concurrency": 1,
+    "artist": "kuroimori",
+    "refreshExisting": false,
+    "cacheImages": true
+  },
+  "counts": {
+    "scanned": 1,
+    "matched": 1,
+    "upserted": 1,
+    "skipped": 0,
+    "ambiguous": 0,
+    "imageCached": 1,
+    "imageCacheNeeded": 0
+  },
+  "samples": [
+    {
+      "artist": "kuroimori",
+      "displayName": "黒イ森 (Kuroimori)",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7159",
+      "imageUrl": "https://cdn.pokoin.com/artist-profiles/kuroimori.png",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kuroimori"
+    }
+  ],
+  "report": [
+    {
+      "artist": "kuroimori",
+      "normalizedArtist": "kuroimori",
+      "status": "upserted",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7159",
+      "pocketmonstersUrl": "https://www.pocketmonsters.net/staff/view/7159",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kuroimori",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7159/main.png/t/250.png",
+      "profileImageCdnUrl": "https://cdn.pokoin.com/artist-profiles/kuroimori.png",
+      "imageCache": "cached"
+    }
+  ]
+}

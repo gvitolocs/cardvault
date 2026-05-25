@@ -67,21 +67,26 @@ flutter run -d ios
    nano .env
    ```
 
-### API Keys Setup
+### Runtime Services Setup
 
-#### Pokemon TCG API
-1. Visit [Pokemon TCG API](https://pokemontcg.io/)
-2. Sign up for a free account
-3. Get your API key
-4. Add it to your `.env` file
-
-#### Firebase (Optional)
-1. Create a Firebase project at [Firebase Console](https://console.firebase.google.com/)
-2. Enable Authentication, Firestore, and Storage
+#### Firebase
+1. Create or use the `pokoin` Firebase project in [Firebase Console](https://console.firebase.google.com/).
+2. Enable Authentication, Firestore, and Storage.
 3. Download configuration files:
    - `google-services.json` for Android
    - `GoogleService-Info.plist` for iOS
 4. Place them in the appropriate directories
+
+#### Oracle Marketplace Postgres
+1. Provision or connect to the Oracle marketplace Postgres database.
+2. Set `MARKETPLACE_DATABASE_URL` locally and in Vercel.
+3. Run the marketplace schema/migration flow from `oracle-postgres/README.md`.
+
+#### Marketplace APIs
+The web marketplace reads catalog, search, versions, home sections, event
+analytics, and hot blueprint rollups through Vercel APIs under `api/*.js`. Use
+`./deploy-pokoin-web.sh` for production deploys so those API files are copied
+into the Flutter web output.
 
 #### Stripe (Optional)
 1. Create a Stripe account at [Stripe Dashboard](https://dashboard.stripe.com/)

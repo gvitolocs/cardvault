@@ -1,0 +1,3028 @@
+{
+  "generatedAt": "2026-05-24T14:53:44.474Z",
+  "mode": "dry-run",
+  "options": {
+    "limit": "all",
+    "source": "all",
+    "concurrency": 1,
+    "artist": "aimi tomita,akino fukuji,akira egawa,and direc the pokemon company art team,anesaki dynamic,asuka iwashita,atsuko ujiie,atsushi furusawa,atsuya uki,aya kusube,ayaka yoshida,ayako o",
+    "refreshExisting": true,
+    "cacheImages": true,
+    "auditImageCache": false,
+    "recacheMissingImages": false
+  },
+  "counts": {
+    "scanned": 160,
+    "matched": 133,
+    "upserted": 0,
+    "skipped": 27,
+    "ambiguous": 0,
+    "imageCached": 0,
+    "imageCacheNeeded": 0,
+    "reasons": {
+      "matched_bulbapedia": 133,
+      "missing_page": 19,
+      "title_mismatch": 8
+    }
+  },
+  "samples": [
+    {
+      "artist": "Aimi Tomita",
+      "displayName": "Aimi Tomita",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Aimi_Tomita",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Aimi_Tomita"
+    },
+    {
+      "artist": "Akino Fukuji",
+      "displayName": "Akino Fukuji",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Akino_Fukuji",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Akino_Fukuji"
+    },
+    {
+      "artist": "AKIRA EGAWA",
+      "displayName": "AKIRA EGAWA",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/AKIRA_EGAWA",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/AKIRA_EGAWA"
+    },
+    {
+      "artist": "Anesaki Dynamic",
+      "displayName": "Anesaki Dynamic",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Anesaki_Dynamic",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Anesaki_Dynamic"
+    },
+    {
+      "artist": "Asuka Iwashita",
+      "displayName": "Asuka Iwashita",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Asuka_Iwashita",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Asuka_Iwashita"
+    },
+    {
+      "artist": "Atsuko Ujiie",
+      "displayName": "Atsuko Ujiie",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Atsuko_Ujiie",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Atsuko_Ujiie"
+    },
+    {
+      "artist": "Atsushi Furusawa",
+      "displayName": "Atsushi Furusawa",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Atsushi_Furusawa",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Atsushi_Furusawa"
+    },
+    {
+      "artist": "Atsuya Uki",
+      "displayName": "Atsuya Uki",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Atsuya_Uki",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Atsuya_Uki"
+    },
+    {
+      "artist": "Aya Kusube",
+      "displayName": "Aya Kusube",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Aya_Kusube",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Aya_Kusube"
+    },
+    {
+      "artist": "Ayaka Yoshida",
+      "displayName": "Ayaka Yoshida",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Ayaka_Yoshida",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Ayaka_Yoshida"
+    },
+    {
+      "artist": "Ayako Ozaki",
+      "displayName": "Ayako Ozaki",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Ayako_Ozaki",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Ayako_Ozaki"
+    },
+    {
+      "artist": "AYUMI ODASHIMA",
+      "displayName": "AYUMI ODASHIMA",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/AYUMI_ODASHIMA",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/AYUMI_ODASHIMA"
+    },
+    {
+      "artist": "Benimaru Itoh",
+      "displayName": "Benimaru Itoh",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Benimaru_Itoh",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Benimaru_Itoh"
+    },
+    {
+      "artist": "booota",
+      "displayName": "Booota",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Booota",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Booota"
+    },
+    {
+      "artist": "buchi",
+      "displayName": "Buchi",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Buchi",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Buchi"
+    },
+    {
+      "artist": "Bun Toujo",
+      "displayName": "Bun Toujo",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Bun_Toujo",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Bun_Toujo"
+    },
+    {
+      "artist": "CHORISO",
+      "displayName": "CHORISO",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/CHORISO",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/CHORISO"
+    },
+    {
+      "artist": "Cona Nitanda",
+      "displayName": "Cona Nitanda",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Cona_Nitanda",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Cona_Nitanda"
+    },
+    {
+      "artist": "DemizuPosuka",
+      "displayName": "DemizuPosuka",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/DemizuPosuka",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/DemizuPosuka"
+    },
+    {
+      "artist": "Emi Ando",
+      "displayName": "Emi Ando",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Emi_Ando",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Emi_Ando"
+    },
+    {
+      "artist": "Emi Yoshida",
+      "displayName": "Emi Yoshida",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Emi_Yoshida",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Emi_Yoshida"
+    },
+    {
+      "artist": "En Morikura",
+      "displayName": "En Morikura",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/En_Morikura",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/En_Morikura"
+    },
+    {
+      "artist": "Eri Kamei",
+      "displayName": "Eri Kamei",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Eri_Kamei",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Eri_Kamei"
+    },
+    {
+      "artist": "Eri Yamaki",
+      "displayName": "Eri Yamaki",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Eri_Yamaki",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Eri_Yamaki"
+    },
+    {
+      "artist": "Etsuya Hattori",
+      "displayName": "Etsuya Hattori",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Etsuya_Hattori",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Etsuya_Hattori"
+    },
+    {
+      "artist": "Fujimoto Gold",
+      "displayName": "Fujimoto Gold",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Fujimoto_Gold",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Fujimoto_Gold"
+    },
+    {
+      "artist": "Fumie Kittaka",
+      "displayName": "Fumie Kittaka",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Fumie_Kittaka",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Fumie_Kittaka"
+    },
+    {
+      "artist": "hanabushi",
+      "displayName": "Hanabushi",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hanabushi",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Hanabushi"
+    },
+    {
+      "artist": "hatachu",
+      "displayName": "Hatachu",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hatachu",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Hatachu"
+    },
+    {
+      "artist": "Heisuke Kitazawa",
+      "displayName": "Heisuke Kitazawa",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Heisuke_Kitazawa",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Heisuke_Kitazawa"
+    },
+    {
+      "artist": "Hideki Ishikawa",
+      "displayName": "Hideki Ishikawa",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hideki_Ishikawa",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Hideki_Ishikawa"
+    },
+    {
+      "artist": "Hiroki Asanuma",
+      "displayName": "Hiroki Asanuma",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hiroki_Asanuma",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Hiroki_Asanuma"
+    },
+    {
+      "artist": "Hiroki Fuchino",
+      "displayName": "Hiroki Fuchino",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hiroki_Fuchino",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Hiroki_Fuchino"
+    },
+    {
+      "artist": "HiRON",
+      "displayName": "HiRON",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/HiRON",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/HiRON"
+    },
+    {
+      "artist": "Hironobu Yoshida",
+      "displayName": "Hironobu Yoshida",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hironobu_Yoshida",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Hironobu_Yoshida"
+    },
+    {
+      "artist": "Hiroyuki Yamamoto",
+      "displayName": "Hiroyuki Yamamoto",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hiroyuki_Yamamoto",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Hiroyuki_Yamamoto"
+    },
+    {
+      "artist": "Hitoshi Ariga",
+      "displayName": "Hitoshi Ariga",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hitoshi_Ariga",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Hitoshi_Ariga"
+    },
+    {
+      "artist": "Hizuki Misono",
+      "displayName": "Hizuki Misono",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hizuki_Misono",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Hizuki_Misono"
+    },
+    {
+      "artist": "HYOGONOSUKE",
+      "displayName": "HYOGONOSUKE",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/HYOGONOSUKE",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/HYOGONOSUKE"
+    },
+    {
+      "artist": "IKEDA Saki",
+      "displayName": "IKEDA Saki",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/IKEDA_Saki",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/IKEDA_Saki"
+    },
+    {
+      "artist": "Iwamoto05",
+      "displayName": "Iwamoto05",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Iwamoto05",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Iwamoto05"
+    },
+    {
+      "artist": "Izucch",
+      "displayName": "Izucch",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Izucch",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Izucch"
+    },
+    {
+      "artist": "Kagemaru Himeno",
+      "displayName": "Kagemaru Himeno",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kagemaru_Himeno",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kagemaru_Himeno"
+    },
+    {
+      "artist": "Kamome Shirahama",
+      "displayName": "Kamome Shirahama",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kamome_Shirahama",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kamome_Shirahama"
+    },
+    {
+      "artist": "Kanako Eo",
+      "displayName": "Kanako Eo",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kanako_Eo",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kanako_Eo"
+    },
+    {
+      "artist": "Kanami Ogata",
+      "displayName": "Kanami Ogata",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kanami_Ogata",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kanami_Ogata"
+    },
+    {
+      "artist": "Katsunori Sato",
+      "displayName": "Katsunori Sato",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Katsunori_Sato",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Katsunori_Sato"
+    },
+    {
+      "artist": "Kazuhisa Uragami",
+      "displayName": "Kazuhisa Uragami",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kazuhisa_Uragami",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kazuhisa_Uragami"
+    },
+    {
+      "artist": "Kazuma Koda",
+      "displayName": "Kazuma Koda",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kazuma_Koda",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kazuma_Koda"
+    },
+    {
+      "artist": "Kazumasa Yasukuni",
+      "displayName": "Kazumasa Yasukuni",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kazumasa_Yasukuni",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kazumasa_Yasukuni"
+    },
+    {
+      "artist": "Kedamahadaitai Yawarakai",
+      "displayName": "Kedamahadaitai Yawarakai",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kedamahadaitai_Yawarakai",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kedamahadaitai_Yawarakai"
+    },
+    {
+      "artist": "Keiji Kinebuchi",
+      "displayName": "Keiji Kinebuchi",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Keiji_Kinebuchi",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Keiji_Kinebuchi"
+    },
+    {
+      "artist": "Keiko Fukuyama",
+      "displayName": "Keiko Fukuyama",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Keiko_Fukuyama",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Keiko_Fukuyama"
+    },
+    {
+      "artist": "Ken Ikuji",
+      "displayName": "Ken Ikuji",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Ken_Ikuji",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Ken_Ikuji"
+    },
+    {
+      "artist": "Ken Sugimori",
+      "displayName": "Ken Sugimori",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Ken_Sugimori",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Ken_Sugimori"
+    },
+    {
+      "artist": "Kenkichi Toyama",
+      "displayName": "Kenkichi Toyama",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kenkichi_Toyama",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kenkichi_Toyama"
+    },
+    {
+      "artist": "Kimiya Masago",
+      "displayName": "Kimiya Masago",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kimiya_Masago",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kimiya_Masago"
+    },
+    {
+      "artist": "KIYOTAKA OSHIYAMA",
+      "displayName": "KIYOTAKA OSHIYAMA",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/KIYOTAKA_OSHIYAMA",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/KIYOTAKA_OSHIYAMA"
+    },
+    {
+      "artist": "Koji Nakata",
+      "displayName": "Koji Nakata",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Koji_Nakata",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Koji_Nakata"
+    },
+    {
+      "artist": "Kouki Saitou",
+      "displayName": "Kouki Saitou",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kouki_Saitou",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kouki_Saitou"
+    },
+    {
+      "artist": "Kurata So",
+      "displayName": "Kurata So",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kurata_So",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kurata_So"
+    },
+    {
+      "artist": "Kyoko Umemoto",
+      "displayName": "Kyoko Umemoto",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kyoko_Umemoto",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kyoko_Umemoto"
+    },
+    {
+      "artist": "Lee HyunJung",
+      "displayName": "Lee HyunJung",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Lee_HyunJung",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Lee_HyunJung"
+    },
+    {
+      "artist": "Ligton",
+      "displayName": "Ligton",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Ligton",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Ligton"
+    },
+    {
+      "artist": "Makura Tami",
+      "displayName": "Makura Tami",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Makura_Tami",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Makura_Tami"
+    },
+    {
+      "artist": "Mana Ibe",
+      "displayName": "Mana Ibe",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Mana_Ibe",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Mana_Ibe"
+    },
+    {
+      "artist": "Masakazu Fukuda",
+      "displayName": "Masakazu Fukuda",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Masakazu_Fukuda",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Masakazu_Fukuda"
+    },
+    {
+      "artist": "Masako Tomii",
+      "displayName": "Masako Tomii",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Masako_Tomii",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Masako_Tomii"
+    },
+    {
+      "artist": "Masako Yamashita",
+      "displayName": "Masako Yamashita",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Masako_Yamashita",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Masako_Yamashita"
+    },
+    {
+      "artist": "Megumi Mizutani",
+      "displayName": "Megumi Mizutani",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Megumi_Mizutani",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Megumi_Mizutani"
+    },
+    {
+      "artist": "Mékayu",
+      "displayName": "Mékayu",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/M%C3%A9kayu",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/M%C3%A9kayu"
+    },
+    {
+      "artist": "mele",
+      "displayName": "Mele",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Mele",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Mele"
+    },
+    {
+      "artist": "Midori Harada",
+      "displayName": "Midori Harada",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Midori_Harada",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Midori_Harada"
+    },
+    {
+      "artist": "Mika Pikazo",
+      "displayName": "Mika Pikazo",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Mika_Pikazo",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Mika_Pikazo"
+    },
+    {
+      "artist": "Miki Tanaka",
+      "displayName": "Miki Tanaka",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Miki_Tanaka",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Miki_Tanaka"
+    },
+    {
+      "artist": "Milky Isobe",
+      "displayName": "Milky Isobe",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Milky_Isobe",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Milky_Isobe"
+    },
+    {
+      "artist": "Mina Nakai",
+      "displayName": "Mina Nakai",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Mina_Nakai",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Mina_Nakai"
+    },
+    {
+      "artist": "Minahamu",
+      "displayName": "Minahamu",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Minahamu",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Minahamu"
+    },
+    {
+      "artist": "MINAMINAMI Take",
+      "displayName": "MINAMINAMI Take",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/MINAMINAMI_Take",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/MINAMINAMI_Take"
+    },
+    {
+      "artist": "Misaki Hashimoto",
+      "displayName": "Misaki Hashimoto",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Misaki_Hashimoto",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Misaki_Hashimoto"
+    },
+    {
+      "artist": "Mizue",
+      "displayName": "Mizue",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Mizue",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Mizue"
+    },
+    {
+      "artist": "Mori Yuu",
+      "displayName": "Mori Yuu",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Mori_Yuu",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Mori_Yuu"
+    },
+    {
+      "artist": "Mousho",
+      "displayName": "Mousho",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Mousho",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Mousho"
+    },
+    {
+      "artist": "Mugi Hamada",
+      "displayName": "Mugi Hamada",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Mugi_Hamada",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Mugi_Hamada"
+    },
+    {
+      "artist": "nagimiso",
+      "displayName": "Nagimiso",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Nagimiso",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Nagimiso"
+    },
+    {
+      "artist": "Nagomi Nijo",
+      "displayName": "Nagomi Nijo",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Nagomi_Nijo",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Nagomi_Nijo"
+    },
+    {
+      "artist": "Naoyo Kimura",
+      "displayName": "Naoyo Kimura",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Naoyo_Kimura",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Naoyo_Kimura"
+    },
+    {
+      "artist": "Narano",
+      "displayName": "Narano",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Narano",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Narano"
+    },
+    {
+      "artist": "Natsumi Miyanose",
+      "displayName": "Natsumi Miyanose",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Natsumi_Miyanose",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Natsumi_Miyanose"
+    },
+    {
+      "artist": "Natsumi Yoshida",
+      "displayName": "Natsumi Yoshida",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Natsumi_Yoshida",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Natsumi_Yoshida"
+    },
+    {
+      "artist": "NC Empire",
+      "displayName": "NC Empire",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/NC_Empire",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/NC_Empire"
+    },
+    {
+      "artist": "Nisota Niso",
+      "displayName": "Nisota Niso",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Nisota_Niso",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Nisota_Niso"
+    },
+    {
+      "artist": "Nobuhiro Imagawa",
+      "displayName": "Nobuhiro Imagawa",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Nobuhiro_Imagawa",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Nobuhiro_Imagawa"
+    },
+    {
+      "artist": "Nurikabe",
+      "displayName": "Nurikabe",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Nurikabe",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Nurikabe"
+    },
+    {
+      "artist": "Oswaldo KATO",
+      "displayName": "Oswaldo KATO",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Oswaldo_KATO",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Oswaldo_KATO"
+    },
+    {
+      "artist": "Pani Kobayashi",
+      "displayName": "Pani Kobayashi",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Pani_Kobayashi",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Pani_Kobayashi"
+    },
+    {
+      "artist": "Reiko Tanoue",
+      "displayName": "Reiko Tanoue",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Reiko_Tanoue",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Reiko_Tanoue"
+    },
+    {
+      "artist": "Rond",
+      "displayName": "Rond",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Rond",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Rond"
+    },
+    {
+      "artist": "Ryo Ueda",
+      "displayName": "Ryo Ueda",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Ryo_Ueda",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Ryo_Ueda"
+    },
+    {
+      "artist": "Ryota Murayama",
+      "displayName": "Ryota Murayama",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Ryota_Murayama",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Ryota_Murayama"
+    },
+    {
+      "artist": "Ryuta Fuse",
+      "displayName": "Ryuta Fuse",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Ryuta_Fuse",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Ryuta_Fuse"
+    },
+    {
+      "artist": "Saki Hayashiro",
+      "displayName": "Saki Hayashiro",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Saki_Hayashiro",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Saki_Hayashiro"
+    },
+    {
+      "artist": "Sakiko Maeda",
+      "displayName": "Sakiko Maeda",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Sakiko_Maeda",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Sakiko_Maeda"
+    },
+    {
+      "artist": "Sanosuke Sakuma",
+      "displayName": "Sanosuke Sakuma",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Sanosuke_Sakuma",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Sanosuke_Sakuma"
+    },
+    {
+      "artist": "SATOSHI NAKAI",
+      "displayName": "SATOSHI NAKAI",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/SATOSHI_NAKAI",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/SATOSHI_NAKAI"
+    },
+    {
+      "artist": "Shigenori Negishi",
+      "displayName": "Shigenori Negishi",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Shigenori_Negishi",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Shigenori_Negishi"
+    },
+    {
+      "artist": "Shinya Mizuno",
+      "displayName": "Shinya Mizuno",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Shinya_Mizuno",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Shinya_Mizuno"
+    },
+    {
+      "artist": "SIE NANAHARA",
+      "displayName": "SIE NANAHARA",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/SIE_NANAHARA",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/SIE_NANAHARA"
+    },
+    {
+      "artist": "sui",
+      "displayName": "Sui",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Sui",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Sui"
+    },
+    {
+      "artist": "Sumiyoshi Kizuki",
+      "displayName": "Sumiyoshi Kizuki",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Sumiyoshi_Kizuki",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Sumiyoshi_Kizuki"
+    },
+    {
+      "artist": "Susumu Maeya",
+      "displayName": "Susumu Maeya",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Susumu_Maeya",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Susumu_Maeya"
+    },
+    {
+      "artist": "Taira Akitsu",
+      "displayName": "Taira Akitsu",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Taira_Akitsu",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Taira_Akitsu"
+    },
+    {
+      "artist": "Takao Unno",
+      "displayName": "Takao Unno",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Takao_Unno",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Takao_Unno"
+    },
+    {
+      "artist": "takashi shiraishi",
+      "displayName": "Takashi shiraishi",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Takashi_shiraishi",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Takashi_shiraishi"
+    },
+    {
+      "artist": "Takeshi Nakamura",
+      "displayName": "Takeshi Nakamura",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Takeshi_Nakamura",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Takeshi_Nakamura"
+    },
+    {
+      "artist": "Takumi Wada",
+      "displayName": "Takumi Wada",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Takumi_Wada",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Takumi_Wada"
+    },
+    {
+      "artist": "Terada Tera",
+      "displayName": "Terada Tera",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Terada_Tera",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Terada_Tera"
+    },
+    {
+      "artist": "Tetsuo Hara",
+      "displayName": "Tetsuo Hara",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Tetsuo_Hara",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Tetsuo_Hara"
+    },
+    {
+      "artist": "Tika Matsuno",
+      "displayName": "Tika Matsuno",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Tika_Matsuno",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Tika_Matsuno"
+    },
+    {
+      "artist": "Tomoaki Imakuni",
+      "displayName": "Tomoaki Imakuni",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Tomoaki_Imakuni",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Tomoaki_Imakuni"
+    },
+    {
+      "artist": "Tomohiro Kitakaze",
+      "displayName": "Tomohiro Kitakaze",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Tomohiro_Kitakaze",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Tomohiro_Kitakaze"
+    },
+    {
+      "artist": "Tomomi Ozaki",
+      "displayName": "Tomomi Ozaki",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Tomomi_Ozaki",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Tomomi_Ozaki"
+    },
+    {
+      "artist": "Tomowaka",
+      "displayName": "Tomowaka",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Tomowaka",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Tomowaka"
+    },
+    {
+      "artist": "toriyufu",
+      "displayName": "Toriyufu",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Toriyufu",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Toriyufu"
+    },
+    {
+      "artist": "Ultimateinudog",
+      "displayName": "Ultimateinudog",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Ultimateinudog",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Ultimateinudog"
+    },
+    {
+      "artist": "Yoko Hishida",
+      "displayName": "Yoko Hishida",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yoko_Hishida",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Yoko_Hishida"
+    },
+    {
+      "artist": "Yoshimoto Yoshimon",
+      "displayName": "Yoshimoto Yoshimon",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yoshimoto_Yoshimon",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Yoshimoto_Yoshimon"
+    },
+    {
+      "artist": "Yoshinobu Saito",
+      "displayName": "Yoshinobu Saito",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yoshinobu_Saito",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Yoshinobu_Saito"
+    },
+    {
+      "artist": "Yoshioka",
+      "displayName": "Yoshioka",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yoshioka",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Yoshioka"
+    },
+    {
+      "artist": "You Iribi",
+      "displayName": "You Iribi",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/You_Iribi",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/You_Iribi"
+    },
+    {
+      "artist": "Yuka Morii",
+      "displayName": "Yuka Morii",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yuka_Morii",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Yuka_Morii"
+    },
+    {
+      "artist": "Yuka Tanaka",
+      "displayName": "Yuka Tanaka",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yuka_Tanaka",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Yuka_Tanaka"
+    },
+    {
+      "artist": "Yusuke Ohmura",
+      "displayName": "Yusuke Ohmura",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yusuke_Ohmura",
+      "imageUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Yusuke_Ohmura"
+    }
+  ],
+  "report": [
+    {
+      "artist": "Aimi Tomita",
+      "normalizedArtist": "aimi tomita",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Aimi_Tomita",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Aimi_Tomita",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Akino Fukuji",
+      "normalizedArtist": "akino fukuji",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Akino_Fukuji",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Akino_Fukuji",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "AKIRA EGAWA",
+      "normalizedArtist": "akira egawa",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/AKIRA_EGAWA",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/AKIRA_EGAWA",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Illus.＆Direc.The Pokémon Company Art Team",
+      "normalizedArtist": "and direc the pokemon company art team",
+      "status": "skipped",
+      "reason": "missing_page",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "Illus.＆Direc.The_Pokémon_Company_Art_Team",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Illus.＆Direc.The_Pokémon_Company_Art_Team_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Illus.＆Direc.The_Pokémon_Company_Art_Team_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      }
+    },
+    {
+      "artist": "Anesaki Dynamic",
+      "normalizedArtist": "anesaki dynamic",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Anesaki_Dynamic",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Anesaki_Dynamic",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Asuka Iwashita",
+      "normalizedArtist": "asuka iwashita",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Asuka_Iwashita",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Asuka_Iwashita",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Atsuko Ujiie",
+      "normalizedArtist": "atsuko ujiie",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Atsuko_Ujiie",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Atsuko_Ujiie",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Atsushi Furusawa",
+      "normalizedArtist": "atsushi furusawa",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Atsushi_Furusawa",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Atsushi_Furusawa",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Atsuya Uki",
+      "normalizedArtist": "atsuya uki",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Atsuya_Uki",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Atsuya_Uki",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Aya Kusube",
+      "normalizedArtist": "aya kusube",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Aya_Kusube",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Aya_Kusube",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Ayaka Yoshida",
+      "normalizedArtist": "ayaka yoshida",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Ayaka_Yoshida",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Ayaka_Yoshida",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Ayako Ozaki",
+      "normalizedArtist": "ayako ozaki",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Ayako_Ozaki",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Ayako_Ozaki",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "AYUMI ODASHIMA",
+      "normalizedArtist": "ayumi odashima",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/AYUMI_ODASHIMA",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/AYUMI_ODASHIMA",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Benimaru Itoh",
+      "normalizedArtist": "benimaru itoh",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Benimaru_Itoh",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Benimaru_Itoh",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "booota",
+      "normalizedArtist": "booota",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Booota",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Booota",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "buchi",
+      "normalizedArtist": "buchi",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Buchi",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Buchi",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Bun Toujo",
+      "normalizedArtist": "bun toujo",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Bun_Toujo",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Bun_Toujo",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "CHORISO",
+      "normalizedArtist": "choriso",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/CHORISO",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/CHORISO",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Cona Nitanda",
+      "normalizedArtist": "cona nitanda",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Cona_Nitanda",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Cona_Nitanda",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "DemizuPosuka",
+      "normalizedArtist": "demizuposuka",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/DemizuPosuka",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/DemizuPosuka",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Dr.Ooyama",
+      "normalizedArtist": "dr ooyama",
+      "status": "skipped",
+      "reason": "missing_page",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "Dr.Ooyama",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Dr.Ooyama_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Dr.Ooyama_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      }
+    },
+    {
+      "artist": "Emi Ando",
+      "normalizedArtist": "emi ando",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Emi_Ando",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Emi_Ando",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Emi Yoshida",
+      "normalizedArtist": "emi yoshida",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Emi_Yoshida",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Emi_Yoshida",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "En Morikura",
+      "normalizedArtist": "en morikura",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/En_Morikura",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/En_Morikura",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Eri Kamei",
+      "normalizedArtist": "eri kamei",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Eri_Kamei",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Eri_Kamei",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Eri Yamaki",
+      "normalizedArtist": "eri yamaki",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Eri_Yamaki",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Eri_Yamaki",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Etsuya Hattori",
+      "normalizedArtist": "etsuya hattori",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Etsuya_Hattori",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Etsuya_Hattori",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Fujimoto Gold",
+      "normalizedArtist": "fujimoto gold",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Fujimoto_Gold",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Fujimoto_Gold",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Fujmoto Gold",
+      "normalizedArtist": "fujmoto gold",
+      "status": "skipped",
+      "reason": "missing_page",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "Fujmoto_Gold",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Fujmoto_Gold_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Fujmoto_Gold_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      }
+    },
+    {
+      "artist": "Fumie Kittaka",
+      "normalizedArtist": "fumie kittaka",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Fumie_Kittaka",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Fumie_Kittaka",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "GAME FREAK inc.",
+      "normalizedArtist": "game freak inc",
+      "status": "skipped",
+      "reason": "title_mismatch",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "GAME_FREAK_inc.",
+            "reason": "title_mismatch",
+            "pageTitle": "Game Freak"
+          },
+          {
+            "title": "GAME_FREAK_inc._(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "GAME_FREAK_inc._(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      }
+    },
+    {
+      "artist": "hanabushi",
+      "normalizedArtist": "hanabushi",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hanabushi",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Hanabushi",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "hatachu",
+      "normalizedArtist": "hatachu",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hatachu",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Hatachu",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Heisuke Kitazawa",
+      "normalizedArtist": "heisuke kitazawa",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Heisuke_Kitazawa",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Heisuke_Kitazawa",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Hideki Ishikawa",
+      "normalizedArtist": "hideki ishikawa",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hideki_Ishikawa",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Hideki_Ishikawa",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Hiroki Asanuma",
+      "normalizedArtist": "hiroki asanuma",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hiroki_Asanuma",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Hiroki_Asanuma",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Hiroki Fuchino",
+      "normalizedArtist": "hiroki fuchino",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hiroki_Fuchino",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Hiroki_Fuchino",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "HiRON",
+      "normalizedArtist": "hiron",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/HiRON",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/HiRON",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Hironobu Yoshida",
+      "normalizedArtist": "hironobu yoshida",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hironobu_Yoshida",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Hironobu_Yoshida",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Hiroyuki Yamamoto",
+      "normalizedArtist": "hiroyuki yamamoto",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hiroyuki_Yamamoto",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Hiroyuki_Yamamoto",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Hitoshi Ariga",
+      "normalizedArtist": "hitoshi ariga",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hitoshi_Ariga",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Hitoshi_Ariga",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Hizuki Misono",
+      "normalizedArtist": "hizuki misono",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hizuki_Misono",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Hizuki_Misono",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "HYOGONOSUKE",
+      "normalizedArtist": "hyogonosuke",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/HYOGONOSUKE",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/HYOGONOSUKE",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "IKEDA Saki",
+      "normalizedArtist": "ikeda saki",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/IKEDA_Saki",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/IKEDA_Saki",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Imakuni?",
+      "normalizedArtist": "imakuni",
+      "status": "skipped",
+      "reason": "title_mismatch",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "Imakuni?",
+            "reason": "title_mismatch",
+            "pageTitle": "Tomoaki Imakuni"
+          },
+          {
+            "title": "Imakuni?_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Imakuni?_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      }
+    },
+    {
+      "artist": "Iwamoto05",
+      "normalizedArtist": "iwamoto05",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Iwamoto05",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Iwamoto05",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Izucch",
+      "normalizedArtist": "izucch",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Izucch",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Izucch",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Kagemaru Himeno",
+      "normalizedArtist": "kagemaru himeno",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kagemaru_Himeno",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kagemaru_Himeno",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Kamome Shirahama",
+      "normalizedArtist": "kamome shirahama",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kamome_Shirahama",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kamome_Shirahama",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Kanako Eo",
+      "normalizedArtist": "kanako eo",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kanako_Eo",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kanako_Eo",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Kanami Ogata",
+      "normalizedArtist": "kanami ogata",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kanami_Ogata",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kanami_Ogata",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Katie Gross",
+      "normalizedArtist": "katie gross",
+      "status": "skipped",
+      "reason": "title_mismatch",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "Katie_Gross",
+            "reason": "title_mismatch",
+            "pageTitle": "Illustration contests"
+          },
+          {
+            "title": "Katie_Gross_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Katie_Gross_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      }
+    },
+    {
+      "artist": "Katsunori Sato",
+      "normalizedArtist": "katsunori sato",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Katsunori_Sato",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Katsunori_Sato",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Kazuhisa Uragami",
+      "normalizedArtist": "kazuhisa uragami",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kazuhisa_Uragami",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kazuhisa_Uragami",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Kazuma Koda",
+      "normalizedArtist": "kazuma koda",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kazuma_Koda",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kazuma_Koda",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Kazumasa Yasukuni",
+      "normalizedArtist": "kazumasa yasukuni",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kazumasa_Yasukuni",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kazumasa_Yasukuni",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Kedamahadaitai Yawarakai",
+      "normalizedArtist": "kedamahadaitai yawarakai",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kedamahadaitai_Yawarakai",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kedamahadaitai_Yawarakai",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Keiji Kinebuchi",
+      "normalizedArtist": "keiji kinebuchi",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Keiji_Kinebuchi",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Keiji_Kinebuchi",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Keiko Fukuyama",
+      "normalizedArtist": "keiko fukuyama",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Keiko_Fukuyama",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Keiko_Fukuyama",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Ken Ikugi",
+      "normalizedArtist": "ken ikugi",
+      "status": "skipped",
+      "reason": "missing_page",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "Ken_Ikugi",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Ken_Ikugi_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Ken_Ikugi_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      }
+    },
+    {
+      "artist": "Ken Ikuji",
+      "normalizedArtist": "ken ikuji",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Ken_Ikuji",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Ken_Ikuji",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Ken Sugimori",
+      "normalizedArtist": "ken sugimori",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Ken_Sugimori",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Ken_Sugimori",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Ken Sugimori Yusuke Ohmura",
+      "normalizedArtist": "ken sugimori yusuke ohmura",
+      "status": "skipped",
+      "reason": "missing_page",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "Ken_Sugimori_Yusuke_Ohmura",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Ken_Sugimori_Yusuke_Ohmura_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Ken_Sugimori_Yusuke_Ohmura_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      }
+    },
+    {
+      "artist": "Kenkichi Toyama",
+      "normalizedArtist": "kenkichi toyama",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kenkichi_Toyama",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kenkichi_Toyama",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Kent Kanetsuna/Direc. Shinji Higuchi",
+      "normalizedArtist": "kent kanetsuna direc shinji higuchi",
+      "status": "skipped",
+      "reason": "missing_page",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "Kent_Kanetsuna/Direc._Shinji_Higuchi",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Kent_Kanetsuna/Direc._Shinji_Higuchi_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Kent_Kanetsuna/Direc._Shinji_Higuchi_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      }
+    },
+    {
+      "artist": "KG-2000",
+      "normalizedArtist": "kg 2000",
+      "status": "skipped",
+      "reason": "missing_page",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "KG_2000",
+            "reason": "missing_page"
+          },
+          {
+            "title": "KG_2000_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "KG_2000_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      }
+    },
+    {
+      "artist": "Kimiya Masago",
+      "normalizedArtist": "kimiya masago",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kimiya_Masago",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kimiya_Masago",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "KIYOTAKA OSHIYAMA",
+      "normalizedArtist": "kiyotaka oshiyama",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/KIYOTAKA_OSHIYAMA",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/KIYOTAKA_OSHIYAMA",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Koji Nakata",
+      "normalizedArtist": "koji nakata",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Koji_Nakata",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Koji_Nakata",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Kouki Saitou",
+      "normalizedArtist": "kouki saitou",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kouki_Saitou",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kouki_Saitou",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Kurata So",
+      "normalizedArtist": "kurata so",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kurata_So",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kurata_So",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Kyoko Umemoto",
+      "normalizedArtist": "kyoko umemoto",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kyoko_Umemoto",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kyoko_Umemoto",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Lee HyunJung",
+      "normalizedArtist": "lee hyunjung",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Lee_HyunJung",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Lee_HyunJung",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Ligton",
+      "normalizedArtist": "ligton",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Ligton",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Ligton",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Makura Tami",
+      "normalizedArtist": "makura tami",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Makura_Tami",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Makura_Tami",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Mana Ibe",
+      "normalizedArtist": "mana ibe",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Mana_Ibe",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Mana_Ibe",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Mark Kraus",
+      "normalizedArtist": "mark kraus",
+      "status": "skipped",
+      "reason": "title_mismatch",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "Mark_Kraus",
+            "reason": "title_mismatch",
+            "pageTitle": "Illustration contests"
+          },
+          {
+            "title": "Mark_Kraus_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Mark_Kraus_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      }
+    },
+    {
+      "artist": "Masakazu Fukuda",
+      "normalizedArtist": "masakazu fukuda",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Masakazu_Fukuda",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Masakazu_Fukuda",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Masako Tomii",
+      "normalizedArtist": "masako tomii",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Masako_Tomii",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Masako_Tomii",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Masako Yamashita",
+      "normalizedArtist": "masako yamashita",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Masako_Yamashita",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Masako_Yamashita",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "May Do",
+      "normalizedArtist": "may do",
+      "status": "skipped",
+      "reason": "title_mismatch",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "May_Do",
+            "reason": "title_mismatch",
+            "pageTitle": "Illustration contests"
+          },
+          {
+            "title": "May_Do_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "May_Do_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      }
+    },
+    {
+      "artist": "Megumi Mizutani",
+      "normalizedArtist": "megumi mizutani",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Megumi_Mizutani",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Megumi_Mizutani",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Mékayu",
+      "normalizedArtist": "mekayu",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/M%C3%A9kayu",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/M%C3%A9kayu",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "mele",
+      "normalizedArtist": "mele",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Mele",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Mele",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Midori Harada",
+      "normalizedArtist": "midori harada",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Midori_Harada",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Midori_Harada",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Mika Pikazo",
+      "normalizedArtist": "mika pikazo",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Mika_Pikazo",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Mika_Pikazo",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Miki Tanaka",
+      "normalizedArtist": "miki tanaka",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Miki_Tanaka",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Miki_Tanaka",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "MikiTanaka",
+      "normalizedArtist": "mikitanaka",
+      "status": "skipped",
+      "reason": "missing_page",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "MikiTanaka",
+            "reason": "missing_page"
+          },
+          {
+            "title": "MikiTanaka_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "MikiTanaka_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      }
+    },
+    {
+      "artist": "Milky Isobe",
+      "normalizedArtist": "milky isobe",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Milky_Isobe",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Milky_Isobe",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Mina Nakai",
+      "normalizedArtist": "mina nakai",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Mina_Nakai",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Mina_Nakai",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Minahamu",
+      "normalizedArtist": "minahamu",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Minahamu",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Minahamu",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "MINAMINAMI Take",
+      "normalizedArtist": "minaminami take",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/MINAMINAMI_Take",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/MINAMINAMI_Take",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Misaki Hashimoto",
+      "normalizedArtist": "misaki hashimoto",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Misaki_Hashimoto",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Misaki_Hashimoto",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Mizue",
+      "normalizedArtist": "mizue",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Mizue",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Mizue",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Mori Yuu",
+      "normalizedArtist": "mori yuu",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Mori_Yuu",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Mori_Yuu",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Mousho",
+      "normalizedArtist": "mousho",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Mousho",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Mousho",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Mugi Hamada",
+      "normalizedArtist": "mugi hamada",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Mugi_Hamada",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Mugi_Hamada",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "N-DESIGN Inc.",
+      "normalizedArtist": "n design inc",
+      "status": "skipped",
+      "reason": "missing_page",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "N_DESIGN_Inc.",
+            "reason": "missing_page"
+          },
+          {
+            "title": "N_DESIGN_Inc._(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "N_DESIGN_Inc._(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      }
+    },
+    {
+      "artist": "nagimiso",
+      "normalizedArtist": "nagimiso",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Nagimiso",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Nagimiso",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Nagomi Nijo",
+      "normalizedArtist": "nagomi nijo",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Nagomi_Nijo",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Nagomi_Nijo",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Naoyo Kimura",
+      "normalizedArtist": "naoyo kimura",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Naoyo_Kimura",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Naoyo_Kimura",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Narano",
+      "normalizedArtist": "narano",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Narano",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Narano",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Natsumi Miyanose",
+      "normalizedArtist": "natsumi miyanose",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Natsumi_Miyanose",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Natsumi_Miyanose",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Natsumi Yoshida",
+      "normalizedArtist": "natsumi yoshida",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Natsumi_Yoshida",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Natsumi_Yoshida",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "NC Empire",
+      "normalizedArtist": "nc empire",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/NC_Empire",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/NC_Empire",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Nisota Niso",
+      "normalizedArtist": "nisota niso",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Nisota_Niso",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Nisota_Niso",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Nobuhiro Imagawa",
+      "normalizedArtist": "nobuhiro imagawa",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Nobuhiro_Imagawa",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Nobuhiro_Imagawa",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Nobusawa/Mochipuyo",
+      "normalizedArtist": "nobusawa mochipuyo",
+      "status": "skipped",
+      "reason": "missing_page",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "Nobusawa/Mochipuyo",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Nobusawa/Mochipuyo_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Nobusawa/Mochipuyo_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      }
+    },
+    {
+      "artist": "Nurikabe",
+      "normalizedArtist": "nurikabe",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Nurikabe",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Nurikabe",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "okawamatakatoshi",
+      "normalizedArtist": "okawamatakatoshi",
+      "status": "skipped",
+      "reason": "missing_page",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "okawamatakatoshi",
+            "reason": "missing_page"
+          },
+          {
+            "title": "okawamatakatoshi_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "okawamatakatoshi_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      }
+    },
+    {
+      "artist": "Oswaldo KATO",
+      "normalizedArtist": "oswaldo kato",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Oswaldo_KATO",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Oswaldo_KATO",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Pani Kobayashi",
+      "normalizedArtist": "pani kobayashi",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Pani_Kobayashi",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Pani_Kobayashi",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Reiko Tanoue",
+      "normalizedArtist": "reiko tanoue",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Reiko_Tanoue",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Reiko_Tanoue",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Rond",
+      "normalizedArtist": "rond",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Rond",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Rond",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Rowan Laidlaw",
+      "normalizedArtist": "rowan laidlaw",
+      "status": "skipped",
+      "reason": "title_mismatch",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "Rowan_Laidlaw",
+            "reason": "title_mismatch",
+            "pageTitle": "Illustration contests"
+          },
+          {
+            "title": "Rowan_Laidlaw_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Rowan_Laidlaw_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      }
+    },
+    {
+      "artist": "Ryo Ueda",
+      "normalizedArtist": "ryo ueda",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Ryo_Ueda",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Ryo_Ueda",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Ryota Murayama",
+      "normalizedArtist": "ryota murayama",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Ryota_Murayama",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Ryota_Murayama",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Ryuta Fuse",
+      "normalizedArtist": "ryuta fuse",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Ryuta_Fuse",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Ryuta_Fuse",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Saki Hayashiro",
+      "normalizedArtist": "saki hayashiro",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Saki_Hayashiro",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Saki_Hayashiro",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Sakiko Maeda",
+      "normalizedArtist": "sakiko maeda",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Sakiko_Maeda",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Sakiko_Maeda",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Sanosuke Sakuma",
+      "normalizedArtist": "sanosuke sakuma",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Sanosuke_Sakuma",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Sanosuke_Sakuma",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "SATOSHI NAKAI",
+      "normalizedArtist": "satoshi nakai",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/SATOSHI_NAKAI",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/SATOSHI_NAKAI",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Shigenori Negishi",
+      "normalizedArtist": "shigenori negishi",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Shigenori_Negishi",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Shigenori_Negishi",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Shin-ichi Yoshida",
+      "normalizedArtist": "shin ichi yoshida",
+      "status": "skipped",
+      "reason": "missing_page",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "Shin_ichi_Yoshida",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Shin_ichi_Yoshida_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Shin_ichi_Yoshida_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      }
+    },
+    {
+      "artist": "Shinji Higuchi + Noriko Takaya",
+      "normalizedArtist": "shinji higuchi noriko takaya",
+      "status": "skipped",
+      "reason": "missing_page",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "Shinji_Higuchi_+_Noriko_Takaya",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Shinji_Higuchi_+_Noriko_Takaya_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Shinji_Higuchi_+_Noriko_Takaya_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      }
+    },
+    {
+      "artist": "Shinji Higuchi + Sachiko Eba",
+      "normalizedArtist": "shinji higuchi sachiko eba",
+      "status": "skipped",
+      "reason": "missing_page",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "Shinji_Higuchi_+_Sachiko_Eba",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Shinji_Higuchi_+_Sachiko_Eba_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Shinji_Higuchi_+_Sachiko_Eba_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      }
+    },
+    {
+      "artist": "Shinya Mizuno",
+      "normalizedArtist": "shinya mizuno",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Shinya_Mizuno",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Shinya_Mizuno",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "SIE NANAHARA",
+      "normalizedArtist": "sie nanahara",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/SIE_NANAHARA",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/SIE_NANAHARA",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "so-taro",
+      "normalizedArtist": "so taro",
+      "status": "skipped",
+      "reason": "missing_page",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "so_taro",
+            "reason": "missing_page"
+          },
+          {
+            "title": "so_taro_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "so_taro_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      }
+    },
+    {
+      "artist": "sui",
+      "normalizedArtist": "sui",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Sui",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Sui",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Sumiyoshi Kizuki",
+      "normalizedArtist": "sumiyoshi kizuki",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Sumiyoshi_Kizuki",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Sumiyoshi_Kizuki",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Susumu Maeya",
+      "normalizedArtist": "susumu maeya",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Susumu_Maeya",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Susumu_Maeya",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Sylvia Forrest",
+      "normalizedArtist": "sylvia forrest",
+      "status": "skipped",
+      "reason": "title_mismatch",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "Sylvia_Forrest",
+            "reason": "title_mismatch",
+            "pageTitle": "Illustration contests"
+          },
+          {
+            "title": "Sylvia_Forrest_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Sylvia_Forrest_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      }
+    },
+    {
+      "artist": "Taira Akitsu",
+      "normalizedArtist": "taira akitsu",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Taira_Akitsu",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Taira_Akitsu",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Takao Unno",
+      "normalizedArtist": "takao unno",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Takao_Unno",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Takao_Unno",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "takashi shiraishi",
+      "normalizedArtist": "takashi shiraishi",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Takashi_shiraishi",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Takashi_shiraishi",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Takeshi Nakamura",
+      "normalizedArtist": "takeshi nakamura",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Takeshi_Nakamura",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Takeshi_Nakamura",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Takumi Wada",
+      "normalizedArtist": "takumi wada",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Takumi_Wada",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Takumi_Wada",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Terada Tera",
+      "normalizedArtist": "terada tera",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Terada_Tera",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Terada_Tera",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Tetsuo Hara",
+      "normalizedArtist": "tetsuo hara",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Tetsuo_Hara",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Tetsuo_Hara",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "tetsuya koizumi",
+      "normalizedArtist": "tetsuya koizumi",
+      "status": "skipped",
+      "reason": "title_mismatch",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "tetsuya_koizumi",
+            "reason": "title_mismatch",
+            "pageTitle": "Scav"
+          },
+          {
+            "title": "tetsuya_koizumi_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "tetsuya_koizumi_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      }
+    },
+    {
+      "artist": "Tika Matsuno",
+      "normalizedArtist": "tika matsuno",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Tika_Matsuno",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Tika_Matsuno",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Tokumi Akabane",
+      "normalizedArtist": "tokumi akabane",
+      "status": "skipped",
+      "reason": "missing_page",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "Tokumi_Akabane",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Tokumi_Akabane_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Tokumi_Akabane_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      }
+    },
+    {
+      "artist": "Tomoaki Imakuni",
+      "normalizedArtist": "tomoaki imakuni",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Tomoaki_Imakuni",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Tomoaki_Imakuni",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Tomohiro Kitakaze",
+      "normalizedArtist": "tomohiro kitakaze",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Tomohiro_Kitakaze",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Tomohiro_Kitakaze",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Tomokazu",
+      "normalizedArtist": "tomokazu",
+      "status": "skipped",
+      "reason": "missing_page",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "Tomokazu",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Tomokazu_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Tomokazu_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      }
+    },
+    {
+      "artist": "Tomokazu Kamiya",
+      "normalizedArtist": "tomokazu kamiya",
+      "status": "skipped",
+      "reason": "missing_page",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "Tomokazu_Kamiya",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Tomokazu_Kamiya_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Tomokazu_Kamiya_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      }
+    },
+    {
+      "artist": "Tomomi Ozaki",
+      "normalizedArtist": "tomomi ozaki",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Tomomi_Ozaki",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Tomomi_Ozaki",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Tomowaka",
+      "normalizedArtist": "tomowaka",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Tomowaka",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Tomowaka",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "toriyufu",
+      "normalizedArtist": "toriyufu",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Toriyufu",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Toriyufu",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Ultimateinudog",
+      "normalizedArtist": "ultimateinudog",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Ultimateinudog",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Ultimateinudog",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Wataru Kawahara/Direc. Shinji Higuchi",
+      "normalizedArtist": "wataru kawahara direc shinji higuchi",
+      "status": "skipped",
+      "reason": "missing_page",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "Wataru_Kawahara/Direc._Shinji_Higuchi",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Wataru_Kawahara/Direc._Shinji_Higuchi_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Wataru_Kawahara/Direc._Shinji_Higuchi_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      }
+    },
+    {
+      "artist": "Yoko Hishida",
+      "normalizedArtist": "yoko hishida",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yoko_Hishida",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Yoko_Hishida",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Yoshimoto Yoshimon",
+      "normalizedArtist": "yoshimoto yoshimon",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yoshimoto_Yoshimon",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Yoshimoto_Yoshimon",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Yoshinobu Saito",
+      "normalizedArtist": "yoshinobu saito",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yoshinobu_Saito",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Yoshinobu_Saito",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Yoshioka",
+      "normalizedArtist": "yoshioka",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yoshioka",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Yoshioka",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "You Iribi",
+      "normalizedArtist": "you iribi",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/You_Iribi",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/You_Iribi",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Yuka Morii",
+      "normalizedArtist": "yuka morii",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yuka_Morii",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Yuka_Morii",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Yuka Tanaka",
+      "normalizedArtist": "yuka tanaka",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yuka_Tanaka",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Yuka_Tanaka",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    },
+    {
+      "artist": "Yusuke Ohmura",
+      "normalizedArtist": "yusuke ohmura",
+      "status": "matched_dry_run",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yusuke_Ohmura",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Yusuke_Ohmura",
+      "profileImageUrl": "",
+      "profileImageCdnUrl": "",
+      "imageCache": "no_image"
+    }
+  ]
+}

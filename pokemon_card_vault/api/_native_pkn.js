@@ -46,6 +46,25 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function explorerBaseUrl() {
+  const rpcUrl = String(process.env.POKOIN_RPC_URL || DEFAULT_POKOIN_RPC_URL).trim();
+  return rpcUrl.replace(/\/rpc\/?$/, '').replace(/\/$/, '');
+}
+
+async function addressTransactions(address, { limit = 40 } = {}) {
+  const normalized = normalizeAddress(address);
+  const response = await fetch(`${explorerBaseUrl()}/explorer/address/${normalized}`);
+  if (!response.ok) {
+    const error = new Error('Could not load Pokoin bank activity.');
+    error.statusCode = 502;
+    throw error;
+  }
+  const payload = await response.json();
+  return ((payload.transactions || [])
+    .filter((tx) => tx && typeof tx === 'object')
+    .slice(0, limit));
+}
+
 async function verifyNativeDeposit({ txHash, fromAddress, expectedAmountPkn }) {
   const normalizedTx = String(txHash || '').trim().toLowerCase();
   if (!/^0x[a-f0-9]{64}$/.test(normalizedTx)) {
@@ -185,6 +204,7 @@ async function sendReservePkn({ toAddress, amountPkn }) {
 }
 
 module.exports = {
+  addressTransactions,
   reserveAddress,
   sendBankPkn,
   sendReservePkn,

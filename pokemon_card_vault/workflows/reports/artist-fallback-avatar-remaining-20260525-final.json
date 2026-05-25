@@ -1,0 +1,28 @@
+{
+  "generatedAt": "2026-05-25T08:22:04.539Z",
+  "mode": "artist-fallback-avatar-dry-run",
+  "options": {
+    "limit": "all",
+    "concurrency": 2,
+    "artist": "",
+    "auditReport": "workflows/reports/artist-profile-grey-placeholder-audit-20260525.json",
+    "avatarSize": 512,
+    "cropYRatio": 0.1,
+    "includeMissing": true,
+    "includePlaceholders": true
+  },
+  "counts": {
+    "scanned": 0,
+    "placeholderProfileImage": 0,
+    "missingProfileImage": 0,
+    "candidatesWithCard": 0,
+    "generated": 0,
+    "uploaded": 0,
+    "upserted": 0,
+    "skipped": 0,
+    "failed": 0,
+    "reasons": {}
+  },
+  "samples": [],
+  "report": []
+}

@@ -2,7 +2,11 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:http/http.dart' as http;
+
+import 'pokoin_api_auth.dart';
+import 'pokoin_api_client.dart';
 
 class ForumCategory {
   const ForumCategory({
@@ -160,12 +164,27 @@ class ForumPost {
 }
 
 class ForumService {
-  ForumService({http.Client? client, FirebaseAuth? auth})
-      : _client = client ?? http.Client(),
-        _auth = auth ?? FirebaseAuth.instance;
+  ForumService({
+    http.Client? client,
+    FirebaseAuth? auth,
+    PokoinApiClient? apiClient,
+  })  : _client = client ?? http.Client(),
+        _auth = auth ?? FirebaseAuth.instance,
+        _apiClient = apiClient ??
+            PokoinApiClient(
+              client: client ?? http.Client(),
+              auth: PokoinApiAuthService.instance(
+                auth: auth ?? FirebaseAuth.instance,
+              ),
+            );
 
   final http.Client _client;
   final FirebaseAuth _auth;
+  final PokoinApiClient _apiClient;
+  static const String _cacheBoxName = 'forum_public_cache';
+  static const int _cacheSchemaVersion = 1;
+  static const Duration _homeCacheTtl = Duration(minutes: 15);
+  static const Duration _topicCacheTtl = Duration(minutes: 10);
 
   Future<List<ForumCategory>> categories() async {
     try {
@@ -192,6 +211,27 @@ class ForumService {
 
   Future<List<ForumPost>> posts(String topicId) async {
     return _topicSnapshot(topicId).then((snapshot) => snapshot.posts);
+  }
+
+  Future<List<ForumCategory>> cachedCategories() async {
+    final snapshot = await _cachedHomeSnapshot();
+    final categories = snapshot?.categories ?? const <ForumCategory>[];
+    return categories.isEmpty ? defaultForumCategories : categories;
+  }
+
+  Future<List<ForumTopic>> cachedTopics({String? categoryId}) async {
+    final snapshot = await _cachedHomeSnapshot(categoryId: categoryId);
+    return snapshot?.topics ?? const <ForumTopic>[];
+  }
+
+  Future<ForumTopic?> cachedTopic(String topicId) async {
+    final snapshot = await _cachedTopicSnapshot(topicId);
+    return snapshot?.topic;
+  }
+
+  Future<List<ForumPost>> cachedPosts(String topicId) async {
+    final snapshot = await _cachedTopicSnapshot(topicId);
+    return snapshot?.posts ?? const <ForumPost>[];
   }
 
   Future<String> createTopic({
@@ -263,6 +303,7 @@ class ForumService {
     final response =
         await _client.get(uri).timeout(const Duration(seconds: 10));
     final data = _decodeResponse(response);
+    await _saveCache(_homeCacheKey(categoryId), data);
     return _ForumHomeSnapshot.fromJson(data);
   }
 
@@ -273,6 +314,7 @@ class ForumService {
     final response =
         await _client.get(uri).timeout(const Duration(seconds: 10));
     final data = _decodeResponse(response);
+    await _saveCache(_topicCacheKey(topicId), data);
     return _ForumTopicSnapshot.fromJson(data);
   }
 
@@ -284,19 +326,65 @@ class ForumService {
     if (user == null) {
       throw StateError('Sign in to post in the forum.');
     }
-    final token = await user.getIdToken();
-    final response = await _client
-        .post(
-          Uri.base.resolve(path),
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Content-Type': 'application/json',
-          },
-          body: jsonEncode(body),
-        )
-        .timeout(const Duration(seconds: 20));
+    final response = await _apiClient.postJson(
+      Uri.base.resolve(path),
+      body: body,
+    );
     return _decodeResponse(response);
   }
+
+  Future<_ForumHomeSnapshot?> _cachedHomeSnapshot({String? categoryId}) async {
+    final data = await _cachedPayload(_homeCacheKey(categoryId), _homeCacheTtl);
+    return data == null ? null : _ForumHomeSnapshot.fromJson(data);
+  }
+
+  Future<_ForumTopicSnapshot?> _cachedTopicSnapshot(String topicId) async {
+    final data = await _cachedPayload(_topicCacheKey(topicId), _topicCacheTtl);
+    return data == null ? null : _ForumTopicSnapshot.fromJson(data);
+  }
+
+  Future<Map<String, dynamic>?> _cachedPayload(String key, Duration ttl) async {
+    try {
+      final box = await Hive.openBox<Map>(_cacheBoxName);
+      final raw = box.get(key);
+      if (raw == null) {
+        return null;
+      }
+      final data = Map<String, dynamic>.from(raw);
+      final schema = (data['_schemaVersion'] as num?)?.toInt();
+      final cachedAtMs = (data['_cachedAtMs'] as num?)?.toInt();
+      if (schema != _cacheSchemaVersion || cachedAtMs == null) {
+        return null;
+      }
+      final age = DateTime.now().difference(
+        DateTime.fromMillisecondsSinceEpoch(cachedAtMs),
+      );
+      if (age > ttl) {
+        return null;
+      }
+      return Map<String, dynamic>.from(data['payload'] as Map? ?? const {});
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _saveCache(String key, Map<String, dynamic> payload) async {
+    try {
+      final box = await Hive.openBox<Map>(_cacheBoxName);
+      await box.put(key, {
+        '_schemaVersion': _cacheSchemaVersion,
+        '_cachedAtMs': DateTime.now().millisecondsSinceEpoch,
+        'payload': payload,
+      });
+    } catch (_) {
+      // Forum cache is a first-paint optimization only.
+    }
+  }
+
+  String _homeCacheKey(String? categoryId) =>
+      'home:${categoryId?.trim() ?? ''}';
+
+  String _topicCacheKey(String topicId) => 'topic:${topicId.trim()}';
 }
 
 DateTime _readDate(Object? value) {

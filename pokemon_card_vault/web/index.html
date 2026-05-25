@@ -19,8 +19,8 @@
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Pokoin is the official PKN Card Reserve marketplace and crypto collector platform for Pokémon card listings, native PKN wallet rails, wPKN liquidity, Pokoin Scan, marketplace signals and native Pokoin NFTs.">
-  <meta name="keywords" content="Pokoin, Pokoin official, Pokoin crypto, PKN, wPKN, Card Reserve, Pokemon card marketplace, Pokemon card listings, Pokemon card analytics, Pokoin wallet, Pokoin Scan, native Pokoin NFTs">
+  <meta name="description" content="Pokoin is the official PKN Card Reserve marketplace and crypto collector platform for Pokémon card listings, native PKN wallet, wPKN liquidity, Pokoin Scan, marketplace signals and NFTs.">
+  <meta name="keywords" content="Pokoin, Pokoin official, Pokoin crypto, PKN, wPKN, Card Reserve, Pokemon card marketplace, Pokemon card listings, Pokemon card analytics, Pokoin wallet, Pokoin Scan, NFTs">
   <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
   <meta name="googlebot" content="index, follow">
   <meta name="author" content="Pokoin">
@@ -32,31 +32,65 @@
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Pokoin">
   <meta property="og:title" content="Pokoin - Official PKN Card Reserve Marketplace">
-  <meta property="og:description" content="Official Pokoin site for Card Reserve listings, PKN wallet rails, wPKN liquidity, Pokoin Scan, marketplace signals and native Pokoin NFTs.">
+  <meta property="og:description" content="Official Pokoin site for Card Reserve listings, PKN wallet, wPKN liquidity, Pokoin Scan, marketplace signals and NFTs.">
   <meta property="og:url" content="https://pokoin.com/">
-  <meta property="og:image" content="https://pokoin.com/pokoin-1024.png">
+  <meta property="og:image" content="https://pokoin.com/pokoin-project-banner-1360x430.png">
+  <meta property="og:image:width" content="1360">
+  <meta property="og:image:height" content="430">
+  <meta property="og:image:type" content="image/png">
   <meta property="og:image:alt" content="Pokoin PKN crypto logo">
 
-  <meta name="twitter:card" content="summary">
+  <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Pokoin - Official PKN Card Reserve Marketplace">
-  <meta name="twitter:description" content="Official Pokoin site for Card Reserve listings, PKN wallet rails, wPKN liquidity, Pokoin Scan and marketplace signals.">
-  <meta name="twitter:image" content="https://pokoin.com/pokoin-1024.png">
+  <meta name="twitter:description" content="Official Pokoin site for Card Reserve listings, PKN wallet, wPKN liquidity, Pokoin Scan and marketplace signals.">
+  <meta name="twitter:image" content="https://pokoin.com/pokoin-project-banner-1360x430.png">
 
   <!-- iOS meta tags & icons -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="Pokoin">
-  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 
   <!-- Favicon -->
-  <link rel="icon" href="favicon.ico" sizes="any">
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png"/>
-  <link rel="icon" type="image/png" sizes="512x512" href="favicon.png"/>
-  <link rel="icon" type="image/png" sizes="192x192" href="pokoin-192.png"/>
-  <link rel="shortcut icon" href="favicon.ico"/>
 
+  <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="48x48" href="favicon-48x48.png">
+  <link rel="icon" type="image/png" sizes="96x96" href="favicon-96x96.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="pokoin-192.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <link rel="shortcut icon" href="favicon.ico">
   <title>Pokoin Official - PKN Card Reserve Marketplace, Wallet and Scan</title>
   <link rel="manifest" href="manifest.json">
+  <style>
+    html,
+    body {
+      margin: 0;
+      width: 100%;
+      min-height: 100%;
+      background: #050816;
+      color: #e5e7eb;
+    }
+
+    body {
+      overflow-x: hidden;
+    }
+
+    flt-glass-pane,
+    flutter-view {
+      background: #050816 !important;
+    }
+
+    noscript main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 48px 24px;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    a {
+      color: #facc15;
+    }
+  </style>
   <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -72,7 +106,7 @@
         "https://coinmarketcap.com/",
         "https://coinmarketcap.com/dexscan/bsc/0x86294c008542c2707b9f67e3e4ba2d03b7bf7451/"
       ],
-      "description": "Pokoin is the official PKN Card Reserve marketplace and crypto collector platform, combining Pokémon card inventory, seller listings, marketplace signal analytics, native PKN wallet rails, wPKN liquidity, Pokoin Scan and native Pokoin NFTs.",
+      "description": "Pokoin is the official PKN Card Reserve marketplace and crypto collector platform, combining Pokémon card inventory, seller listings, marketplace signals, PKN wallet, wPKN liquidity, Pokoin Scan and NFTs.",
       "contactPoint": {
         "@type": "ContactPoint",
         "email": "contact@pokoin.com",
@@ -87,25 +121,13 @@
       "name": "Pokoin",
       "alternateName": ["Pokoin Crypto", "PKN", "Card Reserve"],
       "url": "https://pokoin.com/",
-      "description": "Official Pokoin website for the Card Reserve marketplace, marketplace signal analytics, wallet-linked accounts, Pokoin Scan explorer, native NFTs and network health.",
+      "description": "Official Pokoin website for the Card Reserve marketplace, marketplace signal analytics, wallet-linked accounts, Pokoin Scan explorer, NFTs and network health.",
       "potentialAction": {
         "@type": "SearchAction",
         "target": "https://pokoin.com/marketplace/search?q={search_term_string}",
         "query-input": "required name=search_term_string"
       }
     }
-  </script>
-  <script>
-    window.pokoinClearFlutterCache = async function () {
-      if ('serviceWorker' in navigator) {
-        const registrations = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(registrations.map((registration) => registration.unregister()));
-      }
-      if ('caches' in window) {
-        const cacheNames = await caches.keys();
-        await Promise.all(cacheNames.map((cacheName) => caches.delete(cacheName)));
-      }
-    };
   </script>
   <script>
     window.va =
@@ -115,6 +137,50 @@
       };
   </script>
   <script defer src="/_vercel/insights/script.js"></script>
+  <script>
+    (function () {
+      const initialHref = window.location.href;
+      const initialUrl = new URL(initialHref);
+      const isCardDetailPath = /^\/marketplace\/[a-z]{2}(?:-[a-z]{2})?\/cards\/\d+\/[^/?#]+$/i.test(
+        initialUrl.pathname
+      );
+      window.__pokoinInitialHref = initialHref;
+      if (!isCardDetailPath || !window.history) {
+        return;
+      }
+      const originalPushState = window.history.pushState;
+      const originalReplaceState = window.history.replaceState;
+      const shouldBlockRootDrift = function (url) {
+        if (url === undefined || url === null) {
+          return false;
+        }
+        try {
+          const target = new URL(String(url), window.location.origin);
+          return target.pathname === '/' && window.location.pathname === initialUrl.pathname;
+        } catch (_) {
+          return false;
+        }
+      };
+      window.history.pushState = function (state, title, url) {
+        if (shouldBlockRootDrift(url)) {
+          console.warn('Blocked card detail root pushState drift', { from: initialHref, to: url });
+          return;
+        }
+        return originalPushState.apply(this, arguments);
+      };
+      window.history.replaceState = function (state, title, url) {
+        if (shouldBlockRootDrift(url)) {
+          console.warn('Blocked card detail root replaceState drift', { from: initialHref, to: url });
+          return;
+        }
+        return originalReplaceState.apply(this, arguments);
+      };
+      window.setTimeout(function () {
+        window.history.pushState = originalPushState;
+        window.history.replaceState = originalReplaceState;
+      }, 30000);
+    })();
+  </script>
   <script>
     window.pokoinWallet = {
       hasProvider: function () {
@@ -233,6 +299,72 @@
             gasPrice: '0x3b9aca00'
           }]
         }).catch((error) => Promise.reject(window.pokoinWallet._walletError(error)));
+      },
+      sendExternalTransaction: function (from, to, valueHex, chainIdHex) {
+        if (!window.ethereum) {
+          return Promise.reject('MetaMask or another EVM wallet is not available');
+        }
+        const chainId = chainIdHex || '0x1';
+        return window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: chainId }]
+        }).then(function () {
+          return window.ethereum.request({
+            method: 'eth_sendTransaction',
+            params: [{
+              from: from,
+              to: to,
+              value: valueHex,
+              chainId: chainId,
+              gas: '0x5208'
+            }]
+          });
+        }).catch((error) => Promise.reject(window.pokoinWallet._walletError(error)));
+      },
+      sendExternalTokenTransfer: function (from, tokenAddress, to, amountHex, chainIdHex) {
+        if (!window.ethereum) {
+          return Promise.reject('MetaMask or another EVM wallet is not available');
+        }
+        const chainId = chainIdHex || '0x38';
+        const cleanTo = String(to || '').replace(/^0x/, '').padStart(64, '0');
+        const cleanAmount = String(amountHex || '0x0').replace(/^0x/, '').padStart(64, '0');
+        const data = `0xa9059cbb${cleanTo}${cleanAmount}`;
+        return window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: chainId }]
+        }).then(function () {
+          return window.ethereum.request({
+            method: 'eth_sendTransaction',
+            params: [{
+              from: from,
+              to: tokenAddress,
+              value: '0x0',
+              data: data,
+              chainId: chainId
+            }]
+          });
+        }).catch((error) => Promise.reject(window.pokoinWallet._walletError(error)));
+      },
+      sendDataTransaction: function (from, to, valueHex, dataHex, nonceHex) {
+        if (!window.ethereum) {
+          return Promise.reject('MetaMask or another EVM wallet is not available');
+        }
+        const tx = {
+          from: from,
+          to: to,
+          value: valueHex || '0x0',
+          data: dataHex,
+          chainId: '0x18dacca',
+          gas: '0x1d4c0',
+          gasPrice: '0x3b9aca00'
+        };
+        if (nonceHex) {
+          tx.nonce = nonceHex;
+        }
+        return window.ethereum.request({
+          method: 'eth_sendTransaction',
+          params: [tx]
+        }).catch((error) => Promise.reject(window.pokoinWallet._walletError(error)));
       }
     };
   </script>
@@ -262,15 +394,6 @@
       </nav>
     </main>
   </noscript>
-  <script>
-    window.pokoinClearFlutterCache()
-      .catch(() => {})
-      .finally(() => {
-        const script = document.createElement('script');
-        script.src = `flutter_bootstrap.js?v=${Date.now()}`;
-        script.async = true;
-        document.body.appendChild(script);
-      });
-  </script>
+  <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

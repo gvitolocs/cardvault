@@ -150,19 +150,19 @@ const _palettesByType = {
     typeGradient: LinearGradient(
       begin: _gradientBegin,
       end: _gradientEnd,
-      colors: [Color(0xFF64748B), Color(0xFF111827)],
+      colors: [Color(0xFF64748B), Color(0xFF0F172A)],
     ),
     darkSurfaceGradient: LinearGradient(
       begin: _gradientBegin,
       end: _gradientEnd,
-      colors: [Color(0xFF242C41), Color(0xFF080C1A)],
+      colors: [Color(0xFF1F2937), Color(0xFF111827)],
     ),
     lightSurfaceGradient: LinearGradient(
       begin: _gradientBegin,
       end: _gradientEnd,
       colors: [Color(0xFFE6E9EC), Color(0xFFE7E8E9)],
     ),
-    imageFrameColor: Color(0xFF303A52),
+    imageFrameColor: Color(0xFF1F2937),
   ),
   'metal': CardPalette(
     typeGradient: LinearGradient(
@@ -274,8 +274,8 @@ CardPalette cardPaletteFromPayload(
       payload['lightSurfaceGradient'],
       fallback.lightSurfaceGradient,
     ),
-    imageFrameColor:
-        _colorFromPayload(payload['imageFrameColor']) ?? fallback.imageFrameColor,
+    imageFrameColor: _colorFromPayload(payload['imageFrameColor']) ??
+        fallback.imageFrameColor,
   );
 }
 
@@ -370,10 +370,8 @@ LinearGradient _gradientFromPayload(Object? value, LinearGradient fallback) {
   if (value is! List || value.length < 2) {
     return fallback;
   }
-  final colors = value
-      .map(_colorFromPayload)
-      .whereType<Color>()
-      .toList(growable: false);
+  final colors =
+      value.map(_colorFromPayload).whereType<Color>().toList(growable: false);
   if (colors.length < 2) {
     return fallback;
   }

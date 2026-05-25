@@ -1,0 +1,21 @@
+{
+  "name": "trainingai-cardvault-images",
+  "main": "scripts/trainingai-cardvault-images-worker.js",
+  "compatibility_date": "2026-05-25",
+  "routes": [
+    {
+      "pattern": "trainingai.pokoin.com",
+      "custom_domain": true
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "CARD_IMAGES",
+      "bucket_name": "cardvault-images"
+    }
+  ],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  }
+}

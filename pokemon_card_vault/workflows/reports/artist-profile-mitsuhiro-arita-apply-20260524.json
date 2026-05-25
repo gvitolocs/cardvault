@@ -1,0 +1,46 @@
+{
+  "generatedAt": "2026-05-24T09:57:03.170Z",
+  "mode": "apply",
+  "options": {
+    "limit": 1,
+    "source": "pocketmonsters",
+    "concurrency": 1,
+    "artist": "Mitsuhiro Arita",
+    "refreshExisting": false,
+    "cacheImages": true
+  },
+  "counts": {
+    "scanned": 1,
+    "matched": 1,
+    "upserted": 1,
+    "skipped": 0,
+    "ambiguous": 0,
+    "imageCached": 1,
+    "imageCacheNeeded": 0,
+    "reasons": {
+      "matched_bulbapedia": 1
+    }
+  },
+  "samples": [
+    {
+      "artist": "Mitsuhiro Arita",
+      "displayName": "有田満弘 (Mitsuhiro Arita)",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/6956",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/mitsuhiro-arita.png",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Mitsuhiro_Arita"
+    }
+  ],
+  "report": [
+    {
+      "artist": "Mitsuhiro Arita",
+      "normalizedArtist": "mitsuhiro arita",
+      "status": "upserted",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/6956",
+      "pocketmonstersUrl": "https://www.pocketmonsters.net/staff/view/6956",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Mitsuhiro_Arita",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/6956/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/mitsuhiro-arita.png",
+      "imageCache": "cached"
+    }
+  ]
+}

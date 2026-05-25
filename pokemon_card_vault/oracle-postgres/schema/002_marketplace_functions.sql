@@ -204,6 +204,23 @@ begin
             ('col', 'Call of Legends', 'manual', 40),
             ('call legends', 'Call of Legends', 'manual', 80),
             ('call of legends', 'Call of Legends', 'manual', 20),
+            ('hgss', 'HeartGold & SoulSilver', 'manual', 40),
+            ('hgss', 'Unleashed', 'manual', 55),
+            ('hgss', 'Undaunted', 'manual', 55),
+            ('hgss', 'Triumphant', 'manual', 55),
+            ('hgss', 'Call of Legends', 'manual', 70),
+            ('heartgold', 'HeartGold & SoulSilver', 'manual', 60),
+            ('heartgold', 'HeartGold Collection', 'manual', 65),
+            ('heartgold', 'Unleashed', 'manual', 75),
+            ('heartgold', 'Undaunted', 'manual', 75),
+            ('heartgold', 'Triumphant', 'manual', 75),
+            ('heartgold', 'Call of Legends', 'manual', 90),
+            ('soulsilver', 'HeartGold & SoulSilver', 'manual', 60),
+            ('soulsilver', 'SoulSilver Collection', 'manual', 65),
+            ('soulsilver', 'Unleashed', 'manual', 75),
+            ('soulsilver', 'Undaunted', 'manual', 75),
+            ('soulsilver', 'Triumphant', 'manual', 75),
+            ('soulsilver', 'Call of Legends', 'manual', 90),
             ('151', '151', 'manual', 20),
             ('151', 'Pokémon Card 151', 'manual', 25),
             ('151', 'Collect 151', 'manual', 25),
@@ -276,26 +293,60 @@ as $$
       lower(coalesce(version, '')) as version_text,
       coalesce(blueprint_id::text, '') as id_text
   ),
-  flags as (
+  signals as (
     select
       *,
-      name ~ '(^|[^a-z0-9])(booster|box|pack|bundle|tin|deck|etb|elite trainer|collection|display|case|blister|starter|theme deck|binder|dice|figure|pin)([^a-z0-9]|$)' as name_product,
-      category ~ '(^|[^a-z0-9])(sealed|booster|box|pack|deck|product|accessory)([^a-z0-9]|$)' as category_product,
-      type ~ '(^|[^a-z0-9])(sealed|booster|box|pack|deck|product|accessory)([^a-z0-9]|$)' as type_product,
-      (number || ' ' || version_text) ~ '(^|[^a-z0-9])(booster|box|pack|bundle|tin|deck|etb|elite trainer|collection|display|case|blister|starter|theme deck|binder|dice|figure|pin|premium)([^a-z0-9]|$)' as number_product,
-      number = id_text or number ~ '^[0-9]{5,}$' as looks_like_blueprint_number
+      nullif(trim(version_text), '') is not null as has_version,
+      number ~ '^[0-9]{1,4}[a-z]?/[0-9]{1,4}' as has_collector_number,
+      number = id_text or number ~ '^[0-9]{5,}$' as looks_like_blueprint_number,
+      expansion ~ 'world championship decks|world championships .* deck' as is_championship_set
     from normalized
   )
   select case
-    when name ~ 'divider|sleeve|playmat|binder|dice|coin|marker|accessor' then 'accessory'
-    when name ~ 'booster|pack' or (number || ' ' || version_text) ~ 'booster|pack' then 'booster_pack'
-    when name ~ 'box|display|etb|elite trainer' or (number || ' ' || version_text) ~ 'box|display|etb|elite trainer' then 'box'
-    when name ~ 'deck|starter|theme deck' or (number || ' ' || version_text) ~ 'deck|starter|theme deck' then 'deck'
-    when name ~ 'collection|bundle|tin|blister|case|figure|pin|premium' or (number || ' ' || version_text) ~ 'collection|bundle|tin|blister|case|figure|pin|premium' then 'collection_box'
-    when (name_product or category_product or type_product or number_product) and looks_like_blueprint_number then 'sealed_product'
+    when has_collector_number
+    then 'card'
+    when name ~ '(^|[^a-z0-9])(coin|sleeves|sleeve|playmat|binder|portfolio|divider|dividers|accessory)([^a-z0-9]|$)'
+      or category ~ '(^|[^a-z0-9])(coin|sleeves|sleeve|playmat|binder|portfolio|divider|dividers|accessory)([^a-z0-9]|$)'
+      or type ~ '(^|[^a-z0-9])(coin|sleeves|sleeve|playmat|binder|portfolio|divider|dividers|accessory)([^a-z0-9]|$)'
+    then 'accessory'
+    when name ~ '(^|[^a-z0-9])(booster box|display box|sealed box)([^a-z0-9]|$)'
+      or category ~ '(^|[^a-z0-9])(booster box|display box|sealed box)([^a-z0-9]|$)'
+      or type ~ '(^|[^a-z0-9])(booster box|display box|sealed box)([^a-z0-9]|$)'
+    then 'booster_box'
+    when name ~ '(^|[^a-z0-9])(booster bundle|bundle)([^a-z0-9]|$)'
+      or category ~ '(^|[^a-z0-9])(booster bundle|bundle)([^a-z0-9]|$)'
+      or type ~ '(^|[^a-z0-9])(booster bundle|bundle)([^a-z0-9]|$)'
+    then 'booster_bundle'
+    when name ~ '(^|[^a-z0-9])(booster|booster pack|pack)([^a-z0-9]|$)'
+      or category ~ '(^|[^a-z0-9])(booster|booster pack|pack)([^a-z0-9]|$)'
+      or type ~ '(^|[^a-z0-9])(booster|booster pack|pack)([^a-z0-9]|$)'
+    then 'booster_pack'
+    when name ~ '(^|[^a-z0-9])(elite trainer box|etb)([^a-z0-9]|$)'
+      or category ~ '(^|[^a-z0-9])(elite trainer box|etb)([^a-z0-9]|$)'
+      or type ~ '(^|[^a-z0-9])(elite trainer box|etb)([^a-z0-9]|$)'
+    then 'elite_trainer_box'
+    when name ~ '(^|[^a-z0-9])(tin|tins)([^a-z0-9]|$)'
+      or category ~ '(^|[^a-z0-9])(tin|tins)([^a-z0-9]|$)'
+      or type ~ '(^|[^a-z0-9])(tin|tins)([^a-z0-9]|$)'
+    then 'tin'
+    when name ~ '(^|[^a-z0-9])(premium collection|special collection|collection box|box set|gift box|card frame box|frame box|collection|collector.?s? chest|empty mini|blister|case|toolkit|figure|pin)([^a-z0-9]|$)'
+      or category ~ '(^|[^a-z0-9])(premium collection|special collection|collection box|box set|gift box|card frame box|frame box|collection|collector.?s? chest|empty mini|blister|case|toolkit|figure|pin)([^a-z0-9]|$)'
+      or type ~ '(^|[^a-z0-9])(premium collection|special collection|collection box|box set|gift box|card frame box|frame box|collection|collector.?s? chest|empty mini|blister|case|toolkit|figure|pin)([^a-z0-9]|$)'
+    then 'collection_box'
+    when name ~ '(^|[^a-z0-9])(theme deck|starter deck|battle deck|deck)([^a-z0-9]|$)'
+      or category ~ '(^|[^a-z0-9])(theme deck|starter deck|battle deck|deck)([^a-z0-9]|$)'
+      or type ~ '(^|[^a-z0-9])(theme deck|starter deck|battle deck|deck)([^a-z0-9]|$)'
+    then 'deck'
+    when is_championship_set and not has_collector_number and (not has_version or looks_like_blueprint_number)
+    then 'championship_deck'
+    when (category ~ '(^|[^a-z0-9])(sealed|sealed product|product)([^a-z0-9]|$)'
+      or type ~ '(^|[^a-z0-9])(sealed|sealed product|product)([^a-z0-9]|$)'
+      or name ~ '(^|[^a-z0-9])(sealed product|sealed case|product)([^a-z0-9]|$)')
+      and not has_collector_number
+    then 'sealed_product'
     else 'card'
   end
-  from flags;
+  from signals;
 $$;
 
 create or replace function public.marketplace_palette_key(
@@ -635,6 +686,10 @@ as $$
         else ''
       end as pokemon_emoji_b,
       case
+        when text ~ '(promo|stamped|stamp)' then '🎟️'
+        when text ~ '(special illustration rare|special art rare|illustration rare|art rare|alternate art|alt art|full[- ]?art)' then '🎨'
+        when text ~ '(gold secret|secret rare|hyper rare|gold)' then '🏆'
+        when text ~ '(holo|foil|reverse)' then '✨'
         when text ~ '(^|[^a-z0-9])(vmax|v max)([^a-z0-9]|$)' then '👑'
         when text ~ '(^|[^a-z0-9])(vstar|v star)([^a-z0-9]|$)' then '🌟'
         when text ~ '(^|[^a-z0-9])(gx|g x)([^a-z0-9]|$)' then '💥'
@@ -649,11 +704,14 @@ as $$
         when text ~ '(tag team|tagteam)' then '🤝'
         when text ~ '(prime)' then '🏅'
         when text ~ '(^|[^a-z0-9])break([^a-z0-9]|$)' then '⚡'
+        when text ~ '(^|[^a-z0-9])rare([^a-z0-9]|$)' then '⭐'
+        when text ~ '(^|[^a-z0-9])uncommon([^a-z0-9]|$)' then '🔷'
+        when text ~ '(^|[^a-z0-9])common([^a-z0-9]|$)' then '⚪'
         else ''
       end as variant_emoji
     from normalized
   )
-  select concat_ws(' ', pokemon_emoji_a, pokemon_emoji_b, variant_emoji)
+  select concat_ws(' ', nullif(pokemon_emoji_a, ''), nullif(pokemon_emoji_b, ''), nullif(variant_emoji, ''))
   from parts;
 $$;
 
@@ -678,6 +736,10 @@ as $$
     select lower(concat_ws(' ', card_name, rarity, product_variant)) as text
   )
   select case
+    when text ~ '(promo|stamped|stamp)' then '🎟️'
+    when text ~ '(special illustration rare|special art rare|illustration rare|art rare|alternate art|alt art|full[- ]?art)' then '🎨'
+    when text ~ '(gold secret|secret rare|hyper rare|gold)' then '🏆'
+    when text ~ '(holo|foil|reverse)' then '✨'
     when text ~ '(^|[^a-z0-9])(vmax|v max)([^a-z0-9]|$)' then '👑'
     when text ~ '(^|[^a-z0-9])(vstar|v star)([^a-z0-9]|$)' then '🌟'
     when text ~ '(^|[^a-z0-9])(gx|g x)([^a-z0-9]|$)' then '💥'
@@ -692,6 +754,9 @@ as $$
     when text ~ '(tag team|tagteam)' then '🤝'
     when text ~ '(prime)' then '🏅'
     when text ~ '(^|[^a-z0-9])break([^a-z0-9]|$)' then '⚡'
+    when text ~ '(^|[^a-z0-9])rare([^a-z0-9]|$)' then '⭐'
+    when text ~ '(^|[^a-z0-9])uncommon([^a-z0-9]|$)' then '🔷'
+    when text ~ '(^|[^a-z0-9])common([^a-z0-9]|$)' then '⚪'
     else ''
   end
   from normalized;

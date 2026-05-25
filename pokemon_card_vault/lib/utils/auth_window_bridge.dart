@@ -1,0 +1,3 @@
+void notifyAuthWindowAuthenticated() {}
+
+void closeAuthWindow() {}

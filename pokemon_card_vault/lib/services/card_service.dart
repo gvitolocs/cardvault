@@ -1,10 +1,66 @@
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:http/http.dart' as http;
 import '../models/pokemon_card.dart';
+import '../utils/card_url.dart';
+import 'pokoin_api_auth.dart';
+import 'search_debug_trace.dart';
+
+const String _cardImageProxyOrigin = 'https://pokoin.com';
+const String _cardImageProxyPrefix = '/card-images';
+const String _cardImageCdnHost = 'cdn.pokoin.com';
+const int _marketplaceArtistSnapshotLimit = 300;
+
+Map<String, dynamic> _mapFromJson(Object? value) {
+  if (value is Map) {
+    return Map<String, dynamic>.from(value);
+  }
+  return const <String, dynamic>{};
+}
+
+double? _readPositiveDouble(Object? value) {
+  if (value is num && value > 0) {
+    return value.toDouble();
+  }
+  final parsed = double.tryParse('${value ?? ''}'.trim());
+  return parsed != null && parsed > 0 ? parsed : null;
+}
+
+int _readIntValue(Object? value) {
+  if (value is num) {
+    return value.toInt();
+  }
+  return int.tryParse('${value ?? ''}'.trim()) ?? 0;
+}
+
+class MarketplaceCardCanonicalUrl {
+  const MarketplaceCardCanonicalUrl({
+    required this.cardId,
+    required this.canonicalPath,
+    required this.language,
+    this.publicNumber = '',
+  });
+
+  factory MarketplaceCardCanonicalUrl.fromJson(Map<String, dynamic> json) {
+    return MarketplaceCardCanonicalUrl(
+      cardId: '${json['cardId'] ?? json['card_id'] ?? ''}'.trim(),
+      canonicalPath:
+          '${json['canonicalPath'] ?? json['canonical_path'] ?? ''}'.trim(),
+      language: '${json['language'] ?? 'en'}'.trim(),
+      publicNumber:
+          '${json['publicNumber'] ?? json['public_number'] ?? ''}'.trim(),
+    );
+  }
+
+  final String cardId;
+  final String canonicalPath;
+  final String language;
+  final String publicNumber;
+}
 
 class MarketplaceExpansion {
   const MarketplaceExpansion({
@@ -12,6 +68,7 @@ class MarketplaceExpansion {
     required this.slug,
     required this.cardCount,
     required this.symbolImageUrl,
+    required this.logoImageUrl,
     required this.defaultSymbolUrl,
   });
 
@@ -21,6 +78,7 @@ class MarketplaceExpansion {
       slug: '${json['slug'] ?? ''}',
       cardCount: (json['cardCount'] as num?)?.toInt() ?? 0,
       symbolImageUrl: '${json['symbolImageUrl'] ?? ''}',
+      logoImageUrl: '${json['logoImageUrl'] ?? ''}',
       defaultSymbolUrl: '${json['defaultSymbolUrl'] ?? ''}',
     );
   }
@@ -29,6 +87,7 @@ class MarketplaceExpansion {
   final String slug;
   final int cardCount;
   final String symbolImageUrl;
+  final String logoImageUrl;
   final String defaultSymbolUrl;
 }
 
@@ -42,11 +101,1387 @@ class MarketplaceExpansionSnapshot {
   final List<PokemonCard> cards;
 }
 
+class MarketplaceCheapestPrice {
+  const MarketplaceCheapestPrice({
+    required this.cardId,
+    required this.pricePkn,
+    required this.available,
+    required this.listingCount,
+    required this.listedQuantity,
+    this.publicNumber = '',
+    this.canonicalPath = '',
+    this.source = '',
+    this.name = '',
+    this.setName = '',
+    this.number = '',
+  });
+
+  factory MarketplaceCheapestPrice.fromJson(Map<String, dynamic> json) {
+    final cardtrader = _mapFromJson(json['cardtrader']);
+    final price = _readPositiveDouble(
+      json['pricePkn'] ?? json['price'] ?? cardtrader['pricePkn'],
+    );
+    final listingCount = _readIntValue(
+      json['listingCount'] ?? cardtrader['listingCount'],
+    );
+    final listedQuantity = _readIntValue(
+      json['listedQuantity'] ?? cardtrader['listedQuantity'],
+    );
+    return MarketplaceCheapestPrice(
+      cardId: '${json['cardId'] ?? json['card_id'] ?? ''}'.trim(),
+      pricePkn: price,
+      available: json['available'] == true ||
+          json['inStock'] == true ||
+          listingCount > 0,
+      listingCount: listingCount,
+      listedQuantity: listedQuantity,
+      publicNumber:
+          '${json['publicNumber'] ?? json['public_number'] ?? ''}'.trim(),
+      canonicalPath:
+          '${json['canonicalPath'] ?? json['canonical_path'] ?? ''}'.trim(),
+      source: '${json['source'] ?? cardtrader['source'] ?? ''}'.trim(),
+      name: '${json['name'] ?? ''}'.trim(),
+      setName:
+          '${json['set'] ?? json['setName'] ?? json['set_name'] ?? ''}'.trim(),
+      number:
+          '${json['number'] ?? json['cardNumber'] ?? json['card_number'] ?? ''}'
+              .trim(),
+    );
+  }
+
+  final String cardId;
+  final double? pricePkn;
+  final bool available;
+  final int listingCount;
+  final int listedQuantity;
+  final String publicNumber;
+  final String canonicalPath;
+  final String source;
+  final String name;
+  final String setName;
+  final String number;
+}
+
+class MarketplaceArtistSnapshot {
+  const MarketplaceArtistSnapshot({
+    required this.name,
+    required this.slug,
+    required this.cardCount,
+    required this.cards,
+    this.profile = const MarketplaceArtistProfile(),
+  });
+
+  final String name;
+  final String slug;
+  final int cardCount;
+  final List<PokemonCard> cards;
+  final MarketplaceArtistProfile profile;
+}
+
+class MarketplaceArtistProfile {
+  const MarketplaceArtistProfile({
+    this.displayName = '',
+    this.summary = '',
+    this.bio = '',
+    this.imageUrl = '',
+    this.sourceImageUrl = '',
+    this.imageObjectKey = '',
+    this.pocketmonstersUrl = '',
+    this.pocketmonstersId = '',
+    this.bulbapediaUrl = '',
+    this.bulbapediaTitle = '',
+    this.sourceName = '',
+    this.sourceUrl = '',
+    this.generatedProfileImage = const <String, dynamic>{},
+  });
+
+  factory MarketplaceArtistProfile.fromJson(Map<String, dynamic> json) {
+    return MarketplaceArtistProfile(
+      displayName:
+          '${json['displayName'] ?? json['display_name'] ?? ''}'.trim(),
+      summary: '${json['summary'] ?? ''}'.trim(),
+      bio: '${json['bio'] ?? ''}'.trim(),
+      imageUrl: '${json['imageUrl'] ?? json['image_url'] ?? ''}'.trim(),
+      sourceImageUrl:
+          '${json['sourceImageUrl'] ?? json['source_image_url'] ?? ''}'.trim(),
+      imageObjectKey:
+          '${json['imageObjectKey'] ?? json['image_object_key'] ?? ''}'.trim(),
+      pocketmonstersUrl:
+          '${json['pocketmonstersUrl'] ?? json['pocketmonsters_url'] ?? ''}'
+              .trim(),
+      pocketmonstersId:
+          '${json['pocketmonstersId'] ?? json['pocketmonsters_id'] ?? ''}'
+              .trim(),
+      bulbapediaUrl:
+          '${json['bulbapediaUrl'] ?? json['bulbapedia_url'] ?? ''}'.trim(),
+      bulbapediaTitle:
+          '${json['bulbapediaTitle'] ?? json['bulbapedia_title'] ?? ''}'.trim(),
+      sourceName: '${json['sourceName'] ?? json['source_name'] ?? ''}'.trim(),
+      sourceUrl: '${json['sourceUrl'] ?? json['source_url'] ?? ''}'.trim(),
+      generatedProfileImage: _mapFromJson(
+        json['generatedProfileImage'] ?? json['generated_profile_image'],
+      ),
+    );
+  }
+
+  final String displayName;
+  final String summary;
+  final String bio;
+  final String imageUrl;
+  final String sourceImageUrl;
+  final String imageObjectKey;
+  final String pocketmonstersUrl;
+  final String pocketmonstersId;
+  final String bulbapediaUrl;
+  final String bulbapediaTitle;
+  final String sourceName;
+  final String sourceUrl;
+  final Map<String, dynamic> generatedProfileImage;
+
+  bool get hasGeneratedProfileImage => generatedProfileImage.isNotEmpty;
+
+  bool get hasContent =>
+      summary.isNotEmpty ||
+      bio.isNotEmpty ||
+      imageUrl.isNotEmpty ||
+      pocketmonstersUrl.isNotEmpty ||
+      bulbapediaUrl.isNotEmpty;
+}
+
+class MarketplaceArtistSummary {
+  const MarketplaceArtistSummary({
+    required this.name,
+    required this.slug,
+    required this.cardCount,
+    required this.imageUrl,
+  });
+
+  factory MarketplaceArtistSummary.fromJson(Map<String, dynamic> json) {
+    return MarketplaceArtistSummary(
+      name: '${json['name'] ?? ''}'.trim(),
+      slug: artistSlug('${json['slug'] ?? json['name'] ?? ''}'),
+      cardCount: (json['cardCount'] as num?)?.toInt() ?? 0,
+      imageUrl: '${json['imageUrl'] ?? json['image_url'] ?? ''}'.trim(),
+    );
+  }
+
+  final String name;
+  final String slug;
+  final int cardCount;
+  final String imageUrl;
+}
+
+class CompetitiveGame {
+  const CompetitiveGame({
+    required this.id,
+    required this.name,
+    required this.formats,
+    required this.metagame,
+  });
+
+  factory CompetitiveGame.fromJson(Map<String, dynamic> json) {
+    return CompetitiveGame(
+      id: '${json['id'] ?? ''}'.trim(),
+      name: '${json['name'] ?? json['id'] ?? ''}'.trim(),
+      formats: Map<String, String>.fromEntries(
+        (json['formats'] as Map? ?? const {}).entries.map(
+              (entry) => MapEntry('${entry.key}', '${entry.value}'),
+            ),
+      ),
+      metagame: json['metagame'] == true,
+    );
+  }
+
+  final String id;
+  final String name;
+  final Map<String, String> formats;
+  final bool metagame;
+}
+
+class CompetitiveSummary {
+  const CompetitiveSummary({
+    required this.tournamentCount,
+    required this.totalPlayers,
+    required this.tournamentsWithStandings,
+    required this.tournamentsWithPairings,
+    this.updatedAt,
+  });
+
+  factory CompetitiveSummary.fromJson(Map<String, dynamic> json) {
+    return CompetitiveSummary(
+      tournamentCount: (json['tournamentCount'] as num?)?.toInt() ?? 0,
+      totalPlayers: (json['totalPlayers'] as num?)?.toInt() ?? 0,
+      tournamentsWithStandings:
+          (json['tournamentsWithStandings'] as num?)?.toInt() ?? 0,
+      tournamentsWithPairings:
+          (json['tournamentsWithPairings'] as num?)?.toInt() ?? 0,
+      updatedAt: DateTime.tryParse('${json['updatedAt'] ?? ''}'),
+    );
+  }
+
+  final int tournamentCount;
+  final int totalPlayers;
+  final int tournamentsWithStandings;
+  final int tournamentsWithPairings;
+  final DateTime? updatedAt;
+}
+
+class CompetitiveTopDeck {
+  const CompetitiveTopDeck({
+    required this.deckId,
+    required this.archetype,
+    required this.game,
+    required this.format,
+    required this.formatLabel,
+    required this.count,
+    required this.share,
+    this.points = 0,
+    required this.featuredPlayer,
+    required this.featuredPlacing,
+    required this.featuredWins,
+    required this.featuredLosses,
+    required this.featuredTies,
+    required this.featuredTournamentId,
+    required this.featuredTournamentName,
+    required this.featuredTournamentDate,
+    required this.featuredDecklistId,
+    this.representativeCardId = '',
+    this.representativeCardName = '',
+    this.representativeCardSetName = '',
+    this.representativeCardNumber = '',
+    this.representativeCardPath = '',
+    this.imageUrl = '',
+    this.cardImageUrl = '',
+  });
+
+  factory CompetitiveTopDeck.fromJson(Map<String, dynamic> json) {
+    final featuredRecord =
+        Map<String, dynamic>.from(json['featuredRecord'] as Map? ?? {});
+    return CompetitiveTopDeck(
+      deckId: '${json['deckId'] ?? json['deck_id'] ?? ''}'.trim(),
+      archetype: '${json['archetype'] ?? ''}'.trim(),
+      game: '${json['game'] ?? ''}'.trim(),
+      format: '${json['format'] ?? ''}'.trim(),
+      formatLabel: '${json['formatLabel'] ?? json['format'] ?? ''}'.trim(),
+      count: (json['count'] as num?)?.toInt() ?? 0,
+      share: (json['share'] as num?)?.toDouble() ?? 0,
+      points: (json['points'] as num?)?.toInt() ?? 0,
+      featuredPlayer: '${json['featuredPlayer'] ?? ''}'.trim(),
+      featuredPlacing: (json['featuredPlacing'] as num?)?.toInt(),
+      featuredWins: (featuredRecord['wins'] as num?)?.toInt() ?? 0,
+      featuredLosses: (featuredRecord['losses'] as num?)?.toInt() ?? 0,
+      featuredTies: (featuredRecord['ties'] as num?)?.toInt() ?? 0,
+      featuredTournamentId: '${json['featuredTournamentId'] ?? ''}'.trim(),
+      featuredTournamentName: '${json['featuredTournamentName'] ?? ''}'.trim(),
+      featuredTournamentDate:
+          DateTime.tryParse('${json['featuredTournamentDate'] ?? ''}'),
+      featuredDecklistId: '${json['featuredDecklistId'] ?? ''}'.trim(),
+      representativeCardId: '${json['representativeCardId'] ?? ''}'.trim(),
+      representativeCardName: '${json['representativeCardName'] ?? ''}'.trim(),
+      representativeCardSetName:
+          '${json['representativeCardSetName'] ?? ''}'.trim(),
+      representativeCardNumber:
+          '${json['representativeCardNumber'] ?? ''}'.trim(),
+      representativeCardPath: '${json['representativeCardPath'] ?? ''}'.trim(),
+      imageUrl: '${json['imageUrl'] ?? json['image_url'] ?? ''}'.trim(),
+      cardImageUrl:
+          '${json['cardImageUrl'] ?? json['card_image_url'] ?? ''}'.trim(),
+    );
+  }
+
+  final String archetype;
+  final String deckId;
+  final String game;
+  final String format;
+  final String formatLabel;
+  final int count;
+  final double share;
+  final int points;
+  final String featuredPlayer;
+  final int? featuredPlacing;
+  final int featuredWins;
+  final int featuredLosses;
+  final int featuredTies;
+  final String featuredTournamentId;
+  final String featuredTournamentName;
+  final DateTime? featuredTournamentDate;
+  final String featuredDecklistId;
+  final String representativeCardId;
+  final String representativeCardName;
+  final String representativeCardSetName;
+  final String representativeCardNumber;
+  final String representativeCardPath;
+  final String imageUrl;
+  final String cardImageUrl;
+}
+
+class CompetitiveTournament {
+  const CompetitiveTournament({
+    required this.id,
+    required this.name,
+    required this.game,
+    required this.gameName,
+    required this.format,
+    required this.formatLabel,
+    required this.date,
+    required this.players,
+    required this.organizerName,
+    required this.platform,
+    required this.decklistsAvailable,
+    required this.isOnline,
+    required this.phases,
+    required this.sourceUrl,
+    this.standingsFetchedAt,
+    this.pairingsFetchedAt,
+  });
+
+  factory CompetitiveTournament.fromJson(Map<String, dynamic> json) {
+    return CompetitiveTournament(
+      id: '${json['id'] ?? ''}'.trim(),
+      name: '${json['name'] ?? ''}'.trim(),
+      game: '${json['game'] ?? ''}'.trim(),
+      gameName: '${json['gameName'] ?? json['game'] ?? ''}'.trim(),
+      format: '${json['format'] ?? ''}'.trim(),
+      formatLabel: '${json['formatLabel'] ?? json['format'] ?? ''}'.trim(),
+      date: DateTime.tryParse('${json['date'] ?? ''}'),
+      players: (json['players'] as num?)?.toInt() ?? 0,
+      organizerName: '${json['organizerName'] ?? ''}'.trim(),
+      platform: '${json['platform'] ?? ''}'.trim(),
+      decklistsAvailable: json['decklistsAvailable'] == true,
+      isOnline: json['isOnline'] == true,
+      phases: (json['phases'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map((row) => Map<String, dynamic>.from(row))
+          .toList(),
+      sourceUrl: '${json['sourceUrl'] ?? ''}'.trim(),
+      standingsFetchedAt:
+          DateTime.tryParse('${json['standingsFetchedAt'] ?? ''}'),
+      pairingsFetchedAt:
+          DateTime.tryParse('${json['pairingsFetchedAt'] ?? ''}'),
+    );
+  }
+
+  final String id;
+  final String name;
+  final String game;
+  final String gameName;
+  final String format;
+  final String formatLabel;
+  final DateTime? date;
+  final int players;
+  final String organizerName;
+  final String platform;
+  final bool decklistsAvailable;
+  final bool isOnline;
+  final List<Map<String, dynamic>> phases;
+  final String sourceUrl;
+  final DateTime? standingsFetchedAt;
+  final DateTime? pairingsFetchedAt;
+}
+
+class CompetitiveDashboard {
+  const CompetitiveDashboard({
+    this.topDecks = const [],
+    this.recentTournaments = const [],
+    this.upcomingTournaments = const [],
+    this.cityLeagues = const [],
+  });
+
+  factory CompetitiveDashboard.fromJson(Map<String, dynamic> json) {
+    return CompetitiveDashboard(
+      topDecks: (json['topDecks'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map((row) =>
+              CompetitiveTopDeck.fromJson(Map<String, dynamic>.from(row)))
+          .toList(),
+      recentTournaments:
+          (json['recentTournaments'] as List<dynamic>? ?? const [])
+              .whereType<Map>()
+              .map((row) => CompetitiveTournament.fromJson(
+                    Map<String, dynamic>.from(row),
+                  ))
+              .toList(),
+      upcomingTournaments:
+          (json['upcomingTournaments'] as List<dynamic>? ?? const [])
+              .whereType<Map>()
+              .map((row) => CompetitiveTournament.fromJson(
+                    Map<String, dynamic>.from(row),
+                  ))
+              .toList(),
+      cityLeagues: (json['cityLeagues'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map((row) => CompetitiveTournament.fromJson(
+                Map<String, dynamic>.from(row),
+              ))
+          .toList(),
+    );
+  }
+
+  final List<CompetitiveTopDeck> topDecks;
+  final List<CompetitiveTournament> recentTournaments;
+  final List<CompetitiveTournament> upcomingTournaments;
+  final List<CompetitiveTournament> cityLeagues;
+}
+
+class CompetitiveStanding {
+  const CompetitiveStanding({
+    required this.placing,
+    required this.playerId,
+    required this.name,
+    required this.country,
+    required this.wins,
+    required this.losses,
+    required this.ties,
+    required this.deckName,
+    required this.deckArchetype,
+    required this.decklistId,
+  });
+
+  factory CompetitiveStanding.fromJson(Map<String, dynamic> json) {
+    final record = Map<String, dynamic>.from(json['record'] as Map? ?? {});
+    return CompetitiveStanding(
+      placing: (json['placing'] as num?)?.toInt(),
+      playerId: '${json['playerId'] ?? ''}'.trim(),
+      name: '${json['name'] ?? ''}'.trim(),
+      country: '${json['country'] ?? ''}'.trim(),
+      wins: (record['wins'] as num?)?.toInt() ?? 0,
+      losses: (record['losses'] as num?)?.toInt() ?? 0,
+      ties: (record['ties'] as num?)?.toInt() ?? 0,
+      deckName: '${json['deckName'] ?? ''}'.trim(),
+      deckArchetype: '${json['deckArchetype'] ?? ''}'.trim(),
+      decklistId: '${json['decklistId'] ?? ''}'.trim(),
+    );
+  }
+
+  final int? placing;
+  final String playerId;
+  final String name;
+  final String country;
+  final int wins;
+  final int losses;
+  final int ties;
+  final String deckName;
+  final String deckArchetype;
+  final String decklistId;
+}
+
+class CompetitivePairing {
+  const CompetitivePairing({
+    required this.phase,
+    required this.round,
+    required this.table,
+    required this.player1Name,
+    required this.player2Name,
+    required this.winnerPlayerId,
+  });
+
+  factory CompetitivePairing.fromJson(Map<String, dynamic> json) {
+    return CompetitivePairing(
+      phase: (json['phase'] as num?)?.toInt() ?? 0,
+      round: (json['round'] as num?)?.toInt() ?? 0,
+      table: (json['table'] as num?)?.toInt() ?? 0,
+      player1Name: '${json['player1Name'] ?? json['player1Id'] ?? ''}'.trim(),
+      player2Name: '${json['player2Name'] ?? json['player2Id'] ?? ''}'.trim(),
+      winnerPlayerId: '${json['winnerPlayerId'] ?? ''}'.trim(),
+    );
+  }
+
+  final int phase;
+  final int round;
+  final int table;
+  final String player1Name;
+  final String player2Name;
+  final String winnerPlayerId;
+}
+
+class CompetitiveDeckCard {
+  const CompetitiveDeckCard({
+    required this.name,
+    this.count,
+    this.inclusionShare,
+    this.section = '',
+    this.setCode = '',
+    this.collectorNumber = '',
+    this.marketplaceCardId = '',
+    this.marketplacePath = '',
+    this.imageUrl = '',
+  });
+
+  factory CompetitiveDeckCard.fromJson(Map<String, dynamic> json) {
+    return CompetitiveDeckCard(
+      name: '${json['name'] ?? json['cardName'] ?? ''}'.trim(),
+      count: (json['count'] as num?)?.toDouble(),
+      inclusionShare: (json['inclusionShare'] as num?)?.toDouble(),
+      section: '${json['section'] ?? ''}'.trim(),
+      setCode: '${json['setCode'] ?? ''}'.trim(),
+      collectorNumber: '${json['collectorNumber'] ?? ''}'.trim(),
+      marketplaceCardId: '${json['marketplaceCardId'] ?? ''}'.trim(),
+      marketplacePath: '${json['marketplacePath'] ?? ''}'.trim(),
+      imageUrl: '${json['imageUrl'] ?? ''}'.trim(),
+    );
+  }
+
+  final String name;
+  final double? count;
+  final double? inclusionShare;
+  final String section;
+  final String setCode;
+  final String collectorNumber;
+  final String marketplaceCardId;
+  final String marketplacePath;
+  final String imageUrl;
+}
+
+class CompetitiveDeckResult {
+  const CompetitiveDeckResult({
+    required this.tournamentId,
+    required this.tournamentName,
+    required this.playerName,
+    this.tournamentDate,
+    this.format = '',
+    this.placing,
+    this.placingLabel = '',
+    this.variant = '',
+    this.playerId = '',
+    this.decklistId = '',
+    this.sourceUrl = '',
+  });
+
+  factory CompetitiveDeckResult.fromJson(Map<String, dynamic> json) {
+    return CompetitiveDeckResult(
+      tournamentId: '${json['tournamentId'] ?? ''}'.trim(),
+      tournamentName: '${json['tournamentName'] ?? ''}'.trim(),
+      tournamentDate: DateTime.tryParse('${json['tournamentDate'] ?? ''}'),
+      format: '${json['format'] ?? ''}'.trim(),
+      placing: (json['placing'] as num?)?.toInt(),
+      placingLabel: '${json['placingLabel'] ?? ''}'.trim(),
+      variant: '${json['variant'] ?? ''}'.trim(),
+      playerId: '${json['playerId'] ?? ''}'.trim(),
+      playerName: '${json['playerName'] ?? ''}'.trim(),
+      decklistId: '${json['decklistId'] ?? ''}'.trim(),
+      sourceUrl: '${json['sourceUrl'] ?? ''}'.trim(),
+    );
+  }
+
+  final String tournamentId;
+  final String tournamentName;
+  final DateTime? tournamentDate;
+  final String format;
+  final int? placing;
+  final String placingLabel;
+  final String variant;
+  final String playerId;
+  final String playerName;
+  final String decklistId;
+  final String sourceUrl;
+}
+
+class CompetitiveDeckPlayer {
+  const CompetitiveDeckPlayer({
+    required this.playerName,
+    this.playerId = '',
+    this.country = '',
+    this.rank,
+    this.points = 0,
+    this.sourceUrl = '',
+  });
+
+  factory CompetitiveDeckPlayer.fromJson(Map<String, dynamic> json) {
+    return CompetitiveDeckPlayer(
+      playerId: '${json['playerId'] ?? ''}'.trim(),
+      playerName: '${json['playerName'] ?? ''}'.trim(),
+      country: '${json['country'] ?? ''}'.trim(),
+      rank: (json['rank'] as num?)?.toInt(),
+      points: (json['points'] as num?)?.toInt() ?? 0,
+      sourceUrl: '${json['sourceUrl'] ?? ''}'.trim(),
+    );
+  }
+
+  final String playerId;
+  final String playerName;
+  final String country;
+  final int? rank;
+  final int points;
+  final String sourceUrl;
+}
+
+class CompetitiveDecklist {
+  const CompetitiveDecklist({
+    required this.decklistId,
+    this.cards = const [],
+  });
+
+  factory CompetitiveDecklist.fromJson(Map<String, dynamic> json) {
+    return CompetitiveDecklist(
+      decklistId: '${json['decklistId'] ?? ''}'.trim(),
+      cards: (json['cards'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map((row) =>
+              CompetitiveDeckCard.fromJson(Map<String, dynamic>.from(row)))
+          .toList(),
+    );
+  }
+
+  final String decklistId;
+  final List<CompetitiveDeckCard> cards;
+}
+
+class CompetitiveDeckDetail {
+  const CompetitiveDeckDetail({
+    required this.id,
+    required this.name,
+    this.format = '',
+    this.formatLabel = '',
+    this.rank,
+    this.points = 0,
+    this.share = 0,
+    this.earningsText = '',
+    this.totalPoints = 0,
+    this.regionalTop8 = 0,
+    this.regionalWins = 0,
+    this.internationalTop8 = 0,
+    this.internationalWins = 0,
+    this.variants = const [],
+    this.sourceUrl = '',
+    this.updatedAt,
+  });
+
+  factory CompetitiveDeckDetail.fromJson(Map<String, dynamic> json) {
+    return CompetitiveDeckDetail(
+      id: '${json['id'] ?? ''}'.trim(),
+      name: '${json['name'] ?? ''}'.trim(),
+      format: '${json['format'] ?? ''}'.trim(),
+      formatLabel: '${json['formatLabel'] ?? json['format'] ?? ''}'.trim(),
+      rank: (json['rank'] as num?)?.toInt(),
+      points: (json['points'] as num?)?.toInt() ?? 0,
+      share: (json['share'] as num?)?.toDouble() ?? 0,
+      earningsText: '${json['earningsText'] ?? ''}'.trim(),
+      totalPoints: (json['totalPoints'] as num?)?.toInt() ?? 0,
+      regionalTop8: (json['regionalTop8'] as num?)?.toInt() ?? 0,
+      regionalWins: (json['regionalWins'] as num?)?.toInt() ?? 0,
+      internationalTop8: (json['internationalTop8'] as num?)?.toInt() ?? 0,
+      internationalWins: (json['internationalWins'] as num?)?.toInt() ?? 0,
+      variants: (json['variants'] as List<dynamic>? ?? const [])
+          .map((value) => '$value'.trim())
+          .where((value) => value.isNotEmpty)
+          .toList(),
+      sourceUrl: '${json['sourceUrl'] ?? ''}'.trim(),
+      updatedAt: DateTime.tryParse('${json['updatedAt'] ?? ''}'),
+    );
+  }
+
+  final String id;
+  final String name;
+  final String format;
+  final String formatLabel;
+  final int? rank;
+  final int points;
+  final double share;
+  final String earningsText;
+  final int totalPoints;
+  final int regionalTop8;
+  final int regionalWins;
+  final int internationalTop8;
+  final int internationalWins;
+  final List<String> variants;
+  final String sourceUrl;
+  final DateTime? updatedAt;
+}
+
+class CompetitiveSnapshot {
+  const CompetitiveSnapshot({
+    required this.summary,
+    required this.games,
+    required this.tournaments,
+    this.years = const [],
+    this.dashboard = const CompetitiveDashboard(),
+    this.selectedDeck,
+    this.coreCards = const [],
+    this.deckResults = const [],
+    this.deckPlayers = const [],
+    this.decklists = const [],
+    this.selectedTournament,
+    this.standings = const [],
+    this.pairings = const [],
+  });
+
+  factory CompetitiveSnapshot.fromJson(Map<String, dynamic> json) {
+    return CompetitiveSnapshot(
+      summary: CompetitiveSummary.fromJson(
+        Map<String, dynamic>.from(json['summary'] as Map? ?? {}),
+      ),
+      games: (json['games'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map(
+              (row) => CompetitiveGame.fromJson(Map<String, dynamic>.from(row)))
+          .toList(),
+      tournaments: (json['tournaments'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map((row) =>
+              CompetitiveTournament.fromJson(Map<String, dynamic>.from(row)))
+          .toList(),
+      years: (json['years'] as List<dynamic>? ?? const [])
+          .map((year) => (year as num?)?.toInt() ?? 0)
+          .where((year) => year > 0)
+          .toList(),
+      dashboard: CompetitiveDashboard.fromJson(
+        Map<String, dynamic>.from(json['dashboard'] as Map? ?? {}),
+      ),
+      selectedDeck: json['deck'] is Map
+          ? CompetitiveDeckDetail.fromJson(
+              Map<String, dynamic>.from(json['deck'] as Map),
+            )
+          : null,
+      coreCards: (json['coreCards'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map((row) =>
+              CompetitiveDeckCard.fromJson(Map<String, dynamic>.from(row)))
+          .toList(),
+      deckResults: (json['results'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map((row) =>
+              CompetitiveDeckResult.fromJson(Map<String, dynamic>.from(row)))
+          .toList(),
+      deckPlayers: (json['players'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map((row) =>
+              CompetitiveDeckPlayer.fromJson(Map<String, dynamic>.from(row)))
+          .toList(),
+      decklists: (json['decklists'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map((row) =>
+              CompetitiveDecklist.fromJson(Map<String, dynamic>.from(row)))
+          .toList(),
+      selectedTournament: json['tournament'] is Map
+          ? CompetitiveTournament.fromJson(
+              Map<String, dynamic>.from(json['tournament'] as Map),
+            )
+          : null,
+      standings: (json['standings'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map((row) =>
+              CompetitiveStanding.fromJson(Map<String, dynamic>.from(row)))
+          .toList(),
+      pairings: (json['pairings'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map((row) =>
+              CompetitivePairing.fromJson(Map<String, dynamic>.from(row)))
+          .toList(),
+    );
+  }
+
+  final CompetitiveSummary summary;
+  final List<CompetitiveGame> games;
+  final List<CompetitiveTournament> tournaments;
+  final List<int> years;
+  final CompetitiveDashboard dashboard;
+  final CompetitiveDeckDetail? selectedDeck;
+  final List<CompetitiveDeckCard> coreCards;
+  final List<CompetitiveDeckResult> deckResults;
+  final List<CompetitiveDeckPlayer> deckPlayers;
+  final List<CompetitiveDecklist> decklists;
+  final CompetitiveTournament? selectedTournament;
+  final List<CompetitiveStanding> standings;
+  final List<CompetitivePairing> pairings;
+}
+
+class MarketplaceProductFacet {
+  const MarketplaceProductFacet({
+    required this.productType,
+    required this.count,
+  });
+
+  factory MarketplaceProductFacet.fromJson(Map<String, dynamic> json) {
+    return MarketplaceProductFacet(
+      productType:
+          '${json['productType'] ?? json['product_type'] ?? ''}'.trim(),
+      count: (json['count'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  final String productType;
+  final int count;
+}
+
+class SearchCandidateLabel {
+  const SearchCandidateLabel({
+    required this.id,
+    required this.name,
+    this.itemKind = 'single',
+    this.productType = 'card',
+    this.setName = '',
+    this.number = '',
+    this.trainerName = '',
+  });
+
+  factory SearchCandidateLabel.fromJson(Map<String, dynamic> json) {
+    return SearchCandidateLabel(
+      id: '${json['id'] ?? json['card_id'] ?? ''}'.trim(),
+      name: '${json['name'] ?? ''}'.trim(),
+      itemKind: '${json['itemKind'] ?? json['item_kind'] ?? 'single'}'.trim(),
+      productType:
+          '${json['productType'] ?? json['product_type'] ?? 'card'}'.trim(),
+      setName: '${json['setName'] ?? json['set_name'] ?? ''}'.trim(),
+      number: '${json['number'] ?? json['card_number'] ?? ''}'.trim(),
+      trainerName:
+          '${json['trainerName'] ?? json['trainer_name'] ?? ''}'.trim(),
+    );
+  }
+
+  final String id;
+  final String name;
+  final String itemKind;
+  final String productType;
+  final String setName;
+  final String number;
+  final String trainerName;
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        if (itemKind.isNotEmpty) 'item_kind': itemKind,
+        if (productType.isNotEmpty) 'product_type': productType,
+        if (setName.isNotEmpty) 'set_name': setName,
+        if (number.isNotEmpty) 'card_number': number,
+        if (trainerName.isNotEmpty) 'trainer_name': trainerName,
+      };
+}
+
+class CardSaleEvent {
+  const CardSaleEvent({
+    required this.cardId,
+    required this.condition,
+    required this.pricePkn,
+    required this.quantity,
+    required this.soldAt,
+    required this.graded,
+    required this.gradingCompany,
+    required this.grade,
+  });
+
+  factory CardSaleEvent.fromJson(Map<String, dynamic> json) {
+    return CardSaleEvent(
+      cardId: '${json['cardId'] ?? json['card_id'] ?? ''}'.trim(),
+      condition: '${json['condition'] ?? 'NM'}'.trim(),
+      pricePkn: (json['pricePkn'] as num?)?.toDouble() ??
+          (json['price_pkn'] as num?)?.toDouble() ??
+          0,
+      quantity: (json['quantity'] as num?)?.toInt() ?? 1,
+      soldAt: DateTime.tryParse('${json['soldAt'] ?? json['sold_at'] ?? ''}') ??
+          DateTime.fromMillisecondsSinceEpoch(0),
+      graded: json['graded'] == true,
+      gradingCompany:
+          '${json['gradingCompany'] ?? json['grading_company'] ?? ''}'.trim(),
+      grade: '${json['grade'] ?? ''}'.trim(),
+    );
+  }
+
+  final String cardId;
+  final String condition;
+  final double pricePkn;
+  final int quantity;
+  final DateTime soldAt;
+  final bool graded;
+  final String gradingCompany;
+  final String grade;
+}
+
+class MarketplaceBlueprintPrice {
+  const MarketplaceBlueprintPrice({
+    required this.cardId,
+    required this.blueprintId,
+    required this.pricePkn,
+    required this.source,
+    required this.listingCount,
+    required this.listedQuantity,
+    this.updatedAt,
+  });
+
+  factory MarketplaceBlueprintPrice.fromJson(Map<String, dynamic> json) {
+    final price = (json['price_pkn'] as num?)?.toDouble() ??
+        (json['pricePkn'] as num?)?.toDouble();
+    return MarketplaceBlueprintPrice(
+      cardId: '${json['card_id'] ?? json['cardId'] ?? ''}'.trim(),
+      blueprintId:
+          '${json['blueprint_id'] ?? json['blueprintId'] ?? ''}'.trim(),
+      pricePkn: price,
+      source: '${json['source'] ?? ''}'.trim(),
+      listingCount: (json['listing_count'] as num?)?.toInt() ??
+          (json['listingCount'] as num?)?.toInt() ??
+          0,
+      listedQuantity: (json['listed_quantity'] as num?)?.toInt() ??
+          (json['listedQuantity'] as num?)?.toInt() ??
+          0,
+      updatedAt:
+          DateTime.tryParse('${json['updated_at'] ?? json['updatedAt'] ?? ''}'),
+    );
+  }
+
+  final String cardId;
+  final String blueprintId;
+  final double? pricePkn;
+  final String source;
+  final int listingCount;
+  final int listedQuantity;
+  final DateTime? updatedAt;
+
+  bool get hasPrice => pricePkn != null && pricePkn! > 0;
+}
+
+class SearchAutocompleteContext {
+  const SearchAutocompleteContext({
+    required this.query,
+    required this.language,
+    required this.cardIds,
+    required this.createdAtMs,
+    required this.strategy,
+    this.candidateIdLadder = const {},
+    this.depthScores = const {},
+    this.latestDepths = const {},
+    this.latestOrders = const {},
+    this.nonNameContext = const {},
+    this.candidateLabels = const [],
+    this.predictedNameTokens = const [],
+  });
+
+  factory SearchAutocompleteContext.fromJson(Map<String, dynamic> json) {
+    final cardIds = (json['card_ids'] as List<dynamic>? ?? const [])
+        .map((id) => '$id'.trim())
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .take(5000)
+        .toList(growable: false);
+    final nonNameContext = json['non_name_context'] is Map
+        ? Map<String, dynamic>.from(json['non_name_context'] as Map)
+        : const <String, dynamic>{};
+    final cardIdSet = cardIds.toSet();
+    final depthScores = _depthScoresFromContext(nonNameContext, cardIdSet);
+    final latestDepths = _latestDepthsFromContext(nonNameContext, cardIdSet);
+    final latestOrders = _latestOrdersFromContext(nonNameContext, cardIdSet);
+    final normalizedNonNameContext = _nonNameContextWithDepthScores(
+      nonNameContext,
+      depthScores,
+      latestDepths,
+      latestOrders,
+    );
+    return SearchAutocompleteContext(
+      query: '${json['query'] ?? ''}',
+      language: '${json['language'] ?? 'en'}',
+      cardIds: cardIds,
+      createdAtMs: (json['created_at_ms'] as num?)?.toInt() ?? 0,
+      strategy: '${json['strategy'] ?? ''}',
+      candidateIdLadder: _stringKeyedIntMap(json['candidate_id_ladder']),
+      depthScores: depthScores,
+      latestDepths: latestDepths,
+      latestOrders: latestOrders,
+      nonNameContext: normalizedNonNameContext,
+      candidateLabels: _candidateLabelsFromJson(json['candidate_labels'],
+          limit: cardIds.length),
+      predictedNameTokens:
+          _predictedNameTokensFromContext(normalizedNonNameContext),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'query': query,
+        'language': language,
+        'card_ids': cardIds,
+        'created_at_ms': createdAtMs,
+        'strategy': strategy,
+        if (candidateIdLadder.isNotEmpty)
+          'candidate_id_ladder': candidateIdLadder,
+        if (nonNameContext.isNotEmpty) 'non_name_context': nonNameContext,
+        if (candidateLabels.isNotEmpty)
+          'candidate_labels':
+              candidateLabels.map((label) => label.toJson()).toList(),
+      };
+
+  bool canRefine(String nextQuery, String nextLanguage) {
+    final normalizedNext = nextQuery.trim();
+    return cardIds.isNotEmpty &&
+        normalizedNext.startsWith(query) &&
+        normalizedNext != query &&
+        language == nextLanguage &&
+        DateTime.now().millisecondsSinceEpoch - createdAtMs < 60000;
+  }
+
+  final String query;
+  final String language;
+  final List<String> cardIds;
+  final int createdAtMs;
+  final String strategy;
+  final Map<String, int> candidateIdLadder;
+  final Map<String, int> depthScores;
+  final Map<String, int> latestDepths;
+  final Map<String, int> latestOrders;
+  final Map<String, dynamic> nonNameContext;
+  final List<SearchCandidateLabel> candidateLabels;
+  final List<SearchPredictedNameToken> predictedNameTokens;
+}
+
+class SearchPredictedNameToken {
+  const SearchPredictedNameToken({
+    required this.normalized,
+    required this.display,
+    this.confidence = 0,
+    this.sourceRank = 0,
+    this.language = '',
+    this.source = '',
+    this.nameFragment = '',
+    this.representativeCardIds = const [],
+    this.representativeLabels = const [],
+  });
+
+  factory SearchPredictedNameToken.fromJson(
+    Map<String, dynamic> json, {
+    String source = '',
+  }) {
+    final jsonSource = '${json['source'] ?? source}'.trim();
+    return SearchPredictedNameToken(
+      normalized:
+          '${json['normalized'] ?? json['normalized_token'] ?? ''}'.trim(),
+      display: '${json['display'] ?? json['display_token'] ?? ''}'.trim(),
+      confidence: (json['confidence'] as num?)?.toDouble() ?? 0,
+      sourceRank: (json['source_rank'] as num?)?.toInt() ?? 0,
+      language: '${json['language'] ?? ''}'.trim(),
+      source: jsonSource,
+      nameFragment:
+          '${json['name_fragment'] ?? json['nameFragment'] ?? ''}'.trim(),
+      representativeCardIds:
+          _stringListFromJson(json['representative_card_ids']),
+      representativeLabels: _candidateLabelsFromJson(
+        json['representative_labels'],
+        limit: 8,
+      ),
+    );
+  }
+
+  final String normalized;
+  final String display;
+  final double confidence;
+  final int sourceRank;
+  final String language;
+  final String source;
+  final String nameFragment;
+  final List<String> representativeCardIds;
+  final List<SearchCandidateLabel> representativeLabels;
+
+  Map<String, dynamic> toJson() => {
+        'normalized': normalized,
+        'display': display,
+        if (confidence > 0) 'confidence': confidence,
+        if (sourceRank > 0) 'source_rank': sourceRank,
+        if (language.isNotEmpty) 'language': language,
+        if (source.isNotEmpty) 'source': source,
+        if (nameFragment.isNotEmpty) 'name_fragment': nameFragment,
+        if (representativeCardIds.isNotEmpty)
+          'representative_card_ids': representativeCardIds,
+        if (representativeLabels.isNotEmpty)
+          'representative_labels':
+              representativeLabels.map((label) => label.toJson()).toList(),
+      };
+
+  bool get isStructuredDimension =>
+      source == 'oracle_dimension_alias' || source.startsWith('oracle_');
+}
+
+class SearchTokenPredictionContext {
+  const SearchTokenPredictionContext({
+    required this.query,
+    required this.fragment,
+    required this.normalizedFragment,
+    required this.language,
+    required this.createdAtMs,
+    this.predictionFragment = '',
+    this.depth = 0,
+    this.source = '',
+    this.candidates = const [],
+  });
+
+  factory SearchTokenPredictionContext.fromJson(Map<String, dynamic> json) {
+    return SearchTokenPredictionContext(
+      query: '${json['query'] ?? ''}'.trim(),
+      fragment: '${json['fragment'] ?? ''}'.trim(),
+      predictionFragment:
+          '${json['prediction_fragment'] ?? json['predictionFragment'] ?? ''}'
+              .trim(),
+      normalizedFragment:
+          '${json['normalized_fragment'] ?? json['normalizedFragment'] ?? ''}'
+              .trim(),
+      language: '${json['language'] ?? json['search_language'] ?? ''}'.trim(),
+      depth: (json['depth'] as num?)?.toInt() ?? 0,
+      createdAtMs: (json['created_at_ms'] as num?)?.toInt() ??
+          (json['createdAtMs'] as num?)?.toInt() ??
+          0,
+      source: '${json['source'] ?? ''}'.trim(),
+      candidates: _predictedNameTokensFromJson(
+        json['candidates'],
+        source: 'token_predict.context',
+        limit: 20,
+      ),
+    );
+  }
+
+  final String query;
+  final String fragment;
+  final String predictionFragment;
+  final String normalizedFragment;
+  final String language;
+  final int depth;
+  final int createdAtMs;
+  final String source;
+  final List<SearchPredictedNameToken> candidates;
+
+  Map<String, dynamic> toJson() => {
+        'query': query,
+        'fragment': fragment,
+        if (predictionFragment.isNotEmpty)
+          'prediction_fragment': predictionFragment,
+        'normalized_fragment': normalizedFragment,
+        'language': language,
+        if (depth > 0) 'depth': depth,
+        'created_at_ms': createdAtMs,
+        if (source.isNotEmpty) 'source': source,
+        'candidates':
+            candidates.map((candidate) => candidate.toJson()).toList(),
+      };
+
+  bool canRefine(String nextQuery, String nextLanguage) {
+    final normalizedNext = _compactTokenPredictionText(nextQuery);
+    return normalizedFragment.isNotEmpty &&
+        candidates.isNotEmpty &&
+        normalizedNext.startsWith(normalizedFragment) &&
+        normalizedNext != normalizedFragment &&
+        language.toLowerCase() == nextLanguage.toLowerCase() &&
+        DateTime.now().millisecondsSinceEpoch - createdAtMs < 60000;
+  }
+}
+
+String _compactTokenPredictionText(String value) {
+  return value.trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+}
+
+class SearchTokenPredictionResult {
+  const SearchTokenPredictionResult({
+    this.tokens = const [],
+    this.context,
+  });
+
+  final List<SearchPredictedNameToken> tokens;
+  final SearchTokenPredictionContext? context;
+}
+
+List<String> _stringListFromJson(Object? value, {int limit = 8}) {
+  if (value is! List) {
+    return const [];
+  }
+  return List.unmodifiable(value
+      .map((item) => '$item'.trim())
+      .where((item) => item.isNotEmpty)
+      .take(limit));
+}
+
+List<SearchCandidateLabel> _candidateLabelsFromJson(
+  Object? value, {
+  required int limit,
+}) {
+  if (value is! List) {
+    return const [];
+  }
+  final labels = <SearchCandidateLabel>[];
+  final seen = <String>{};
+  for (final item in value.whereType<Map>()) {
+    final label = SearchCandidateLabel.fromJson(
+      Map<String, dynamic>.from(item),
+    );
+    if (label.id.isEmpty || label.name.isEmpty || !seen.add(label.id)) {
+      continue;
+    }
+    labels.add(label);
+    if (labels.length >= math.min(math.max(limit, 0), 10000)) {
+      break;
+    }
+  }
+  return List.unmodifiable(labels);
+}
+
+Map<String, int> _stringKeyedIntMap(Object? value) {
+  if (value is! Map) {
+    return const {};
+  }
+  final mapped = <String, int>{};
+  for (final entry in value.entries) {
+    final key = '${entry.key}'.trim();
+    final numeric = entry.value is num
+        ? (entry.value as num).toInt()
+        : int.tryParse('${entry.value}');
+    if (key.isNotEmpty && numeric != null) {
+      mapped[key] = numeric;
+    }
+  }
+  return Map.unmodifiable(mapped);
+}
+
+Map<String, int> _depthScoresFromContext(
+  Map<String, dynamic> nonNameContext,
+  Set<String> cardIds,
+) {
+  return _boundedContextIntMap(
+    nonNameContext['depth_scores'],
+    cardIds,
+    maxValue: 512,
+  );
+}
+
+Map<String, int> _latestDepthsFromContext(
+  Map<String, dynamic> nonNameContext,
+  Set<String> cardIds,
+) {
+  return _boundedContextIntMap(
+    nonNameContext['latest_depths'],
+    cardIds,
+    maxValue: 512,
+  );
+}
+
+Map<String, int> _latestOrdersFromContext(
+  Map<String, dynamic> nonNameContext,
+  Set<String> cardIds,
+) {
+  return _boundedContextIntMap(
+    nonNameContext['latest_orders'],
+    cardIds,
+    minValue: 0,
+    maxValue: 10000,
+  );
+}
+
+Map<String, int> _boundedContextIntMap(
+  Object? rawValue,
+  Set<String> cardIds, {
+  int minValue = 1,
+  required int maxValue,
+}) {
+  if (rawValue is! Map) {
+    return const {};
+  }
+  final values = <String, int>{};
+  for (final entry in rawValue.entries) {
+    final id = '${entry.key}'.trim();
+    if (id.isEmpty || !cardIds.contains(id)) {
+      continue;
+    }
+    final value = entry.value is num
+        ? (entry.value as num).toInt()
+        : int.tryParse('${entry.value}');
+    if (value == null || value < minValue) {
+      continue;
+    }
+    values[id] = math.min(value, maxValue);
+  }
+  return Map.unmodifiable(values);
+}
+
+Map<String, dynamic> _nonNameContextWithDepthScores(
+  Map<String, dynamic> nonNameContext,
+  Map<String, int> depthScores,
+  Map<String, int> latestDepths,
+  Map<String, int> latestOrders,
+) {
+  if (nonNameContext.isEmpty &&
+      depthScores.isEmpty &&
+      latestDepths.isEmpty &&
+      latestOrders.isEmpty) {
+    return const {};
+  }
+  final normalized = Map<String, dynamic>.from(nonNameContext)
+    ..remove('depth_scores')
+    ..remove('latest_depths')
+    ..remove('latest_orders');
+  if (depthScores.isNotEmpty) {
+    normalized['depth_scores'] = depthScores;
+  }
+  if (latestDepths.isNotEmpty) {
+    normalized['latest_depths'] = latestDepths;
+  }
+  if (latestOrders.isNotEmpty) {
+    normalized['latest_orders'] = latestOrders;
+  }
+  return Map.unmodifiable(normalized);
+}
+
+List<SearchPredictedNameToken> _predictedNameTokensFromContext(
+  Map<String, dynamic> nonNameContext,
+) {
+  final predictivePool = nonNameContext['predictive_pool'];
+  if (predictivePool is! Map) {
+    return const [];
+  }
+  return _predictedNameTokensFromJson(
+    predictivePool['predicted_tokens'] ?? predictivePool['predictedTokens'],
+    source: 'search_context.predictive_pool',
+  );
+}
+
+List<SearchPredictedNameToken> _predictedNameTokensFromJson(
+  Object? value, {
+  String source = '',
+  int limit = 8,
+}) {
+  if (value is! List) {
+    return const [];
+  }
+  final tokens = <SearchPredictedNameToken>[];
+  final seen = <String>{};
+  for (final item in value.whereType<Map>()) {
+    final token = SearchPredictedNameToken.fromJson(
+      Map<String, dynamic>.from(item),
+      source: source,
+    );
+    final normalized = token.normalized;
+    final display = token.display;
+    if (normalized.isEmpty || display.isEmpty || !seen.add(normalized)) {
+      continue;
+    }
+    tokens.add(token);
+    if (tokens.length >= limit) {
+      break;
+    }
+  }
+  return List.unmodifiable(tokens);
+}
+
+class SearchAutocompleteResult {
+  const SearchAutocompleteResult({
+    required this.cards,
+    this.context,
+    this.poolSize = 0,
+    this.poolSource = '',
+    this.predictedNameTokens = const [],
+  });
+
+  final List<PokemonCard> cards;
+  final SearchAutocompleteContext? context;
+  final int poolSize;
+  final String poolSource;
+  final List<SearchPredictedNameToken> predictedNameTokens;
+}
+
 class CardService {
   // Local storage
   static const String _cardsBoxName = 'pokemon_cards';
   static const String _homeSnapshotBoxName = 'marketplace_home_snapshot';
   static const String _homeSnapshotKey = 'snapshot';
+  static const String _spotlightCardsKey = 'spotlightCards';
+  static const String _listCacheBoxName = 'marketplace_card_list_cache';
+  static const String _cacheMetaBoxName = 'pokoin_cache_meta';
+  static const String _cacheSchemaKey = 'schemaVersion';
+  static const String _cacheCachedAtKey = 'cachedAtMs';
+  static const int _cacheSchemaVersion = 2;
+  static const Duration _catalogCacheTtl = Duration(days: 7);
+  static const Duration _homeSnapshotCacheTtl = Duration(hours: 12);
+  static const Duration _detailCacheTtl = Duration(days: 7);
+  static const Duration _listCacheTtl = Duration(days: 3);
   static const Map<String, double> _pknPrices = <String, double>{
     '1': 495,
     '2': 149995,
@@ -60,6 +1495,8 @@ class CardService {
     'goldstar': 'gold star',
     'shiningrare': 'shining rare',
     'shinystar': 'shiny star',
+    'ill': 'illustration rare',
+    'illus': 'illustration rare',
     'illustrationrare': 'illustration rare',
     'specialillustrationrare': 'special illustration rare',
     'amazingerare': 'amazing rare',
@@ -159,6 +1596,15 @@ class CardService {
     await _initHive();
     try {
       final box = await Hive.openBox<PokemonCard>(_cardsBoxName);
+      final metadata = await _cacheMetadata('cards');
+      final hasLegacyCards = metadata == null && box.isNotEmpty;
+      if (!_cacheMapIsUsable(metadata, _catalogCacheTtl,
+          allowLegacy: hasLegacyCards)) {
+        return const [];
+      }
+      if (hasLegacyCards) {
+        await _writeCacheMetadata('cards');
+      }
       return _normalizeCards(box.values.toList());
     } catch (error) {
       debugPrint('Cached cards load failed: $error');
@@ -173,11 +1619,27 @@ class CardService {
       if (cached == null) {
         return null;
       }
-      return _homeSnapshotFromMap(Map<String, dynamic>.from(cached));
+      final data = Map<String, dynamic>.from(cached);
+      final hasLegacySnapshot = data[_cacheSchemaKey] == null;
+      if (!_cacheMapIsUsable(
+        data,
+        _homeSnapshotCacheTtl,
+        allowLegacy: hasLegacySnapshot,
+      )) {
+        return null;
+      }
+      if (hasLegacySnapshot) {
+        await box.put(_homeSnapshotKey, _withCacheMeta(data));
+      }
+      return _homeSnapshotFromMap(data);
     } catch (error) {
       debugPrint('Cached marketplace home snapshot failed: $error');
       return null;
     }
+  }
+
+  Future<List<PokemonCard>> getCachedSpotlightCards() async {
+    return _cachedCardList(_spotlightCardsKey);
   }
 
   Future<MarketplaceHomeSnapshot?> getMarketplaceHomeSnapshot() async {
@@ -189,6 +1651,10 @@ class CardService {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       final snapshot = _homeSnapshotFromMap(data);
       await _saveMarketplaceHomeSnapshot(snapshot);
+      if (snapshot.cards.isNotEmpty) {
+        await _mergeCardsToLocal(snapshot.cards);
+        await _saveSpotlightCardsFromSnapshot(snapshot);
+      }
       return snapshot;
     } catch (error) {
       debugPrint('Marketplace home snapshot failed: $error');
@@ -218,15 +1684,176 @@ class CardService {
   ) async {
     try {
       final box = await Hive.openBox<Map>(_homeSnapshotBoxName);
-      await box.put(_homeSnapshotKey, snapshot.toJson());
+      await box.put(_homeSnapshotKey, _withCacheMeta(snapshot.toJson()));
     } catch (error) {
       debugPrint('Marketplace home cache save failed: $error');
     }
   }
 
+  Future<void> _saveSpotlightCardsFromSnapshot(
+    MarketplaceHomeSnapshot snapshot,
+  ) async {
+    final byId = {
+      for (final card in snapshot.cards)
+        if (card.id.isNotEmpty) card.id: card,
+    };
+    final orderedIds = [
+      ...snapshot.sections.featuredIds,
+      ...snapshot.sections.bestSellerIds,
+      ...snapshot.sections.recentlySeenIds,
+    ];
+    final seen = <String>{};
+    final cards = <PokemonCard>[];
+    for (final id in orderedIds) {
+      if (seen.add(id)) {
+        final card = byId[id];
+        if (card != null &&
+            card.itemKind != 'product' &&
+            card.productType == 'card') {
+          cards.add(card);
+        }
+      }
+    }
+    for (final card in snapshot.cards) {
+      if (cards.length >= 48) {
+        break;
+      }
+      if (card.id.isNotEmpty &&
+          seen.add(card.id) &&
+          card.itemKind != 'product' &&
+          card.productType == 'card') {
+        cards.add(card);
+      }
+    }
+    await _saveCardList(_spotlightCardsKey, cards.take(48).toList());
+  }
+
   Future<http.Response?> _getMarketplaceHomeResponse() {
     final uri = Uri.base.resolve('/api/marketplace-home');
     return http.get(uri).timeout(const Duration(seconds: 8));
+  }
+
+  Future<Map<String, MarketplaceCheapestPrice>> getCheapestPricesForCardIds(
+    Iterable<String> cardIds,
+  ) async {
+    final querySets = marketplaceCheapestPriceQueriesForTest(cardIds);
+    if (querySets.isEmpty) {
+      return const {};
+    }
+    final pricesById = <String, MarketplaceCheapestPrice>{};
+    for (final queryParameters in querySets) {
+      try {
+        final uri = Uri.base
+            .resolve('/api/marketplace-card-cheapest-price')
+            .replace(queryParameters: queryParameters);
+        final response =
+            await http.get(uri).timeout(const Duration(seconds: 6));
+        if (response.statusCode >= 400) {
+          debugPrint(
+              'Marketplace cheapest price load failed: ${response.statusCode}');
+          continue;
+        }
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final prices = (data['prices'] as List<dynamic>? ?? const [])
+            .whereType<Map>()
+            .map((row) => MarketplaceCheapestPrice.fromJson(
+                  Map<String, dynamic>.from(row),
+                ))
+            .where((price) => price.cardId.isNotEmpty)
+            .toList();
+        for (final price in prices) {
+          pricesById.putIfAbsent(price.cardId, () => price);
+        }
+      } catch (error) {
+        debugPrint('Marketplace cheapest price load failed: $error');
+        continue;
+      }
+    }
+    return pricesById;
+  }
+
+  @visibleForTesting
+  Map<String, String> marketplaceCheapestPriceQueryForTest(
+    Iterable<String> cardIds,
+  ) {
+    final queries = marketplaceCheapestPriceQueriesForTest(cardIds);
+    return queries.isEmpty ? const {} : queries.first;
+  }
+
+  @visibleForTesting
+  List<Map<String, String>> marketplaceCheapestPriceQueriesForTest(
+    Iterable<String> cardIds,
+  ) {
+    final ids = <String>[];
+    final canonicalPaths = <String>[];
+    final structuredQueries = <Map<String, String>>[];
+    final seenIds = <String>{};
+    final seenPaths = <String>{};
+    final seenStructured = <String>{};
+    for (final rawValue in cardIds) {
+      final value = rawValue.trim();
+      if (value.isEmpty) {
+        continue;
+      }
+      if (value.startsWith('/marketplace/') && value.contains('/cards/')) {
+        if (seenPaths.add(value)) {
+          canonicalPaths.add(value);
+        }
+        final publicNumber = _publicNumberFromMarketplacePath(value);
+        final internalId = cardIdFromDoubledId(publicNumber);
+        for (final id in [publicNumber, internalId]) {
+          if (id.isNotEmpty && seenIds.add(id) && ids.length < 50) {
+            ids.add(id);
+          }
+        }
+      } else if (RegExp(r'^[0-9]+$').hasMatch(value) &&
+          seenIds.add(value) &&
+          ids.length < 50) {
+        ids.add(value);
+      } else if (value.startsWith('structured:') &&
+          seenStructured.add(value) &&
+          structuredQueries.length < 9) {
+        final query = _structuredCheapestLookupQuery(value);
+        if (query.isNotEmpty) {
+          structuredQueries.add(query);
+        }
+      }
+      if (ids.length >= 50) {
+        break;
+      }
+    }
+    final primaryQuery = {
+      if (ids.isNotEmpty) 'cardIds': ids.join(','),
+      if (canonicalPaths.isNotEmpty) 'canonicalPath': canonicalPaths.first,
+    };
+    return [
+      if (primaryQuery.isNotEmpty) primaryQuery,
+      ...structuredQueries,
+    ];
+  }
+
+  static String _publicNumberFromMarketplacePath(String canonicalPath) {
+    final match = RegExp(r'/cards/([0-9]+)(?:/|$)').firstMatch(canonicalPath);
+    return match?.group(1) ?? '';
+  }
+
+  static Map<String, String> _structuredCheapestLookupQuery(String value) {
+    final parts = value.substring('structured:'.length).split('|');
+    if (parts.length != 3) {
+      return const {};
+    }
+    final name = parts[0].trim();
+    final setName = parts[1].trim();
+    final number = parts[2].trim();
+    if (name.isEmpty || (setName.isEmpty && number.isEmpty)) {
+      return const {};
+    }
+    return {
+      'name': name,
+      if (setName.isNotEmpty) 'setName': setName,
+      if (number.isNotEmpty) 'number': number,
+      'limit': '1',
+    };
   }
 
   static List<String> _stringList(Object? value) {
@@ -242,12 +1869,79 @@ class CardService {
   }
 
   @visibleForTesting
+  PokemonCard cardFromVersionRowForTest(Map<String, dynamic> row) {
+    return _cardFromVersionRow(row);
+  }
+
+  @visibleForTesting
+  PokemonCard cardFromMarketplaceRowForTest(Map<String, dynamic> row) {
+    return _cardFromMarketplaceRow(row);
+  }
+
+  @visibleForTesting
   List<PokemonCard> rankSearchCandidatesForTest(
     List<PokemonCard> cards,
     String query, {
     int limit = 20,
   }) {
     return _rankLocalCards(cards, query, limit);
+  }
+
+  @visibleForTesting
+  List<PokemonCard> searchCandidateCardsFromRowsForTest(
+    List<Map<String, dynamic>> rows, {
+    int limit = 20,
+  }) {
+    return _dedupeCards(rows.map(_cardFromSearchCandidate).toList())
+        .take(limit)
+        .toList();
+  }
+
+  @visibleForTesting
+  List<PokemonCard> searchAutocompletePreviewCardsFromRowsForTest(
+    List<Map<String, dynamic>> rows, {
+    int limit = 20,
+  }) {
+    return _searchAutocompletePreviewCardsFromRows(rows, limit);
+  }
+
+  @visibleForTesting
+  List<SearchPredictedNameToken> predictedNameTokensFromJsonForTest(
+    Object? value, {
+    String source = 'token_predict',
+  }) {
+    return _predictedNameTokensFromJson(value, source: source);
+  }
+
+  @visibleForTesting
+  List<String> searchQueryVariantsForTest(String query) {
+    return _searchQueryVariants([query]);
+  }
+
+  @visibleForTesting
+  Map<String, dynamic> searchCancelPayloadForTest({
+    required String sessionId,
+    required String lastQuery,
+    String reason = 'exit',
+  }) {
+    return _searchCancelPayload(
+      sessionId: sessionId,
+      lastQuery: lastQuery,
+      reason: reason,
+    );
+  }
+
+  @visibleForTesting
+  List<PokemonCard> excludeSimilarVersionCardsForTest(
+    PokemonCard current,
+    List<PokemonCard> versionCards,
+    List<PokemonCard> similarCards,
+  ) {
+    return _excludeVersionBlueprintCards(
+      current,
+      versionCards,
+      similarCards,
+    );
   }
 
   Future<List<PokemonCard>> _getMarketplaceCards() async {
@@ -300,24 +1994,41 @@ class CardService {
     final previewImageUrl = _normalizeImageUrl(
       row['preview_image_url'] ?? row['cdn_image_url'] ?? row['image_url'],
     );
+    final homepageImageUrl = _normalizeImageUrl(
+      row['homepage_image_url'] ??
+          row['homepageImageUrl'] ??
+          row['preview_image_url'] ??
+          row['cdn_image_url'] ??
+          row['image_url'],
+    );
+    final listedQuantity = (row['listed_quantity'] as num?)?.toInt() ?? 0;
+    final listedPrice = _readMarketplaceTilePrice(row);
+    final hasCardTraderListing = _readCardTraderAvailability(row);
+    final cardTraderListingCount = _readCardTraderEligibleListingCount(row);
+    final artist = _cleanLabel(
+      row['artist'] ?? row['illustrator'],
+      fallback: '',
+    );
     return PokemonCard(
       id: id,
       name: '${row['name'] ?? 'Pokemon card'}',
       imageUrl: imageUrl,
       previewImageUrl: previewImageUrl,
+      homepageImageUrl: homepageImageUrl,
       rarity: rarity,
       type: type,
       hp: 0,
       attacks: const [],
-      price: (_pknPrices[id] ?? 1000 + (_stableSeed(id) % 120000)).toDouble(),
+      price: listedPrice ??
+          (_pknPrices[id] ?? 1000 + (_stableSeed(id) % 120000)).toDouble(),
       description: itemKind == 'product'
           ? 'Imported from the Pokoin marketplace product projection.'
           : 'Imported from the Pokoin marketplace projection. Full blueprint data is loaded on card detail.',
       set: setName,
       number: number,
-      artist: '',
-      stock: 0,
-      rating: 0,
+      artist: artist,
+      stock: listedQuantity,
+      rating: _readWatchlistCount(row).toDouble(),
       reviewCount: 0,
       isFoil: row['is_foil'] == true,
       isHolo: row['is_holo'] == true,
@@ -336,6 +2047,12 @@ class CardService {
       productType: productType,
       trainerName: trainerName,
       expansionSymbolUrl: _normalizeImageUrl(row['expansion_symbol_url']),
+      expansionLogoUrl: _normalizeImageUrl(row['expansion_logo_url']),
+      canonicalPath: _cleanCanonicalPath(row),
+      hasCardTraderListing: hasCardTraderListing,
+      cardtraderEligibleListingCount: cardTraderListingCount,
+      watchlistCount: _readWatchlistCount(row),
+      cartHolderCount: _readCartHolderCount(row),
       cardPalette: _readCardPalette(row),
       emoji: _readEmoji(row),
     );
@@ -357,38 +2074,59 @@ class CardService {
       number: rawNumber,
     );
     final number = itemKind == 'product' ? productVariant : rawNumber;
-    final type = _marketplaceDisplayType(productType, fallback: 'Card');
+    final rarity = _cleanLabel(row['rarity'], fallback: 'Card');
+    final type = _marketplaceDisplayType(
+      productType,
+      fallback: _cleanLabel(row['card_type'], fallback: 'Card'),
+    );
     final trainerName = _cleanLabel(row['trainer_name'], fallback: '');
     final imageUrl =
         _normalizeImageUrl(row['cdn_image_url'] ?? row['image_url']);
     final previewImageUrl = _normalizeImageUrl(
       row['preview_image_url'] ?? row['cdn_image_url'] ?? row['image_url'],
     );
+    final homepageImageUrl = _normalizeImageUrl(
+      row['homepage_image_url'] ??
+          row['homepageImageUrl'] ??
+          row['preview_image_url'] ??
+          row['cdn_image_url'] ??
+          row['image_url'],
+    );
+    final listedQuantity = (row['listed_quantity'] as num?)?.toInt() ?? 0;
+    final listedPrice = _readMarketplaceTilePrice(row);
+    final hasCardTraderListing = _readCardTraderAvailability(row);
+    final cardTraderListingCount = _readCardTraderEligibleListingCount(row);
+    final artist = _cleanLabel(
+      row['artist'] ?? row['illustrator'],
+      fallback: '',
+    );
     return PokemonCard(
       id: id,
       name: '${row['name'] ?? 'Pokemon card'}',
       imageUrl: imageUrl,
       previewImageUrl: previewImageUrl,
-      rarity: 'Card',
+      homepageImageUrl: homepageImageUrl,
+      rarity: itemKind == 'product' ? type : rarity,
       type: type,
       hp: 0,
       attacks: const [],
-      price: (_pknPrices[id] ?? 1000 + (_stableSeed(id) % 120000)).toDouble(),
+      price: listedPrice ??
+          (_pknPrices[id] ?? 1000 + (_stableSeed(id) % 120000)).toDouble(),
       description: itemKind == 'product'
           ? 'Imported from the Pokoin marketplace product version index.'
           : 'Imported from the Pokoin marketplace version index. Full blueprint data is loaded on card detail.',
       set: setName,
       number: number,
-      artist: '',
-      stock: 0,
-      rating: 0,
+      artist: artist,
+      stock: listedQuantity,
+      rating: _readWatchlistCount(row).toDouble(),
       reviewCount: 0,
       isFoil: false,
       isHolo: false,
       releaseDate: _parseDate(row['projected_at']),
       tags: [
         setName,
-        'Card',
+        itemKind == 'product' ? type : rarity,
         type,
         itemKind,
         productType,
@@ -400,6 +2138,12 @@ class CardService {
       productType: productType,
       trainerName: trainerName,
       expansionSymbolUrl: _normalizeImageUrl(row['expansion_symbol_url']),
+      expansionLogoUrl: _normalizeImageUrl(row['expansion_logo_url']),
+      canonicalPath: _cleanCanonicalPath(row),
+      hasCardTraderListing: hasCardTraderListing,
+      cardtraderEligibleListingCount: cardTraderListingCount,
+      watchlistCount: _readWatchlistCount(row),
+      cartHolderCount: _readCartHolderCount(row),
       cardPalette: _readCardPalette(row),
       emoji: _readEmoji(row),
     );
@@ -462,12 +2206,23 @@ class CardService {
           row['image_url'] ??
           blueprint['image_url'],
     );
+    final homepageImageUrl = _normalizeImageUrl(
+      row['homepage_image_url'] ??
+          row['homepageImageUrl'] ??
+          row['preview_image_url'] ??
+          row['cdn_preview_image_url'] ??
+          row['previewImageUrl'] ??
+          row['cdn_image_url'] ??
+          row['image_url'] ??
+          blueprint['image_url'],
+    );
     final price = _pknPrices[id] ?? 1000 + (_stableSeed(id) % 120000);
     return PokemonCard(
       id: id,
       name: name,
       imageUrl: imageUrl,
       previewImageUrl: previewImageUrl,
+      homepageImageUrl: homepageImageUrl,
       rarity: displayRarity,
       type: type,
       hp: 0,
@@ -498,8 +2253,10 @@ class CardService {
       itemKind: itemKind,
       productType: productType,
       trainerName: trainerName,
+      canonicalPath: _cleanCanonicalPath(row),
       cardPalette: _readCardPalette(row),
       emoji: _readEmoji(row),
+      cartHolderCount: _readCartHolderCount(row),
     );
   }
 
@@ -714,17 +2471,53 @@ class CardService {
     if (text.isEmpty) {
       return '';
     }
+    return _publicCardImageUrl(text);
+  }
 
-    final uri = Uri.tryParse(text);
-    if (uri == null || !uri.hasScheme) {
-      return text;
+  String _publicCardImageUrl(String value) {
+    if (value == _cardImageProxyPrefix ||
+        value.startsWith('$_cardImageProxyPrefix/') ||
+        value.startsWith('card-images/')) {
+      return _cardImageProxyUrl(value);
     }
-    if (uri.host != 'cdn.pokoin.com') {
-      return text;
+    try {
+      final uri = Uri.parse(value);
+      if (uri.hasScheme && uri.host == _cardImageCdnHost) {
+        return _cardImageProxyUrl(uri.path, query: uri.query);
+      }
+      if (uri.hasScheme &&
+          uri.host == 'pokoin.com' &&
+          (uri.path == _cardImageProxyPrefix ||
+              uri.path.startsWith('$_cardImageProxyPrefix/'))) {
+        return _cardImageProxyUrl(uri.path, query: uri.query);
+      }
+      return value;
+    } catch (_) {
+      return value;
     }
+  }
 
-    final path = uri.path.startsWith('/') ? uri.path : '/${uri.path}';
-    return '/card-images$path${uri.hasQuery ? '?${uri.query}' : ''}';
+  String _cardImageProxyUrl(String path, {String query = ''}) {
+    var imagePath = path.trim();
+    if (imagePath.isEmpty) {
+      return '';
+    }
+    if (!imagePath.startsWith('/')) {
+      imagePath = '/$imagePath';
+    }
+    while (imagePath == _cardImageProxyPrefix ||
+        imagePath.startsWith('$_cardImageProxyPrefix/')) {
+      imagePath = imagePath.substring(_cardImageProxyPrefix.length);
+      if (imagePath.isEmpty) {
+        imagePath = '/';
+      }
+    }
+    final uri = Uri.parse(_cardImageProxyOrigin)
+        .replace(path: '$_cardImageProxyPrefix$imagePath');
+    if (query.isEmpty) {
+      return uri.toString();
+    }
+    return uri.replace(query: query).toString();
   }
 
   Future<void> _saveCardsToLocal(List<PokemonCard> cards) async {
@@ -734,6 +2527,7 @@ class CardService {
       for (int i = 0; i < cards.length; i++) {
         await box.put(i, cards[i]);
       }
+      await _writeCacheMetadata('cards');
     } catch (e) {
       debugPrint('Error saving cards to local storage: $e');
     }
@@ -751,6 +2545,7 @@ class CardService {
   }
 
   Future<PokemonCard?> getCardById(String id) async {
+    final cached = await getCachedCardById(id);
     try {
       final projectionCard = await _getMarketplaceProjectionCardById(id);
       if (projectionCard != null) {
@@ -758,12 +2553,195 @@ class CardService {
         return projectionCard;
       }
 
-      final box = await Hive.openBox<PokemonCard>(_cardsBoxName);
-      return box.values.firstWhere((card) => card.id == id);
+      return cached;
     } catch (e) {
       debugPrint('Error getting card by ID: $e');
+      return cached;
+    }
+  }
+
+  Future<PokemonCard?> getCardByDetailSlug(String slug) async {
+    final normalizedSlug = normalizeCardDetailSlug(slug);
+    if (normalizedSlug.isEmpty) {
       return null;
     }
+
+    final cached = await getCachedCardByDetailSlug(normalizedSlug);
+    try {
+      final projectionCard = await _getMarketplaceProjectionCardBySlug(
+        normalizedSlug,
+      );
+      if (projectionCard != null) {
+        await _upsertCardToLocal(projectionCard);
+        return projectionCard;
+      }
+
+      return cached;
+    } catch (e) {
+      debugPrint('Error getting card by detail slug: $e');
+      return cached;
+    }
+  }
+
+  Future<MarketplaceCardCanonicalUrl?> getMarketplaceCardCanonicalUrl({
+    String? cardId,
+    String? path,
+    String language = 'en',
+  }) async {
+    final trimmedCardId = (cardId ?? '').trim();
+    final trimmedPath = (path ?? '').trim();
+    if (trimmedCardId.isEmpty && trimmedPath.isEmpty) {
+      return null;
+    }
+
+    try {
+      final queryParameters = <String, String>{
+        'language': language,
+        if (trimmedCardId.isNotEmpty) 'cardId': trimmedCardId,
+        if (trimmedPath.isNotEmpty) 'path': trimmedPath,
+      };
+      final uri = Uri.base.resolve('/api/marketplace-card-url').replace(
+            queryParameters: queryParameters,
+          );
+      final response = await http.get(uri).timeout(const Duration(seconds: 6));
+      if (response.statusCode >= 400) {
+        return null;
+      }
+      final payload = jsonDecode(response.body);
+      if (payload is! Map<String, dynamic>) {
+        return null;
+      }
+      final canonical = MarketplaceCardCanonicalUrl.fromJson(payload);
+      if (canonical.canonicalPath.startsWith('/marketplace/') &&
+          canonical.canonicalPath.contains('/cards/')) {
+        return canonical;
+      }
+    } catch (error) {
+      debugPrint('Marketplace canonical URL lookup failed: $error');
+    }
+    return null;
+  }
+
+  Future<List<CardSaleEvent>> getCardSalesHistory(String cardId) async {
+    final trimmedId = cardId.trim();
+    if (!RegExp(r'^\d+$').hasMatch(trimmedId)) {
+      return const [];
+    }
+
+    try {
+      final uri = Uri.base.resolve('/api/marketplace-card-sales').replace(
+        queryParameters: {
+          'cardId': trimmedId,
+          'limit': '160',
+        },
+      );
+      final response = await http.get(uri).timeout(const Duration(seconds: 8));
+      if (response.statusCode >= 400) {
+        debugPrint('Marketplace card sales failed: ${response.statusCode}');
+        return const [];
+      }
+      final decoded = jsonDecode(response.body);
+      final rows = decoded is Map ? decoded['rows'] : decoded;
+      if (rows is! List) {
+        return const [];
+      }
+      return rows
+          .whereType<Map>()
+          .map((row) => CardSaleEvent.fromJson(Map<String, dynamic>.from(row)))
+          .where((event) =>
+              event.cardId == trimmedId &&
+              event.pricePkn > 0 &&
+              event.soldAt.millisecondsSinceEpoch > 0)
+          .toList();
+    } catch (error) {
+      debugPrint('Marketplace card sales failed: $error');
+      return const [];
+    }
+  }
+
+  Future<MarketplaceBlueprintPrice?> getCardTraderSuggestedListingPrice(
+    String cardId,
+  ) async {
+    final trimmedId = cardId.trim();
+    if (!RegExp(r'^\d+$').hasMatch(trimmedId)) {
+      return null;
+    }
+
+    try {
+      final uri = Uri.base.resolve('/api/marketplace-blueprint-price').replace(
+        queryParameters: {
+          'cardId': trimmedId,
+          'source': 'cardtrader',
+        },
+      );
+      final response = await http.get(uri).timeout(const Duration(seconds: 6));
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        return null;
+      }
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        return null;
+      }
+      final price = MarketplaceBlueprintPrice.fromJson(decoded);
+      return price.hasPrice ? price : null;
+    } catch (error) {
+      debugPrint('CardTrader suggested listing price failed: $error');
+      return null;
+    }
+  }
+
+  Future<PokemonCard?> getCachedCardById(String id) async {
+    await _initHive();
+    try {
+      final box = await Hive.openBox<PokemonCard>(_cardsBoxName);
+      final meta = await _cacheMetadata('cards');
+      final hasLegacyCards = meta == null && box.isNotEmpty;
+      if (!_cacheMapIsUsable(meta, _detailCacheTtl,
+          allowLegacy: hasLegacyCards)) {
+        return null;
+      }
+      if (hasLegacyCards) {
+        await _writeCacheMetadata('cards');
+      }
+      for (final card in box.values) {
+        if (card.id == id) {
+          return card;
+        }
+      }
+    } catch (error) {
+      debugPrint('Cached card by id failed: $error');
+    }
+    return null;
+  }
+
+  Future<PokemonCard?> getCachedCardByDetailSlug(String slug) async {
+    final normalizedSlug = normalizeCardDetailSlug(slug);
+    if (normalizedSlug.isEmpty) {
+      return null;
+    }
+
+    await _initHive();
+    try {
+      final box = await Hive.openBox<PokemonCard>(_cardsBoxName);
+      final meta = await _cacheMetadata('cards');
+      final hasLegacyCards = meta == null && box.isNotEmpty;
+      if (!_cacheMapIsUsable(meta, _detailCacheTtl,
+          allowLegacy: hasLegacyCards)) {
+        return null;
+      }
+      if (hasLegacyCards) {
+        await _writeCacheMetadata('cards');
+      }
+      for (final card in box.values) {
+        if (cardDetailSlugsMatch(cardDetailSlug(card), normalizedSlug) ||
+            cardDetailSlugsMatch(legacyCardDetailSlug(card), normalizedSlug)) {
+          return card;
+        }
+      }
+    } catch (error) {
+      debugPrint('Cached card by detail slug failed: $error');
+    }
+    return null;
   }
 
   Future<PokemonCard?> _getMarketplaceProjectionCardById(String id) async {
@@ -796,6 +2774,43 @@ class CardService {
     }
   }
 
+  Future<PokemonCard?> _getMarketplaceProjectionCardBySlug(String slug) async {
+    final normalizedSlug = normalizeCardDetailSlug(slug);
+    if (normalizedSlug.isEmpty) {
+      return null;
+    }
+
+    try {
+      final uri = Uri.base.resolve('/api/marketplace-card-versions').replace(
+        queryParameters: {
+          'cardSlug': normalizedSlug,
+          'limit': '120',
+        },
+      );
+      final response = await http.get(uri).timeout(const Duration(seconds: 6));
+
+      if (response.statusCode >= 400) {
+        return null;
+      }
+      final rows = jsonDecode(response.body) as List<dynamic>;
+      final cards = rows
+          .whereType<Map>()
+          .map((row) => _cardFromVersionRow(Map<String, dynamic>.from(row)))
+          .where((card) => cardDetailSlugsMatch(
+                cardDetailSlug(card),
+                normalizedSlug,
+              ))
+          .toList();
+      if (cards.isEmpty) {
+        return null;
+      }
+      return cards.first;
+    } catch (error) {
+      debugPrint('Marketplace projection card by slug failed: $error');
+      return null;
+    }
+  }
+
   Future<List<PokemonCard>> getExpansionVersionCards(PokemonCard card) async {
     return getCardsByExpansion(card.set);
   }
@@ -805,6 +2820,8 @@ class CardService {
     if (!RegExp(r'^\d+$').hasMatch(trimmedId)) {
       return const [];
     }
+    final cacheKey = 'versions:$trimmedId';
+    final cached = await _cachedCardList(cacheKey);
 
     try {
       final uri = Uri.base.resolve('/api/marketplace-card-versions').replace(
@@ -823,18 +2840,27 @@ class CardService {
           .whereType<Map>()
           .map((row) => _cardFromVersionRow(Map<String, dynamic>.from(row)))
           .toList();
-      return _sortCardsByCollectorNumber(cards);
+      final sorted = _sortCardsByCollectorNumber(_dedupeCards(cards));
+      await _saveCardList(cacheKey, sorted);
+      await _mergeCardsToLocal(sorted);
+      return sorted;
     } catch (error) {
       debugPrint('Other version cards failed: $error');
-      return const [];
+      return cached;
     }
   }
 
-  Future<List<PokemonCard>> getSimilarVersionCards(String cardId) async {
+  Future<List<PokemonCard>> getSimilarVersionCards(
+    String cardId, {
+    List<PokemonCard> versionCards = const [],
+  }) async {
     final current = await getCardById(cardId);
     if (current == null || current.set.trim().isEmpty) {
       return const [];
     }
+    final excludedVersionCards = versionCards.isEmpty
+        ? await getOtherVersionCards(cardId)
+        : versionCards;
     final sameNameCards = await searchMarketplaceCards(
       current.name,
       limit: 80,
@@ -861,7 +2887,8 @@ class CardService {
       });
     final sameNameIds = sameNameRanked.map((card) => card.id).toSet();
     final rankedExpansion = expansionCards
-        .where((card) => card.id != current.id && !sameNameIds.contains(card.id))
+        .where(
+            (card) => card.id != current.id && !sameNameIds.contains(card.id))
         .map((card) => (card: card, score: _similarityScore(current, card)))
         .toList()
       ..sort((a, b) {
@@ -874,10 +2901,38 @@ class CardService {
           _collectorNumberSortKey(b.card.number),
         );
       });
-    return _dedupeCards([
-      ...sameNameRanked,
-      ...rankedExpansion.map((entry) => entry.card),
-    ]).take(16).toList();
+    final filtered = _excludeVersionBlueprintCards(
+      current,
+      excludedVersionCards,
+      _dedupeCards([
+        ...sameNameRanked,
+        ...rankedExpansion.map((entry) => entry.card),
+      ]),
+    );
+    return filtered.take(16).toList();
+  }
+
+  Set<String> _versionBlueprintIds(
+    PokemonCard current,
+    Iterable<PokemonCard> versionCards,
+  ) {
+    return {
+      current.id.trim(),
+      for (final card in versionCards)
+        if (card.id.trim().isNotEmpty) card.id.trim(),
+    }..remove('');
+  }
+
+  List<PokemonCard> _excludeVersionBlueprintCards(
+    PokemonCard current,
+    Iterable<PokemonCard> versionCards,
+    Iterable<PokemonCard> similarCards,
+  ) {
+    final excludedIds = _versionBlueprintIds(current, versionCards);
+    return [
+      for (final card in similarCards)
+        if (!excludedIds.contains(card.id.trim())) card,
+    ];
   }
 
   Future<List<MarketplaceExpansion>> getMarketplaceExpansions({
@@ -947,11 +3002,158 @@ class CardService {
     }
   }
 
+  Future<MarketplaceArtistSnapshot?> getMarketplaceArtistSnapshotBySlug(
+    String slug, {
+    int limit = _marketplaceArtistSnapshotLimit,
+  }) async {
+    final normalizedSlug = artistSlug(slug);
+    if (normalizedSlug.isEmpty) {
+      return null;
+    }
+    final cacheKey = 'artist:$normalizedSlug:$limit';
+    final cached = await _cachedCardList(cacheKey);
+    try {
+      final uri = Uri.base.resolve('/api/marketplace-artist-cards').replace(
+        queryParameters: {
+          'artistSlug': normalizedSlug,
+          'limit': '$limit',
+        },
+      );
+      final response = await _getMarketplaceArtistCardsResponse(uri);
+      if (response.statusCode >= 400) {
+        return cached.isEmpty
+            ? null
+            : MarketplaceArtistSnapshot(
+                name: _artistTitleFromSlug(normalizedSlug),
+                slug: normalizedSlug,
+                cardCount: cached.length,
+                cards: cached,
+              );
+      }
+      final payload = jsonDecode(response.body) as Map<String, dynamic>;
+      final artist = Map<String, dynamic>.from(
+        payload['artist'] as Map? ?? const {},
+      );
+      final profile = MarketplaceArtistProfile.fromJson(
+        Map<String, dynamic>.from(payload['profile'] as Map? ?? const {}),
+      );
+      final cards = (payload['cards'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map((row) => _cardFromVersionRow(Map<String, dynamic>.from(row)))
+          .toList();
+      final sorted = _sortCardsByCollectorNumber(_dedupeCards(cards));
+      if (sorted.isNotEmpty) {
+        await _saveCardList(cacheKey, sorted);
+        await _mergeCardsToLocal(sorted);
+      }
+      final name = _cleanLabel(artist['name'], fallback: '');
+      if (name.isEmpty && sorted.isEmpty) {
+        return null;
+      }
+      return MarketplaceArtistSnapshot(
+        name: name.isEmpty ? _artistTitleFromSlug(normalizedSlug) : name,
+        slug: _cleanLabel(artist['slug'], fallback: normalizedSlug),
+        cardCount: (artist['cardCount'] as num?)?.toInt() ?? sorted.length,
+        cards: sorted.isEmpty ? cached : sorted,
+        profile: profile,
+      );
+    } catch (error) {
+      debugPrint('Marketplace artist cards failed: $error');
+      return cached.isEmpty
+          ? null
+          : MarketplaceArtistSnapshot(
+              name: _artistTitleFromSlug(normalizedSlug),
+              slug: normalizedSlug,
+              cardCount: cached.length,
+              cards: cached,
+            );
+    }
+  }
+
+  Future<http.Response> _getMarketplaceArtistCardsResponse(Uri uri) async {
+    var response = await http.get(uri).timeout(const Duration(seconds: 6));
+    if (response.statusCode < 500) {
+      return response;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+    return http.get(uri).timeout(const Duration(seconds: 6));
+  }
+
+  Future<List<MarketplaceArtistSummary>> getMarketplaceArtistSummaries() async {
+    try {
+      final uri = Uri.base.resolve('/api/marketplace-artist-cards').replace(
+        queryParameters: {
+          'summaries': '1',
+          'limit': '1000',
+        },
+      );
+      final response = await http.get(uri).timeout(const Duration(seconds: 6));
+      if (response.statusCode >= 400) {
+        return const [];
+      }
+      final payload = jsonDecode(response.body) as Map<String, dynamic>;
+      return (payload['artists'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map((row) => MarketplaceArtistSummary.fromJson(
+                Map<String, dynamic>.from(row),
+              ))
+          .where((artist) =>
+              artist.name.isNotEmpty &&
+              artist.slug.isNotEmpty &&
+              artist.cardCount > 0)
+          .toList();
+    } catch (error) {
+      debugPrint('Marketplace artist summaries failed: $error');
+      return const [];
+    }
+  }
+
+  Future<CompetitiveSnapshot?> getCompetitiveSnapshot({
+    String? game,
+    String? format,
+    int? year,
+    String? tournamentId,
+    String? deckId,
+    int limit = 50,
+  }) async {
+    try {
+      final queryParameters = <String, String>{
+        if (deckId?.trim().isNotEmpty == true)
+          'deckId': deckId!.trim()
+        else if (tournamentId?.trim().isNotEmpty == true)
+          'tournamentId': tournamentId!.trim()
+        else ...{
+          'includeGames': '1',
+          'limit': '$limit',
+          if (game?.trim().isNotEmpty == true) 'game': game!.trim(),
+          if (format?.trim().isNotEmpty == true) 'format': format!.trim(),
+          if (year != null && year > 0) 'year': '$year',
+        },
+      };
+      final uri = Uri.base.resolve('/api/marketplace-competitive').replace(
+            queryParameters: queryParameters,
+          );
+      final response = await http.get(uri).timeout(const Duration(seconds: 8));
+      if (response.statusCode >= 400) {
+        debugPrint('Marketplace competitive failed: ${response.statusCode}');
+        return null;
+      }
+      return CompetitiveSnapshot.fromJson(
+        jsonDecode(response.body) as Map<String, dynamic>,
+      );
+    } catch (error) {
+      debugPrint('Marketplace competitive failed: $error');
+      return null;
+    }
+  }
+
   Future<List<PokemonCard>> getCardsByExpansion(String expansionName) async {
     final normalizedExpansion = expansionName.trim();
     if (normalizedExpansion.isEmpty) {
       return const [];
     }
+    final cacheKey = 'expansion:${normalizedExpansion.toLowerCase()}';
+    final cached = await _cachedCardList(cacheKey);
 
     try {
       final uri = Uri.base.resolve('/api/marketplace-card-versions').replace(
@@ -971,11 +3173,30 @@ class CardService {
           .whereType<Map>()
           .map((row) => _cardFromVersionRow(Map<String, dynamic>.from(row)))
           .toList();
-      return _sortCardsByCollectorNumber(cards);
+      final sorted = _sortCardsByCollectorNumber(_dedupeCards(cards));
+      await _saveCardList(cacheKey, sorted);
+      await _mergeCardsToLocal(sorted);
+      return sorted;
     } catch (error) {
       debugPrint('Expansion cards failed: $error');
-      return const [];
+      return cached;
     }
+  }
+
+  String _artistTitleFromSlug(String slug) {
+    final normalizedSlug = artistSlug(slug);
+    if (normalizedSlug == '2017-pikachu-project' ||
+        normalizedSlug == 'pikachu-project-2017' ||
+        normalizedSlug == 'pikachu-project') {
+      return 'Pikachu Project';
+    }
+    return slug
+        .split('-')
+        .where((part) => part.isNotEmpty)
+        .map((part) => part.length <= 1
+            ? part.toUpperCase()
+            : '${part[0].toUpperCase()}${part.substring(1)}')
+        .join(' ');
   }
 
   List<PokemonCard> _sortCardsByCollectorNumber(List<PokemonCard> cards) {
@@ -1049,8 +3270,9 @@ class CardService {
   ) {
     final normalized = number.trim().toLowerCase();
     final firstNumber = RegExp(r'\d+').firstMatch(normalized);
-    final parsedNumber =
-        firstNumber == null ? 1 << 30 : int.tryParse(firstNumber.group(0)!) ?? 1 << 30;
+    final parsedNumber = firstNumber == null
+        ? 1 << 30
+        : int.tryParse(firstNumber.group(0)!) ?? 1 << 30;
     final normalNumber =
         RegExp(r'[a-z]*\d+[a-z]?\s*/\s*\d+', caseSensitive: false)
                 .hasMatch(normalized) ||
@@ -1075,9 +3297,130 @@ class CardService {
       } else {
         await box.put(key, card);
       }
+      await _writeCacheMetadata('cards');
     } catch (error) {
       debugPrint('Error caching card by id: $error');
     }
+  }
+
+  Future<void> _mergeCardsToLocal(List<PokemonCard> cards) async {
+    if (cards.isEmpty) {
+      return;
+    }
+    try {
+      await _initHive();
+      final box = await Hive.openBox<PokemonCard>(_cardsBoxName);
+      final byId = <String, PokemonCard>{
+        for (final card in box.values)
+          if (card.id.isNotEmpty) card.id: card,
+      };
+      for (final card in cards) {
+        if (card.id.isNotEmpty) {
+          byId[card.id] = card;
+        }
+      }
+      await box.clear();
+      var index = 0;
+      for (final card in byId.values) {
+        await box.put(index++, card);
+      }
+      await _writeCacheMetadata('cards');
+    } catch (error) {
+      debugPrint('Error merging cards to local cache: $error');
+    }
+  }
+
+  Future<List<PokemonCard>> _cachedCardList(String key) async {
+    try {
+      final box = await Hive.openBox<Map>(_listCacheBoxName);
+      final cached = box.get(key);
+      if (cached == null) {
+        return const [];
+      }
+      final data = Map<String, dynamic>.from(cached);
+      if (!_cacheMapIsUsable(data, _listCacheTtl)) {
+        return const [];
+      }
+      return (data['cards'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map((row) => PokemonCard.fromJson(Map<String, dynamic>.from(row)))
+          .toList(growable: false);
+    } catch (error) {
+      debugPrint('Marketplace card list cache load failed: $error');
+      return const [];
+    }
+  }
+
+  Future<void> _saveCardList(String key, List<PokemonCard> cards) async {
+    if (cards.isEmpty) {
+      return;
+    }
+    try {
+      final box = await Hive.openBox<Map>(_listCacheBoxName);
+      await box.put(
+        key,
+        _withCacheMeta({
+          'cards': cards.map((card) => card.toJson()).toList(),
+        }),
+      );
+    } catch (error) {
+      debugPrint('Marketplace card list cache save failed: $error');
+    }
+  }
+
+  Future<Map?> _cacheMetadata(String key) async {
+    try {
+      final box = await Hive.openBox<Map>(_cacheMetaBoxName);
+      return box.get(key);
+    } catch (error) {
+      debugPrint('Cache metadata load failed: $error');
+      return null;
+    }
+  }
+
+  Future<void> _writeCacheMetadata(String key) async {
+    try {
+      final box = await Hive.openBox<Map>(_cacheMetaBoxName);
+      await box.put(key, _cacheMetadataMap());
+    } catch (error) {
+      debugPrint('Cache metadata save failed: $error');
+    }
+  }
+
+  Map<String, dynamic> _withCacheMeta(Map<String, dynamic> data) {
+    return {
+      ...data,
+      ..._cacheMetadataMap(),
+    };
+  }
+
+  Map<String, dynamic> _cacheMetadataMap() {
+    return {
+      _cacheSchemaKey: _cacheSchemaVersion,
+      _cacheCachedAtKey: DateTime.now().millisecondsSinceEpoch,
+    };
+  }
+
+  bool _cacheMapIsUsable(
+    Map? raw,
+    Duration ttl, {
+    bool allowLegacy = false,
+  }) {
+    if (raw == null) {
+      return allowLegacy;
+    }
+    final schema = (raw[_cacheSchemaKey] as num?)?.toInt();
+    if (schema != _cacheSchemaVersion) {
+      return false;
+    }
+    final cachedAtMs = (raw[_cacheCachedAtKey] as num?)?.toInt();
+    if (cachedAtMs == null || cachedAtMs <= 0) {
+      return false;
+    }
+    final age = DateTime.now().difference(
+      DateTime.fromMillisecondsSinceEpoch(cachedAtMs),
+    );
+    return age <= ttl;
   }
 
   Future<List<PokemonCard>> searchCards(String query) async {
@@ -1104,6 +3447,7 @@ class CardService {
     int limit = 120,
     String? productType,
     String searchLanguage = 'en',
+    String? searchSessionId,
   }) async {
     final normalizedQuery = query.trim();
     if (_meaningfulSearchLength(normalizedQuery) < 1) {
@@ -1121,6 +3465,7 @@ class CardService {
           limit: limit,
           productType: productType,
           searchLanguage: queryLanguage,
+          searchSessionId: searchSessionId,
         );
         results.addAll(rows);
         if (results.length >= limit) {
@@ -1131,25 +3476,30 @@ class CardService {
     }
 
     for (final searchQuery in queries) {
-      final rows = await _searchMarketplaceCardVersions(
-        searchQuery,
-        limit: limit,
-        searchLanguage: queryLanguage,
-      );
-      results.addAll(rows.where((card) => card.itemKind != 'product'));
-      final singleRows = await _searchMarketplaceCardRows(
-        searchQuery,
-        limit: limit,
-        searchLanguage: queryLanguage,
-      );
-      results.addAll(singleRows.where((card) => card.itemKind != 'product'));
-      final productRows = await _searchMarketplaceCardRows(
-        searchQuery,
-        limit: limit,
-        searchLanguage: queryLanguage,
-        productSearchOnly: true,
-      );
-      results.addAll(productRows);
+      final rows = await Future.wait([
+        _searchMarketplaceCardVersions(
+          searchQuery,
+          limit: limit,
+          searchLanguage: queryLanguage,
+          searchSessionId: searchSessionId,
+        ),
+        _searchMarketplaceCardRows(
+          searchQuery,
+          limit: limit,
+          searchLanguage: queryLanguage,
+          searchSessionId: searchSessionId,
+        ),
+        _searchMarketplaceCardRows(
+          searchQuery,
+          limit: limit,
+          searchLanguage: queryLanguage,
+          productSearchOnly: true,
+          searchSessionId: searchSessionId,
+        ),
+      ]);
+      results.addAll(rows[0].where((card) => card.itemKind != 'product'));
+      results.addAll(rows[1].where((card) => card.itemKind != 'product'));
+      results.addAll(rows[2]);
       if (results.length >= limit) {
         break;
       }
@@ -1161,64 +3511,93 @@ class CardService {
     String productType, {
     int limit = 240,
   }) async {
-    return _searchMarketplaceCardVersions(
-      '',
-      limit: limit,
-      productType: productType,
-    );
+    final normalizedType = productType.trim();
+    final cacheKey = 'product:$normalizedType:$limit';
+    final cached = await _cachedCardList(cacheKey);
+    try {
+      final cards = await _searchMarketplaceCardVersions(
+        '',
+        limit: limit,
+        productType: normalizedType,
+      );
+      if (cards.isNotEmpty) {
+        await _saveCardList(cacheKey, cards);
+        await _mergeCardsToLocal(cards);
+      }
+      return cards.isEmpty ? cached : cards;
+    } catch (error) {
+      debugPrint('Product type cards failed: $error');
+      return cached;
+    }
   }
 
-  Future<List<PokemonCard>> searchCardPreviews(
-    String query, {
-    List<PokemonCard> fallbackCards = const [],
-    int limit = 8,
+  Future<List<MarketplaceProductFacet>> getMarketplaceProductFacets({
+    String query = '',
     String searchLanguage = 'en',
-    bool preserveRemotePool = false,
   }) async {
-    final normalizedQuery = query.trim();
-    if (_meaningfulSearchLength(normalizedQuery) < 1) {
+    try {
+      final queryParameters = <String, String>{'facets': 'products'};
+      final normalizedQuery = query.trim();
+      if (normalizedQuery.isNotEmpty) {
+        queryParameters['query'] = normalizedQuery;
+      }
+      if (_tcgdexLanguage(searchLanguage) != 'en') {
+        queryParameters['lang'] = _tcgdexLanguage(searchLanguage);
+      }
+      final uri = Uri.base.resolve('/api/marketplace-cards').replace(
+            queryParameters: queryParameters,
+          );
+      final response = await http.get(uri).timeout(const Duration(seconds: 4));
+      if (response.statusCode >= 400) {
+        return const [];
+      }
+      final payload = jsonDecode(response.body) as Map<String, dynamic>;
+      return (payload['products'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map((row) =>
+              MarketplaceProductFacet.fromJson(Map<String, dynamic>.from(row)))
+          .where((facet) => facet.productType.isNotEmpty && facet.count > 0)
+          .toList();
+    } catch (error) {
+      debugPrint('Marketplace product facets failed: $error');
       return const [];
     }
+  }
 
-    final queryVariants = _searchQueryVariants([normalizedQuery]);
-    final local =
-        _rankLocalCardsForQueries(fallbackCards, queryVariants, limit);
-
+  Future<List<PokemonCard>> getHotMarketplaceCards({
+    int limit = 1000,
+    String window = '24h',
+  }) async {
     try {
-      final queryLanguage = _tcgdexLanguage(searchLanguage);
-      final remote = await _searchMarketplaceCandidatesForQueries(
-        _searchQueryVariants([normalizedQuery]),
-        normalizedQuery,
-        limit: limit,
-        searchLanguage: queryLanguage,
-        preserveRemotePool: preserveRemotePool,
+      final uri = Uri.base.resolve('/api/marketplace-hot-blueprints').replace(
+        queryParameters: {
+          'window': window,
+          'limit': '$limit',
+          'includeCards': '1',
+        },
       );
-      final similarQuery = _previewSimilarQuery(normalizedQuery);
-      final similarRemote = similarQuery == null
-          ? const <PokemonCard>[]
-          : await _searchMarketplaceCandidatesForQueries(
-              _searchQueryVariants([similarQuery]),
-              similarQuery,
-              limit: limit,
-              searchLanguage: queryLanguage,
-              preserveRemotePool: preserveRemotePool,
-            );
-      final similarLocal = similarQuery == null
-          ? const <PokemonCard>[]
-          : _rankLocalCardsForQueries(
-              fallbackCards,
-              _searchQueryVariants([similarQuery]),
-              limit,
-            );
-      return _dedupeCards([
-        ...remote,
-        ...local,
-        ...similarRemote,
-        ...similarLocal,
-      ]).take(limit).toList();
+      final response = await http.get(uri).timeout(const Duration(seconds: 6));
+      if (response.statusCode >= 400) {
+        return const [];
+      }
+      final payload = jsonDecode(response.body) as Map<String, dynamic>;
+      final cardRows = (payload['cards'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map(
+              (row) => _cardFromSearchCandidate(Map<String, dynamic>.from(row)))
+          .toList();
+      if (cardRows.isNotEmpty) {
+        return _dedupeCards(cardRows).take(limit).toList();
+      }
+      final blueprintCards = (payload['blueprints'] as List<dynamic>? ??
+              const [])
+          .whereType<Map>()
+          .map((row) => _cardFromHotBlueprint(Map<String, dynamic>.from(row)))
+          .toList();
+      return _dedupeCards(blueprintCards).take(limit).toList();
     } catch (error) {
-      debugPrint('Supabase card search failed: $error');
-      return local;
+      debugPrint('Hot marketplace cards failed: $error');
+      return const [];
     }
   }
 
@@ -1227,149 +3606,341 @@ class CardService {
     int limit = 20,
     int poolLimit = 15874,
     String searchLanguage = 'en',
+    String previewMode = '',
+    SearchAutocompleteContext? previousSearchContext,
+    SearchTokenPredictionContext? predictionContext,
+    String? searchSessionId,
+  }) async {
+    final result = await searchAutocompleteCardsWithContext(
+      query,
+      limit: limit,
+      poolLimit: poolLimit,
+      searchLanguage: searchLanguage,
+      previewMode: previewMode,
+      previousSearchContext: previousSearchContext,
+      predictionContext: predictionContext,
+      searchSessionId: searchSessionId,
+    );
+    return result.cards;
+  }
+
+  Future<SearchAutocompleteResult> searchAutocompleteCardsWithContext(
+    String query, {
+    int limit = 20,
+    int poolLimit = 15874,
+    String searchLanguage = 'en',
+    String previewMode = '',
+    SearchAutocompleteContext? previousSearchContext,
+    SearchTokenPredictionContext? predictionContext,
+    String? searchSessionId,
   }) async {
     final normalizedQuery = query.trim();
     if (_meaningfulSearchLength(normalizedQuery) < 1) {
-      return const [];
+      return const SearchAutocompleteResult(cards: []);
+    }
+    final canShowAutocomplete = _meaningfulSearchLength(normalizedQuery) >= 1;
+    const retryDelays = [Duration.zero];
+    Object? lastError;
+    for (var attempt = 0; attempt < retryDelays.length; attempt += 1) {
+      final delay = retryDelays[attempt];
+      if (delay > Duration.zero) {
+        await Future<void>.delayed(delay);
+      }
+      try {
+        final trace = SearchDebugTrace.instance;
+        final debugEnabled = trace.enabled;
+        final debugToken = debugEnabled
+            ? await PokoinApiAuthService.instance().bearerToken()
+            : null;
+        final authHeaders = debugToken == null
+            ? await PokoinApiAuthService.instance().authorizationHeaders(
+                requireSignedIn: false,
+              )
+            : const <String, String>{};
+        final started = DateTime.now();
+        trace.record('service.autocomplete.request', {
+          'query': normalizedQuery,
+          if (searchSessionId?.isNotEmpty == true)
+            'searchSessionId': searchSessionId,
+          'attempt': attempt + 1,
+          'limit': limit,
+          'poolLimit': poolLimit,
+          'language': _tcgdexLanguage(searchLanguage),
+          if (previewMode.isNotEmpty) 'previewMode': previewMode,
+          if (previousSearchContext != null)
+            'previousContextIds': previousSearchContext.cardIds.length,
+          if (predictionContext != null)
+            'predictionContextCandidates': predictionContext.candidates.length,
+        });
+        final normalizedLanguage = _tcgdexLanguage(searchLanguage);
+        final response = await http
+            .post(
+              Uri.base.resolve('/api/marketplace-autocomplete'),
+              headers: {
+                'content-type': 'application/json',
+                ...authHeaders,
+                if (debugToken != null) 'authorization': 'Bearer $debugToken',
+              },
+              body: jsonEncode({
+                'search_term': normalizedQuery,
+                'result_limit': limit,
+                'pool_limit': poolLimit,
+                'search_language': normalizedLanguage,
+                if (previewMode.isNotEmpty) 'preview_mode': previewMode,
+                if (previousSearchContext != null &&
+                    previousSearchContext.canRefine(
+                      normalizedQuery,
+                      normalizedLanguage,
+                    ))
+                  'previous_search_context': previousSearchContext.toJson(),
+                if (predictionContext != null &&
+                    predictionContext.canRefine(
+                      normalizedQuery,
+                      normalizedLanguage,
+                    ))
+                  'prediction_context': predictionContext.toJson(),
+                if (searchSessionId?.isNotEmpty == true)
+                  'search_session_id': searchSessionId,
+                if (debugEnabled) 'debug': true,
+                if (debugEnabled) 'debug_session_id': trace.sessionId,
+              }),
+            )
+            .timeout(const Duration(seconds: 6));
+        trace.record('service.autocomplete.response', {
+          'query': normalizedQuery,
+          'attempt': attempt + 1,
+          'statusCode': response.statusCode,
+          'elapsedMs': DateTime.now().difference(started).inMilliseconds,
+          'serverTiming': response.headers['server-timing'],
+        });
+        if (response.statusCode >= 400) {
+          lastError = 'status ${response.statusCode}';
+          if (!canShowAutocomplete || attempt == retryDelays.length - 1) {
+            debugPrint(
+                'Marketplace autocomplete failed: ${response.statusCode}');
+            return const SearchAutocompleteResult(cards: []);
+          }
+          continue;
+        }
+        final decoded = jsonDecode(response.body);
+        final rows = decoded is Map<String, dynamic>
+            ? (decoded['rows'] as List<dynamic>? ?? const [])
+            : decoded as List<dynamic>;
+        final context =
+            decoded is Map<String, dynamic> && decoded['search_context'] is Map
+                ? SearchAutocompleteContext.fromJson(
+                    Map<String, dynamic>.from(decoded['search_context'] as Map),
+                  )
+                : null;
+        final pool = decoded is Map<String, dynamic> && decoded['pool'] is Map
+            ? Map<String, dynamic>.from(decoded['pool'] as Map)
+            : const <String, dynamic>{};
+        final predictedNameTokens =
+            _predictedNameTokensFromResponse(decoded, context);
+        if (decoded is Map<String, dynamic>) {
+          SearchDebugTrace.instance.record('service.autocomplete.debug', {
+            'query': normalizedQuery,
+            'debug': decoded['debug'],
+            if (predictedNameTokens.isNotEmpty)
+              'predictedTokens': predictedNameTokens
+                  .map((token) => token.toJson())
+                  .toList(growable: false),
+          });
+        }
+        final cards = _searchAutocompletePreviewCardsFromRows(rows, limit);
+        if (cards.isNotEmpty ||
+            !canShowAutocomplete ||
+            attempt == retryDelays.length - 1) {
+          SearchDebugTrace.instance.record('service.autocomplete.cards', {
+            'query': normalizedQuery,
+            'attempt': attempt + 1,
+            'count': cards.length,
+            'poolSize': (pool['size'] as num?)?.toInt() ?? 0,
+            'poolSource': '${pool['source'] ?? ''}',
+            'top': cards
+                .take(8)
+                .map((card) => {
+                      'id': card.id,
+                      'name': card.name,
+                      'set': card.set,
+                      'number': card.number,
+                    })
+                .toList(),
+          });
+          return SearchAutocompleteResult(
+            cards: cards,
+            context: context,
+            poolSize: (pool['size'] as num?)?.toInt() ?? 0,
+            poolSource: '${pool['source'] ?? ''}',
+            predictedNameTokens: predictedNameTokens,
+          );
+        }
+      } catch (error) {
+        lastError = error;
+        SearchDebugTrace.instance.record('service.autocomplete.error', {
+          'query': normalizedQuery,
+          'attempt': attempt + 1,
+          'error': '$error',
+        });
+        if (!canShowAutocomplete || attempt == retryDelays.length - 1) {
+          debugPrint('Marketplace autocomplete failed: $error');
+          return const SearchAutocompleteResult(cards: []);
+        }
+      }
+    }
+    if (lastError != null) {
+      debugPrint('Marketplace autocomplete failed: $lastError');
+    }
+    return const SearchAutocompleteResult(cards: []);
+  }
+
+  Future<List<SearchPredictedNameToken>> predictSearchNameTokens(
+    String query, {
+    int limit = 5,
+    String searchLanguage = 'en',
+    SearchTokenPredictionContext? previousPredictionContext,
+  }) async {
+    final result = await predictSearchNameTokensWithContext(
+      query,
+      limit: limit,
+      searchLanguage: searchLanguage,
+      previousPredictionContext: previousPredictionContext,
+    );
+    return result.tokens;
+  }
+
+  Future<SearchTokenPredictionResult> predictSearchNameTokensWithContext(
+    String query, {
+    int limit = 5,
+    String searchLanguage = 'en',
+    SearchTokenPredictionContext? previousPredictionContext,
+  }) async {
+    final normalizedQuery = query.trim();
+    if (_meaningfulSearchLength(normalizedQuery) < 1) {
+      return const SearchTokenPredictionResult();
     }
     try {
+      final trace = SearchDebugTrace.instance;
+      final normalizedLanguage = _tcgdexLanguage(searchLanguage);
+      final previousContext = previousPredictionContext;
+      final canRefineFromPrevious = previousContext?.canRefine(
+            normalizedQuery,
+            normalizedLanguage,
+          ) ??
+          false;
+      final started = DateTime.now();
+      trace.record('service.token_predict.request', {
+        'query': normalizedQuery,
+        'limit': limit,
+        'language': normalizedLanguage,
+        if (canRefineFromPrevious)
+          'previousPredictionCandidates': previousContext!.candidates.length,
+      });
       final response = await http
           .post(
-            Uri.base.resolve('/api/marketplace-autocomplete'),
-            headers: {'content-type': 'application/json'},
+            Uri.base.resolve('/api/searchbar-token-predict'),
+            headers: const {'content-type': 'application/json'},
             body: jsonEncode({
-              'search_term': normalizedQuery,
-              'result_limit': limit,
-              'pool_limit': poolLimit,
-              'search_language': _tcgdexLanguage(searchLanguage),
+              'query': normalizedQuery,
+              'limit': limit,
+              'search_language': normalizedLanguage,
+              if (canRefineFromPrevious)
+                'previous_prediction_context': previousContext!.toJson(),
             }),
           )
-          .timeout(const Duration(seconds: 6));
+          .timeout(const Duration(seconds: 2));
+      trace.record('service.token_predict.response', {
+        'query': normalizedQuery,
+        'statusCode': response.statusCode,
+        'elapsedMs': DateTime.now().difference(started).inMilliseconds,
+        'payloadBytes': response.bodyBytes.length,
+        'serverTiming': response.headers['server-timing'],
+      });
       if (response.statusCode >= 400) {
-        debugPrint('Marketplace autocomplete failed: ${response.statusCode}');
-        return const [];
+        debugPrint('Search token prediction failed: ${response.statusCode}');
+        return const SearchTokenPredictionResult();
       }
-      final rows = jsonDecode(response.body) as List<dynamic>;
-      return _dedupeCards(rows
-          .whereType<Map>()
-          .map(
-              (row) => _cardFromSearchCandidate(Map<String, dynamic>.from(row)))
-          .toList());
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        return const SearchTokenPredictionResult();
+      }
+      final context = decoded['prediction_context'] is Map
+          ? SearchTokenPredictionContext.fromJson(
+              Map<String, dynamic>.from(decoded['prediction_context'] as Map),
+            )
+          : null;
+      return SearchTokenPredictionResult(
+        tokens: _predictedNameTokensFromJson(
+          decoded['predictions'],
+          source: 'token_predict',
+        ),
+        context: context,
+      );
     } catch (error) {
-      debugPrint('Marketplace autocomplete failed: $error');
+      SearchDebugTrace.instance.record('service.token_predict.error', {
+        'query': normalizedQuery,
+        'error': '$error',
+      });
+      debugPrint('Search token prediction failed: $error');
+      return const SearchTokenPredictionResult();
+    }
+  }
+
+  List<SearchPredictedNameToken> _predictedNameTokensFromResponse(
+    Object? decoded,
+    SearchAutocompleteContext? context,
+  ) {
+    if (decoded is! Map<String, dynamic>) {
+      return context?.predictedNameTokens ?? const <SearchPredictedNameToken>[];
+    }
+    final sources = [
+      context?.predictedNameTokens ?? const <SearchPredictedNameToken>[],
+      _predictedNameTokensFromMeta(decoded['meta']),
+      _predictedNameTokensFromDebug(decoded['debug']),
+    ];
+    final merged = <SearchPredictedNameToken>[];
+    final seen = <String>{};
+    for (final source in sources) {
+      for (final token in source) {
+        if (token.normalized.isEmpty ||
+            token.display.isEmpty ||
+            !seen.add(token.normalized)) {
+          continue;
+        }
+        merged.add(token);
+        if (merged.length >= 8) {
+          return List.unmodifiable(merged);
+        }
+      }
+    }
+    return List.unmodifiable(merged);
+  }
+
+  List<SearchPredictedNameToken> _predictedNameTokensFromMeta(Object? meta) {
+    if (meta is! Map) {
       return const [];
     }
-  }
-
-  Future<List<PokemonCard>> _searchMarketplaceCandidatesForQueries(
-    Iterable<String> queries,
-    String rankingQuery, {
-    required int limit,
-    String searchLanguage = 'en',
-    bool preserveRemotePool = false,
-  }) async {
-    final results = <PokemonCard>[];
-    for (final query in queries) {
-      final rows = await _searchMarketplaceCandidates(
-        query,
-        limit: limit,
-        searchLanguage: searchLanguage,
-      );
-      results.addAll(rows);
-      if (results.length >= limit) {
-        break;
-      }
+    final predictive = meta['predictive'];
+    if (predictive is! Map) {
+      return const [];
     }
-    final deduped = _dedupeCards(results);
-    if (preserveRemotePool) {
-      return deduped.take(limit).toList();
-    }
-    return _rankLocalCards(deduped, rankingQuery, limit);
-  }
-
-  Future<List<PokemonCard>> _searchMarketplaceCandidates(
-    String normalizedQuery, {
-    required int limit,
-    String searchLanguage = 'en',
-  }) async {
-    const pageSize = 1000;
-    if (limit > pageSize) {
-      final results = <PokemonCard>[];
-      for (var offset = 0; offset < limit; offset += pageSize) {
-        final pageLimit = math.min(pageSize, limit - offset);
-        final page = await _searchMarketplaceCandidatePage(
-          normalizedQuery,
-          limit: pageLimit,
-          offset: offset,
-          searchLanguage: searchLanguage,
-        );
-        if (page.isEmpty) {
-          break;
-        }
-        results.addAll(page);
-        if (page.length < pageLimit) {
-          break;
-        }
-      }
-      return _dedupeCards(results).take(limit).toList();
-    }
-    return _searchMarketplaceCandidatePage(
-      normalizedQuery,
-      limit: limit,
-      offset: 0,
-      searchLanguage: searchLanguage,
+    return _predictedNameTokensFromJson(
+      predictive['predicted_tokens'] ?? predictive['predictedTokens'],
+      source: 'meta.predictive',
     );
   }
 
-  Future<List<PokemonCard>> _searchMarketplaceCandidatesDirect(
-    String normalizedQuery, {
-    required int limit,
-    int offset = 0,
-    String searchLanguage = 'en',
-  }) async {
-    try {
-      final response = await http
-          .post(
-            Uri.base.resolve('/api/marketplace-search-candidates'),
-            headers: {'content-type': 'application/json'},
-            body: jsonEncode({
-              'search_term': normalizedQuery,
-              'result_limit': limit,
-              'result_offset': offset,
-              'search_language': _tcgdexLanguage(searchLanguage),
-            }),
-          )
-          .timeout(const Duration(seconds: 6));
-      if (response.statusCode >= 400) {
-        debugPrint(
-          'Direct marketplace candidate search failed: ${response.statusCode}',
-        );
-        return const [];
-      }
-      final rows = jsonDecode(response.body) as List<dynamic>;
-      final cards = rows
-          .whereType<Map>()
-          .map(
-              (row) => _cardFromSearchCandidate(Map<String, dynamic>.from(row)))
-          .toList();
-      return _dedupeCards(cards).take(limit).toList();
-    } catch (error) {
-      debugPrint('Direct marketplace candidate search failed: $error');
+  List<SearchPredictedNameToken> _predictedNameTokensFromDebug(Object? debug) {
+    if (debug is! Map) {
       return const [];
     }
-  }
-
-  Future<List<PokemonCard>> _searchMarketplaceCandidatePage(
-    String normalizedQuery, {
-    required int limit,
-    required int offset,
-    String searchLanguage = 'en',
-  }) async {
-    return _searchMarketplaceCandidatesDirect(
-      normalizedQuery,
-      limit: limit,
-      offset: offset,
-      searchLanguage: searchLanguage,
+    final predictivePool = debug['predictivePool'];
+    if (predictivePool is! Map) {
+      return const [];
+    }
+    return _predictedNameTokensFromJson(
+      predictivePool['predictedTokens'] ?? predictivePool['predicted_tokens'],
+      source: 'debug.predictivePool',
     );
   }
 
@@ -1400,11 +3971,23 @@ class CardService {
     final previewImageUrl = _normalizeImageUrl(
       row['preview_image_url'] ?? row['cdn_image_url'] ?? row['image_url'],
     );
+    final homepageImageUrl = _normalizeImageUrl(
+      row['homepage_image_url'] ??
+          row['homepageImageUrl'] ??
+          row['preview_image_url'] ??
+          row['cdn_image_url'] ??
+          row['image_url'],
+    );
+    final artist = _cleanLabel(
+      row['artist'] ?? row['illustrator'],
+      fallback: '',
+    );
     return PokemonCard(
       id: id,
       name: '${row['name'] ?? 'Pokemon card'}',
       imageUrl: imageUrl,
       previewImageUrl: previewImageUrl,
+      homepageImageUrl: homepageImageUrl,
       rarity: rarity,
       type: type,
       hp: 0,
@@ -1415,9 +3998,9 @@ class CardService {
           : 'Imported from the Pokoin autocomplete projection.',
       set: setName,
       number: number,
-      artist: '',
+      artist: artist,
       stock: 0,
-      rating: 0,
+      rating: _readWatchlistCount(row).toDouble(),
       reviewCount: 0,
       isFoil: false,
       isHolo: false,
@@ -1435,12 +4018,366 @@ class CardService {
       itemKind: itemKind,
       productType: productType,
       trainerName: trainerName,
+      canonicalPath: _cleanCanonicalPath(row),
+      watchlistCount: _readWatchlistCount(row),
+      cartHolderCount: _readCartHolderCount(row),
       cardPalette: _readCardPalette(row),
       emoji: _readEmoji(row),
     );
   }
 
-  String _readEmoji(Map<String, dynamic> row) => '${row['emoji'] ?? ''}'.trim();
+  List<PokemonCard> _searchAutocompletePreviewCardsFromRows(
+    Iterable<dynamic> rows,
+    int limit,
+  ) {
+    return _dedupeCards(rows
+        .whereType<Map>()
+        .take(limit)
+        .map((row) => _cardFromSearchCandidate(Map<String, dynamic>.from(row)))
+        .toList());
+  }
+
+  PokemonCard _cardFromHotBlueprint(Map<String, dynamic> row) {
+    final id =
+        '${row['blueprintId'] ?? row['blueprint_id'] ?? row['card_id'] ?? ''}';
+    final setName =
+        _cleanLabel(row['set'] ?? row['set_name'], fallback: 'Pokemon');
+    final rarity = _cleanLabel(row['rarity'], fallback: 'Card');
+    final type = _marketplaceDisplayType(
+      _normalizeProductType(row['productType'] ?? row['product_type'],
+          '${row['itemKind'] ?? row['item_kind'] ?? 'single'}'),
+      fallback: _cleanLabel(row['type'] ?? row['card_type'], fallback: 'Card'),
+    );
+    final itemKind = _normalizeItemKind(row['itemKind'] ?? row['item_kind']);
+    final productType = _normalizeProductType(
+        row['productType'] ?? row['product_type'], itemKind);
+    final artist = _cleanLabel(
+      row['artist'] ?? row['illustrator'],
+      fallback: '',
+    );
+    return PokemonCard(
+      id: id,
+      name: '${row['name'] ?? 'Pokemon card'}',
+      imageUrl: _normalizeImageUrl(
+          row['cdn_image_url'] ?? row['imageUrl'] ?? row['image_url']),
+      previewImageUrl: _normalizeImageUrl(
+        row['preview_image_url'] ??
+            row['previewImageUrl'] ??
+            row['cdn_image_url'] ??
+            row['imageUrl'] ??
+            row['image_url'],
+      ),
+      homepageImageUrl: _normalizeImageUrl(
+        row['homepage_image_url'] ??
+            row['homepageImageUrl'] ??
+            row['preview_image_url'] ??
+            row['previewImageUrl'] ??
+            row['cdn_image_url'] ??
+            row['imageUrl'] ??
+            row['image_url'],
+      ),
+      rarity: itemKind == 'product' ? type : rarity,
+      type: type,
+      hp: 0,
+      attacks: const [],
+      price: (_pknPrices[id] ?? 1000 + (_stableSeed(id) % 120000)).toDouble(),
+      description: 'Imported from Pokoin hot marketplace analytics.',
+      set: setName,
+      number: '${row['number'] ?? row['card_number'] ?? ''}',
+      artist: artist,
+      stock: 0,
+      rating: _readWatchlistCount(row).toDouble(),
+      reviewCount: 0,
+      isFoil: false,
+      isHolo: rarity.toLowerCase().contains('holo'),
+      releaseDate: DateTime.now(),
+      tags: [setName, rarity, type, itemKind, productType],
+      condition: 'NM',
+      isGraded: false,
+      itemKind: itemKind,
+      productType: productType,
+      trainerName: _cleanLabel(row['trainer_name'], fallback: ''),
+      canonicalPath: _cleanCanonicalPath(row),
+      watchlistCount: _readWatchlistCount(row),
+      cartHolderCount: _readCartHolderCount(row),
+    );
+  }
+
+  int _readWatchlistCount(Map<String, dynamic> row) {
+    final analytics = row['analytics'];
+    final analyticsMap = analytics is Map
+        ? Map<String, dynamic>.from(analytics)
+        : const <String, dynamic>{};
+    final candidates = [
+      row['watchlistCount'],
+      row['watchlist_count'],
+      analyticsMap['watchlistCount'],
+      analyticsMap['watchlist_count'],
+      row['rating'],
+    ];
+    for (final value in candidates) {
+      if (value is num && value > 0) {
+        return value.toInt();
+      }
+      final parsed = int.tryParse('${value ?? ''}'.trim());
+      if (parsed != null && parsed > 0) {
+        return parsed;
+      }
+    }
+    return 0;
+  }
+
+  int _readCartHolderCount(Map<String, dynamic> row) {
+    final analytics = row['analytics'];
+    final analyticsMap = analytics is Map
+        ? Map<String, dynamic>.from(analytics)
+        : const <String, dynamic>{};
+    final candidates = [
+      row['cartHolderCount'],
+      row['cart_holder_count'],
+      analyticsMap['cartHolderCount'],
+      analyticsMap['cart_holder_count'],
+    ];
+    for (final value in candidates) {
+      if (value is num && value > 0) {
+        return value.toInt();
+      }
+      final parsed = int.tryParse('${value ?? ''}'.trim());
+      if (parsed != null && parsed > 0) {
+        return parsed;
+      }
+    }
+    return 0;
+  }
+
+  String _readEmoji(Map<String, dynamic> row) {
+    final identity = _readEmojiList(
+      row['cardIdentityEmojis'] ?? row['card_identity_emojis'],
+    );
+    final identityText =
+        '${row['cardIdentityEmoji'] ?? row['card_identity_emoji'] ?? ''}';
+    if (identity.isEmpty && identityText.trim().isNotEmpty) {
+      identity.addAll(_splitEmojiText(identityText));
+    }
+
+    final fallback = _splitEmojiText(row['emoji']);
+    final tokens = <String>[];
+    for (final token in identity) {
+      if (!tokens.contains(token)) {
+        tokens.add(token);
+      }
+      if (tokens.length == 2) {
+        break;
+      }
+    }
+    if (tokens.length < 2) {
+      for (final token
+          in fallback.where((token) => !_variantEmojis.contains(token))) {
+        if (!tokens.contains(token)) {
+          tokens.add(token);
+        }
+        if (tokens.length == 2) {
+          break;
+        }
+      }
+    }
+    if (tokens.length < 2) {
+      for (final token in _fallbackIdentityEmojis(row)) {
+        if (!tokens.contains(token)) {
+          tokens.add(token);
+        }
+        if (tokens.length == 2) {
+          break;
+        }
+      }
+    }
+
+    final variantTokens = _splitEmojiText(
+      row['rarityVariantEmoji'] ??
+          row['rarity_variant_emoji'] ??
+          row['variantEmoji'] ??
+          row['variant_emoji'],
+    );
+    final variant = (variantTokens.isNotEmpty ? variantTokens.first : null) ??
+        _rarityVariantEmoji(row) ??
+        fallback.firstWhere(
+          (token) => _variantEmojis.contains(token),
+          orElse: () => '',
+        );
+    if (variant.isNotEmpty) {
+      tokens.add(variant);
+    }
+    return tokens.join(' ').trim();
+  }
+
+  List<String> _readEmojiList(Object? value) {
+    if (value is! List) {
+      return <String>[];
+    }
+    return value.expand(_splitEmojiText).toList(growable: true);
+  }
+
+  List<String> _splitEmojiText(Object? value) {
+    final text = '${value ?? ''}'.trim();
+    if (text.isEmpty) {
+      return const <String>[];
+    }
+    return RegExp(
+      r'\S(?:[\uFE0F\u{1F3FB}-\u{1F3FF}]|\u200D\S)*',
+      unicode: true,
+    )
+        .allMatches(text)
+        .map((match) => match.group(0)!.trim())
+        .where((token) => token.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  List<String> _fallbackIdentityEmojis(Map<String, dynamic> row) {
+    final text = '${row['name'] ?? ''} ${row['card_type'] ?? row['type'] ?? ''}'
+        .toLowerCase();
+    if (RegExp(
+            r'leafeon|eevee|vaporeon|jolteon|flareon|espeon|umbreon|glaceon|sylveon')
+        .hasMatch(text)) {
+      return const ['🦊', '✨'];
+    }
+    if (RegExp(
+            r'drifloon|drifblim|gastly|haunter|gengar|mismagius|mimikyu|duskull|dusknoir')
+        .hasMatch(text)) {
+      return const ['👻', '🌫️'];
+    }
+    if (RegExp(
+            r'meltan|melmetal|magnemite|magneton|magnezone|beldum|metang|metagross|klink|klang|klinklang')
+        .hasMatch(text)) {
+      return const ['⚙️', '🔩'];
+    }
+    if (text.contains('cresselia')) {
+      return const ['🌙', '🔮'];
+    }
+    if (RegExp(r'mewtwo|mew|lunala|solgaleo|jirachi|celebi').hasMatch(text)) {
+      return const ['🔮', '✨'];
+    }
+    if (RegExp(r'dragon|charizard|dragonite|rayquaza|salamence|garchomp|kyurem')
+        .hasMatch(text)) {
+      return const ['🐉', '🔥'];
+    }
+    return const ['🃏', '✨'];
+  }
+
+  String? _rarityVariantEmoji(Map<String, dynamic> row) {
+    final text = [
+      row['rarity'],
+      row['product_variant'],
+      row['productVariant'],
+      row['number'],
+      row['card_number'],
+      row['expansion_number'],
+      row['name'],
+    ].map((value) => '${value ?? ''}'.toLowerCase()).join(' ');
+    if (RegExp(r'promo|stamped|stamp').hasMatch(text)) return '🎟️';
+    if (RegExp(
+            r'special illustration rare|special art rare|illustration rare|art rare|alternate art|alt art|full[- ]?art')
+        .hasMatch(text)) {
+      return '🎨';
+    }
+    if (RegExp(r'gold secret|secret rare|hyper rare|gold').hasMatch(text)) {
+      return '🏆';
+    }
+    if (RegExp(r'shining|shiny|holo|foil|reverse').hasMatch(text)) return '✨';
+    if (RegExp(r'(^|[^a-z0-9])(vmax|v max)([^a-z0-9]|$)').hasMatch(text)) {
+      return '👑';
+    }
+    if (RegExp(r'(^|[^a-z0-9])(vstar|v star)([^a-z0-9]|$)').hasMatch(text)) {
+      return '🌟';
+    }
+    if (RegExp(r'(^|[^a-z0-9])(gx|g x)([^a-z0-9]|$)').hasMatch(text)) {
+      return '💥';
+    }
+    if (RegExp(r'(^|[^a-z0-9])(ex|e x)([^a-z0-9]|$)').hasMatch(text)) {
+      return '💎';
+    }
+    if (RegExp(r'(^|[^a-z0-9])rare([^a-z0-9]|$)').hasMatch(text)) return '⭐';
+    if (RegExp(r'(^|[^a-z0-9])uncommon([^a-z0-9]|$)').hasMatch(text)) {
+      return '🔷';
+    }
+    if (RegExp(r'(^|[^a-z0-9])common([^a-z0-9]|$)').hasMatch(text)) return '⚪';
+    return null;
+  }
+
+  static const Set<String> _variantEmojis = {
+    '👑',
+    '🌟',
+    '💥',
+    '💎',
+    '⬆️',
+    '🛡️',
+    '✨',
+    '🌈',
+    '🔺',
+    '🔻',
+    '🤝',
+    '🏅',
+    '⚡',
+    '🎨',
+    '🎟️',
+    '🏆',
+    '⭐',
+    '🔷',
+    '⚪',
+  };
+
+  String _cleanCanonicalPath(Map<String, dynamic> row) {
+    final text =
+        '${row['canonicalPath'] ?? row['canonical_path'] ?? row['marketplacePath'] ?? row['marketplace_path'] ?? ''}'
+            .trim();
+    if (!text.startsWith('/marketplace/') || !text.contains('/cards/')) {
+      return '';
+    }
+    return text.split('?').first.split('#').first;
+  }
+
+  bool _readCardTraderAvailability(Map<String, dynamic> row) {
+    final explicit =
+        row['hasCardTraderListing'] ?? row['has_cardtrader_listing'];
+    if (explicit is bool) {
+      return explicit;
+    }
+    if (explicit is num) {
+      return explicit > 0;
+    }
+    final explicitText = '${explicit ?? ''}'.trim().toLowerCase();
+    if (const {'true', '1', 'yes', 'y'}.contains(explicitText)) {
+      return true;
+    }
+    return _readCardTraderEligibleListingCount(row) > 0;
+  }
+
+  int _readCardTraderEligibleListingCount(Map<String, dynamic> row) {
+    final value = row['cardtraderEligibleListingCount'] ??
+        row['cardtrader_eligible_listing_count'];
+    if (value is num) {
+      return value.toInt();
+    }
+    return int.tryParse('${value ?? ''}'.trim()) ?? 0;
+  }
+
+  double? _readMarketplaceTilePrice(Map<String, dynamic> row) {
+    final values = [
+      row['lowest_price_pkn'],
+      row['price'],
+      row['cardtraderLowestPricePkn'],
+      row['cardtrader_lowest_price_pkn'],
+    ];
+    for (final value in values) {
+      if (value is num && value > 0) {
+        return value.toDouble();
+      }
+      final parsed = double.tryParse('${value ?? ''}'.trim());
+      if (parsed != null && parsed > 0) {
+        return parsed;
+      }
+    }
+    return null;
+  }
 
   Map<String, dynamic> _readCardPalette(Map<String, dynamic> row) {
     final value = row['card_palette'] ?? row['cardPalette'];
@@ -1451,18 +4388,6 @@ class CardService {
       return Map<String, dynamic>.from(value);
     }
     return const {};
-  }
-
-  String? _previewSimilarQuery(String query) {
-    final terms = _searchTerms(query)
-        .where((term) => !RegExp(r'^[0-9]+$').hasMatch(term))
-        .toList();
-    if (terms.isEmpty) {
-      return null;
-    }
-    terms.sort((a, b) => b.length.compareTo(a.length));
-    final strongest = terms.first;
-    return strongest == query.trim().toLowerCase() ? null : strongest;
   }
 
   String _tcgdexLanguage(String language) {
@@ -1498,6 +4423,7 @@ class CardService {
     String? productType,
     bool productSearchOnly = false,
     String searchLanguage = 'en',
+    String? searchSessionId,
   }) async {
     try {
       final queryParameters = <String, String>{'limit': '${limit * 4}'};
@@ -1513,6 +4439,9 @@ class CardService {
       if (_tcgdexLanguage(searchLanguage) != 'en') {
         queryParameters['lang'] = _tcgdexLanguage(searchLanguage);
       }
+      if (searchSessionId?.trim().isNotEmpty == true) {
+        queryParameters['search_session_id'] = searchSessionId!.trim();
+      }
       final uri = Uri.base.resolve('/api/marketplace-cards').replace(
             queryParameters: queryParameters,
           );
@@ -1527,7 +4456,7 @@ class CardService {
           .whereType<Map>()
           .map((row) => _cardFromMarketplaceRow(Map<String, dynamic>.from(row)))
           .toList();
-      return _rankLocalCards(cards, normalizedQuery, limit);
+      return _dedupeCards(cards).take(limit).toList();
     } catch (error) {
       debugPrint('Marketplace card row search failed: $error');
       return const [];
@@ -1539,6 +4468,7 @@ class CardService {
     required int limit,
     String? productType,
     String searchLanguage = 'en',
+    String? searchSessionId,
   }) async {
     try {
       final queryParameters = <String, String>{'limit': '${limit * 4}'};
@@ -1551,6 +4481,9 @@ class CardService {
       }
       if (_tcgdexLanguage(searchLanguage) != 'en') {
         queryParameters['lang'] = _tcgdexLanguage(searchLanguage);
+      }
+      if (searchSessionId?.trim().isNotEmpty == true) {
+        queryParameters['search_session_id'] = searchSessionId!.trim();
       }
       final uri = Uri.base.resolve('/api/marketplace-card-versions').replace(
             queryParameters: queryParameters,
@@ -1566,7 +4499,7 @@ class CardService {
           .whereType<Map>()
           .map((row) => _cardFromVersionRow(Map<String, dynamic>.from(row)))
           .toList();
-      return _rankLocalCards(cards, normalizedQuery, limit);
+      return _dedupeCards(cards).take(limit).toList();
     } catch (error) {
       debugPrint('Marketplace card version search failed: $error');
       return const [];
@@ -1574,29 +4507,115 @@ class CardService {
   }
 
   Future<void> recordMarketplaceEvent(
-    String cardId,
+    PokemonCard card,
     String eventType, {
     String source = 'web',
+    Map<String, Object?> metadata = const {},
   }) async {
-    final id = int.tryParse(cardId);
+    final id = int.tryParse(card.id);
     if (id == null) {
       return;
     }
+    final payloadMetadata = _marketplaceEventMetadata(card, metadata);
     try {
+      final authHeaders =
+          await PokoinApiAuthService.instance().authorizationHeaders(
+        requireSignedIn: false,
+      );
       await http
           .post(
             Uri.base.resolve('/api/marketplace-event'),
-            headers: {'content-type': 'application/json'},
+            headers: {
+              'content-type': 'application/json',
+              ...authHeaders,
+            },
             body: jsonEncode({
               'cardId': id,
               'eventType': eventType,
               'source': source,
+              'metadata': payloadMetadata,
             }),
           )
           .timeout(const Duration(seconds: 3));
     } catch (_) {
       // Analytics must never block the marketplace UX.
     }
+  }
+
+  Future<void> cancelSearchSession({
+    required String sessionId,
+    required String lastQuery,
+    String reason = 'exit',
+  }) async {
+    if (sessionId.trim().isEmpty) {
+      return;
+    }
+    try {
+      await http
+          .post(
+            Uri.base.resolve('/api/searchbar-cancel'),
+            headers: {'content-type': 'application/json'},
+            body: jsonEncode(_searchCancelPayload(
+              sessionId: sessionId,
+              lastQuery: lastQuery,
+              reason: reason,
+            )),
+          )
+          .timeout(const Duration(seconds: 2));
+    } catch (_) {
+      // Search exit cancellation is best-effort and must not block navigation.
+    }
+  }
+
+  Map<String, dynamic> _searchCancelPayload({
+    required String sessionId,
+    required String lastQuery,
+    required String reason,
+  }) {
+    return {
+      'search_session_id': sessionId.trim(),
+      'last_query': lastQuery.trim(),
+      'reason': reason.trim().isEmpty ? 'exit' : reason.trim(),
+      'client': kIsWeb ? 'flutter_web' : 'flutter',
+      'locale': ui.PlatformDispatcher.instance.locale.toLanguageTag(),
+    };
+  }
+
+  Map<String, Object?> _marketplaceEventMetadata(
+    PokemonCard card,
+    Map<String, Object?> metadata,
+  ) {
+    final merged = <String, Object?>{
+      'name': card.name,
+      'set': card.set,
+      'number': card.number,
+      'rarity': card.rarity,
+      'type': card.type,
+      'itemKind': card.itemKind,
+      'productType': card.productType,
+      'trainerName': card.trainerName,
+      if (card.tags.isNotEmpty) 'tags': card.tags.take(8).toList(),
+      ...metadata,
+    };
+    merged.removeWhere((_, value) {
+      if (value == null) {
+        return true;
+      }
+      if (value is String) {
+        return value.trim().isEmpty;
+      }
+      if (value is Iterable) {
+        return value.isEmpty;
+      }
+      return false;
+    });
+    return merged.map((key, value) {
+      if (value is String) {
+        return MapEntry(
+            key, value.length > 160 ? value.substring(0, 160) : value);
+      }
+      return MapEntry(key, value);
+    });
   }
 
   List<PokemonCard> _rankLocalCards(
@@ -1614,26 +4633,29 @@ class CardService {
     int limit,
   ) {
     final ranked = cards
-        .map((card) => MapEntry(
-              card,
-              queries.fold<int>(
+        .asMap()
+        .entries
+        .map((entry) => (
+              card: entry.value,
+              sourceIndex: entry.key,
+              score: queries.fold<int>(
                 0,
                 (score, query) => math.max(
                   score,
-                  _localSearchScore(card, query.toLowerCase()),
+                  _localSearchScore(entry.value, query.toLowerCase()),
                 ),
               ),
             ))
-        .where((entry) => entry.value > 0)
+        .where((entry) => entry.score > 0)
         .toList()
       ..sort((a, b) {
-        final score = b.value.compareTo(a.value);
+        final score = b.score.compareTo(a.score);
         if (score != 0) {
           return score;
         }
-        return a.key.name.compareTo(b.key.name);
+        return a.sourceIndex.compareTo(b.sourceIndex);
       });
-    return ranked.map((entry) => entry.key).take(limit).toList();
+    return ranked.map((entry) => entry.card).take(limit).toList();
   }
 
   int _localSearchScore(PokemonCard card, String query) {
@@ -1653,6 +4675,8 @@ class CardService {
     final compactNumber = number.replaceAll(RegExp(r'[^a-z0-9]'), '');
     final compactTrainerName = trainerName.replaceAll(RegExp(r'[^a-z0-9]'), '');
     final compactTags = tags.replaceAll(RegExp(r'[^a-z0-9]'), '');
+    final nameTerms = _searchTerms(name);
+    final setTerms = _searchTerms(set);
     final compactHaystack = [
       compactName,
       compactNumber,
@@ -1667,7 +4691,8 @@ class CardService {
       _characterCoverageScore(compactHaystack, compactQuery) ~/ 2,
     );
     int boost(int score) => score + coverageBonus;
-    final hasNumberTerm = terms.any((term) => RegExp(r'^[0-9]+$').hasMatch(term));
+    final hasNumberTerm =
+        terms.any((term) => RegExp(r'^[0-9]+$').hasMatch(term));
     final hasVariationTerm = terms.any(_isVariationSearchTerm);
     final hasRarityTerm = terms.any(_isRaritySearchTerm);
     final hasExpansionAliasTerm = terms.any(_isExpansionAliasSearchTerm);
@@ -1678,6 +4703,31 @@ class CardService {
           !_isRaritySearchTerm(term) &&
           !_isExpansionAliasSearchTerm(term),
     );
+    int applyCompoundPenalty(int score) => math.max(
+          0,
+          score +
+              _compoundNameCoveragePenalty(
+                name: name,
+                query: query,
+                terms: terms,
+                nameTerms: nameTerms,
+                baseScore: score,
+              ),
+        );
+    final singleVariationTerm =
+        terms.length == 1 && _isVariationSearchTerm(terms.first)
+            ? terms.first
+            : null;
+    if (singleVariationTerm != null) {
+      if (_cardHasVariation(card, singleVariationTerm)) {
+        return boost(1600);
+      }
+      if (singleVariationTerm == 'vstar' &&
+          _cardHasSetToken(card, singleVariationTerm)) {
+        return boost(900);
+      }
+      return 0;
+    }
     if (terms.length > 1 &&
         (hasNumberTerm || hasVariationTerm || hasExpansionAliasTerm) &&
         hasTextTerm) {
@@ -1693,13 +4743,20 @@ class CardService {
           final numberTokens = _searchTerms(number);
           if (number == term ||
               compactNumber == compactTerm ||
-              numberTokens.contains(term)) {
+              numberTokens.contains(term) ||
+              nameTerms.contains(term) ||
+              setTerms.contains(term)) {
             score += 1600;
             matchedNumber = true;
-          } else if (number.startsWith(term) || compactNumber.startsWith(compactTerm)) {
+          } else if (number.startsWith(term) ||
+              compactNumber.startsWith(compactTerm) ||
+              name.contains(term) ||
+              set.startsWith(term)) {
             score += 1300;
             matchedNumber = true;
-          } else if (number.contains(term) || compactNumber.contains(compactTerm)) {
+          } else if (number.contains(term) ||
+              compactNumber.contains(compactTerm) ||
+              set.contains(term)) {
             score += 900;
             matchedNumber = true;
           }
@@ -1722,7 +4779,8 @@ class CardService {
         if (name == term || compactName == compactTerm) {
           score += 1400;
           matchedName = true;
-        } else if (name.startsWith(term) || compactName.startsWith(compactTerm)) {
+        } else if (name.startsWith(term) ||
+            compactName.startsWith(compactTerm)) {
           score += 1150;
           matchedName = true;
         } else if (_wordStartsWith(name, term)) {
@@ -1742,17 +4800,23 @@ class CardService {
           matchedSet = true;
         }
       }
-      if (matchedName && matchedNumber) {
-        return boost(score + 5200);
+      if (hasVariationTerm && !matchedVariation) {
+        return 0;
       }
-      if (matchedName && matchedVariation) {
-        return boost(score + 4400);
+      if (matchedName && matchedNumber) {
+        return applyCompoundPenalty(boost(score + 5200));
       }
       if (matchedName && matchedExpansion) {
-        return boost(score + 4600);
+        return applyCompoundPenalty(boost(score + 4200));
+      }
+      if (matchedName && matchedVariation) {
+        return applyCompoundPenalty(boost(score + 5000));
       }
       if (matchedName && matchedSet) {
-        return boost(score + 700);
+        return applyCompoundPenalty(boost(score + 700));
+      }
+      if (matchedName && hasVariationTerm) {
+        return applyCompoundPenalty(boost(score + 900));
       }
       if (matchedNumber || matchedVariation || matchedExpansion) {
         return 0;
@@ -1768,7 +4832,7 @@ class CardService {
       return boost(840);
     }
     if (name == query) {
-      return boost(1000);
+      return applyCompoundPenalty(boost(1000));
     }
     if (compactQuery.isNotEmpty) {
       final nameDistance = _boundedDamerauLevenshtein(
@@ -1780,7 +4844,7 @@ class CardService {
         return boost(940 - (nameDistance * 70));
       }
       if (compactName.startsWith(compactQuery)) {
-        return boost(760);
+        return applyCompoundPenalty(boost(760));
       }
       final fuzzyName = _fuzzyPrefixScore(compactName, compactQuery);
       if (fuzzyName > 0) {
@@ -1808,7 +4872,7 @@ class CardService {
             }
           }
         }
-        return boost(fuzzyName);
+        return applyCompoundPenalty(boost(fuzzyName));
       }
       final fuzzySet = _fuzzyPrefixScore(compactSet, compactQuery);
       if (fuzzySet > 0) {
@@ -1820,14 +4884,21 @@ class CardService {
       var matchedName = false;
       var matchedSet = false;
       var matchedNumber = false;
+      var matchedRarity = false;
       for (final term in terms) {
-        if (number == term) {
+        if (_isRaritySearchTerm(term) && _cardHasRarityHint(card, term)) {
+          score += 220;
+          matchedRarity = true;
+        } else if (number == term) {
           score += 220;
           matchedNumber = true;
+        } else if (nameTerms.contains(term)) {
+          score += 260;
+          matchedName = true;
         } else if (number.startsWith(term)) {
           score += 190;
           matchedNumber = true;
-        } else if (_wordStartsWith(number, term)) {
+        } else if (_wordStartsWith(number, term) || setTerms.contains(term)) {
           score += 170;
           matchedNumber = true;
         } else if (number.contains(term)) {
@@ -1865,6 +4936,9 @@ class CardService {
       if (matchedName && matchedSet) {
         score += 140;
       }
+      if (matchedName && matchedRarity) {
+        score += 420;
+      }
       if (matchedNumber && matchedName) {
         score += 180;
       } else if (matchedNumber && matchedSet) {
@@ -1882,6 +4956,9 @@ class CardService {
             score += 420;
             matchedRarity = true;
           }
+        } else if (nameTerms.contains(term)) {
+          score += 700;
+          matchedName = true;
         } else if (name.startsWith(term)) {
           score += 260;
           matchedName = true;
@@ -1894,14 +4971,14 @@ class CardService {
         }
       }
       if (matchedName && matchedRarity) {
-        return boost(score);
+        return applyCompoundPenalty(boost(score));
       }
     }
     if (name.startsWith(query)) {
-      return boost(800);
+      return applyCompoundPenalty(boost(800));
     }
     if (name.contains(query)) {
-      return boost(600);
+      return applyCompoundPenalty(boost(600));
     }
     if (number.contains(query)) {
       return boost(700);
@@ -1925,12 +5002,11 @@ class CardService {
       terms: terms,
       compactQuery: compactQuery,
       compactName: compactName,
-      hasStructuredIntent:
-          hasTextTerm &&
-              (hasNumberTerm ||
-                  hasVariationTerm ||
-                  hasRarityTerm ||
-                  hasExpansionAliasTerm),
+      hasStructuredIntent: hasTextTerm &&
+          (hasNumberTerm ||
+              hasVariationTerm ||
+              hasRarityTerm ||
+              hasExpansionAliasTerm),
       nameCoverageBonus: nameCoverageBonus,
       coverageBonus: coverageBonus,
     )) {
@@ -2082,16 +5158,27 @@ class CardService {
   }
 
   List<String> _searchTerms(String query) {
-    return _normalizeVariationSearchPhrases(query)
+    final rawTerms = _normalizeVariationSearchPhrases(query)
         .toLowerCase()
+        .replaceAllMapped(
+          RegExp(r'\b([a-z0-9]+)s\b'),
+          (match) => "${match.group(1)}'s",
+        )
         .split(RegExp(r'[^a-z0-9]+'))
         .map((term) => term.trim())
-        .where((term) => term.length >= 2 || term == 'v')
+        .toList();
+    return rawTerms
+        .where((term) =>
+            term.length >= 2 ||
+            term == 'v' ||
+            term == 'n' ||
+            ((term == 'g' || term == 'e') && rawTerms.length > 1))
         .toList();
   }
 
   String _normalizeVariationSearchPhrases(String value) {
     return value
+        .replaceAll('&', ' tagteam ')
         .replaceAll(RegExp(r'\blv\s*\.?\s*x\b', caseSensitive: false), 'lvx')
         .replaceAll(RegExp(r'\blevel\s+x\b', caseSensitive: false), 'lvx')
         .replaceAll(RegExp(r'\bv\s*max\b', caseSensitive: false), 'vmax')
@@ -2101,7 +5188,48 @@ class CardService {
   }
 
   bool _isVariationSearchTerm(String term) {
-    const variations = {
+    return _variationSearchTargets(term).isNotEmpty;
+  }
+
+  bool _cardHasVariation(PokemonCard card, String term) {
+    final normalizedTerm = term.replaceAll(RegExp(r'[^a-z0-9]'), '');
+    final targets = _variationSearchTargets(normalizedTerm);
+    if (targets.isNotEmpty && !targets.contains(normalizedTerm)) {
+      return targets.any((target) => _cardHasVariation(card, target));
+    }
+    final text = [
+      card.name,
+      card.rarity,
+      card.type,
+      card.productType,
+      ...card.tags,
+    ].join(' ').toLowerCase();
+    switch (normalizedTerm) {
+      case 'lvx':
+        return RegExp(r'(^|[^a-z0-9])(lv\.?x|level x)([^a-z0-9]|$)')
+            .hasMatch(text);
+      case 'lv':
+        return RegExp(r'(^|[^a-z0-9])lv\.?([0-9]+|x)([^a-z0-9]|$)')
+            .hasMatch(text);
+      case 'v':
+        return RegExp(r'(^|[^a-z0-9])v([^a-z0-9]|$)').hasMatch(text);
+      case 'mega':
+        return RegExp(r'(^|[^a-z0-9])(mega|m)([^a-z0-9]|$)').hasMatch(text);
+      case 'tagteam':
+        return RegExp(r'(^|[^a-z0-9])(tag\s*team|tagteam|&)([^a-z0-9]|$)')
+            .hasMatch(text);
+      default:
+        return RegExp('(^|[^a-z0-9])$normalizedTerm([^a-z0-9]|\$)')
+            .hasMatch(text);
+    }
+  }
+
+  List<String> _variationSearchTargets(String term) {
+    final normalizedTerm = term.replaceAll(RegExp(r'[^a-z0-9]'), '');
+    if (normalizedTerm.isEmpty) {
+      return const [];
+    }
+    const variations = [
       'ex',
       'v',
       'vmax',
@@ -2115,34 +5243,19 @@ class CardService {
       'shining',
       'shiny',
       'prime',
-    };
-    return variations.contains(term.replaceAll(RegExp(r'[^a-z0-9]'), ''));
-  }
-
-  bool _cardHasVariation(PokemonCard card, String term) {
-    final normalizedTerm = term.replaceAll(RegExp(r'[^a-z0-9]'), '');
-    final text = [
-      card.name,
-      card.rarity,
-      card.type,
-      card.productType,
-      ...card.tags,
-    ].join(' ').toLowerCase();
-    final compact = text.replaceAll(RegExp(r'[^a-z0-9]'), '');
-    switch (normalizedTerm) {
-      case 'lvx':
-        return RegExp(r'(^|[^a-z0-9])(lv\.?x|level x)([^a-z0-9]|$)')
-            .hasMatch(text);
-      case 'lv':
-        return RegExp(r'(^|[^a-z0-9])lv\.?([0-9]+|x)([^a-z0-9]|$)')
-            .hasMatch(text);
-      case 'v':
-        return RegExp(r'(^|[^a-z0-9])v([^a-z0-9]|$)').hasMatch(text);
-      default:
-        return RegExp('(^|[^a-z0-9])$normalizedTerm([^a-z0-9]|\$)')
-                .hasMatch(text) ||
-            compact.contains(normalizedTerm);
+      'tagteam',
+    ];
+    if (variations.contains(normalizedTerm)) {
+      return [normalizedTerm];
     }
+    if (normalizedTerm == 'g' ||
+        normalizedTerm == 'e' ||
+        normalizedTerm.length >= 2) {
+      return variations
+          .where((variation) => variation.startsWith(normalizedTerm))
+          .toList(growable: false);
+    }
+    return const [];
   }
 
   bool _isRaritySearchTerm(String term) {
@@ -2154,11 +5267,22 @@ class CardService {
       'rare',
       'ultra',
       'secret',
+      'ill',
+      'illus',
       'illustration',
       'holo',
       'shiny',
     };
     return rarities.contains(term.replaceAll(RegExp(r'[^a-z0-9]'), ''));
+  }
+
+  bool _cardHasSetToken(PokemonCard card, String term) {
+    final normalizedTerm = term.replaceAll(RegExp(r'[^a-z0-9]'), '');
+    if (normalizedTerm.isEmpty) {
+      return false;
+    }
+    return RegExp('(^|[^a-z0-9])$normalizedTerm([^a-z0-9]|\$)')
+        .hasMatch(card.set.toLowerCase());
   }
 
   bool _cardHasRarityHint(PokemonCard card, String term) {
@@ -2173,6 +5297,10 @@ class CardService {
       case 'sir':
         return normalizedText.contains('special illustration rare');
       case 'ir':
+        return normalizedText.contains('illustration rare');
+      case 'ill':
+      case 'illus':
+      case 'illustration':
         return normalizedText.contains('illustration rare');
       case 'ur':
       case 'ultra':
@@ -2190,6 +5318,54 @@ class CardService {
       'col': ['calloflegends'],
       'calllegends': ['calloflegends'],
       'calloflegends': ['calloflegends'],
+      'hgss': [
+        'heartgoldsoulsilver',
+        'unleashed',
+        'undaunted',
+        'triumphant',
+        'calloflegends'
+      ],
+      'hgs': [
+        'heartgoldsoulsilver',
+        'unleashed',
+        'undaunted',
+        'triumphant',
+        'calloflegends'
+      ],
+      'heartgold': [
+        'heartgoldsoulsilver',
+        'heartgoldcollection',
+        'unleashed',
+        'undaunted',
+        'triumphant',
+        'calloflegends'
+      ],
+      'hearthgold': [
+        'heartgoldsoulsilver',
+        'heartgoldcollection',
+        'unleashed',
+        'undaunted',
+        'triumphant',
+        'calloflegends'
+      ],
+      'soulsilver': [
+        'heartgoldsoulsilver',
+        'soulsilvercollection',
+        'unleashed',
+        'undaunted',
+        'triumphant',
+        'calloflegends'
+      ],
+      'heartgoldsoulsilver': [
+        'heartgoldsoulsilver',
+        'unleashed',
+        'undaunted',
+        'triumphant',
+        'calloflegends'
+      ],
+      'unleashed': ['unleashed'],
+      'undaunted': ['undaunted'],
+      'triumphant': ['triumphant'],
       '151': ['151', 'pokemoncard151', 'collect151'],
       'pokemon151': ['pokemoncard151'],
       'pokemoncard151': ['pokemoncard151'],
@@ -2209,9 +5385,11 @@ class CardService {
   }
 
   bool _cardHasExpansionAlias(PokemonCard card, String term) {
-    final compactSet = card.set.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+    final compactSet =
+        card.set.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
     return _expansionAliasTargets(term).any(
-      (target) => compactSet == target ||
+      (target) =>
+          compactSet == target ||
           compactSet.startsWith(target) ||
           target.startsWith(compactSet),
     );
@@ -2223,6 +5401,92 @@ class CardService {
     }
     return compactName.startsWith(compactTerm.substring(0, 2)) &&
         _boundedDamerauLevenshtein(compactName, compactTerm, 3) <= 3;
+  }
+
+  int _compoundNameCoveragePenalty({
+    required String name,
+    required String query,
+    required List<String> terms,
+    required List<String> nameTerms,
+    required int baseScore,
+  }) {
+    if (!RegExp(r'(^|[^a-z0-9])(&|and|tag\s*team|tagteam)([^a-z0-9]|$)',
+            caseSensitive: false)
+        .hasMatch(name)) {
+      return 0;
+    }
+    final queryRoots = _nameRootTokens(query).toSet();
+    if (queryRoots.isEmpty) {
+      return 0;
+    }
+    final queryRoot = queryRoots.first;
+    final candidateRoots = _nameRootTokens(name).toSet();
+    if (candidateRoots.length < 2 || !candidateRoots.contains(queryRoot)) {
+      return 0;
+    }
+    if (queryRoots.length > 1) {
+      final missingTypedRoots =
+          queryRoots.where((root) => !candidateRoots.contains(root)).length;
+      if (missingTypedRoots > 0) {
+        return -math.max(
+          3600 + (missingTypedRoots * 1200),
+          (baseScore * 0.65).round(),
+        );
+      }
+      return 0;
+    }
+    final typedRoots = terms
+        .map((term) => term.replaceAll(RegExp(r'[^a-z0-9]'), ''))
+        .where(candidateRoots.contains)
+        .toSet();
+    final untypedExtraRoots = candidateRoots
+        .where((root) => root != queryRoot && !typedRoots.contains(root))
+        .length;
+    if (untypedExtraRoots <= 0) {
+      return 0;
+    }
+    final queryRootIsExactNameToken = nameTerms
+        .map((term) => term.replaceAll(RegExp(r'[^a-z0-9]'), ''))
+        .contains(queryRoot);
+    final coveragePenalty =
+        (baseScore * (untypedExtraRoots / candidateRoots.length)).round();
+    final fixedPenalty =
+        queryRootIsExactNameToken ? 3600 + (untypedExtraRoots * 900) : 1800;
+    return -math.max(fixedPenalty, coveragePenalty + 1800);
+  }
+
+  List<String> _nameRootTokens(String value) {
+    const stopWords = {
+      'ex',
+      'v',
+      'vmax',
+      'vstar',
+      'gx',
+      'lvx',
+      'lv',
+      'mega',
+      'break',
+      'radiant',
+      'shining',
+      'shiny',
+      'prime',
+      'tagteam',
+      'and',
+      'gold',
+      'star',
+      'legend',
+      'delta',
+      'species',
+    };
+    return _searchTerms(value)
+        .map((term) => term.replaceAll(RegExp(r'[^a-z0-9]'), ''))
+        .where((term) =>
+            term.length >= 3 &&
+            !stopWords.contains(term) &&
+            !RegExp(r'^[0-9]+$').hasMatch(term) &&
+            !_isRaritySearchTerm(term) &&
+            !_isExpansionAliasSearchTerm(term))
+        .toList(growable: false);
   }
 
   List<String> _searchQueryVariants(Iterable<String> queries) {
@@ -2323,7 +5587,7 @@ class CardService {
 
   void _addUnique(List<String> values, String value) {
     final normalized = value.trim().toLowerCase();
-    if (normalized.length >= 2 && !values.contains(normalized)) {
+    if (normalized.isNotEmpty && !values.contains(normalized)) {
       values.add(normalized);
     }
   }

@@ -1,4 +1,5 @@
 const { marketplaceQuery } = require('./_marketplace_db');
+const { withCardEmojiFields } = require('./_marketplace_card_emoji');
 
 function cleanLimit(value, fallback = 1000) {
   const limit = Number(value);
@@ -40,7 +41,7 @@ function normalCollectorSql(column) {
   end`;
 }
 
-async function rowsForExpansions({ slug, limit }) {
+async function rowsForExpansions({ slug, limit, query = marketplaceQuery }) {
   const values = [];
   let where = "where versions.expansion_name is not null and versions.expansion_name <> '' and versions.product_type = 'card'";
   const normalizedSlug = cleanText(slug);
@@ -50,7 +51,7 @@ async function rowsForExpansions({ slug, limit }) {
   }
   values.push(cleanLimit(limit));
 
-  const result = await marketplaceQuery(
+  const result = await query(
     `
       with representative_cards as (
         select distinct on (
@@ -71,6 +72,7 @@ async function rowsForExpansions({ slug, limit }) {
       select
         representative_cards.expansion_name as name,
         min(expansions.symbol_image_url) as symbol_image_url,
+        min(expansions.logo_image_url) as logo_image_url,
         count(*)::integer as card_count
       from representative_cards
       left join public.cardtrader_pokemon_expansions expansions
@@ -89,6 +91,7 @@ async function rowsForExpansions({ slug, limit }) {
       name,
       slug: resolvedSlug,
       symbolImageUrl: row.symbol_image_url || '',
+      logoImageUrl: row.logo_image_url || '',
       defaultSymbolUrl: resolvedSlug
         ? `https://cdn.pokoin.com/expansions/symbols/${resolvedSlug}.png`
         : '',
@@ -97,13 +100,13 @@ async function rowsForExpansions({ slug, limit }) {
   });
 }
 
-async function snapshotForExpansion({ slug, limit }) {
-  const expansions = await rowsForExpansions({ slug, limit: 1 });
+async function snapshotForExpansion({ slug, limit, query = marketplaceQuery }) {
+  const expansions = await rowsForExpansions({ slug, limit: 1, query });
   const expansion = expansions[0];
   if (!expansion) {
     return null;
   }
-  const result = await marketplaceQuery(
+  const result = await query(
     `
       with representative_cards as (
         select distinct on (
@@ -135,11 +138,16 @@ async function snapshotForExpansion({ slug, limit }) {
         representative_cards.trainer_name,
         representative_cards.card_palette,
         representative_cards.emoji,
+        urls.canonical_path,
         representative_cards.projected_at,
-        expansions.symbol_image_url as expansion_symbol_url
+        expansions.symbol_image_url as expansion_symbol_url,
+        expansions.logo_image_url as expansion_logo_url
       from representative_cards
       left join public.cardtrader_pokemon_expansions expansions
         on expansions.name = representative_cards.expansion_name
+      left join public.marketplace_card_urls urls
+        on urls.card_id = representative_cards.card_id
+        and urls.language = 'en'
       order by
         ${normalCollectorSql('representative_cards.expansion_number')} asc,
         representative_cards.expansion_number_int asc nulls last,
@@ -150,7 +158,7 @@ async function snapshotForExpansion({ slug, limit }) {
     `,
     [expansion.name, cleanLimit(limit)],
   );
-  return { expansion, cards: result.rows };
+  return { expansion, cards: result.rows.map(withCardEmojiFields) };
 }
 
 module.exports = async function handler(req, res) {

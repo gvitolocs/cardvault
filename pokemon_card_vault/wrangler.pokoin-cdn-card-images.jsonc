@@ -1,0 +1,25 @@
+{
+  "name": "pokoin-cdn-card-images",
+  "main": "scripts/pokoin-cdn-card-images-worker.js",
+  "compatibility_date": "2026-05-17",
+  "routes": [
+    {
+      "pattern": "pokoin.com/card-images/*",
+      "zone_name": "pokoin.com"
+    },
+    {
+      "pattern": "www.pokoin.com/card-images/*",
+      "zone_name": "pokoin.com"
+    },
+    {
+      "pattern": "cdn.pokoin.com/*",
+      "zone_name": "pokoin.com"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "CARD_IMAGES",
+      "bucket_name": "cardvault-images"
+    }
+  ]
+}

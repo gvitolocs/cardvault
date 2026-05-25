@@ -11,14 +11,15 @@ Pokoin is a Flutter web app for the Pokoin ecosystem. It combines a crypto-nativ
 
 The site and wallet are no longer separate Vercel apps or separate Flutter deployments. Vercel serves one Flutter SPA, and `/wallet` is handled by the same router and bundle as the main Pokoin site.
 
-## ✨ Features
+## Features
 
-### E-Commerce Core
-- **Card Catalog**: Browse thousands of Pokemon cards with advanced filtering
-- **Shopping Cart**: Add/remove items, quantity management, persistent storage
-- **Checkout Process**: Complete order flow with address and payment management
-- **Order Management**: Track orders, view history, order status updates
-- **User Authentication**: Firebase email/password and Google login on the main site
+### Marketplace Core
+- **Oracle-backed Card Catalog**: Browse CardTrader blueprint projections through lightweight Vercel APIs.
+- **Real Homepage Sections**: Best sellers and Featured are resolved from Oracle snapshot IDs backed by rolling hot-blueprint analytics.
+- **CardTrader-style Search**: Autocomplete uses Oracle-backed Vercel APIs, structured token intersection for queries like `flareon ex`, and direct Flutter rendering of the returned preview rows.
+- **Seller Listings**: Live offers are stored in Firestore with condition, language, reverse holo, signed, graded, NFT, shipping, price, and quantity metadata.
+- **Shopping Cart And Checkout**: Cart rows reference exact seller listings and preserve listing snapshots.
+- **User Authentication**: Firebase email/password and Google login on the main site.
 
 ### Pokoin Wallet
 - **Integrated Route**: Wallet is served from `/wallet` in the same Flutter app
@@ -31,14 +32,17 @@ The site and wallet are no longer separate Vercel apps or separate Flutter deplo
   inventory should be rendered by Pokoin/Card Vault or explorer UI, not
   MetaMask's NFT tab. See `docs/native-nfts.md`.
 
-### Advanced Features
-- **Smart Search**: Real-time search with filters by type, rarity, set, price
-- **Wishlist**: Save favorite cards for later purchase
-- **Card Grading**: Support for graded cards with grading company info
-- **Condition Tracking**: Card condition (NM, LP, MP, HP, DMG)
-- **Stock Management**: Real-time inventory tracking
-- **Price Tracking**: Historical price data and trends
-- **Ratings & Reviews**: User reviews and rating system
+Common user actions such as checking live status, using the wallet, adding
+MetaMask, buying/understanding PKN, swapping, selling/listing cards, searching,
+NFTs, running nodes, and reporting bugs are documented in
+`docs/common-user-actions.md`.
+
+### Advanced Marketplace Features
+- **Hot Card Analytics**: `marketplace_card_events` rolls into `marketplace_hot_blueprints` with 1h, 24h, and 7d scores for views, searches, clicks, cart adds, reserves, and sales events.
+- **Marketplace Signal**: Reserve/listing analytics summarize active Firestore listings without presenting unsettled interaction events as completed sales.
+- **Wishlist**: Save favorite cards for later purchase.
+- **Card Grading**: Seller listings support graded cards with grading company and grade.
+- **Condition Tracking**: Card condition (NM, LP, MP, HP, DMG).
 
 ### UI/UX Features
 - **Material Design 3**: Modern, beautiful interface
@@ -51,13 +55,11 @@ The site and wallet are no longer separate Vercel apps or separate Flutter deplo
 ### Technical Features
 - **State Management**: Riverpod for reactive state management
 - **Local Storage**: Hive for offline data persistence
-- **API Integration**: RESTful API with Pokemon TCG API
+- **API Integration**: Vercel serverless APIs backed by Oracle Postgres and Firebase/Firestore
 - **Firebase Backend**: Auth, Firestore profiles, balances, orders, and withdraw requests
+- **Oracle Marketplace Backend**: Catalog/search/home/version projections and hot blueprint analytics
 - **Vercel SPA Routing**: Direct URLs like `/wallet`, `/profile`, and `/orders` route into the same app
-- **Offline Support**: Works without internet connection
-- **Push Notifications**: Order updates and promotions
-- **Analytics**: User behavior tracking
-- **Crash Reporting**: Error monitoring and reporting
+- **Analytics**: Bounded marketplace interaction events with non-PII card/search metadata
 
 ## 🚀 Getting Started
 
@@ -90,19 +92,19 @@ The site and wallet are no longer separate Vercel apps or separate Flutter deplo
    flutter run
    ```
 
-## 📱 Screenshots
+## Main Screens
 
 ### Home Screen
-- Featured cards carousel
+- Real Best sellers and Featured carousels from Oracle snapshot sections
 - Category filters
-- Search functionality
+- Marketplace autocomplete
 - Card grid with filters
 
 ### Card Detail
 - High-resolution card images
-- Detailed card information
-- Add to cart functionality
-- Related cards suggestions
+- Seller listing table and no-listing sell/wishlist state
+- Previous/next within the same expansion
+- Other versions by name and expansion
 
 ### Shopping Cart
 - Item management
@@ -135,9 +137,10 @@ lib/
 - **Notifiers**: State notifiers for complex state logic
 
 ### Data Layer
-- **Hive**: Local database for offline storage
-- **HTTP**: API communication with Pokemon TCG API
-- **Caching**: Smart caching for images and data
+- **Hive**: Local cache for cards and home snapshots.
+- **Oracle Postgres**: Marketplace catalog, search projections, expansion versions, variation dimensions, Cardmarket parsing metadata, and hot blueprint rollups.
+- **Vercel APIs**: `/api/marketplace-home`, `/api/marketplace-cards`, `/api/marketplace-card-versions`, `/api/marketplace-search-candidates`, `/api/marketplace-autocomplete`, `/api/marketplace-event`, and `/api/marketplace-hot-blueprints`.
+- **Firebase/Firestore**: Identity, user profiles, wallet/account state, seller listings, carts, orders, and forum-authenticated writes.
 
 ## Configuration
 
@@ -152,6 +155,10 @@ Required Firebase services:
 4. Firestore rules from `firestore.rules` deployed.
 
 Data model details are documented in `docs/firebase-data-model.md`.
+
+### Oracle Marketplace Setup
+
+Marketplace catalog/search data lives in Oracle Postgres. Schema and migration details are documented in `oracle-postgres/README.md`. Vercel production must have `MARKETPLACE_DATABASE_URL` configured before deploying marketplace APIs.
 
 ### Native NFT Runtime
 
@@ -222,23 +229,21 @@ theme: ThemeData(
    ```
 
 ### Web
-Build and deploy the single app:
+Build and deploy the single app through the project deploy script:
 
 ```bash
-flutter build web --release --pwa-strategy=none
-vercel deploy build/web --prod
+./deploy-pokoin-web.sh
 ```
 
-Vercel uses `web/vercel.json` to rewrite all app routes back to `index.html`.
+Do not run plain `vercel deploy` from the project root. The deploy script builds Flutter, copies API functions into `build/web/api`, rewrites server helper imports, verifies required wallet/API files, deploys the Vercel output, then verifies the produced deployment URL and production aliases before returning success.
 
-After deploy:
+After a production deploy the script sets `pokoin.com`, `www.pokoin.com`, and the managed Pokoin web aliases to the new deployment. It then fails non-zero if the deployment URL or custom domains do not serve healthy pages/API responses, including protection against Vercel `404: NOT_FOUND`.
 
 ```bash
-curl -I https://pokoin.com/
-curl -I https://pokoin.com/wallet
+node scripts/verify-production-aliases.js --deployment-url <deployment-url> --set-aliases
 ```
 
-Both routes should return `200`.
+The verifier checks `/`, `/marketplace`, a representative marketplace card route, and `/api/marketplace-home` JSON on the deployment URL and canonical custom domains.
 
 ## 🤝 Contributing
 
@@ -254,7 +259,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- Pokemon TCG API for card data
+- CardTrader and Oracle Postgres marketplace projections for card catalog data
 - Flutter team for the amazing framework
 - Material Design for UI guidelines
 - Open source community for inspiration
@@ -269,7 +274,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [ ] AR card viewing
 - [ ] Blockchain integration for authenticity
 - [ ] Multi-language support
-- [ ] Advanced analytics dashboard
+- [x] Rolling hot-card analytics for homepage sections
+- [ ] Settled-sale analytics dashboard
 - [ ] Mobile app for sellers
 
 ---

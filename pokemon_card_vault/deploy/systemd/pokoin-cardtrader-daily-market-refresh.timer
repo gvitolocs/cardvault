@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Pokoin CardTrader daily market refresh after overnight imports
+
+[Timer]
+OnCalendar=*-*-* 03:20:00
+Persistent=true
+Unit=pokoin-cardtrader-daily-market-refresh.service
+
+[Install]
+WantedBy=timers.target

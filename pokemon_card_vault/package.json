@@ -1,12 +1,23 @@
 {
   "private": true,
   "type": "commonjs",
+  "scripts": {
+    "api:docs": "node scripts/generate-api-docs.js",
+    "api:server": "node server/oracle-api-server.js",
+    "api:check": "node scripts/check-oracle-api-server.js",
+    "api:smoke": "node scripts/smoke-oracle-api-routes.js",
+    "peer3:bundle": "bash scripts/package-oracle-api-service.sh",
+    "peer3:deploy": "bash scripts/deploy-oracle-api-peer3.sh"
+  },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1048.0",
+    "bitcoinjs-lib": "^7.0.1",
+    "ecpair": "^3.0.1",
     "ethers": "^6.16.0",
     "firebase-admin": "^13.6.0",
     "pg": "^8.21.0",
     "sharp": "^0.34.5",
-    "stripe": "^20.1.0"
+    "stripe": "^20.1.0",
+    "tiny-secp256k1": "^2.2.4"
   }
 }

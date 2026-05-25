@@ -36,12 +36,19 @@ class _DocsLayout extends StatefulWidget {
 class _DocsLayoutState extends State<_DocsLayout> {
   static const items = [
     _DocsNavItem('Overview', 'How the network works', Icons.hub_outlined),
-    _DocsNavItem('Network roles', 'Validators, peers, vetting', Icons.groups_2_outlined),
-    _DocsNavItem('Consensus', 'Permissioned PoS lifecycle', Icons.verified_outlined),
+    _DocsNavItem(
+        'Network roles', 'Validators, peers, vetting', Icons.groups_2_outlined),
+    _DocsNavItem(
+        'Consensus', 'Permissioned PoS lifecycle', Icons.verified_outlined),
     _DocsNavItem('Run a node', 'Docker peer setup', Icons.terminal_outlined),
-    _DocsNavItem('Wallets', 'PKN balances and transfers', Icons.account_balance_wallet_outlined),
-    _DocsNavItem('Operations', 'Health checks and upgrades', Icons.monitor_heart_outlined),
-    _DocsNavItem('Security', 'Keys, endpoints, recovery', Icons.shield_outlined),
+    _DocsNavItem('Wallets', 'PKN balances and transfers',
+        Icons.account_balance_wallet_outlined),
+    _DocsNavItem('Operations', 'Health checks and upgrades',
+        Icons.monitor_heart_outlined),
+    _DocsNavItem(
+        'Security', 'Keys, endpoints, recovery', Icons.shield_outlined),
+    _DocsNavItem('User actions', 'Wallet, market, swap, support',
+        Icons.touch_app_outlined),
     _DocsNavItem('FAQ', 'Common questions', Icons.help_outline),
   ];
 
@@ -156,8 +163,8 @@ class _DocsSidebar extends StatelessWidget {
                 width: 34,
                 height: 34,
                 filterQuality: FilterQuality.none,
-                errorBuilder: (_, __, ___) =>
-                    const Icon(Icons.article_outlined, color: Color(0xFFFACC15)),
+                errorBuilder: (_, __, ___) => const Icon(Icons.article_outlined,
+                    color: Color(0xFFFACC15)),
               ),
               const SizedBox(width: 10),
               const Expanded(
@@ -236,10 +243,12 @@ class _MobileDocsNav extends StatelessWidget {
                     : const Color(0xFFFACC15),
               ),
               label: Text(items[i].label),
-              backgroundColor:
-                  i == selectedIndex ? const Color(0xFFFACC15) : const Color(0xFF111936),
+              backgroundColor: i == selectedIndex
+                  ? const Color(0xFFFACC15)
+                  : const Color(0xFF111936),
               labelStyle: TextStyle(
-                color: i == selectedIndex ? const Color(0xFF111827) : Colors.white,
+                color:
+                    i == selectedIndex ? const Color(0xFF111827) : Colors.white,
                 fontWeight: FontWeight.w800,
               ),
               side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
@@ -300,7 +309,8 @@ class _SidebarButton extends StatelessWidget {
                       Text(
                         item.label,
                         style: TextStyle(
-                          color: selected ? const Color(0xFF111827) : Colors.white,
+                          color:
+                              selected ? const Color(0xFF111827) : Colors.white,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
@@ -387,10 +397,14 @@ class _DocsContent extends StatelessWidget {
             children: [
               _StepList(
                 steps: [
-                  _StepData('1', 'Discovery', 'A peer starts from the public bootstrap manifest and connects to known network nodes.'),
-                  _StepData('2', 'Vetting', 'The node stays online and observable for the vetting window.'),
-                  _StepData('3', 'Participation', 'Healthy approved nodes exchange chain data and can become validator infrastructure.'),
-                  _StepData('4', 'Bootstrap maturity', 'After long-term uptime, a node can qualify as a bootstrap candidate.'),
+                  _StepData('1', 'Discovery',
+                      'A peer starts from the public bootstrap manifest and connects to known network nodes.'),
+                  _StepData('2', 'Vetting',
+                      'The node stays online and observable for the vetting window.'),
+                  _StepData('3', 'Participation',
+                      'Healthy approved nodes exchange chain data and can become validator infrastructure.'),
+                  _StepData('4', 'Bootstrap maturity',
+                      'After long-term uptime, a node can qualify as a bootstrap candidate.'),
                 ],
               ),
             ],
@@ -417,13 +431,11 @@ class _DocsContent extends StatelessWidget {
                     'Copy the peer template and edit the values for your node name, local ports and join host.',
               ),
               _CodeBlock(
-                text:
-                    'cp deploy/env/peer.env.example deploy/env/my-peer.env\n'
+                text: 'cp deploy/env/peer.env.example deploy/env/my-peer.env\n'
                     'nano deploy/env/my-peer.env',
               ),
               _CodeBlock(
-                text:
-                    'PEER_NAME=pokoinpos-my-peer\n'
+                text: 'PEER_NAME=pokoinpos-my-peer\n'
                     'POKOINPOS_LISTEN_PORT=43001\n'
                     'POKOINPOS_ADVERTISE_HOST=example.duckdns.com\n'
                     'POKOINPOS_OPS_PORT=8081\n'
@@ -436,13 +448,11 @@ class _DocsContent extends StatelessWidget {
                     'The helper script pulls the Docker image and starts the peer. You can also use Docker Compose directly.',
               ),
               _CodeBlock(
-                text:
-                    'chmod +x deploy/scripts/docker-peer-up.sh\n'
+                text: 'chmod +x deploy/scripts/docker-peer-up.sh\n'
                     './deploy/scripts/docker-peer-up.sh deploy/env/my-peer.env',
               ),
               _CodeBlock(
-                text:
-                    'docker compose --env-file deploy/env/my-peer.env \\\n'
+                text: 'docker compose --env-file deploy/env/my-peer.env \\\n'
                     '  -f docker-compose.peer.yml up -d --remove-orphans',
               ),
             ],
@@ -489,15 +499,13 @@ class _DocsContent extends StatelessWidget {
                 'Node operators should monitor local health endpoints and the public bootstrap manifest. Live Oracle nodes run the Docker Hub image newisdom/pokoinpos-peer:latest, so production updates go live after a multi-architecture image push.',
             children: [
               _CodeBlock(
-                text:
-                    'curl http://localhost:8081/health\n'
+                text: 'curl http://localhost:8081/health\n'
                     'curl http://localhost:8081/ready\n'
                     'curl http://localhost:8081/chain/status\n'
                     'curl https://pokoin.com/bootstrap-peers.json',
               ),
               _CodeBlock(
-                text:
-                    'make test\n'
+                text: 'make test\n'
                     'make docker-push\n'
                     'docker buildx imagetools inspect newisdom/pokoinpos-peer:latest',
               ),
@@ -524,6 +532,71 @@ class _DocsContent extends StatelessWidget {
         const SizedBox(height: 18),
         KeyedSubtree(
           key: sectionKeys[7],
+          child: const _DocArticle(
+            eyebrow: 'User actions',
+            title: 'Common actions on pokoin.com',
+            body:
+                'These are the everyday flows users ask about in the marketplace, wallet, Scan, and Pokontact. They are written to match the assistant answers and the live site behavior.',
+            children: [
+              _InfoGrid(
+                cards: [
+                  _InfoCardData(
+                    'Check live status',
+                    'Use /health, /scan, RPC health, chain status, and the bootstrap manifest to confirm site and network availability.',
+                    Icons.monitor_heart_outlined,
+                  ),
+                  _InfoCardData(
+                    'Use the wallet',
+                    'Open /wallet to add PokoinPoS to MetaMask, view native PKN balance, send PKN, and open Swap.',
+                    Icons.account_balance_wallet_outlined,
+                  ),
+                  _InfoCardData(
+                    'Buy or understand PKN',
+                    'PKN is native on PokoinPoS. wPKN is the wrapped BNB Chain token; always verify network and contract before signing.',
+                    Icons.token_outlined,
+                  ),
+                ],
+              ),
+              _InfoGrid(
+                cards: [
+                  _InfoCardData(
+                    'Swap assets',
+                    'PokoinSwap quotes live pools. A token should be swappable only when a pool exists and has liquidity.',
+                    Icons.swap_horiz_outlined,
+                  ),
+                  _InfoCardData(
+                    'Sell or list cards',
+                    'Listings store condition, language, reverse, signed, graded/NFT flags, shipping, price, and quantity.',
+                    Icons.storefront_outlined,
+                  ),
+                  _InfoCardData(
+                    'Search cards',
+                    'Search by name, expansion, collector number, and variation tokens such as ex, gx, vmax, vstar, mega, and lv.x.',
+                    Icons.search_outlined,
+                  ),
+                ],
+              ),
+              _DocSection(
+                title: 'How earning works',
+                body:
+                    'Pokoin does not currently publish an automatic rewards or achievements program. Do not trust pages or messages that promise guaranteed earnings. Realistic paths are marketplace selling/listing, using available PKN features, or node/peer participation if the team opens that route. This is not financial advice.',
+              ),
+              _DocSection(
+                title: 'Report a bug or inquiry',
+                body:
+                    'Pokontact forwards bug and inquiry reports to the development team. Include the page URL, what you clicked, expected result, actual result, screenshots or error text, and a transaction hash only if relevant. Never share seed phrases, private keys, passwords, API keys, or service tokens.',
+              ),
+              _DocSection(
+                title: 'Ask about nodes',
+                body:
+                    'If someone asks about a node, peer, validator, bootstrap, or nodo without naming another chain, assume PokoinPoS. Ask whether they want a local test node, a public Oracle/VPS node, or a production validator/peer.',
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+        KeyedSubtree(
+          key: sectionKeys[8],
           child: const _DocArticle(
             eyebrow: 'FAQ',
             title: 'Common questions',
@@ -902,7 +975,8 @@ class _Callout extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(
                   body,
-                  style: const TextStyle(color: Color(0xFFE2E8F0), height: 1.45),
+                  style:
+                      const TextStyle(color: Color(0xFFE2E8F0), height: 1.45),
                 ),
               ],
             ),
@@ -1003,8 +1077,9 @@ class _DocsTopBar extends StatelessWidget implements PreferredSizeWidget {
                     width: 42,
                     height: 42,
                     filterQuality: FilterQuality.none,
-                    errorBuilder: (_, __, ___) =>
-                        const Icon(Icons.article_outlined, color: Color(0xFFFACC15)),
+                    errorBuilder: (_, __, ___) => const Icon(
+                        Icons.article_outlined,
+                        color: Color(0xFFFACC15)),
                   ),
                   const SizedBox(width: 10),
                   const Expanded(
@@ -1017,8 +1092,12 @@ class _DocsTopBar extends StatelessWidget implements PreferredSizeWidget {
                       ),
                     ),
                   ),
-                  TextButton(onPressed: () => context.go('/'), child: const Text('Home')),
-                  TextButton(onPressed: () => context.go('/forum'), child: const Text('Forum')),
+                  TextButton(
+                      onPressed: () => context.go('/'),
+                      child: const Text('Home')),
+                  TextButton(
+                      onPressed: () => context.go('/forum'),
+                      child: const Text('Forum')),
                   FilledButton(
                     onPressed: () => context.go('/wallet'),
                     child: const Text('Wallet'),

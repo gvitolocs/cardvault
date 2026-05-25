@@ -17,8 +17,22 @@ Cloudflare R2 forum media.
 
 ## Required Environment
 
-The app already needs the standard Firebase and Supabase variables documented in
-`workflows/README.md`. Forum media additionally needs:
+The forum APIs run server-side on Vercel. These variables must exist in the
+Vercel project for every environment where `/forum` is expected to work:
+
+```bash
+SUPABASE_URL=
+SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+```
+
+`GET /api/forum` uses the anon key for public reads. Topic/reply/media writes
+verify a Firebase ID token and then use `SUPABASE_SERVICE_ROLE_KEY` to write the
+Supabase forum tables. If the service role key is missing, the browser can still
+render fallback categories, but publishing will fail with `Supabase is not
+configured.`
+
+Forum media additionally needs:
 
 ```bash
 CLOUDFLARE_ACCOUNT_ID=
@@ -73,13 +87,19 @@ When adding API files, update both `vercel.json` rewrites and
    ```
 2. Verify the API files are copied by the deploy script or inspect `build/web/api`
    after a local build.
-3. Test anonymous reads:
+3. Verify Vercel has the forum env vars before deploying:
+   ```bash
+   vercel env ls production | grep -E 'SUPABASE_URL|SUPABASE_ANON_KEY|SUPABASE_SERVICE_ROLE_KEY'
+   ```
+   `deploy-pokoin-web.sh` also blocks production deploys if any of these are
+   missing.
+4. Test anonymous reads:
    ```bash
    curl https://pokoin.com/api/forum
    ```
-4. Test authenticated topic/reply/media flows from the browser with a signed-in
+5. Test authenticated topic/reply/media flows from the browser with a signed-in
    Firebase user.
-5. Deploy with the project workflow only:
+6. Deploy with the project workflow only:
    ```bash
    ./deploy-pokoin-web.sh
    ```

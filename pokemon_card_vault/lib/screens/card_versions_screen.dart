@@ -7,25 +7,34 @@ import '../models/pokemon_card.dart';
 import '../providers/auth_provider.dart';
 import '../providers/card_provider.dart';
 import '../providers/cart_provider.dart';
-import '../providers/recent_views_provider.dart';
 import '../services/card_service.dart';
+import '../utils/card_navigation.dart';
+import '../utils/card_palette.dart';
 import '../utils/card_url.dart';
 import 'home_screen.dart'
     show
         MarketplaceLogoButton,
         MarketplaceTopBar,
-        MarketplaceTopSearch,
-        ProfileIconButton,
+        MarketplaceTopBarSearch,
         SearchLanguageMenu,
-        WalletBalanceButton;
+        marketplaceSearchPreviewHeroHoldDuration,
+        marketplaceTopBarColor,
+        marketplaceTopBarHeight,
+        marketplaceTopBarActions,
+        showMarketplaceEmptyFocusSearchPreviews,
+        showMarketplaceSideMenu;
 
 class CardVersionsScreen extends ConsumerStatefulWidget {
   const CardVersionsScreen({
     super.key,
     required this.cardId,
+    this.cardSlug,
+    this.language = 'en',
   });
 
   final String cardId;
+  final String? cardSlug;
+  final String language;
 
   @override
   ConsumerState<CardVersionsScreen> createState() => _CardVersionsScreenState();
@@ -34,16 +43,20 @@ class CardVersionsScreen extends ConsumerStatefulWidget {
 class _CardVersionsScreenState extends ConsumerState<CardVersionsScreen> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
+  final CardService _cardService = CardService();
   bool _searchFocused = false;
-  late final Future<List<PokemonCard>> _versionsFuture;
-  late final Future<List<PokemonCard>> _similarFuture;
+  String? _resolvedCardId;
+  PokemonCard? _titleCard;
+  List<PokemonCard> _versions = const [];
+  List<PokemonCard> _similar = const [];
+  bool _versionsLoading = true;
+  int _loadRequestId = 0;
 
   @override
   void initState() {
     super.initState();
     _searchFocusNode.addListener(_handleSearchFocusChanged);
-    _versionsFuture = CardService().getOtherVersionCards(widget.cardId);
-    _similarFuture = CardService().getSimilarVersionCards(widget.cardId);
+    _loadVersions();
   }
 
   @override
@@ -54,16 +67,110 @@ class _CardVersionsScreenState extends ConsumerState<CardVersionsScreen> {
     super.dispose();
   }
 
+  @override
+  void didUpdateWidget(covariant CardVersionsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.cardId != widget.cardId ||
+        oldWidget.cardSlug != widget.cardSlug ||
+        oldWidget.language != widget.language) {
+      setState(() {
+        _resolvedCardId = null;
+        _titleCard = null;
+        _versions = const [];
+        _similar = const [];
+        _versionsLoading = true;
+      });
+      _loadVersions();
+    }
+  }
+
   void _handleSearchFocusChanged() {
+    final compactTopBar = MediaQuery.sizeOf(context).width < 760;
+    if (!compactTopBar &&
+        _searchFocusNode.hasFocus &&
+        _searchController.text.trim().isEmpty) {
+      showMarketplaceEmptyFocusSearchPreviews(ref);
+    }
     if (mounted) {
       setState(() => _searchFocused = _searchFocusNode.hasFocus);
     }
   }
 
+  Future<void> _loadVersions() async {
+    final requestId = ++_loadRequestId;
+    final currentCard = await _resolveCurrentCard(
+      widget.cardId,
+      widget.cardSlug,
+    );
+    if (!mounted || requestId != _loadRequestId) {
+      return;
+    }
+    final resolvedCurrentCard = currentCard;
+    if (resolvedCurrentCard == null) {
+      setState(() => _versionsLoading = false);
+      return;
+    }
+    final currentCardId = resolvedCurrentCard.id;
+    final versions = await _cardService.getOtherVersionCards(currentCardId);
+    if (!mounted || requestId != _loadRequestId) {
+      return;
+    }
+    final cards = _mergeCurrentCard(resolvedCurrentCard, versions);
+    setState(() {
+      _resolvedCardId = currentCardId;
+      _titleCard = currentCard;
+      _versions = cards;
+      _versionsLoading = cards.isEmpty;
+    });
+    final similar = await _cardService.getSimilarVersionCards(
+      currentCardId,
+      versionCards: cards,
+    );
+    if (!mounted || requestId != _loadRequestId) {
+      return;
+    }
+    setState(() {
+      _similar = similar;
+      _versionsLoading = false;
+    });
+  }
+
+  Future<PokemonCard?> _resolveCurrentCard(
+    String cardPage,
+    String? cardSlug,
+  ) async {
+    final slug = normalizeCardDetailSlug(cardSlug ?? '');
+    if (slug.isNotEmpty) {
+      final card = await _cardService.getCardByDetailSlug(slug);
+      if (card != null) {
+        return card;
+      }
+    }
+    final id = cardIdFromSlug(cardPage);
+    if (!RegExp(r'^\d+$').hasMatch(id)) {
+      return null;
+    }
+    return _cardService.getCardById(id);
+  }
+
+  List<PokemonCard> _mergeCurrentCard(
+    PokemonCard current,
+    List<PokemonCard> versions,
+  ) {
+    final merged = <String, PokemonCard>{current.id: current};
+    for (final card in versions) {
+      if (card.id.isNotEmpty) {
+        merged[card.id] = card;
+      }
+    }
+    return merged.values.toList();
+  }
+
   void _resetHeaderSearch() {
-    _searchController.clear();
-    _searchFocusNode.unfocus();
-    ref.read(cardProvider.notifier).clearFilters();
+    if (_searchController.text.isNotEmpty) {
+      _searchController.clear();
+    }
+    ref.read(cardProvider.notifier).clearSearchPreviews();
     if (mounted) {
       setState(() {});
     }
@@ -71,10 +178,11 @@ class _CardVersionsScreenState extends ConsumerState<CardVersionsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final cardState = ref.watch(cardProvider);
+    final cards = ref.watch(cardProvider.select((state) => state.cards));
+    final currentCardId = _resolvedCardId ?? cardIdFromSlug(widget.cardId);
     PokemonCard? currentCard;
-    for (final card in cardState.cards) {
-      if (card.id == widget.cardId) {
+    for (final card in cards) {
+      if (card.id == currentCardId) {
         currentCard = card;
         break;
       }
@@ -82,6 +190,7 @@ class _CardVersionsScreenState extends ConsumerState<CardVersionsScreen> {
     final cachedBalance = ref.watch(cachedPknBalanceProvider).valueOrNull;
     final balance =
         ref.watch(pknBalanceProvider).valueOrNull ?? cachedBalance ?? 0;
+    final cartState = ref.watch(cartProvider);
     final compactTopBar = MediaQuery.sizeOf(context).width < 760;
     final compactSearchExpanded = compactTopBar &&
         (_searchFocused || _searchController.text.trim().isNotEmpty);
@@ -92,23 +201,25 @@ class _CardVersionsScreenState extends ConsumerState<CardVersionsScreen> {
         slivers: [
           SliverAppBar(
             pinned: true,
-            backgroundColor: const Color(0xF20A1026),
+            backgroundColor: marketplaceTopBarColor,
+            toolbarHeight: marketplaceTopBarHeight,
+            elevation: 0,
             titleSpacing: 16,
             title: MarketplaceTopBar(
               compactExpanded: compactSearchExpanded,
               logo: MarketplaceLogoButton(
-                onTap: () => context.go('/marketplace'),
+                onTap: compactTopBar
+                    ? () => showMarketplaceSideMenu(context)
+                    : () => context.go('/marketplace'),
               ),
-              search: MarketplaceTopSearch(
+              search: MarketplaceTopBarSearch(
                 controller: _searchController,
                 focusNode: _searchFocusNode,
-                query: cardState.previewQuery,
-                isSearching: cardState.isSearchingPreviews,
-                previews: cardState.searchPreviews,
-                hintText: 'Search cards, sets, products...',
-                onChanged: (value) {
-                  setState(() {});
-                  ref.read(cardProvider.notifier).searchPreviewsOnly(value);
+                compactTopBar: compactTopBar,
+                onSearchFocusedChanged: (hasFocus) {
+                  if (mounted) {
+                    setState(() => _searchFocused = hasFocus);
+                  }
                 },
                 onSelected: (selection) {
                   final card = selection.card;
@@ -117,93 +228,59 @@ class _CardVersionsScreenState extends ConsumerState<CardVersionsScreen> {
                         'click',
                         source: 'versions_search_preview',
                       );
-                  ref.read(recentViewsProvider.notifier).remember(card);
-                  _resetHeaderSearch();
-                  context.go(cardDetailPath(card), extra: selection.heroTag);
+                  navigateToCanonicalCardDetail(
+                    context,
+                    card,
+                    language: widget.language,
+                    source: 'versions_search_preview',
+                    extra: selection.heroTag,
+                  );
+                  Future<void>.delayed(marketplaceSearchPreviewHeroHoldDuration,
+                      () {
+                    if (mounted) {
+                      _resetHeaderSearch();
+                    }
+                  });
                 },
-                onShowAll: (query) => context.go(
-                  Uri(
-                    path: '/marketplace/search',
-                    queryParameters: {
-                      'q': query,
-                      if (cardState.searchLanguage != 'en')
-                        'lang': cardState.searchLanguage,
-                    },
-                  ).toString(),
-                ),
               ),
-              languageMenu: SearchLanguageMenu(
-                value: cardState.searchLanguage,
-                onChanged: (language) =>
-                    ref.read(cardProvider.notifier).setSearchLanguage(language),
+              languageMenu: Consumer(
+                builder: (context, ref, _) {
+                  final searchLanguage = ref.watch(
+                    cardProvider.select((state) => state.searchLanguage),
+                  );
+                  return SearchLanguageMenu(
+                    value: searchLanguage,
+                    onChanged: (language) => ref
+                        .read(cardProvider.notifier)
+                        .setSearchLanguage(language),
+                  );
+                },
+              ),
+              actions: marketplaceTopBarActions(
+                context: context,
+                balance: balance,
+                itemCount: cartState.itemCount,
+                compactTopBar: compactTopBar,
+                compactSearchExpanded: compactSearchExpanded,
+                keyValue: 'versions-marketplace-actions',
               ),
             ),
-            actions: [
-              if (!compactTopBar) ...[
-                TextButton(
-                    onPressed: () => context.go('/'),
-                    child: const Text('Home')),
-                TextButton(
-                    onPressed: () => context.go('/forum'),
-                    child: const Text('Forum')),
-                TextButton(
-                    onPressed: () => context.go('/marketplace/signal'),
-                    child: const Text('Signal')),
-              ],
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 220),
-                child: compactSearchExpanded
-                    ? const SizedBox.shrink()
-                    : Row(
-                        key: const ValueKey('versions-marketplace-actions'),
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          WalletBalanceButton(
-                            balance: balance,
-                            onTap: () => context.go('/wallet'),
-                          ),
-                          const SizedBox(width: 8),
-                          const ProfileIconButton(),
-                          const SizedBox(width: 8),
-                          Padding(
-                            padding: const EdgeInsets.only(right: 12),
-                            child: FilledButton.icon(
-                              onPressed: () => context.go('/cart'),
-                              icon: const Icon(Icons.shopping_bag_outlined,
-                                  size: 18),
-                              label:
-                                  Text('${ref.watch(cartProvider).itemCount}'),
-                            ),
-                          ),
-                        ],
-                      ),
-              ),
-            ],
           ),
           SliverToBoxAdapter(
-            child: FutureBuilder<List<List<PokemonCard>>>(
-              future: Future.wait([_versionsFuture, _similarFuture]),
-              builder: (context, snapshot) {
-                final versions = snapshot.data?.first ?? const <PokemonCard>[];
-                final similar = snapshot.data == null
-                    ? const <PokemonCard>[]
-                    : snapshot.data![1];
-                if (snapshot.connectionState != ConnectionState.done) {
-                  return const SizedBox(
+            child: _versionsLoading && _versions.isEmpty
+                ? const SizedBox(
                     height: 420,
                     child: Center(child: CircularProgressIndicator()),
-                  );
-                }
-                final titleCard = currentCard ??
-                    (versions.isNotEmpty ? versions.first : null);
-                return _VersionsBody(
-                  cardId: widget.cardId,
-                  titleCard: titleCard,
-                  cards: versions,
-                  similarCards: similar,
-                );
-              },
-            ),
+                  )
+                : _VersionsBody(
+                    cardId: currentCardId,
+                    language: widget.language,
+                    titleCard: currentCard ??
+                        _titleCard ??
+                        (_versions.isNotEmpty ? _versions.first : null),
+                    cards: _versions,
+                    similarCards: _similar,
+                  ),
           ),
         ],
       ),
@@ -214,12 +291,14 @@ class _CardVersionsScreenState extends ConsumerState<CardVersionsScreen> {
 class _VersionsBody extends StatelessWidget {
   const _VersionsBody({
     required this.cardId,
+    required this.language,
     required this.titleCard,
     required this.cards,
     required this.similarCards,
   });
 
   final String cardId;
+  final String language;
   final PokemonCard? titleCard;
   final List<PokemonCard> cards;
   final List<PokemonCard> similarCards;
@@ -243,7 +322,12 @@ class _VersionsBody extends StatelessWidget {
                   OutlinedButton.icon(
                     onPressed: titleCard == null
                         ? () => context.go('/marketplace')
-                        : () => context.go(cardDetailPath(titleCard!)),
+                        : () => navigateToCanonicalCardDetail(
+                              context,
+                              titleCard!,
+                              language: language,
+                              source: 'card_versions_title',
+                            ),
                     icon: const Icon(Icons.arrow_back),
                     label: Text(
                         titleCard == null ? 'Back to market' : 'Back to card'),
@@ -286,9 +370,7 @@ class _VersionsBody extends StatelessWidget {
                         ? 4
                         : width >= 820
                             ? 3
-                            : width >= 560
-                                ? 2
-                                : 1;
+                            : 2;
                     return GridView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
@@ -297,12 +379,21 @@ class _VersionsBody extends StatelessWidget {
                         crossAxisCount: columns,
                         crossAxisSpacing: 14,
                         mainAxisSpacing: 14,
-                        childAspectRatio: columns == 1 ? 1.9 : 0.86,
+                        childAspectRatio: columns == 2 && width < 560
+                            ? 0.72
+                            : columns == 1
+                                ? 1.9
+                                : 0.86,
                       ),
-                      itemBuilder: (context, index) => _VersionCard(
-                        card: cards[index],
-                        isCurrent: cards[index].id == cardId,
-                      ),
+                      itemBuilder: (context, index) {
+                        final card = cards[index];
+                        return _VersionCard(
+                          card: card,
+                          heroTag: _versionHeroTag(card, 'versions', index),
+                          language: language,
+                          isCurrent: card.id == cardId,
+                        );
+                      },
                     );
                   },
                 ),
@@ -324,9 +415,7 @@ class _VersionsBody extends StatelessWidget {
                         ? 4
                         : width >= 820
                             ? 3
-                            : width >= 560
-                                ? 2
-                                : 1;
+                            : 2;
                     return GridView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
@@ -335,12 +424,21 @@ class _VersionsBody extends StatelessWidget {
                         crossAxisCount: columns,
                         crossAxisSpacing: 14,
                         mainAxisSpacing: 14,
-                        childAspectRatio: columns == 1 ? 1.9 : 0.86,
+                        childAspectRatio: columns == 2 && width < 560
+                            ? 0.72
+                            : columns == 1
+                                ? 1.9
+                                : 0.86,
                       ),
-                      itemBuilder: (context, index) => _VersionCard(
-                        card: similarCards[index],
-                        isCurrent: false,
-                      ),
+                      itemBuilder: (context, index) {
+                        final card = similarCards[index];
+                        return _VersionCard(
+                          card: card,
+                          heroTag: _versionHeroTag(card, 'similar', index),
+                          language: language,
+                          isCurrent: false,
+                        );
+                      },
                     );
                   },
                 ),
@@ -376,26 +474,44 @@ class _EmptyVersionsCard extends StatelessWidget {
 class _VersionCard extends ConsumerWidget {
   const _VersionCard({
     required this.card,
+    required this.heroTag,
+    required this.language,
     required this.isCurrent,
   });
 
   final PokemonCard card;
+  final String heroTag;
+  final String language;
   final bool isCurrent;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final displayNumber = _versionDisplayNumber(card.number);
+    final expansionName = card.set.trim();
+    final paletteHint = cardPaletteHint(
+      type: card.type,
+      name: card.name,
+      tags: card.tags,
+    );
+    final frameColor = cardImageFrameColorForPayload(
+      card.cardPalette,
+      fallbackType: paletteHint,
+    );
     return InkWell(
-      onTap: isCurrent
-          ? null
-          : () {
-              ref.read(cardProvider.notifier).recordCardInteraction(
-                    card,
-                    'click',
-                    source: 'card_versions',
-                  );
-              ref.read(recentViewsProvider.notifier).remember(card);
-              context.go(cardDetailPath(card));
-            },
+      onTap: () {
+        ref.read(cardProvider.notifier).recordCardInteraction(
+              card,
+              'click',
+              source: isCurrent ? 'card_versions_current' : 'card_versions',
+            );
+        navigateToCanonicalCardDetail(
+          context,
+          card,
+          language: language,
+          source: isCurrent ? 'card_versions_current' : 'card_versions',
+          extra: heroTag,
+        );
+      },
       borderRadius: BorderRadius.circular(24),
       child: Container(
         padding: const EdgeInsets.all(14),
@@ -413,26 +529,61 @@ class _VersionCard extends ConsumerWidget {
           children: [
             Expanded(
               child: Center(
-                child: card.imageUrl.trim().isEmpty
-                    ? const Icon(
-                        Icons.style,
-                        color: Color(0xFFFACC15),
-                        size: 54,
-                      )
-                    : CachedNetworkImage(
-                        imageUrl: card.imageUrl,
-                        fit: BoxFit.contain,
-                        errorWidget: (_, __, ___) => const Icon(
-                          Icons.style,
-                          color: Color(0xFFFACC15),
-                          size: 54,
+                child: Hero(
+                  tag: heroTag,
+                  flightShuttleBuilder: (
+                    _,
+                    animation,
+                    __,
+                    ___,
+                    toHeroContext,
+                  ) {
+                    return ScaleTransition(
+                      scale: Tween<double>(begin: 0.985, end: 1).animate(
+                        CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOutCubic,
                         ),
                       ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: toHeroContext.widget,
+                      ),
+                    );
+                  },
+                  child: AspectRatio(
+                    aspectRatio: 0.72,
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: frameColor,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      clipBehavior: Clip.none,
+                      child: card.imageUrl.trim().isEmpty
+                          ? const Icon(
+                              Icons.style,
+                              color: Color(0xFFFACC15),
+                              size: 54,
+                            )
+                          : CachedNetworkImage(
+                              imageUrl: card.imageUrl,
+                              fit: BoxFit.contain,
+                              alignment: Alignment.center,
+                              errorWidget: (_, __, ___) => const Icon(
+                                Icons.style,
+                                color: Color(0xFFFACC15),
+                                size: 54,
+                              ),
+                            ),
+                    ),
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 12),
             Text(
-              card.name,
+              displayNumber.isEmpty ? card.name : '${card.name} $displayNumber',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
@@ -443,7 +594,7 @@ class _VersionCard extends ConsumerWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              '#${card.number}',
+              expansionName.isEmpty ? 'Expansion unknown' : expansionName,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
@@ -466,4 +617,31 @@ class _VersionCard extends ConsumerWidget {
       ),
     );
   }
+}
+
+String _versionHeroTag(PokemonCard card, String section, int index) {
+  return 'market-card-image-${card.id}-versions-$section-$index';
+}
+
+String _versionDisplayNumber(String rawNumber) {
+  final text = rawNumber.trim();
+  if (text.isEmpty) {
+    return '';
+  }
+  final parts = text
+      .split(RegExp(r'\s*(?:\||•|-{2,}|–|—)\s*'))
+      .map((part) => part.trim())
+      .where((part) => part.isNotEmpty)
+      .toList();
+  for (final part in parts.reversed) {
+    if (RegExp(r'\d+\s*/\s*\d+').hasMatch(part)) {
+      return part.replaceAll(RegExp(r'\s+'), '');
+    }
+  }
+  for (final part in parts.reversed) {
+    if (RegExp(r'\d').hasMatch(part)) {
+      return part;
+    }
+  }
+  return text;
 }

@@ -1,6 +1,23 @@
 const Stripe = require('stripe');
-const { getFirebaseAdmin } = require('../server/_firebase');
-const { handleCompletedCheckout } = require('../server/_pkn_purchase');
+const path = require('path');
+
+function requireServerHelper(name) {
+  const serverPath = path.join(__dirname, '..', 'server', name);
+  try {
+    return require(serverPath);
+  } catch (error) {
+    if (
+      error.code !== 'MODULE_NOT_FOUND' ||
+      !String(error.message).includes(serverPath)
+    ) {
+      throw error;
+    }
+    return require(`./${name}`);
+  }
+}
+
+const { getFirebaseAdmin } = requireServerHelper('_firebase');
+const { handleCompletedCheckout } = requireServerHelper('_pkn_purchase');
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {

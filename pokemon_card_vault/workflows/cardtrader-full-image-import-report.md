@@ -26,6 +26,15 @@ Rules saved from the fix:
 
 - Ignore CardTrader preview URLs and fallback uploader placeholders for full
   image imports.
+- Treat `blueprint.image.url` as the preferred full-card source. `show_` images
+  are allowed only as a fallback when the full source is missing or fails.
+- Never use `preview_` images for full/card-detail images when
+  `blueprint.image.url` or `blueprint.image.show.url` exists. Preview images
+  belong only in `preview_image_url`.
+- Before repairing existing CDN rows, compare the current R2 object dimensions
+  against the preferred full source. Reupload only when the current image is
+  materially lower resolution, or when an explicit source-metadata repair is
+  requested.
 - Try every usable full/show candidate before failing a row.
 - Record all candidate download failures in the row failure message.
 - Detect actual image format from bytes first, then response content type, then
@@ -71,6 +80,96 @@ node scripts/import-oracle-cardtrader-images.js
 
 Use a fresh `ORACLE_IMAGE_FULL_KEY_SUFFIX` when overwriting previously imported
 low-resolution CDN rows so immutable CDN cache cannot serve the old object.
+
+Quality audit/repair mode:
+
+```bash
+ORACLE_IMAGE_MODE=full \
+ORACLE_IMAGE_AUDIT_QUALITY=1 \
+ORACLE_IMAGE_SOURCE_MISMATCH_ONLY=1 \
+ORACLE_IMAGE_PRODUCT_TYPE=card \
+ORACLE_IMAGE_FULL_KEY_SUFFIX=full-v4 \
+ORACLE_IMAGE_BATCH_SIZE=250 \
+ORACLE_IMAGE_MAX_ROWS=1000 \
+ORACLE_IMAGE_CURSOR_ID=0 \
+node scripts/import-oracle-cardtrader-images.js
+```
+
+This mode downloads the preferred CardTrader full source and the current R2
+object, reads both dimensions with `sharp`, and only reimports rows where the
+current CDN full image is below `ORACLE_IMAGE_QUALITY_MIN_RATIO` of the source
+pixel count. The default ratio is `0.85`.
+
+If the CDN image dimensions are already acceptable but
+`cardtrader_image_url` still points to an old `preview_` or `show_` source, leave
+the row alone by default. Set `ORACLE_IMAGE_REPAIR_SOURCE_MISMATCH=1` only when
+you intentionally want to rewrite source metadata and reupload equal-quality
+objects.
+
+## 2026-05-23 Preview-Derived Full Image Audit
+
+Targeted verification after manually repairing row `274402`:
+
+```text
+ORACLE_IMAGE_MODE=full ORACLE_IMAGE_AUDIT_QUALITY=1 ORACLE_IMAGE_IDS=274402 node scripts/import-oracle-cardtrader-images.js
+```
+
+Result: row `274402` was skipped as `current-full-ok`, confirming the CDN/R2
+object now matches the preferred CardTrader full source closely enough for the
+quality audit.
+
+Bounded source-mismatch audit/repair chunks:
+
+```text
+ORACLE_IMAGE_MODE=full \
+ORACLE_IMAGE_AUDIT_QUALITY=1 \
+ORACLE_IMAGE_SOURCE_MISMATCH_ONLY=1 \
+ORACLE_IMAGE_PRODUCT_TYPE=card \
+ORACLE_IMAGE_BATCH_SIZE=100 \
+ORACLE_IMAGE_MAX_ROWS=500 \
+ORACLE_IMAGE_CURSOR_ID=0 \
+ORACLE_IMAGE_FULL_KEY_SUFFIX=full-audit-1779521232 \
+node scripts/import-oracle-cardtrader-images.js
+```
+
+Result:
+
+- Processed: `500`
+- Imported/repaired: `7`
+- Failed: `0`
+- Resume cursor: `115531`
+- Repaired IDs: `110992`, `111048`, `111287`, `111708`, `112917`, `114324`,
+  `114326`
+
+Second chunk:
+
+```text
+ORACLE_IMAGE_MODE=full \
+ORACLE_IMAGE_AUDIT_QUALITY=1 \
+ORACLE_IMAGE_SOURCE_MISMATCH_ONLY=1 \
+ORACLE_IMAGE_PRODUCT_TYPE=card \
+ORACLE_IMAGE_BATCH_SIZE=100 \
+ORACLE_IMAGE_MAX_ROWS=500 \
+ORACLE_IMAGE_CURSOR_ID=115531 \
+ORACLE_IMAGE_FULL_KEY_SUFFIX=full-audit-1779521467 \
+node scripts/import-oracle-cardtrader-images.js
+```
+
+Result:
+
+- Processed: `500`
+- Imported/repaired: `5`
+- Failed: `0`
+- Resume cursor: `120650`
+- Repaired IDs: `117703`, `117717`, `117719`, `118760`, `120310`
+
+Focused verification for the 12 repaired IDs returned `current-full-ok` for
+every row.
+
+Most skipped rows in both chunks were `current-full-ok-source-metadata-stale`:
+their `cardtrader_image_url` metadata still pointed at an older preview/show
+source, but the current R2 object dimensions already matched the preferred full
+CardTrader source. They were intentionally left untouched.
 
 Resume from the printed cursor:
 

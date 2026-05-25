@@ -1,0 +1,76 @@
+{
+  "generatedAt": "2026-05-25T08:16:58.475Z",
+  "mode": "artist-fallback-avatar-dry-run",
+  "options": {
+    "limit": 100,
+    "concurrency": 2,
+    "artist": "Aky CG Works",
+    "auditReport": "workflows/reports/artist-profile-grey-placeholder-audit-20260525.json",
+    "avatarSize": 512,
+    "cropYRatio": 0.1,
+    "includeMissing": true,
+    "includePlaceholders": true
+  },
+  "counts": {
+    "scanned": 1,
+    "placeholderProfileImage": 1,
+    "missingProfileImage": 0,
+    "candidatesWithCard": 1,
+    "generated": 0,
+    "uploaded": 0,
+    "upserted": 0,
+    "skipped": 0,
+    "failed": 0,
+    "reasons": {
+      "illustration": 1
+    }
+  },
+  "samples": [
+    {
+      "artist": "Aky CG Works",
+      "normalizedArtist": "aky cg works",
+      "status": "matched_dry_run",
+      "generationReason": "placeholder_profile_image",
+      "artCategory": "illustration",
+      "sourceCardName": "Zamazenta",
+      "sourceCardId": "150415",
+      "sourceBlueprintId": "150415",
+      "sourceRarity": "Illustration Rare",
+      "sourceImageUrl": "https://cdn.pokoin.com/150415_zamazenta-102-185-vivid-voltage.jpg",
+      "sourceImageFetchUrl": "https://pokoin.com/card-images/150415_zamazenta-102-185-vivid-voltage.jpg",
+      "sourceImageObjectKey": "150415_zamazenta-102-185-vivid-voltage.jpg",
+      "sourceCardUrl": "https://pokoin.com/marketplace/en/cards/300830/card-zamazenta-102-185-vivid-voltage",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/aky-cg-works.png",
+      "profileImageObjectKey": "artist-profiles/aky-cg-works.png",
+      "cropStrategy": {
+        "name": "top_center_square",
+        "yRatio": 0.1,
+        "outputSize": 512
+      }
+    }
+  ],
+  "report": [
+    {
+      "artist": "Aky CG Works",
+      "normalizedArtist": "aky cg works",
+      "status": "matched_dry_run",
+      "generationReason": "placeholder_profile_image",
+      "artCategory": "illustration",
+      "sourceCardName": "Zamazenta",
+      "sourceCardId": "150415",
+      "sourceBlueprintId": "150415",
+      "sourceRarity": "Illustration Rare",
+      "sourceImageUrl": "https://cdn.pokoin.com/150415_zamazenta-102-185-vivid-voltage.jpg",
+      "sourceImageFetchUrl": "https://pokoin.com/card-images/150415_zamazenta-102-185-vivid-voltage.jpg",
+      "sourceImageObjectKey": "150415_zamazenta-102-185-vivid-voltage.jpg",
+      "sourceCardUrl": "https://pokoin.com/marketplace/en/cards/300830/card-zamazenta-102-185-vivid-voltage",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/aky-cg-works.png",
+      "profileImageObjectKey": "artist-profiles/aky-cg-works.png",
+      "cropStrategy": {
+        "name": "top_center_square",
+        "yRatio": 0.1,
+        "outputSize": 512
+      }
+    }
+  ]
+}

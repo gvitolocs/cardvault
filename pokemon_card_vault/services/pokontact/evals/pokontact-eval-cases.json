@@ -1,0 +1,154 @@
+[
+  {
+    "id": "node-typo-ode",
+    "message": "how do i run an ode",
+    "expectIntent": "node",
+    "expectSource": "docs-referral",
+    "mustInclude": ["https://pokoin.com/docs", "Run a node"],
+    "mustNotInclude": ["I don't know", "Hiii"]
+  },
+  {
+    "id": "node-typo-nide",
+    "message": "how do i run a nide",
+    "expectIntent": "node",
+    "expectSource": "docs-referral",
+    "mustInclude": ["https://pokoin.com/docs", "Run a node"],
+    "mustNotInclude": ["I don't know", "Hiii"]
+  },
+  {
+    "id": "wallet-typo-walet",
+    "message": "how do i setup a walet",
+    "expectIntent": "crypto",
+    "expectSource": "docs-referral",
+    "mustInclude": ["https://pokoin.com/docs", "Wallets"],
+    "mustNotInclude": ["Run a node", "Hiii"]
+  },
+  {
+    "id": "metamask-typo",
+    "message": "how do i setup metamsk",
+    "expectIntent": "crypto",
+    "expectSource": "docs-referral",
+    "mustInclude": ["https://pokoin.com/docs", "Wallets"],
+    "mustNotInclude": ["Run a node", "Hiii"]
+  },
+  {
+    "id": "swap-typo",
+    "message": "how do i swpa pkn",
+    "expectIntent": "crypto",
+    "expectSource": "docs-referral",
+    "mustInclude": ["https://pokoin.com/docs", "Wallets"],
+    "mustNotInclude": ["Run a node", "Hiii"]
+  },
+  {
+    "id": "project-typo-explian",
+    "message": "can you explian pokoin",
+    "expectIntent": "project",
+    "expectSource": "docs-referral",
+    "mustInclude": ["https://pokoin.com/docs", "Overview"],
+    "mustNotInclude": ["Hiii", "I can explain"]
+  },
+  {
+    "id": "docs-typo-documentaton",
+    "message": "where is the documentaton",
+    "expectIntent": "project",
+    "expectSource": "docs-referral",
+    "mustInclude": ["https://pokoin.com/docs", "Overview"],
+    "mustNotInclude": ["Hiii"]
+  },
+  {
+    "id": "marketplace-typo-card",
+    "message": "how do i sell a crad",
+    "expectIntent": "marketplace",
+    "expectSource": "docs-referral",
+    "mustInclude": ["https://pokoin.com/docs", "User actions"],
+    "mustNotInclude": ["Run a node", "Hiii"]
+  },
+  {
+    "id": "casual-introduction",
+    "message": "my name is giuseep",
+    "expectIntent": "introduction",
+    "expectSource": "curated-local",
+    "mustInclude": ["Nice to meet you", "giuseep"],
+    "mustNotInclude": ["https://pokoin.com/docs", "I don't know"]
+  },
+  {
+    "id": "casual-favorite-pokemon-mixed-language",
+    "message": "what is your pokemon preferito",
+    "expectIntent": "favorite-pokemon",
+    "expectSource": "curated-local",
+    "mustInclude": ["Mew"],
+    "mustNotInclude": ["https://pokoin.com/docs", "technical questions"]
+  },
+  {
+    "id": "casual-unknown-first-fast",
+    "message": "ti piace twich",
+    "expectIntent": "unknown",
+    "expectSource": "curated-local",
+    "mustIncludeAny": ["manca", "Non conosco", "non sono sicuro"],
+    "mustNotInclude": ["Hiii", "https://pokoin.com/docs"]
+  },
+  {
+    "id": "casual-wellbeing-italian",
+    "message": "tutto ok?",
+    "expectIntent": "wellbeing",
+    "expectSource": "curated-local",
+    "mustInclude": ["Sì", "tutto ok"],
+    "mustNotInclude": ["I don't know", "https://pokoin.com/docs", "Hiii"]
+  },
+  {
+    "id": "casual-unknown-insist-escalates",
+    "message": "ma dai dimmi se ti piace davvero",
+    "history": [
+      { "role": "user", "text": "ti piace twich" },
+      { "role": "assistant", "text": "Questa ancora mi manca nel Pokédex delle risposte 🐣 Sto migliorando: riprova con qualche dettaglio in più e ci metto più attenzione." }
+    ],
+    "expectIntent": "unknown",
+    "expectSourceAny": ["model-escalated", "curated-escalation-fallback"],
+    "mustIncludeAny": ["gusti personali", "Twitch", "non posso dire"],
+    "mustNotInclude": ["Hiii"]
+  },
+  {
+    "id": "card-suggestion",
+    "message": "suggest a cute card",
+    "expectIntent": "card",
+    "expectSource": "curated-local",
+    "mustInclude": ["not financial advice"],
+    "mustNotInclude": ["https://pokoin.com/docs"]
+  },
+  {
+    "id": "pokemon-history-first-set",
+    "message": "what was the first pokemon card set",
+    "expectIntent": "card-history",
+    "expectSource": "curated-local",
+    "mustInclude": ["1996", "October 20, 1996", "1999", "102 cards"],
+    "mustNotInclude": ["https://pokoin.com/docs", "financial advice"]
+  },
+  {
+    "id": "pokemon-history-wizards-era",
+    "message": "explain the wizards and e-card pokemon tcg era",
+    "expectIntent": "card-history",
+    "expectSource": "curated-local",
+    "mustInclude": ["Wizards of the Coast", "e-Card", "Nintendo e-Reader", "2003"],
+    "mustNotInclude": ["investment", "price"]
+  },
+  {
+    "id": "pokemon-history-italian",
+    "message": "storia delle carte pokemon base set",
+    "expectIntent": "card-history",
+    "expectSource": "curated-local",
+    "mustInclude": ["1996", "1999", "102 carte"],
+    "mustNotInclude": ["https://pokoin.com/docs"]
+  },
+  {
+    "id": "pokemon-history-followup-card-count",
+    "message": "how many cards",
+    "history": [
+      { "role": "user", "text": "quando é uscito il set base" },
+      { "role": "assistant", "text": "Storia TCG, versione precisa 🃏\n\nIl Pokémon Trading Card Game parte in Giappone nel 1996: il Base Set giapponese uscì il 20 ottobre 1996. Il Base Set inglese arrivò in Nord America nel 1999 e ha 102 carte." }
+    ],
+    "expectIntent": "card-history",
+    "expectSource": "context-follow-up",
+    "mustInclude": ["102 cards"],
+    "mustNotInclude": ["https://pokoin.com/docs", "technical questions"]
+  }
+]

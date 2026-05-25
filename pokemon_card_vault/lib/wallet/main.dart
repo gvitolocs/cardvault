@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
@@ -57,11 +58,60 @@ class WalletHomePage extends WalletScreen {
 
 class _WalletScreenState extends State<WalletScreen> {
   static const rpcUrl = 'https://rpc.pokoin.com/rpc';
+  static const swapBaseUrl = 'https://rpc.pokoin.com';
   static const nativeSymbol = 'PKN';
+  static const externalCryptoSettlementAddress =
+      '0x74466c3a204429B22CE8558F3F18f3C59F67fCB3';
+  static const pokoinSwapRouterAddress =
+      '0x0000000000000000000000000000000000002606';
+  static const pokoinSwapCalldataPrefix = 'pokoinswap:v1:';
+  static const defaultSwapAssets = <String>[
+    'WPKN',
+    'BTC',
+    'ETH',
+    'BNB',
+    'EURC',
+    'USDT'
+  ];
+  static const _stablecoinSwapAssets = <String>{'USDT', 'USDC', 'DAI'};
+  static const _cryptoPriceIds = <String, String>{
+    'BTC': 'bitcoin',
+    'ETH': 'ethereum',
+    'BNB': 'binancecoin',
+    'EURC': 'eurc',
+    'LINK': 'chainlink',
+    'UNI': 'uniswap',
+    'CAKE': 'pancakeswap-token',
+  };
+  static const _externalChainIds = <String, String>{
+    'ETH': '0x1',
+    'BNB': '0x38',
+    'EURC': '0x1',
+    'USDT': '0x38',
+    'USDC': '0x38',
+    'DAI': '0x38',
+    'LINK': '0x1',
+    'UNI': '0x1',
+    'CAKE': '0x38',
+  };
+  static const _manualDepositAssets = <String>{'BTC'};
+  static const customSwapAsset = 'CUSTOM';
+  static const _tokenListSources = <_TokenListSource>[
+    _TokenListSource(
+      name: 'Ethereum',
+      chainId: 1,
+      explorerHost: 'etherscan.io',
+      url: 'https://tokens.uniswap.org',
+    ),
+    _TokenListSource(
+      name: 'BNB Chain',
+      chainId: 56,
+      explorerHost: 'bscscan.com',
+      url: 'https://tokens.pancakeswap.finance/pancakeswap-extended.json',
+    ),
+  ];
   static const recentRecipientLimit = 5;
   static const nativeBankAddress = '0xb4029F68E360280aa4Ad21D8aE5AD8896b8768B2';
-  static const wpknSettlementAddress =
-      '0x74466c3a204429B22CE8558F3F18f3C59F67fCB3';
 
   final WalletAuthService _auth = WalletAuthService();
   final WalletBridge _wallet = createWalletBridge();
@@ -71,13 +121,26 @@ class _WalletScreenState extends State<WalletScreen> {
       TextEditingController();
   final TextEditingController _exchangeAddressController =
       TextEditingController();
+  final TextEditingController _customSwapAssetController =
+      TextEditingController();
   final List<ActivityItem> _activity = <ActivityItem>[];
   final List<String> _recipientSuggestions = <String>[];
+  final List<String> _swapAssets = <String>[...defaultSwapAssets];
+  final Map<String, _SwapTokenInfo> _swapTokenCatalog =
+      <String, _SwapTokenInfo>{
+    for (final token in _defaultSwapTokenCatalog) token.symbol: token,
+  };
+  final Map<String, _SwapPoolSnapshot> _swapPoolsByAsset =
+      <String, _SwapPoolSnapshot>{};
 
   RecipientSuggestionSource _recipientSuggestionSource =
       RecipientSuggestionSource.recent;
   bool _recipientSearchLoading = false;
   bool _recipientSearchHadQuery = false;
+  bool _showSwapPage = false;
+  bool _swapQuoteLoading = false;
+  bool _swapPoolsLoading = false;
+  bool _swapTokenCatalogLoading = false;
   String? _address;
   WalletUser? _user;
   String? _username;
@@ -88,7 +151,14 @@ class _WalletScreenState extends State<WalletScreen> {
   bool _authResolved = false;
   bool _accountBalanceReady = false;
   String? _error;
+  Object? _swapPoolError;
   int _recipientSearchToken = 0;
+  int _swapQuoteToken = 0;
+  String _swapAsset = 'ETH';
+  bool _swapFromPkn = false;
+  bool _autoSwapHandled = false;
+  String? _swapQuoteError;
+  Map<String, dynamic>? _swapQuote;
 
   @override
   void dispose() {
@@ -96,7 +166,21 @@ class _WalletScreenState extends State<WalletScreen> {
     _amountController.dispose();
     _exchangeAmountController.dispose();
     _exchangeAddressController.dispose();
+    _customSwapAssetController.dispose();
     super.dispose();
+  }
+
+  void _setSwapPageVisible(bool visible) {
+    setState(() {
+      _showSwapPage = visible;
+      if (!visible) {
+        _swapQuote = null;
+        _swapQuoteError = null;
+        _swapQuoteLoading = false;
+        _exchangeAmountController.clear();
+        _swapQuoteToken++;
+      }
+    });
   }
 
   @override
@@ -133,7 +217,30 @@ class _WalletScreenState extends State<WalletScreen> {
         _loadLinkedWallet();
         _loadAccountBalance();
         _loadActivity();
+        _openSwapFromDeepLinkIfNeeded();
       }
+    });
+  }
+
+  void _openSwapFromDeepLinkIfNeeded() {
+    if (_autoSwapHandled || _showSwapPage) {
+      return;
+    }
+    final query = Uri.base.queryParameters;
+    final requested = query['swap'] == '1' ||
+        query['open'] == 'swap' ||
+        query['action'] == 'swap';
+    if (!requested) {
+      return;
+    }
+    _autoSwapHandled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      _setSwapPageVisible(true);
+      unawaited(_loadSwapPools());
+      unawaited(_loadSwapTokenCatalog());
     });
   }
 
@@ -240,18 +347,18 @@ class _WalletScreenState extends State<WalletScreen> {
   Future<void> _linkWalletAddress(String address) async {
     final normalized = address.trim().toLowerCase();
     final nonce = await _auth.requestWalletNonce(normalized);
-    final message = nonce['message'];
-    if (message == null || message.isEmpty) {
-      throw Exception('Wallet sign-in nonce was empty.');
-    }
-    final signature = await _wallet.signMessage(
+      final message = nonce['message'];
+      if (message == null || message.isEmpty) {
+        throw Exception('Wallet sign-in nonce was empty.');
+      }
+      final signature = await _wallet.signMessage(
       address: normalized,
-      message: message,
-    );
+        message: message,
+      );
     await _auth.linkSignedWallet(
       address: normalized,
-      signature: signature,
-    );
+        signature: signature,
+      );
   }
 
   Future<void> _loadBalance(String address) async {
@@ -272,6 +379,26 @@ class _WalletScreenState extends State<WalletScreen> {
       return;
     }
     setState(() => _accountBalance = balance);
+  }
+
+  Future<void> _reconcileRecentTopUps(int amountPkn) async {
+    if (_user == null) {
+      return;
+    }
+    try {
+      final result = await _auth.reconcileRecentTopUps(amountPkn: amountPkn);
+      final credited = _readInt(result['creditedAmountPkn']);
+      if (credited <= 0) {
+        return;
+      }
+      await _loadAccountBalance();
+      await _loadActivity();
+      if (mounted) {
+        _showMessage('Recovered $credited PKN from confirmed top-up.');
+      }
+    } catch (_) {
+      // Reconciliation is a safety net; normal wallet loading should continue.
+    }
   }
 
   Future<void> _openSendSheet() async {
@@ -365,11 +492,11 @@ class _WalletScreenState extends State<WalletScreen> {
                           ),
                           onSelect: (recipient) {
                             _toController.text = recipient;
-                            _recipientSuggestions.clear();
+                                  _recipientSuggestions.clear();
                             _recipientSearchLoading = false;
                             _recipientSearchHadQuery = false;
-                            setDialogState(() {});
-                          },
+                                  setDialogState(() {});
+                                },
                         ),
                       ],
                       const SizedBox(height: 12),
@@ -583,10 +710,10 @@ class _WalletScreenState extends State<WalletScreen> {
         valueWei: BigInt.from(amount) * BigInt.from(10).pow(18),
       );
       await _auth.topUpAccountBalance(amountPkn: amount, fundingTxHash: hash);
+      await _reconcileRecentTopUps(amount);
       await _loadBalance(from);
       await _loadAccountBalance();
       _amountController.clear();
-      await _record('Topped up $amount PKN', hash, ActivityKind.inbound);
       _showMessage('Account balance topped up.');
       await _loadActivity();
     });
@@ -843,209 +970,843 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   Future<void> _openWpknExchangeSheet() async {
-    if (_user == null) {
-      _showMessage('Sign in before using the PKN/wPKN exchange.');
+    if (!_wallet.hasProvider) {
+      if (_wallet.openMetaMaskDappUrl('https://pokoin.com/wallet?swap=1')) {
+        _showMessage('Opening PokoinSwap in MetaMask.');
+        return;
+      }
+      _showMessage('Install MetaMask or another EVM browser wallet first.');
       return;
     }
 
-    var direction = 'pkn_to_wpkn';
-    Map<String, dynamic>? quote;
-    List<Map<String, dynamic>> requests = const <Map<String, dynamic>>[];
-    _exchangeAmountController.clear();
-    _exchangeAddressController.text = _address ?? '';
+    final from = _address?.trim();
+    if (from == null || from.isEmpty) {
+      _showMessage('Connect MetaMask before using PokoinSwap.');
+      await _connectWallet();
+      return;
+    }
 
-    Future<void> loadRequests(
-        void Function(VoidCallback fn) setDialogState) async {
-      try {
-        final rows = await _auth.wpknExchangeRequests();
         if (!mounted) {
           return;
         }
-        requests = rows;
-        setDialogState(() {});
+    _setSwapPageVisible(true);
+    unawaited(_loadSwapPools());
+    unawaited(_loadSwapTokenCatalog());
+  }
+
+  Future<void> _loadSwapTokenCatalog() async {
+    if (_swapTokenCatalogLoading) {
+      return;
+    }
+    setState(() {
+      _swapTokenCatalogLoading = true;
+    });
+    final discovered = <String, _SwapTokenInfo>{
+      for (final entry in _swapTokenCatalog.entries) entry.key: entry.value,
+    };
+    for (final source in _tokenListSources) {
+      try {
+        final response = await http
+            .get(Uri.parse(source.url))
+            .timeout(const Duration(seconds: 10));
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          continue;
+        }
+        final payload = jsonDecode(response.body) as Map<String, dynamic>;
+        for (final row
+            in (payload['tokens'] as List<dynamic>? ?? <dynamic>[])) {
+          if (row is! Map<String, dynamic>) {
+            continue;
+          }
+          if (_readInt(row['chainId']) != source.chainId) {
+            continue;
+          }
+          final symbol = (row['symbol'] as String? ?? '').trim().toUpperCase();
+          final address = (row['address'] as String? ?? '').trim();
+          if (!_isSupportedSwapSymbol(symbol) || !_isAddress(address)) {
+            continue;
+          }
+          discovered.putIfAbsent(
+            symbol,
+            () => _SwapTokenInfo(
+              symbol: symbol,
+              name: row['name'] as String? ?? symbol,
+              chainName: source.name,
+              chainId: source.chainId,
+              address: address,
+              explorerUrl: 'https://${source.explorerHost}/token/$address',
+              logoUri: row['logoURI'] as String?,
+            ),
+          );
+        }
       } catch (_) {
-        // History is useful context but should not block quoting or requesting.
+        // Token lists are discovery aids; pool quoting remains authoritative.
       }
     }
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _swapTokenCatalog
+        ..clear()
+        ..addAll(discovered);
+      _refreshSwapAssetOptions();
+      _swapTokenCatalogLoading = false;
+    });
+  }
 
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            if (requests.isEmpty) {
-              loadRequests(setDialogState);
-            }
-            return Dialog(
-              backgroundColor: Colors.transparent,
-              insetPadding: const EdgeInsets.all(20),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 520),
-                child: Container(
-                  padding: EdgeInsets.fromLTRB(
-                    22,
-                    22,
-                    22,
-                    22 + MediaQuery.of(dialogContext).viewInsets.bottom,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xF20B1020),
-                    borderRadius: BorderRadius.circular(28),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.08),
-                    ),
-                  ),
+  Future<void> _loadSwapPools() async {
+    setState(() {
+      _swapPoolsLoading = true;
+      _swapPoolError = null;
+    });
+    try {
+      final response = await http
+          .get(Uri.parse('$swapBaseUrl/chain/swap/pools'))
+          .timeout(const Duration(seconds: 10));
+      final payload = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw StateError(
+            payload['error'] as String? ?? 'Pool list unavailable.');
+      }
+      final liveAssets = <String>{};
+      final livePools = <String, _SwapPoolSnapshot>{};
+      for (final pool in (payload['pools'] as List<dynamic>? ?? <dynamic>[])) {
+        if (pool is! Map<String, dynamic>) {
+          continue;
+        }
+        final assetA = (pool['assetA'] as String? ?? '').toUpperCase();
+        final assetB = (pool['assetB'] as String? ?? '').toUpperCase();
+        String? asset;
+        if (assetA == nativeSymbol && assetB.isNotEmpty) {
+          asset = assetB;
+        } else if (assetB == nativeSymbol && assetA.isNotEmpty) {
+          asset = assetA;
+        }
+        if (asset == null) {
+          continue;
+        }
+        liveAssets.add(asset);
+        livePools[asset] = _SwapPoolSnapshot.fromJson(pool, asset);
+      }
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        for (final asset in liveAssets) {
+          _swapTokenCatalog.putIfAbsent(
+            asset,
+            () => _SwapTokenInfo(
+              symbol: asset,
+              name: asset,
+              chainName: 'PokoinSwap',
+            ),
+          );
+        }
+        _swapPoolsByAsset
+          ..clear()
+          ..addAll(livePools);
+        _refreshSwapAssetOptions();
+        if (!_canSwapAsset(_selectedSwapAssetSymbol())) {
+          final firstLive = liveAssets.toList()..sort();
+          if (firstLive.isNotEmpty) {
+            _swapAsset = firstLive.first;
+          }
+        }
+        _swapPoolsLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _swapPoolError = error;
+        _swapPoolsLoading = false;
+      });
+    }
+  }
+
+  void _refreshSwapAssetOptions() {
+    final symbols = <String>{...defaultSwapAssets, ..._swapTokenCatalog.keys};
+    _swapAssets
+      ..clear()
+      ..addAll(symbols.where(_isSupportedSwapSymbol).toList()..sort());
+  }
+
+  void _onSwapAmountChanged(String value) {
+    final token = ++_swapQuoteToken;
+    final amount = double.tryParse(value.trim().replaceAll(',', '.'));
+    if (amount == null ||
+        amount <= 0 ||
+        !_canSwapAsset(_selectedSwapAssetSymbol())) {
+      setState(() {
+        _swapQuote = null;
+        _swapQuoteError = null;
+        _swapQuoteLoading = false;
+      });
+      return;
+    }
+    setState(() {
+      _swapQuote = null;
+      _swapQuoteError = null;
+      _swapQuoteLoading = true;
+    });
+    Future<void>.delayed(const Duration(milliseconds: 350), () async {
+      if (!mounted || token != _swapQuoteToken) {
+        return;
+      }
+      try {
+        final quote = await _loadSwapQuote(amountIn: amount);
+        if (!mounted || token != _swapQuoteToken) {
+          return;
+        }
+        setState(() {
+          _swapQuote = quote;
+          _swapQuoteError = null;
+          _swapQuoteLoading = false;
+        });
+      } catch (error) {
+        if (!mounted || token != _swapQuoteToken) {
+          return;
+        }
+        setState(() {
+          _swapQuote = null;
+          _swapQuoteError = _friendlyError(error);
+          _swapQuoteLoading = false;
+        });
+      }
+    });
+  }
+
+  Future<void> _submitCurrentSwap() async {
+    final from = _address?.trim();
+    final quote = _swapQuote;
+    if (from == null || from.isEmpty) {
+      _showMessage('Connect MetaMask before using PokoinSwap.');
+      return;
+    }
+    if (quote == null) {
+      _showMessage('Enter an amount and wait for the live quote.');
+      return;
+    }
+    final externalSell = quote['source'] == 'external_sell';
+    await _runTask(() async {
+      final txHash = await _submitSwap(from: from, quote: quote);
+      _swapQuote = null;
+      _swapQuoteError = null;
+      _exchangeAmountController.clear();
+      _swapQuoteToken++;
+      setState(() {});
+      if (externalSell) {
+        _showMessage(
+          'Sale request ${_shortAddress(txHash)} created. Crypto payout is pending settlement.',
+        );
+      } else {
+        _showMessage(
+          'PokoinSwap submitted (${_shortAddress(txHash)}). It will appear in activity after it confirms.',
+        );
+      }
+      await _loadBalance(from);
+      await _loadActivity();
+    });
+  }
+
+  Widget _buildSwapPage() {
+    final asset = _selectedSwapAssetSymbol();
+    final pool = _swapPoolsByAsset[asset];
+    final fromAsset = _swapFromPkn ? nativeSymbol : asset;
+    final toAsset = _swapFromPkn ? asset : nativeSymbol;
+    final tokenOptions = <String>[..._swapAssets, customSwapAsset];
+    final quote = _swapQuote;
+    final amountOut = quote == null ? '' : '${quote['amountOut']}';
+    final amountIn = double.tryParse(
+        _exchangeAmountController.text.trim().replaceAll(',', '.'));
+    final canSwap = quote != null && !_loading && _canSwapAsset(asset);
+    final missingPool = !_swapPoolsLoading && !_canSwapAsset(asset);
+    final quoteError = _swapQuoteError;
+    return Scaffold(
+      backgroundColor: const Color(0xFF050816),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF050816),
+        elevation: 0,
+        centerTitle: true,
+        title: const Text(
+          'PokoinSwap',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => _setSwapPageVisible(false),
+        ),
+      ),
+      body: SafeArea(
+        child: Center(
                   child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: <Widget>[
-                        const Text(
-                          'PKN / wPKN exchange',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w900,
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: EdgeInsets.fromLTRB(
+              18,
+              18,
+              18,
+              28 + MediaQuery.viewInsetsOf(context).bottom,
+            ),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: _SwapExchangeCard(
+                poolsLoading: _swapPoolsLoading,
+                poolError: _swapPoolError == null
+                    ? null
+                    : _friendlyError(_swapPoolError!),
+                fromAsset: fromAsset,
+                toAsset: toAsset.isEmpty ? 'TOKEN' : toAsset,
+                amountController: _exchangeAmountController,
+                amountOut: amountOut,
+                quoteLoading: _swapQuoteLoading,
+                quote: quote,
+                pool: pool,
+                canSwap: canSwap,
+                loading: _loading,
+                fromTokenSelector: _buildSwapTokenSelector(
+                  value: fromAsset,
+                  options: tokenOptions,
+                  fixedAsset: toAsset,
+                  isFromSelector: true,
+                ),
+                onAmountChanged: _onSwapAmountChanged,
+                onSwap: _submitCurrentSwap,
+                onFlip: () {
+                  setState(() {
+                    _swapFromPkn = !_swapFromPkn;
+                    _swapQuote = null;
+                    _swapQuoteError = null;
+                    _swapQuoteToken++;
+                  });
+                  _onSwapAmountChanged(_exchangeAmountController.text);
+                },
+                toTokenSelector: _buildSwapTokenSelector(
+                  value: toAsset,
+                  options: tokenOptions,
+                  fixedAsset: fromAsset,
+                  isFromSelector: false,
+                ),
+                customTokenField: _swapAsset == customSwapAsset
+                    ? Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: TextField(
+                          controller: _customSwapAssetController,
+                          textCapitalization: TextCapitalization.characters,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
                           ),
-                        ),
-                        const SizedBox(height: 16),
-                        SegmentedButton<String>(
-                          segments: const <ButtonSegment<String>>[
-                            ButtonSegment(
-                              value: 'pkn_to_wpkn',
-                              label: Text('PKN -> wPKN'),
-                            ),
-                            ButtonSegment(
-                              value: 'wpkn_to_pkn',
-                              label: Text('wPKN -> PKN'),
-                            ),
-                          ],
-                          selected: <String>{direction},
-                          onSelectionChanged: (selected) {
-                            direction = selected.first;
-                            quote = null;
-                            setDialogState(() {});
-                          },
-                        ),
-                        const SizedBox(height: 12),
-                        TextField(
-                          controller: _exchangeAmountController,
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            labelText: direction == 'pkn_to_wpkn'
-                                ? 'Amount PKN'
-                                : 'Amount wPKN',
-                            prefixIcon: const Icon(Icons.payments_outlined),
+                          decoration: const InputDecoration(
+                            labelText: 'Token symbol',
+                            hintText: 'DOGE',
                           ),
                           onChanged: (_) {
-                            quote = null;
-                            setDialogState(() {});
+                            setState(() {
+                              _swapQuote = null;
+                              _swapQuoteError = null;
+                              _swapQuoteToken++;
+                            });
+                            _onSwapAmountChanged(
+                              _exchangeAmountController.text,
+                            );
                           },
                         ),
-                        const SizedBox(height: 12),
-                        TextField(
-                          controller: _exchangeAddressController,
-                          keyboardType: TextInputType.text,
-                          decoration: InputDecoration(
-                            labelText: direction == 'pkn_to_wpkn'
-                                ? 'BSC payout address'
-                                : 'PKN payout address',
-                            prefixIcon:
-                                const Icon(Icons.account_balance_wallet),
-                          ),
-                        ),
-                        if (direction == 'wpkn_to_pkn') ...<Widget>[
-                          const SizedBox(height: 12),
-                          const Text(
-                            'Send wPKN on BNB Chain from your linked wallet to this settlement wallet, then click Request exchange after confirmation.',
-                            style: TextStyle(color: Color(0xFFB8C4E6)),
-                          ),
-                          const SizedBox(height: 6),
-                          const SelectableText(
-                            wpknSettlementAddress,
-                            style: TextStyle(
-                              color: Color(0xFFFACC15),
-                              fontFamily: 'monospace',
-                            ),
-                          ),
-                        ],
-                        const SizedBox(height: 14),
-                        if (quote != null) _ExchangeQuoteCard(quote: quote!),
-                        const SizedBox(height: 14),
-                        Wrap(
-                          spacing: 10,
-                          runSpacing: 10,
-                          children: <Widget>[
-                            OutlinedButton.icon(
-                              onPressed: () => _runTask(() async {
-                                final amount = int.tryParse(
-                                    _exchangeAmountController.text);
-                                if (amount == null || amount <= 0) {
-                                  throw ArgumentError(
-                                    'Enter a whole amount greater than zero.',
-                                  );
-                                }
-                                if (amount < 1000) {
-                                  throw ArgumentError(
-                                    'Amount too low, the minimum is 1000',
-                                  );
-                                }
-                                quote = await _auth.quoteWpknExchange(
-                                  direction: direction,
-                                  amountIn: amount,
-                                );
-                                setDialogState(() {});
-                              }),
-                              icon: const Icon(Icons.price_check),
-                              label: const Text('Get quote'),
-                            ),
-                            FilledButton.icon(
-                              onPressed: quote == null
-                                  ? null
-                                  : () => _runTask(() async {
-                                        final response =
-                                            await _auth.requestWpknExchange(
-                                          quoteId:
-                                              quote!['quoteId'] as String? ??
-                                                  '',
-                                          direction: direction,
-                                          toAddress:
-                                              _exchangeAddressController.text,
-                                        );
-                                        requests =
-                                            await _auth.wpknExchangeRequests();
-                                        quote = null;
-                                        _exchangeAmountController.clear();
-                                        setDialogState(() {});
+                      )
+                    : null,
+                statusLabel: amountIn == null || amountIn <= 0
+                    ? 'Enter amount'
+                    : missingPool
+                        ? 'Pool unavailable'
+                        : quoteError ?? (quote == null ? 'No quote' : 'Ready'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<Map<String, dynamic>> _loadSwapQuote({
+    required double amountIn,
+  }) async {
+    final asset = _selectedSwapAssetSymbol();
+    if (!_canSwapAsset(asset)) {
+      throw StateError('No active PokoinSwap route for $asset.');
+    }
+    if (_usesExternalBuyQuote(asset)) {
+      return _loadExternalBuyQuote(asset: asset, amountIn: amountIn);
+    }
+    if (_usesExternalSellQuote(asset)) {
+      return _loadExternalSellQuote(asset: asset, amountIn: amountIn);
+    }
+    final assetIn = _swapFromPkn ? nativeSymbol : asset;
+    final uri = Uri.parse('$swapBaseUrl/chain/swap/quote').replace(
+      queryParameters: <String, String>{
+        'pool': _swapPoolId(asset),
+        'assetIn': assetIn,
+        'amountIn': amountIn.round().toString(),
+      },
+    );
+    final response = await http.get(uri).timeout(const Duration(seconds: 10));
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError(
+        payload['error'] as String? ??
+            'PokoinSwap quote unavailable. The pool may need liquidity.',
+      );
+    }
+    return payload;
+  }
+
+  Future<Map<String, dynamic>> _loadExternalBuyQuote({
+    required String asset,
+    required double amountIn,
+  }) async {
+    if (_swapFromPkn) {
+      throw StateError('$asset purchases only support buying PKN.');
+    }
+    final quote = await _auth.quoteCryptoPknPurchase(
+      asset: asset,
+      amountIn: amountIn,
+    );
+    return <String, dynamic>{
+      ...quote,
+      'source': 'external_buy',
+      'poolId': '$asset-PKN-market',
+      'assetIn': quote['fromAsset'] ?? asset,
+      'assetOut': quote['toAsset'] ?? nativeSymbol,
+      'reserveIn':
+          '${_formatQuoteNumber(_readDouble(quote['marketPrice']))} USDT/$asset',
+      'reserveOut':
+          '1 PKN = ${_formatQuoteNumber(_readDouble(quote['pknUsd']))} USDT',
+    };
+  }
+
+  Future<Map<String, dynamic>> _loadExternalSellQuote({
+    required String asset,
+    required double amountIn,
+  }) async {
+    if (!_swapFromPkn) {
+      throw StateError('$asset sales only support selling PKN.');
+    }
+    final amountPkn = amountIn.floor();
+    if (amountPkn <= 0) {
+      throw StateError('Enter a whole PKN amount to sell.');
+    }
+    final quote = await _auth.quoteCryptoPknSale(
+      asset: asset,
+      amountPkn: amountPkn,
+    );
+    return <String, dynamic>{
+      ...quote,
+      'source': 'external_sell',
+      'poolId': 'PKN-$asset-market',
+      'assetIn': quote['fromAsset'] ?? nativeSymbol,
+      'assetOut': quote['toAsset'] ?? asset,
+      'reserveIn':
+          '1 PKN = ${_formatQuoteNumber(_readDouble(quote['pknUsd']))} USDT',
+      'reserveOut':
+          '${_formatQuoteNumber(_readDouble(quote['marketPrice']))} USDT/$asset',
+    };
+  }
+
+  String _selectedSwapAssetSymbol() {
+    if (_swapAsset != customSwapAsset) {
+      return _swapAsset.toUpperCase();
+    }
+    return _customSwapAssetController.text.trim().toUpperCase();
+  }
+
+  bool _isSupportedSwapSymbol(String asset) {
+    return RegExp(r'^[A-Z0-9]{2,12}$').hasMatch(asset) && asset != nativeSymbol;
+  }
+
+  bool _canSwapAsset(String asset) {
+    return _isSupportedSwapSymbol(asset) &&
+        (_swapPoolsByAsset.containsKey(asset) ||
+            _isAcceptedSwapAssetWithoutPool(asset));
+  }
+
+  bool _isAcceptedSwapAssetWithoutPool(String asset) {
+    return _stablecoinSwapAssets.contains(asset) ||
+        _cryptoPriceIds.containsKey(asset);
+  }
+
+  bool _usesExternalBuyQuote(String asset) {
+    return !_swapFromPkn && _isAcceptedSwapAssetWithoutPool(asset);
+  }
+
+  bool _usesExternalSellQuote(String asset) {
+    return _swapFromPkn && _isAcceptedSwapAssetWithoutPool(asset);
+  }
+
+  Widget _buildSwapTokenSelector({
+    required String value,
+    required List<String> options,
+    required String fixedAsset,
+    required bool isFromSelector,
+  }) {
+    final selected = value == customSwapAsset
+        ? const _SwapTokenInfo(symbol: customSwapAsset, name: 'Custom token')
+        : _swapTokenCatalog[value] ??
+            _SwapTokenInfo(symbol: value, name: value, chainName: 'Pokoin');
+    return _SwapTokenSelector(
+      token: selected,
+      isAvailable: value == nativeSymbol || _canSwapAsset(value),
+      onTap: () => _showSwapTokenPicker(
+        fixedAsset: fixedAsset,
+        isFromSelector: isFromSelector,
+      ),
+    );
+  }
+
+  Future<void> _showSwapTokenPicker({
+    required String fixedAsset,
+    required bool isFromSelector,
+  }) async {
+    if (_swapTokenCatalog.length <= _defaultSwapTokenCatalog.length) {
+      unawaited(_loadSwapTokenCatalog());
+    }
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _SwapTokenPickerSheet(
+        tokens: _swapPickerTokens(),
+        fixedAsset: fixedAsset,
+        nativeSymbol: nativeSymbol,
+        availableAssets: <String>{
+          ..._swapPoolsByAsset.keys,
+          if (_isAcceptedSwapAssetWithoutPool('ETH')) 'ETH',
+        },
+        loading: _swapTokenCatalogLoading,
+      ),
+    );
+    if (selected == null) {
+      return;
+    }
+    if (selected == nativeSymbol) {
+      setState(() {
+        _swapFromPkn = isFromSelector;
+        _swapQuote = null;
+        _swapQuoteError = null;
+        _swapQuoteToken++;
+      });
+      _onSwapAmountChanged(_exchangeAmountController.text);
+      return;
+    }
+    setState(() {
+      _swapAsset = selected;
+      _swapFromPkn = !isFromSelector;
+      _swapQuote = null;
+      _swapQuoteError = null;
+      _swapQuoteToken++;
+    });
+    _onSwapAmountChanged(_exchangeAmountController.text);
+  }
+
+  List<_SwapTokenInfo> _swapPickerTokens() {
+    final tokens = <String, _SwapTokenInfo>{
+      nativeSymbol: const _SwapTokenInfo(
+        symbol: nativeSymbol,
+        name: 'Pokoin',
+        chainName: 'PokoinPoS',
+      ),
+      for (final entry in _swapTokenCatalog.entries) entry.key: entry.value,
+    };
+    final live = tokens.values.where((token) => _canSwapAsset(token.symbol));
+    final unavailable = tokens.values.where(
+      (token) => token.symbol != nativeSymbol && !_canSwapAsset(token.symbol),
+    );
+    int compareTokens(_SwapTokenInfo a, _SwapTokenInfo b) {
+      final aDefault = defaultSwapAssets.contains(a.symbol) ? 0 : 1;
+      final bDefault = defaultSwapAssets.contains(b.symbol) ? 0 : 1;
+      if (aDefault != bDefault) {
+        return aDefault.compareTo(bDefault);
+      }
+      return a.symbol.compareTo(b.symbol);
+    }
+
+    return <_SwapTokenInfo>[
+      tokens[nativeSymbol]!,
+      ...(live.toList()..sort(compareTokens)),
+      ...(unavailable.toList()..sort(compareTokens)),
+    ];
+  }
+
+  String _swapPoolId(String asset) {
+    if (asset == 'WPKN') {
+      return 'PKN-WPKN';
+    }
+    return '$asset-PKN';
+  }
+
+  Future<String> _submitSwap({
+    required String from,
+    required Map<String, dynamic> quote,
+  }) async {
+    final asset = _selectedSwapAssetSymbol();
+    if (quote['source'] == 'external_buy') {
+      return _submitExternalBuy(from: from, quote: quote, asset: asset);
+    }
+    if (quote['source'] == 'external_sell') {
+      return _submitExternalSell(quote: quote, asset: asset);
+    }
+    await _wallet.addNetwork();
+    await _wallet.switchNetwork();
+    final amountOut = _readInt(quote['amountOut']);
+    if (amountOut <= 0) {
+      throw StateError('PokoinSwap quote returned no output amount.');
+    }
+    final minAmountOut = (amountOut * 995) ~/ 1000;
+    final payload = <String, Object>{
+      'action': 'amm_swap',
+      'poolId': quote['poolId'] as String? ?? _swapPoolId(asset),
+      'assetIn': quote['assetIn'] as String? ?? nativeSymbol,
+      'assetOut': quote['assetOut'] as String? ?? asset,
+      'amountIn': _readInt(quote['amountIn']),
+      'minAmountOut': minAmountOut,
+    };
+    final data =
+        _hexEncodeUtf8('$pokoinSwapCalldataPrefix${jsonEncode(payload)}');
+    final nonce = await _pendingNonce(from);
+    return _wallet.sendDataTransaction(
+      from: from,
+      to: pokoinSwapRouterAddress,
+      dataHex: data,
+      valueWei: BigInt.zero,
+      nonce: nonce,
+    );
+  }
+
+  Future<String> _submitExternalBuy({
+    required String from,
+    required Map<String, dynamic> quote,
+    required String asset,
+  }) async {
+    final amount = double.tryParse('${quote['amountIn']}') ?? 0;
+    if (amount <= 0) {
+      throw StateError('Enter an amount to buy PKN.');
+    }
+    final quoteId = (quote['quoteId'] as String? ?? '').trim();
+    if (quoteId.isEmpty) {
+      throw StateError('Request a fresh crypto quote before buying PKN.');
+    }
+    final chainId = (quote['chainId'] as num?)?.toInt();
+    final chainIdHex = chainId == null
+        ? _externalChainIds[asset] ?? '0x1'
+        : '0x${chainId.toRadixString(16)}';
+    final settlementAddress = (quote['settlementAddress'] as String? ??
+            externalCryptoSettlementAddress)
+        .trim();
+    String txHash;
+    if (_manualDepositAssets.contains(asset)) {
+      txHash = await _promptExternalDepositTxHash(
+        asset: asset,
+        amount: amount,
+        settlementAddress: settlementAddress,
+      );
+    } else if (asset == 'ETH' || asset == 'BNB') {
+      txHash = await _wallet.sendExternalTransaction(
+        from: from,
+        to: settlementAddress,
+        valueWei: _parseDecimalToWei(amount.toString()) ?? BigInt.zero,
+        chainIdHex: chainIdHex,
+      );
+    } else {
+      final tokenAddress = (quote['tokenAddress'] as String? ?? '').trim();
+      if (!_isAddress(tokenAddress)) {
+        throw StateError('$asset token contract is not configured.');
+      }
+      txHash = await _wallet.sendExternalTokenTransfer(
+        from: from,
+        tokenAddress: tokenAddress,
+        to: settlementAddress,
+        amountUnits: _parseDecimalToWei(amount.toString()) ?? BigInt.zero,
+        chainIdHex: chainIdHex,
+      );
+    }
+    final result = await _auth.requestCryptoPknPurchase(
+      quoteId: quoteId,
+      depositTxHash: txHash,
+    );
+    await _loadAccountBalance();
+    await _record(
+      'Bought ${result['amountPkn'] ?? quote['amountOut']} PKN with $asset',
+      txHash,
+      ActivityKind.inbound,
+    );
+    return txHash;
+  }
+
+  Future<String> _submitExternalSell({
+    required Map<String, dynamic> quote,
+    required String asset,
+  }) async {
+    final from = _address?.trim();
+    if (from == null || from.isEmpty) {
+      throw StateError('Connect MetaMask before selling PKN.');
+    }
+    final amountPkn = _readInt(quote['amountIn']);
+    if (amountPkn <= 0) {
+      throw StateError('Enter a whole PKN amount to sell.');
+    }
+    final quoteId = (quote['quoteId'] as String? ?? '').trim();
+    if (quoteId.isEmpty) {
+      throw StateError('Request a fresh crypto sale quote before selling PKN.');
+    }
+    final payoutAddress = await _promptExternalPayoutAddress(asset: asset);
+    await _wallet.addNetwork();
+    await _wallet.switchNetwork();
+    final depositTxHash = await _wallet.sendTransaction(
+      from: from,
+      to: nativeBankAddress,
+      valueWei: BigInt.from(amountPkn) * BigInt.from(10).pow(18),
+    );
+    final result = await _auth.requestCryptoPknSale(
+      quoteId: quoteId,
+      depositTxHash: depositTxHash,
+      payoutAddress: payoutAddress,
+    );
+    await _loadBalance(from);
+    await _record(
+      'Sent ${result['amountPknDeposited'] ?? quote['amountIn']} PKN for $asset payout',
+      depositTxHash,
+      ActivityKind.outbound,
+    );
+    final status = result['status'] as String? ?? 'pending_liquidity';
+    final payoutTxHash = (result['payoutTxHash'] as String? ?? '').trim();
                                         _showMessage(
-                                          response['settlementMode'] ==
-                                                  'manual_pending'
-                                              ? 'Exchange request created for operator settlement.'
-                                              : 'Exchange request created.',
-                                        );
-                                        await _loadActivity();
-                                      }),
-                              icon: const Icon(Icons.swap_horiz),
-                              label: const Text('Request exchange'),
+      payoutTxHash.isNotEmpty || status == 'payout_submitted'
+          ? 'PKN received. $asset payout submitted (${_shortAddress(payoutTxHash)}).'
+          : 'PKN received. $asset payout is pending settlement.',
+    );
+    return depositTxHash;
+  }
+
+  Future<String> _promptExternalPayoutAddress({required String asset}) async {
+    final controller = TextEditingController(
+      text: asset == 'BTC' ? '' : (_linkedAddress ?? _address ?? ''),
+    );
+    try {
+      final address = await showDialog<String>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => AlertDialog(
+          title: Text('Receive $asset'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Enter the $asset address that should receive the payout. Your wallet will send PKN to the Pokoin treasury now, then the backend will submit the crypto payout when a signing wallet is configured.',
+                style: const TextStyle(height: 1.4),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: controller,
+                decoration: InputDecoration(
+                  labelText: '$asset payout address',
+                  prefixIcon: const Icon(Icons.account_balance_wallet_outlined),
+                ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 18),
-                        _ExchangeHistory(requests: requests),
-                        const SizedBox(height: 12),
+          actions: [
                         TextButton(
                           onPressed: () => Navigator.of(dialogContext).pop(),
-                          child: const Text('Close'),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final value = controller.text.trim();
+                if (value.isNotEmpty) {
+                  Navigator.of(dialogContext).pop(value);
+                }
+              },
+              child: const Text('Send PKN'),
                         ),
                       ],
                     ),
-                  ),
+      );
+      if (address == null || address.trim().isEmpty) {
+        throw StateError('$asset payout request cancelled.');
+      }
+      return address.trim();
+    } finally {
+      controller.dispose();
+    }
+  }
+
+  Future<String> _promptExternalDepositTxHash({
+    required String asset,
+    required double amount,
+    required String settlementAddress,
+  }) async {
+    final controller = TextEditingController();
+    try {
+      final txHash = await showDialog<String>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => AlertDialog(
+          title: Text('Send $asset deposit'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Send ${_formatQuoteNumber(amount)} $asset to this address, wait for confirmation, then paste the transaction id.',
+                style: const TextStyle(height: 1.4),
+              ),
+              const SizedBox(height: 12),
+              SelectableText(
+                settlementAddress,
+                style: const TextStyle(fontFamily: 'monospace'),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: controller,
+                decoration: const InputDecoration(
+                  labelText: 'Transaction id',
+                  prefixIcon: Icon(Icons.receipt_long_outlined),
                 ),
               ),
-            );
-          },
-        );
-      },
-    );
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final value = controller.text.trim();
+                if (value.isNotEmpty) {
+                  Navigator.of(dialogContext).pop(value);
+                }
+              },
+              child: const Text('Verify deposit'),
+            ),
+          ],
+        ),
+      );
+      if (txHash == null || txHash.trim().isEmpty) {
+        throw StateError('$asset deposit verification cancelled.');
+      }
+      return txHash.trim();
+    } finally {
+      controller.dispose();
+    }
+  }
+
+  Future<int> _pendingNonce(String address) async {
+    final result = await _rpc('eth_getTransactionCount', <Object>[
+      address,
+      'pending',
+    ]);
+    return _hexToBigInt(result as String).toInt();
   }
 
   Future<void> _loadActivity() async {
@@ -1082,6 +1843,9 @@ class _WalletScreenState extends State<WalletScreen> {
     final rows = await _auth.walletActivity();
     return rows
         .where((row) => !_isLegacyAccountBalanceActivity(
+              row['title'] as String? ?? '',
+            ))
+        .where((row) => !_isUnconfirmedSwapActivity(
               row['title'] as String? ?? '',
             ))
         .map(_activityFromWalletActivity)
@@ -1124,7 +1888,12 @@ class _WalletScreenState extends State<WalletScreen> {
   bool _isLegacyAccountBalanceActivity(String title) {
     final normalized = title.trim().toLowerCase();
     return normalized.contains('from account balance') ||
-        normalized.contains('to account balance');
+        normalized.contains('to account balance') ||
+        RegExp(r'^topped up \d+ pkn$').hasMatch(normalized);
+  }
+
+  bool _isUnconfirmedSwapActivity(String title) {
+    return title.trim().toLowerCase() == 'pokoinswap submitted';
   }
 
   String _cleanActivityTitle(String title) {
@@ -1173,6 +1942,17 @@ class _WalletScreenState extends State<WalletScreen> {
     final block = _readInt(row['blockNumber']);
     final index = _readInt(row['transactionIndex']);
     final explicitDate = _readChainDate(row);
+    final ammItem = _swapActivityFromChain(
+      row: row,
+      hash: hash,
+      outbound: outbound,
+      blockNumber: block,
+      transactionIndex: index,
+      explicitDate: explicitDate,
+    );
+    if (ammItem != null) {
+      return ammItem;
+    }
     return ActivityItem(
       key: 'chain:$hash',
       title:
@@ -1187,6 +1967,50 @@ class _WalletScreenState extends State<WalletScreen> {
             transactionIndex: index,
           ),
       timestampLabel: explicitDate == null && block > 0 ? 'Block $block' : null,
+    );
+  }
+
+  ActivityItem? _swapActivityFromChain({
+    required Map<String, dynamic> row,
+    required String hash,
+    required bool outbound,
+    required int blockNumber,
+    required int transactionIndex,
+    required DateTime? explicitDate,
+  }) {
+    final amm = row['amm'];
+    if (amm is! Map) {
+      return null;
+    }
+    final action = (amm['action'] as String? ?? '').trim().toLowerCase();
+    if (action != 'amm_swap') {
+      return null;
+    }
+    final assetIn = (amm['assetIn'] as String? ?? '').trim().toUpperCase();
+    final assetOut = (amm['assetOut'] as String? ?? '').trim().toUpperCase();
+    final amountIn = _readInt(amm['amountIn']);
+    final amountOut = _readInt(amm['amountOut']);
+    if (assetIn.isEmpty ||
+        assetOut.isEmpty ||
+        amountIn <= 0 ||
+        amountOut <= 0) {
+      return null;
+    }
+    final confirmedLabel =
+        blockNumber > 0 ? 'Confirmed in block $blockNumber' : '';
+    return ActivityItem(
+      key: 'chain:$hash',
+      title:
+          'Swapped ${_formatAssetAmount(amountIn, assetIn)} for ${_formatAssetAmount(amountOut, assetOut)}',
+      detail: hash.isEmpty ? confirmedLabel : hash,
+      kind: outbound ? ActivityKind.outbound : ActivityKind.inbound,
+      at: explicitDate ??
+          _chainSortDate(
+            blockNumber: blockNumber,
+            transactionIndex: transactionIndex,
+          ),
+      timestampLabel:
+          explicitDate == null && blockNumber > 0 ? 'Block $blockNumber' : null,
     );
   }
 
@@ -1230,6 +2054,13 @@ class _WalletScreenState extends State<WalletScreen> {
     return int.tryParse(value?.toString() ?? '') ?? 0;
   }
 
+  static double _readDouble(Object? value) {
+    if (value is num) {
+      return value.toDouble();
+    }
+    return double.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
   static DateTime _readDate(Object? value) {
     if (value is Timestamp) {
       return value.toDate();
@@ -1269,6 +2100,13 @@ class _WalletScreenState extends State<WalletScreen> {
       return text.substring(0, text.length - 18);
     }
     return text;
+  }
+
+  static String _formatAssetAmount(int amount, String asset) {
+    if (asset == nativeSymbol) {
+      return '${_formatWholePkn(amount)} $asset';
+    }
+    return '$amount $asset';
   }
 
   static String _shortAddress(String value) {
@@ -1420,6 +2258,9 @@ class _WalletScreenState extends State<WalletScreen> {
         body: Center(child: CircularProgressIndicator()),
       );
     }
+    if (_showSwapPage) {
+      return _buildSwapPage();
+    }
 
     return Scaffold(
       body: SafeArea(
@@ -1434,10 +2275,7 @@ class _WalletScreenState extends State<WalletScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: <Widget>[
-                      _TopBar(
-                        onOpenHome: () =>
-                            _openUrl('https://pokoin.com/marketplace'),
-                      ),
+                      _TopBar(onOpenMarketplace: _openMarketplace),
                       const SizedBox(height: 20),
                       if (_error != null) _ErrorBanner(message: _error!),
                       if (_loading) const LinearProgressIndicator(),
@@ -1497,7 +2335,7 @@ class _WalletScreenState extends State<WalletScreen> {
             style: const TextStyle(fontSize: 38, fontWeight: FontWeight.w900),
           ),
           if (hasConnectedWallet) ...<Widget>[
-            const SizedBox(height: 18),
+          const SizedBox(height: 18),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(14),
@@ -1505,14 +2343,14 @@ class _WalletScreenState extends State<WalletScreen> {
                 color: Colors.white.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(18),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  const Text(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const Text(
                     'Connected wallet balance',
                     style: TextStyle(color: Colors.white70),
-                  ),
-                  const SizedBox(height: 8),
+                ),
+                const SizedBox(height: 8),
                   Text(
                     '$_balance $nativeSymbol',
                     style: const TextStyle(
@@ -1534,11 +2372,11 @@ class _WalletScreenState extends State<WalletScreen> {
           ],
           if (!hasConnectedWallet) ...<Widget>[
             const SizedBox(height: 18),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: <Widget>[
-                FilledButton.icon(
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: <Widget>[
+                    FilledButton.icon(
                   onPressed: _connectWallet,
                   icon: const Icon(Icons.account_balance_wallet),
                   label: const Text('Connect MetaMask'),
@@ -1547,8 +2385,8 @@ class _WalletScreenState extends State<WalletScreen> {
                     elevation: 0,
                     shadowColor: Colors.transparent,
                   ),
-                ),
-                OutlinedButton.icon(
+                    ),
+                    OutlinedButton.icon(
                   onPressed: _addPokoinNetwork,
                   icon: const Icon(Icons.add_link),
                   label: const Text('Add Pokoin network'),
@@ -1556,13 +2394,13 @@ class _WalletScreenState extends State<WalletScreen> {
                     side: BorderSide.none,
                     elevation: 0,
                     shadowColor: Colors.transparent,
-                  ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
           ],
-        ],
-      ),
+              ],
+          ),
     );
   }
 
@@ -1600,9 +2438,9 @@ class _WalletScreenState extends State<WalletScreen> {
         ),
         _QuickActionButton(
           icon: Icons.currency_exchange,
-          label: 'wPKN',
+          label: 'Swap',
           onTap: _openWpknExchangeSheet,
-        ),
+          ),
         _QuickActionButton(
           icon: Icons.token_outlined,
           label: 'NFT',
@@ -1679,27 +2517,27 @@ class _WalletScreenState extends State<WalletScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             if (hasWallet) ...<Widget>[
-              const Text(
+            const Text(
                 'Receive on your linked crypto wallet',
-                style: TextStyle(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 6),
-              SelectableText(
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 6),
+            SelectableText(
                 address,
-                style: const TextStyle(fontFamily: 'monospace'),
-              ),
+              style: const TextStyle(fontFamily: 'monospace'),
+            ),
             ] else ...<Widget>[
-              const Text(
+            const Text(
                 'Receive on your account balance',
-                style: TextStyle(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 6),
-              SelectableText(
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 6),
+            SelectableText(
                 _username == null || _username!.isEmpty
                     ? 'Log in to receive by username.'
                     : _username!,
-                style: const TextStyle(fontFamily: 'monospace'),
-              ),
+              style: const TextStyle(fontFamily: 'monospace'),
+            ),
             ],
           ],
         ),
@@ -1734,6 +2572,10 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   static BigInt? _parsePknToWei(String value) {
+    return _parseDecimalToWei(value);
+  }
+
+  static BigInt? _parseDecimalToWei(String value) {
     final clean = value.trim().replaceAll(',', '.');
     if (!RegExp(r'^\d+(\.\d{1,18})?$').hasMatch(clean)) {
       return null;
@@ -1744,11 +2586,42 @@ class _WalletScreenState extends State<WalletScreen> {
     return whole * BigInt.from(10).pow(18) + BigInt.parse(fraction);
   }
 
+  static String _formatQuoteNumber(num value) {
+    if (!value.isFinite) {
+      return '0';
+    }
+    if (value == value.roundToDouble()) {
+      return value.toInt().toString();
+    }
+    return value
+        .toStringAsFixed(8)
+        .replaceFirst(RegExp(r'0+$'), '')
+        .replaceFirst(RegExp(r'\.$'), '');
+  }
+
   static String _formatDate(DateTime at) {
     final minute = at.minute.toString().padLeft(2, '0');
     final day = at.day.toString().padLeft(2, '0');
     final month = at.month.toString().padLeft(2, '0');
     return '$day/$month ${at.hour}:$minute';
+  }
+
+  static String _hexEncodeUtf8(String value) {
+    final bytes = utf8.encode(value);
+    final buffer = StringBuffer('0x');
+    for (final byte in bytes) {
+      buffer.write(byte.toRadixString(16).padLeft(2, '0'));
+    }
+    return buffer.toString();
+  }
+
+  void _openMarketplace() {
+    final router = GoRouter.maybeOf(context);
+    if (router != null) {
+      router.go('/marketplace');
+      return;
+    }
+    _openUrl('https://pokoin.com/marketplace');
   }
 
   static Future<void> _openUrl(String url) async {
@@ -1757,9 +2630,9 @@ class _WalletScreenState extends State<WalletScreen> {
 }
 
 class _TopBar extends StatelessWidget {
-  const _TopBar({required this.onOpenHome});
+  const _TopBar({required this.onOpenMarketplace});
 
-  final VoidCallback onOpenHome;
+  final VoidCallback onOpenMarketplace;
 
   @override
   Widget build(BuildContext context) {
@@ -1804,9 +2677,9 @@ class _TopBar extends StatelessWidget {
           ),
         ),
         FilledButton.icon(
-          onPressed: onOpenHome,
+          onPressed: onOpenMarketplace,
           icon: const Icon(Icons.storefront, size: 18),
-          label: const Text('Shop'),
+          label: const Text('Marketplace'),
           style: FilledButton.styleFrom(
             backgroundColor: const Color(0xFFFACC15),
             foregroundColor: const Color(0xFF111827),
@@ -1938,38 +2811,259 @@ class _RecipientSuggestions extends StatelessWidget {
   }
 }
 
-class _ExchangeQuoteCard extends StatelessWidget {
-  const _ExchangeQuoteCard({required this.quote});
+class _SwapExchangeCard extends StatelessWidget {
+  const _SwapExchangeCard({
+    required this.poolsLoading,
+    required this.poolError,
+    required this.fromAsset,
+    required this.toAsset,
+    required this.amountController,
+    required this.amountOut,
+    required this.quoteLoading,
+    required this.quote,
+    required this.pool,
+    required this.canSwap,
+    required this.loading,
+    required this.fromTokenSelector,
+    required this.onAmountChanged,
+    required this.onSwap,
+    required this.onFlip,
+    required this.toTokenSelector,
+    required this.customTokenField,
+    required this.statusLabel,
+  });
 
-  final Map<String, dynamic> quote;
+  final bool poolsLoading;
+  final String? poolError;
+  final String fromAsset;
+  final String toAsset;
+  final TextEditingController amountController;
+  final String amountOut;
+  final bool quoteLoading;
+  final Map<String, dynamic>? quote;
+  final _SwapPoolSnapshot? pool;
+  final bool canSwap;
+  final bool loading;
+  final Widget fromTokenSelector;
+  final ValueChanged<String> onAmountChanged;
+  final VoidCallback onSwap;
+  final VoidCallback onFlip;
+  final Widget toTokenSelector;
+  final Widget? customTokenField;
+  final String statusLabel;
 
   @override
   Widget build(BuildContext context) {
-    final fromAsset = quote['fromAsset'] as String? ?? '';
-    final toAsset = quote['toAsset'] as String? ?? '';
+    final quote = this.quote;
     return Container(
-      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0x2214B8A6),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0x6638BDF8)),
+        color: const Color(0xF20A1026),
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF38BDF8).withValues(alpha: 0.08),
+            blurRadius: 48,
+            offset: const Offset(0, 24),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(30),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: Alignment.topRight,
+                    radius: 1.1,
+                    colors: [
+                      const Color(0xFF7C3AED).withValues(alpha: 0.20),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(18),
+      child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      const Text(
+                        'Swap',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const Spacer(),
+                      _SwapStatusPill(
+                        label: poolsLoading ? 'Syncing' : statusLabel,
+                        accent: poolsLoading
+                            ? const Color(0xFF38BDF8)
+                            : const Color(0xFFFACC15),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  _SwapAssetPanel(
+                    label: 'Sell',
+                    asset: fromAsset,
+                    amountController: amountController,
+                    readOnly: false,
+                    onChanged: onAmountChanged,
+                    trailing: fromTokenSelector,
+                  ),
+                  const SizedBox(height: 10),
+                  Center(
+                    child: _SwapFlipButton(onTap: onFlip),
+                  ),
+                  const SizedBox(height: 10),
+                  _SwapAssetPanel(
+                    label: 'Buy',
+                    asset: toAsset,
+                    amountText: quoteLoading ? '...' : amountOut,
+                    readOnly: true,
+                    trailing: toTokenSelector,
+                  ),
+                  if (customTokenField != null) ...[
+                    const SizedBox(height: 10),
+                    customTokenField!,
+                  ],
+                  const SizedBox(height: 14),
+                  _SwapQuoteDetails(
+                    quote: quote,
+                    pool: pool,
+                    loading: quoteLoading,
+                    poolError: poolError,
+                  ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    height: 54,
+                    child: FilledButton(
+                      onPressed: canSwap ? onSwap : null,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFFFACC15),
+                        foregroundColor: const Color(0xFF111827),
+                        disabledBackgroundColor:
+                            Colors.white.withValues(alpha: 0.08),
+                        disabledForegroundColor:
+                            Colors.white.withValues(alpha: 0.32),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                      ),
+                      child: loading
+                          ? const SizedBox.square(
+                              dimension: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Color(0xFF111827),
+                              ),
+                            )
+                          : Text(
+                              canSwap ? 'Swap' : statusLabel,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SwapAssetPanel extends StatelessWidget {
+  const _SwapAssetPanel({
+    required this.label,
+    required this.asset,
+    this.amountController,
+    this.amountText,
+    this.readOnly = false,
+    this.onChanged,
+    this.trailing,
+  });
+
+  final String label;
+  final String asset;
+  final TextEditingController? amountController;
+  final String? amountText;
+  final bool readOnly;
+  final ValueChanged<String>? onChanged;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final amountStyle = TextStyle(
+      color: amountText == null || amountText!.isEmpty
+          ? const Color(0xFF64748B)
+          : Colors.white,
+      fontSize: 32,
+      fontWeight: FontWeight.w900,
+      letterSpacing: -1,
+    );
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111936),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
           Text(
-            '${quote['amountIn']} $fromAsset -> ${quote['amountOut']} $toAsset',
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+            label,
+            style: const TextStyle(
+              color: Color(0xFF93A4C8),
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
           ),
-          const SizedBox(height: 6),
-          Text(
-            'Fee/slippage: ${quote['feeAmount']} $toAsset | total cost ${quote['totalCostBps']} bps',
-            style: const TextStyle(color: Color(0xFFB8C4E6)),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Expires: ${quote['quoteExpiresAt'] ?? ''}',
-            style: const TextStyle(color: Color(0xFF93A4C8), fontSize: 12),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: readOnly
+                    ? Text(
+                        amountText == null || amountText!.isEmpty
+                            ? '0'
+                            : amountText!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: amountStyle,
+                      )
+                    : TextField(
+                        controller: amountController,
+                        autofocus: true,
+                        keyboardType: TextInputType.number,
+                        onChanged: onChanged,
+                        style: amountStyle,
+                        decoration: const InputDecoration(
+                          hintText: '0',
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      ),
+              ),
+              const SizedBox(width: 12),
+              trailing ?? _SwapTokenPill(symbol: asset),
+            ],
           ),
         ],
       ),
@@ -1977,38 +3071,597 @@ class _ExchangeQuoteCard extends StatelessWidget {
   }
 }
 
-class _ExchangeHistory extends StatelessWidget {
-  const _ExchangeHistory({required this.requests});
+class _SwapTokenPill extends StatelessWidget {
+  const _SwapTokenPill({required this.symbol});
 
-  final List<Map<String, dynamic>> requests;
+  final String symbol;
 
   @override
   Widget build(BuildContext context) {
-    if (requests.isEmpty) {
-      return const Text(
-        'No exchange requests yet.',
-        style: TextStyle(color: Colors.white70),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0B1024),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+      ),
+      child: Text(
+        symbol,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _SwapTokenSelector extends StatelessWidget {
+  const _SwapTokenSelector({
+    required this.token,
+    required this.isAvailable,
+    required this.onTap,
+  });
+
+  final _SwapTokenInfo token;
+  final bool isAvailable;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0B1024),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: isAvailable
+                  ? Colors.white.withValues(alpha: 0.12)
+                  : const Color(0xFFFBBF24).withValues(alpha: 0.34),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+          Text(
+                token.symbol,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: 18,
+                color: isAvailable
+                    ? const Color(0xFFFACC15)
+                    : const Color(0xFFFBBF24),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SwapTokenPickerSheet extends StatefulWidget {
+  const _SwapTokenPickerSheet({
+    required this.tokens,
+    required this.fixedAsset,
+    required this.nativeSymbol,
+    required this.availableAssets,
+    required this.loading,
+  });
+
+  final List<_SwapTokenInfo> tokens;
+  final String fixedAsset;
+  final String nativeSymbol;
+  final Set<String> availableAssets;
+  final bool loading;
+
+  @override
+  State<_SwapTokenPickerSheet> createState() => _SwapTokenPickerSheetState();
+}
+
+class _SwapTokenPickerSheetState extends State<_SwapTokenPickerSheet> {
+  final TextEditingController _queryController = TextEditingController();
+
+  @override
+  void dispose() {
+    _queryController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final query = _queryController.text.trim().toLowerCase();
+    final tokens = widget.tokens
+        .where((token) {
+          if (query.isEmpty) {
+            return true;
+          }
+          return token.symbol.toLowerCase().contains(query) ||
+              token.name.toLowerCase().contains(query) ||
+              token.chainName.toLowerCase().contains(query) ||
+              (token.address ?? '').toLowerCase().contains(query);
+        })
+        .take(80)
+        .toList(growable: false);
+    return DraggableScrollableSheet(
+      initialChildSize: 0.78,
+      minChildSize: 0.45,
+      maxChildSize: 0.94,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFF0B1020),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          padding: EdgeInsets.fromLTRB(
+            18,
+            14,
+            18,
+            18 + MediaQuery.viewInsetsOf(context).bottom,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 42,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Select token',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _queryController,
+                autofocus: true,
+                onChanged: (_) => setState(() {}),
+                decoration: const InputDecoration(
+                  prefixIcon: Icon(Icons.search),
+                  hintText: 'Search ETH, USDT, PEPE, BNB...',
+                ),
+              ),
+              if (widget.loading) ...[
+                const SizedBox(height: 10),
+                const LinearProgressIndicator(),
+              ],
+              const SizedBox(height: 12),
+              Expanded(
+                child: ListView.separated(
+                  controller: scrollController,
+                  itemCount: tokens.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    final token = tokens[index];
+                    final enabled = _isEnabled(token.symbol);
+                    return ListTile(
+                      enabled: enabled,
+                      leading: _SwapTokenAvatar(token: token),
+                      title: Text(
+                        token.symbol,
+                        style: const TextStyle(fontWeight: FontWeight.w900),
+                      ),
+                      subtitle: Text(_subtitle(token, enabled)),
+                      trailing: enabled
+                          ? const Icon(Icons.chevron_right)
+                          : const _SwapUnavailableChip(),
+                      onTap: enabled
+                          ? () => Navigator.of(context).pop(token.symbol)
+                          : null,
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  bool _isEnabled(String symbol) {
+    if (symbol == widget.fixedAsset) {
+      return false;
+    }
+    if (symbol == widget.nativeSymbol) {
+      return widget.fixedAsset != widget.nativeSymbol &&
+          widget.availableAssets.contains(widget.fixedAsset);
+    }
+    return widget.fixedAsset == widget.nativeSymbol &&
+        widget.availableAssets.contains(symbol);
+  }
+
+  String _subtitle(_SwapTokenInfo token, bool enabled) {
+    final parts = <String>[
+      token.name,
+      if (token.chainName.isNotEmpty) token.chainName,
+      if (token.address != null) _shortTokenAddress(token.address!),
+    ];
+    final suffix = enabled ? '' : ' - no PokoinSwap pool yet';
+    return '${parts.join(' · ')}$suffix';
+  }
+
+  static String _shortTokenAddress(String address) {
+    if (address.length <= 12) {
+      return address;
+    }
+    return '${address.substring(0, 6)}...${address.substring(address.length - 4)}';
+  }
+}
+
+class _SwapUnavailableChip extends StatelessWidget {
+  const _SwapUnavailableChip();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFBBF24).withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: const Text(
+        'no pool',
+        style: TextStyle(
+          color: Color(0xFFFBBF24),
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _SwapTokenAvatar extends StatelessWidget {
+  const _SwapTokenAvatar({required this.token});
+
+  final _SwapTokenInfo token;
+
+  @override
+  Widget build(BuildContext context) {
+    final logo = token.logoUri;
+    return CircleAvatar(
+      backgroundColor: const Color(0xFF111936),
+      child: logo == null || logo.isEmpty
+          ? Text(
+              token.symbol.characters.take(2).toString(),
+              style: const TextStyle(fontWeight: FontWeight.w900),
+            )
+          : ClipOval(
+              child: Image.network(
+                logo,
+                width: 40,
+                height: 40,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Text(
+                  token.symbol.characters.take(2).toString(),
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+            ),
+    );
+  }
+}
+
+class _SwapFlipButton extends StatelessWidget {
+  const _SwapFlipButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: const Color(0xFF0B1024),
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: const Color(0xFFFACC15), width: 2),
+          ),
+          child: const Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: Color(0xFFFACC15),
+            size: 30,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SwapStatusPill extends StatelessWidget {
+  const _SwapStatusPill({required this.label, required this.accent});
+
+  final String label;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: accent.withValues(alpha: 0.30)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: accent,
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _SwapQuoteDetails extends StatelessWidget {
+  const _SwapQuoteDetails({
+    required this.quote,
+    required this.pool,
+    required this.loading,
+    required this.poolError,
+  });
+
+  final Map<String, dynamic>? quote;
+  final _SwapPoolSnapshot? pool;
+  final bool loading;
+  final String? poolError;
+
+  @override
+  Widget build(BuildContext context) {
+    final quote = this.quote;
+    if (loading) {
+      return _SwapPoolPanel(
+        pool: pool,
+        child: const Row(
+          children: [
+            SizedBox.square(
+              dimension: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: 10),
+          Text(
+              'Fetching quote',
+              style: TextStyle(
+                color: Color(0xFFB8C4E6),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
       );
     }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        const Text(
-          'Exchange history',
-          style: TextStyle(fontWeight: FontWeight.w900),
+    if (quote == null) {
+      return _SwapPoolPanel(
+        pool: pool,
+        child: Text(
+          poolError == null ? 'Live AMM quote' : poolError!,
+          style: TextStyle(
+            color: poolError == null
+                ? const Color(0xFF93A4C8)
+                : const Color(0xFFFBBF24),
+            fontWeight: FontWeight.w700,
+          ),
         ),
-        const SizedBox(height: 8),
-        for (final request in requests.take(5))
-          ListTile(
-            dense: true,
-            contentPadding: EdgeInsets.zero,
-            title: Text(
-              '${request['amountIn']} ${request['fromAsset']} -> ${request['amountOutQuoted']} ${request['toAsset']}',
+      );
+    }
+    final assetIn = quote['assetIn'] as String? ?? '';
+    final assetOut = quote['assetOut'] as String? ?? '';
+    return _SwapPoolPanel(
+      pool: pool,
+      child: Column(
+        children: [
+          _SwapDetailRow(
+            label: 'Rate',
+            value:
+                '${quote['amountIn']} $assetIn / ${quote['amountOut']} $assetOut',
+          ),
+          const SizedBox(height: 8),
+          _SwapDetailRow(
+            label: 'Fee',
+            value: '${quote['feeBps']} bps',
+          ),
+          const SizedBox(height: 8),
+          _SwapDetailRow(
+            label: 'Pool',
+            value: '${quote['poolId']}',
+          ),
+          const SizedBox(height: 8),
+          _SwapDetailRow(
+            label: 'Reserves',
+            value: '${quote['reserveIn']} / ${quote['reserveOut']}',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SwapPoolPanel extends StatelessWidget {
+  const _SwapPoolPanel({required this.pool, required this.child});
+
+  final _SwapPoolSnapshot? pool;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final pool = this.pool;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.035),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          child,
+          if (pool != null) ...[
+            const SizedBox(height: 14),
+            _SwapPoolChart(pool: pool),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _SwapPoolChart extends StatelessWidget {
+  const _SwapPoolChart({required this.pool});
+
+  final _SwapPoolSnapshot pool;
+
+  @override
+  Widget build(BuildContext context) {
+    final total = math.max(1, pool.reservePkn + pool.reserveAsset);
+    final pknShare = pool.reservePkn / total;
+    final assetShare = pool.reserveAsset / total;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+        const Text(
+              'Pool reserves',
+              style: TextStyle(
+                color: Color(0xFF93A4C8),
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
             ),
-            subtitle: SelectableText(
-              '${request['status']} | ${request['requestId']}',
+            const Spacer(),
+            Text(
+              pool.id,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+              ),
             ),
-            trailing: const Icon(Icons.chevron_right),
+          ],
+        ),
+        const SizedBox(height: 10),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: Row(
+            children: [
+              Expanded(
+                flex: math.max(1, (pknShare * 1000).round()),
+                child: Container(height: 12, color: const Color(0xFFFACC15)),
+              ),
+              Expanded(
+                flex: math.max(1, (assetShare * 1000).round()),
+                child: Container(height: 12, color: const Color(0xFF38BDF8)),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _SwapReserveChip(
+              color: const Color(0xFFFACC15),
+              label: '${pool.reservePkn} PKN',
+            ),
+            _SwapReserveChip(
+              color: const Color(0xFF38BDF8),
+              label: '${pool.reserveAsset} ${pool.asset}',
+            ),
+            _SwapReserveChip(
+              color: const Color(0xFFA78BFA),
+              label: '${pool.feeBps} bps fee',
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _SwapReserveChip extends StatelessWidget {
+  const _SwapReserveChip({required this.color, required this.label});
+
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.30)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _SwapDetailRow extends StatelessWidget {
+  const _SwapDetailRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: Color(0xFF93A4C8),
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const Spacer(),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
           ),
       ],
     );
@@ -2082,9 +3735,9 @@ class _HoverCircleActionState extends State<_HoverCircleAction> {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: widget.onTap,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
             AnimatedContainer(
               duration: const Duration(milliseconds: 140),
               curve: Curves.easeOut,
@@ -2123,6 +3776,88 @@ class _HoverCircleActionState extends State<_HoverCircleAction> {
 }
 
 enum ActivityKind { inbound, outbound }
+
+class _TokenListSource {
+  const _TokenListSource({
+    required this.name,
+    required this.chainId,
+    required this.explorerHost,
+    required this.url,
+  });
+
+  final String name;
+  final int chainId;
+  final String explorerHost;
+  final String url;
+}
+
+class _SwapTokenInfo {
+  const _SwapTokenInfo({
+    required this.symbol,
+    required this.name,
+    this.chainName = '',
+    this.chainId,
+    this.address,
+    this.explorerUrl,
+    this.logoUri,
+  });
+
+  final String symbol;
+  final String name;
+  final String chainName;
+  final int? chainId;
+  final String? address;
+  final String? explorerUrl;
+  final String? logoUri;
+}
+
+const _defaultSwapTokenCatalog = <_SwapTokenInfo>[
+  _SwapTokenInfo(
+      symbol: 'WPKN', name: 'Wrapped Pokoin', chainName: 'PokoinPoS'),
+  _SwapTokenInfo(symbol: 'BTC', name: 'Bitcoin', chainName: 'Bitcoin'),
+  _SwapTokenInfo(symbol: 'ETH', name: 'Ether', chainName: 'Ethereum'),
+  _SwapTokenInfo(symbol: 'BNB', name: 'BNB', chainName: 'BNB Chain'),
+  _SwapTokenInfo(symbol: 'EURC', name: 'Euro Coin', chainName: 'Ethereum'),
+  _SwapTokenInfo(
+      symbol: 'USDT', name: 'Tether USD', chainName: 'Ethereum / BNB Chain'),
+  _SwapTokenInfo(
+      symbol: 'USDC', name: 'USD Coin', chainName: 'Ethereum / BNB Chain'),
+  _SwapTokenInfo(symbol: 'DAI', name: 'Dai Stablecoin', chainName: 'Ethereum'),
+  _SwapTokenInfo(symbol: 'LINK', name: 'Chainlink', chainName: 'Ethereum'),
+  _SwapTokenInfo(symbol: 'UNI', name: 'Uniswap', chainName: 'Ethereum'),
+  _SwapTokenInfo(
+      symbol: 'CAKE', name: 'PancakeSwap Token', chainName: 'BNB Chain'),
+];
+
+class _SwapPoolSnapshot {
+  const _SwapPoolSnapshot({
+    required this.id,
+    required this.asset,
+    required this.reservePkn,
+    required this.reserveAsset,
+    required this.feeBps,
+  });
+
+  factory _SwapPoolSnapshot.fromJson(Map<String, dynamic> json, String asset) {
+    final assetA = (json['assetA'] as String? ?? '').toUpperCase();
+    final reserveA = _WalletScreenState._readInt(json['reserveA']);
+    final reserveB = _WalletScreenState._readInt(json['reserveB']);
+    final pknIsA = assetA == _WalletScreenState.nativeSymbol;
+    return _SwapPoolSnapshot(
+      id: json['id'] as String? ?? '',
+      asset: asset,
+      reservePkn: pknIsA ? reserveA : reserveB,
+      reserveAsset: pknIsA ? reserveB : reserveA,
+      feeBps: _WalletScreenState._readInt(json['feeBps']),
+    );
+  }
+
+  final String id;
+  final String asset;
+  final int reservePkn;
+  final int reserveAsset;
+  final int feeBps;
+}
 
 class ActivityItem {
   ActivityItem({

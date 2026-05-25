@@ -1,0 +1,427 @@
+{
+  "mode": "missing-report",
+  "target": "oracle-peer4:public.marketplace_blueprint_artists",
+  "generatedAt": "2026-05-22T13:58:44.883Z",
+  "primary": {
+    "database": "pokoin_marketplace",
+    "inRecovery": false
+  },
+  "options": {
+    "limit": 1000,
+    "batchSize": 100,
+    "concurrency": 4,
+    "startId": 0,
+    "language": "en",
+    "source": "tcgdex",
+    "refreshExisting": false,
+    "reportEligibleOnly": true,
+    "reportSampleSize": 6
+  },
+  "coverage": {
+    "total_blueprints": 71215,
+    "artist_rows": 18115,
+    "missing_artist_rows": 53100,
+    "missing_eligible_rows": 46196,
+    "missing_non_card_product_rows": 6103,
+    "missing_name_rows": 0,
+    "missing_set_rows": 0,
+    "missing_collector_number_rows": 4554
+  },
+  "counts": {
+    "scanned": 1000,
+    "wouldMatch": 0,
+    "ambiguous": 214,
+    "notFound": 786,
+    "skipped": 0,
+    "errors": 0,
+    "sources": {},
+    "reasons": {
+      "ambiguous_set_name_contains": 214,
+      "low_confidence": 401,
+      "set_not_found": 290,
+      "missing_illustrator": 90,
+      "card_not_found_in_set": 5
+    },
+    "canonicalReasons": {
+      "ambiguous_set": 214,
+      "low_confidence": 401,
+      "set_not_found": 290,
+      "missing_illustrator": 90,
+      "card_not_found": 5
+    }
+  },
+  "samplesByReason": {
+    "ambiguous_set": [
+      {
+        "blueprintId": "105262",
+        "name": "EX Trainer Kit",
+        "setName": "EX Trainer Kit",
+        "setCode": "tk1",
+        "collectorNumber": "Latios & Latias Half Deck",
+        "rarity": "Card",
+        "status": "ambiguous",
+        "reason": "ambiguous_set_name_contains",
+        "canonicalReason": "ambiguous_set",
+        "source": "tcgdex"
+      },
+      {
+        "blueprintId": "105289",
+        "name": "EX Trainer Kit 2",
+        "setName": "EX Trainer Kit 2",
+        "setCode": "tk2",
+        "collectorNumber": "Plusle & Minun Half Deck",
+        "rarity": "Card",
+        "status": "ambiguous",
+        "reason": "ambiguous_set_name_contains",
+        "canonicalReason": "ambiguous_set",
+        "source": "tcgdex"
+      },
+      {
+        "blueprintId": "114400",
+        "name": "Altaria",
+        "setName": "Dragon Majesty Promos",
+        "setCode": "pdrm",
+        "collectorNumber": "Holo Promo | 40a/70",
+        "rarity": "Promo",
+        "status": "ambiguous",
+        "reason": "ambiguous_set_name_contains",
+        "canonicalReason": "ambiguous_set",
+        "source": "tcgdex"
+      },
+      {
+        "blueprintId": "114401",
+        "name": "Fiery Flint",
+        "setName": "Dragon Majesty Promos",
+        "setCode": "pdrm",
+        "collectorNumber": "Pokémon League 60a/70",
+        "rarity": "Uncommon",
+        "status": "ambiguous",
+        "reason": "ambiguous_set_name_contains",
+        "canonicalReason": "ambiguous_set",
+        "source": "tcgdex"
+      },
+      {
+        "blueprintId": "114679",
+        "name": "Ho-Oh EX",
+        "setName": "Dragons Exalted Promos",
+        "setCode": "pdrx",
+        "collectorNumber": "Holo Promo | 22/124",
+        "rarity": "Promo",
+        "status": "ambiguous",
+        "reason": "ambiguous_set_name_contains",
+        "canonicalReason": "ambiguous_set",
+        "source": "tcgdex"
+      },
+      {
+        "blueprintId": "114680",
+        "name": "Gyarados",
+        "setName": "Dragons Exalted Promos",
+        "setCode": "pdrx",
+        "collectorNumber": "Holo Promo | 24/124",
+        "rarity": "Promo",
+        "status": "ambiguous",
+        "reason": "ambiguous_set_name_contains",
+        "canonicalReason": "ambiguous_set",
+        "source": "tcgdex"
+      }
+    ],
+    "low_confidence": [
+      {
+        "blueprintId": "109867",
+        "name": "Vespiquen",
+        "setName": "Ancient Origins",
+        "setCode": "aor",
+        "collectorNumber": "Double 11/98",
+        "rarity": "Rare",
+        "status": "not_found",
+        "reason": "low_confidence",
+        "canonicalReason": "low_confidence",
+        "source": "tcgdex",
+        "bestConfidence": 0.48,
+        "bestSourceCardId": "xy7-11"
+      },
+      {
+        "blueprintId": "109875",
+        "name": "Entei",
+        "setName": "Ancient Origins",
+        "setCode": "aor",
+        "collectorNumber": "Holo Rare | Double 15/98",
+        "rarity": "Holo Rare",
+        "status": "not_found",
+        "reason": "low_confidence",
+        "canonicalReason": "low_confidence",
+        "source": "tcgdex",
+        "bestConfidence": 0.455,
+        "bestSourceCardId": "xy7-14"
+      },
+      {
+        "blueprintId": "109881",
+        "name": "Volcarona",
+        "setName": "Ancient Origins",
+        "setCode": "aor",
+        "collectorNumber": "Double 18/98",
+        "rarity": "Rare",
+        "status": "not_found",
+        "reason": "low_confidence",
+        "canonicalReason": "low_confidence",
+        "source": "tcgdex",
+        "bestConfidence": 0.48,
+        "bestSourceCardId": "xy7-17"
+      },
+      {
+        "blueprintId": "109886",
+        "name": "Gyarados",
+        "setName": "Ancient Origins",
+        "setCode": "aor",
+        "collectorNumber": "Holo Rare | Double 21/98",
+        "rarity": "Holo Rare",
+        "status": "not_found",
+        "reason": "low_confidence",
+        "canonicalReason": "low_confidence",
+        "source": "tcgdex",
+        "bestConfidence": 0.455,
+        "bestSourceCardId": "xy7-20"
+      },
+      {
+        "blueprintId": "109905",
+        "name": "Baltoy",
+        "setName": "Ancient Origins",
+        "setCode": "aor",
+        "collectorNumber": "Stop 32/98",
+        "rarity": "Common",
+        "status": "not_found",
+        "reason": "low_confidence",
+        "canonicalReason": "low_confidence",
+        "source": "tcgdex",
+        "bestConfidence": 0.48,
+        "bestSourceCardId": "xy7-31"
+      },
+      {
+        "blueprintId": "109911",
+        "name": "Golurk",
+        "setName": "Ancient Origins",
+        "setCode": "aor",
+        "collectorNumber": "Stop 35/98",
+        "rarity": "Rare",
+        "status": "not_found",
+        "reason": "low_confidence",
+        "canonicalReason": "low_confidence",
+        "source": "tcgdex",
+        "bestConfidence": 0.48,
+        "bestSourceCardId": "xy7-35"
+      }
+    ],
+    "set_not_found": [
+      {
+        "blueprintId": "110020",
+        "name": "Bellossom",
+        "setName": "Theme Deck & Blisters Exclusives",
+        "setCode": "deckexclusives",
+        "collectorNumber": "Cosmos Holo | 4/98",
+        "rarity": "Promo",
+        "status": "not_found",
+        "reason": "set_not_found",
+        "canonicalReason": "set_not_found",
+        "source": "tcgdex"
+      },
+      {
+        "blueprintId": "110021",
+        "name": "Virizion",
+        "setName": "Theme Deck & Blisters Exclusives",
+        "setCode": "deckexclusives",
+        "collectorNumber": "Non-Holo Theme Deck | 12/98",
+        "rarity": "Fixed",
+        "status": "not_found",
+        "reason": "set_not_found",
+        "canonicalReason": "set_not_found",
+        "source": "tcgdex"
+      },
+      {
+        "blueprintId": "110022",
+        "name": "Flareon",
+        "setName": "Theme Deck & Blisters Exclusives",
+        "setCode": "deckexclusives",
+        "collectorNumber": "Cosmos Holo | 13/98",
+        "rarity": "Promo",
+        "status": "not_found",
+        "reason": "set_not_found",
+        "canonicalReason": "set_not_found",
+        "source": "tcgdex"
+      },
+      {
+        "blueprintId": "110023",
+        "name": "Entei",
+        "setName": "Theme Deck & Blisters Exclusives",
+        "setCode": "deckexclusives",
+        "collectorNumber": "Cosmos Holo | 14/98",
+        "rarity": "Promo",
+        "status": "not_found",
+        "reason": "set_not_found",
+        "canonicalReason": "set_not_found",
+        "source": "tcgdex"
+      },
+      {
+        "blueprintId": "110024",
+        "name": "Gyarados",
+        "setName": "Theme Deck & Blisters Exclusives",
+        "setCode": "deckexclusives",
+        "collectorNumber": "Cosmos Holo | 020/98",
+        "rarity": "Fixed",
+        "status": "not_found",
+        "reason": "set_not_found",
+        "canonicalReason": "set_not_found",
+        "source": "tcgdex"
+      },
+      {
+        "blueprintId": "110025",
+        "name": "Gyarados",
+        "setName": "Theme Deck & Blisters Exclusives",
+        "setCode": "deckexclusives",
+        "collectorNumber": "Cosmos Holo | 21/98",
+        "rarity": "Rare",
+        "status": "not_found",
+        "reason": "set_not_found",
+        "canonicalReason": "set_not_found",
+        "source": "tcgdex"
+      }
+    ],
+    "missing_illustrator": [
+      {
+        "blueprintId": "110315",
+        "name": "Darkness Cube 01",
+        "setName": "Aquapolis",
+        "setCode": "aq",
+        "collectorNumber": "119/147",
+        "rarity": "Uncommon",
+        "status": "not_found",
+        "reason": "missing_illustrator",
+        "canonicalReason": "missing_illustrator",
+        "source": "tcgdex"
+      },
+      {
+        "blueprintId": "110331",
+        "name": "Lightning Cube 01",
+        "setName": "Aquapolis",
+        "setCode": "aq",
+        "collectorNumber": "127/147",
+        "rarity": "Uncommon",
+        "status": "not_found",
+        "reason": "missing_illustrator",
+        "canonicalReason": "missing_illustrator",
+        "source": "tcgdex"
+      },
+      {
+        "blueprintId": "110335",
+        "name": "Metal Cube 01",
+        "setName": "Aquapolis",
+        "setCode": "aq",
+        "collectorNumber": "129/147",
+        "rarity": "Uncommon",
+        "status": "not_found",
+        "reason": "missing_illustrator",
+        "canonicalReason": "missing_illustrator",
+        "source": "tcgdex"
+      },
+      {
+        "blueprintId": "110341",
+        "name": "Psychic Cube 01",
+        "setName": "Aquapolis",
+        "setCode": "aq",
+        "collectorNumber": "132/147",
+        "rarity": "Uncommon",
+        "status": "not_found",
+        "reason": "missing_illustrator",
+        "canonicalReason": "missing_illustrator",
+        "source": "tcgdex"
+      },
+      {
+        "blueprintId": "110357",
+        "name": "Water Cube 01",
+        "setName": "Aquapolis",
+        "setCode": "aq",
+        "collectorNumber": "140/147",
+        "rarity": "Uncommon",
+        "status": "not_found",
+        "reason": "missing_illustrator",
+        "canonicalReason": "missing_illustrator",
+        "source": "tcgdex"
+      },
+      {
+        "blueprintId": "110973",
+        "name": "Tropical Beach",
+        "setName": "BW Black Star Promos",
+        "setCode": "bwbsp",
+        "collectorNumber": "Non-Holo Promo BW28 | Worlds 11",
+        "rarity": "Promo",
+        "status": "not_found",
+        "reason": "missing_illustrator",
+        "canonicalReason": "missing_illustrator",
+        "source": "tcgdex"
+      }
+    ],
+    "card_not_found": [
+      {
+        "blueprintId": "110333",
+        "name": "Memory Berry",
+        "setName": "Aquapolis",
+        "setCode": "aq",
+        "collectorNumber": "128/147",
+        "rarity": "Uncommon",
+        "status": "not_found",
+        "reason": "card_not_found_in_set",
+        "canonicalReason": "card_not_found",
+        "source": "tcgdex"
+      },
+      {
+        "blueprintId": "113665",
+        "name": "Machoke Lv.39",
+        "setName": "DP Trainer Kit (Lucario)",
+        "setCode": "lucario",
+        "collectorNumber": "Non-Holo | Trainer Kit 4/11",
+        "rarity": "Fixed",
+        "status": "not_found",
+        "reason": "card_not_found_in_set",
+        "canonicalReason": "card_not_found",
+        "source": "tcgdex"
+      },
+      {
+        "blueprintId": "113666",
+        "name": "Machop Lv.20",
+        "setName": "DP Trainer Kit (Lucario)",
+        "setCode": "lucario",
+        "collectorNumber": "Non-Holo | Trainer Kit 5/11",
+        "rarity": "Fixed",
+        "status": "not_found",
+        "reason": "card_not_found_in_set",
+        "canonicalReason": "card_not_found",
+        "source": "tcgdex"
+      },
+      {
+        "blueprintId": "113673",
+        "name": "Buizel Lv.10",
+        "setName": "DP Trainer Kit (Manaphy)",
+        "setCode": "manaphy",
+        "collectorNumber": "Non-Holo | Trainer Kit 001/012",
+        "rarity": "Fixed",
+        "status": "not_found",
+        "reason": "card_not_found_in_set",
+        "canonicalReason": "card_not_found",
+        "source": "tcgdex"
+      },
+      {
+        "blueprintId": "114191",
+        "name": "Electivire Lv.46",
+        "setName": "Diamond & Pearl Promos",
+        "setCode": "pdp",
+        "collectorNumber": "STAFF | Regional Championships 3/130",
+        "rarity": "Promo",
+        "status": "not_found",
+        "reason": "card_not_found_in_set",
+        "canonicalReason": "card_not_found",
+        "source": "tcgdex"
+      }
+    ]
+  },
+  "lastBlueprintId": 116990,
+  "nextStartId": 116990
+}

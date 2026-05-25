@@ -1,69 +1,133 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../constants/project_links.dart';
+import '../providers/card_provider.dart';
+import 'home_screen.dart';
 import '../widgets/site_footer.dart';
 
-class LandingScreen extends StatelessWidget {
+class LandingScreen extends ConsumerStatefulWidget {
   const LandingScreen({super.key});
 
   @override
+  ConsumerState<LandingScreen> createState() => _LandingScreenState();
+}
+
+class _LandingScreenState extends ConsumerState<LandingScreen> {
+  static const Duration _marketplaceWarmupDelay = Duration(milliseconds: 700);
+  Timer? _marketplaceWarmupTimer;
+  bool _showMarketplacePreloader = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      _marketplaceWarmupTimer =
+          Timer(_marketplaceWarmupDelay, _startMarketplaceWarmup);
+    });
+  }
+
+  @override
+  void dispose() {
+    _marketplaceWarmupTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startMarketplaceWarmup() {
+    if (!mounted) {
+      return;
+    }
+    unawaited(ref.read(cardProvider.notifier).warmMarketplaceFromLanding());
+    setState(() => _showMarketplacePreloader = true);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      backgroundColor: Color(0xFF050816),
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            pinned: true,
-            toolbarHeight: 76,
-            backgroundColor: Color(0xF2050816),
-            elevation: 0,
-            flexibleSpace: _TopBar(),
-          ),
-          SliverToBoxAdapter(
-            child: _PageShell(
-              children: [
-                _HeroSection(),
-                _MetricStrip(),
-                _ProjectAccessSection(),
-                _SectionTitle(
-                  eyebrow: 'Pokoin today',
-                  title:
-                      'A collector marketplace with wallet rails and network roles.',
-                  body:
-                      'Pokoin combines card discovery, seller listings, PKN balances, node operations and community coordination in one project surface. The homepage should get every role to the right place quickly.',
-                ),
-                Wrap(
-                  spacing: 18,
-                  runSpacing: 18,
+    return Scaffold(
+      backgroundColor: const Color(0xFF050816),
+      body: Stack(
+        children: [
+          const CustomScrollView(
+            slivers: [
+              SliverAppBar(
+                pinned: true,
+                toolbarHeight: 76,
+                backgroundColor: Color(0xF2050816),
+                elevation: 0,
+                flexibleSpace: _TopBar(),
+              ),
+              SliverToBoxAdapter(
+                child: _PageShell(
                   children: [
-                    _FeatureCard(
-                      icon: Icons.style,
-                      title: 'Live card marketplace',
+                    _HeroSection(),
+                    _MetricStrip(),
+                    _ProjectAccessSection(),
+                    _SectionTitle(
+                      eyebrow: 'Pokoin today',
+                      title:
+                          'A collector marketplace with wallet rails and network roles.',
                       body:
-                          'Browse Pokémon card inventory with real card images, card detail pages, seller offers, no-seller states, and listing-aware cart flows.',
+                          'Pokoin combines card discovery, seller listings, PKN balances, node operations and community coordination in one project surface. The homepage should get every role to the right place quickly.',
                     ),
-                    _FeatureCard(
-                      icon: Icons.storefront_outlined,
-                      title: 'Seller listings',
-                      body:
-                          'Logged-in users can create listings with condition, language, reverse holo, grading company, grade, certification ID, shipping and NFT options.',
+                    Wrap(
+                      spacing: 18,
+                      runSpacing: 18,
+                      children: [
+                        _FeatureCard(
+                          icon: Icons.style,
+                          title: 'Live card marketplace',
+                          body:
+                              'Browse Pokémon card inventory with real card images, card detail pages, seller offers, no-seller states, and listing-aware cart flows.',
+                        ),
+                        _FeatureCard(
+                          icon: Icons.storefront_outlined,
+                          title: 'Seller listings',
+                          body:
+                              'Logged-in users can create listings with condition, language, reverse holo, grading company, grade, certification ID, shipping and NFT options.',
+                        ),
+                        _FeatureCard(
+                          icon: Icons.query_stats,
+                          title: 'Marketplace signal',
+                          body:
+                              'Reserve analytics track listed value, floor and median ask, price depth, rarity concentration, reserve coverage and readiness signals.',
+                        ),
+                      ],
                     ),
-                    _FeatureCard(
-                      icon: Icons.query_stats,
-                      title: 'Marketplace signal',
-                      body:
-                          'Reserve analytics track listed value, floor and median ask, price depth, rarity concentration, reserve coverage and readiness signals.',
-                    ),
+                    _MarketplacePanel(),
+                    _RoadmapSection(),
+                    _CtaSection(),
+                    SiteFooter(),
                   ],
                 ),
-                _MarketplacePanel(),
-                _RoadmapSection(),
-                _CtaSection(),
-                SiteFooter(),
-              ],
-            ),
+              ),
+            ],
           ),
+          if (_showMarketplacePreloader) const _MarketplaceRoutePreloader(),
         ],
+      ),
+    );
+  }
+}
+
+class _MarketplaceRoutePreloader extends StatelessWidget {
+  const _MarketplaceRoutePreloader();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Offstage(
+      offstage: true,
+      child: TickerMode(
+        enabled: false,
+        child: ExcludeFocus(
+          child: IgnorePointer(
+            child: HomeScreen(),
+          ),
+        ),
       ),
     );
   }
@@ -136,7 +200,7 @@ class _TopBar extends StatelessWidget {
                       const SizedBox(width: 12),
                     ],
                     _TopBarCta(
-                      label: 'Shop',
+                      label: 'Marketplace',
                       icon: Icons.storefront,
                       primary: true,
                       onPressed: () => context.go('/marketplace'),
@@ -325,7 +389,7 @@ class _HeroSection extends StatelessWidget {
           children: [
             FilledButton(
               onPressed: () => context.go('/marketplace'),
-              child: const Text('Shop cards'),
+              child: const Text('Marketplace'),
             ),
             OutlinedButton(
               onPressed: () => context.go('/docs'),
@@ -413,7 +477,7 @@ class _HeroTokenCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           const Text(
-            'Shop cards and settle with PKN',
+            'Marketplace cards and settle with PKN',
             textAlign: TextAlign.center,
             style: TextStyle(color: Color(0xFFB8C4E6)),
           ),
@@ -423,7 +487,7 @@ class _HeroTokenCard extends StatelessWidget {
             child: FilledButton.icon(
               onPressed: () => context.go('/marketplace'),
               icon: const Icon(Icons.storefront_outlined),
-              label: const Text('Shop the marketplace'),
+              label: const Text('Open marketplace'),
               style: FilledButton.styleFrom(
                 backgroundColor: const Color(0xFFFACC15),
                 foregroundColor: const Color(0xFF111827),
@@ -451,7 +515,7 @@ class _MetricStrip extends StatelessWidget {
       spacing: 14,
       runSpacing: 14,
       children: [
-        _Metric(label: 'Shop', value: 'Marketplace'),
+        _Metric(label: 'Marketplace', value: 'Card Reserve'),
         _Metric(label: 'Wallet', value: 'PKN roles'),
         _Metric(label: 'Network', value: 'Host nodes'),
         _Metric(label: 'Community', value: 'Forum'),

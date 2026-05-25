@@ -1,0 +1,13 @@
+{
+  "generatedAt": "2026-05-22T15:43:40.953Z",
+  "artist_rows": 20883,
+  "tcgdex_rows": 18115,
+  "pokemon_tcg_data_rows": 2768,
+  "distinct_artists": 372,
+  "total_blueprints": 71215,
+  "missing_artist_rows": 50332,
+  "missing_eligible_rows": 43428,
+  "missing_non_card_product_rows": 6103,
+  "missing_collector_number_rows": 4554,
+  "last_matched_at": "2026-05-22T15:43:18.674Z"
+}

@@ -30,6 +30,13 @@ The older standalone Vercel project for `cardvault-lemon.vercel.app` has been re
 - `pokemon_card_vault/firestore.rules`: Firestore access rules.
 - `pokemon_card_vault/web/vercel.json`: SPA rewrite configuration for Vercel.
 
+## Local Project Boundary
+
+CardVault is separate from the PokoinPoS repo. Local operator scripts may read
+PokoinPoS bootstrap peers or Oracle env files through `POKOINPOS_ROOT`, which
+defaults to `/Users/giuseppe/pokoinpos` on this machine. Keep chain/node runtime
+changes in the PokoinPoS checkout and web/marketplace changes in this repo.
+
 ## Development
 
 ```bash

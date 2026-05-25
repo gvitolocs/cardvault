@@ -7,7 +7,7 @@ import '../models/pokemon_card.dart';
 import '../providers/card_provider.dart';
 import '../providers/recent_views_provider.dart';
 import '../services/card_service.dart';
-import '../utils/card_url.dart';
+import '../utils/card_navigation.dart';
 
 class ProductLandingScreen extends ConsumerWidget {
   const ProductLandingScreen({super.key, required this.kind});
@@ -144,7 +144,8 @@ class _ProductLandingConfig {
         return _ProductLandingConfig(
           title: 'Products',
           subtitle: 'Marketplace categories',
-          description: 'Browse curated product categories in the Pokoin market.',
+          description:
+              'Browse curated product categories in the Pokoin market.',
           ctaLabel: 'Back to market',
           ctaPath: '/marketplace',
           loadCards: () async => const <PokemonCard>[],
@@ -250,7 +251,11 @@ class _ProductGrid extends ConsumerWidget {
                       source: 'product_landing',
                     );
                 ref.read(recentViewsProvider.notifier).remember(card);
-                context.go(cardDetailPath(card));
+                navigateToCanonicalCardDetail(
+                  context,
+                  card,
+                  source: 'product_landing',
+                );
               },
             );
           },
@@ -268,8 +273,9 @@ class _ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final imageUrl =
-        card.previewImageUrl.trim().isNotEmpty ? card.previewImageUrl : card.imageUrl;
+    final imageUrl = card.previewImageUrl.trim().isNotEmpty
+        ? card.previewImageUrl
+        : card.imageUrl;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(22),
@@ -317,7 +323,7 @@ class _ProductCard extends StatelessWidget {
             Text(
               [
                 if (card.set.trim().isNotEmpty) card.set,
-                if (card.number.trim().isNotEmpty) '#${card.number}',
+                if (card.number.trim().isNotEmpty) card.number,
               ].join(' '),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,

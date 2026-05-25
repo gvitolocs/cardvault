@@ -41,6 +41,32 @@ external JSPromise<JSString> _sendTransaction(
   JSString valueHex,
 );
 
+@JS('window.pokoinWallet.sendDataTransaction')
+external JSPromise<JSString> _sendDataTransaction(
+  JSString from,
+  JSString to,
+  JSString valueHex,
+  JSString dataHex,
+  JSString nonceHex,
+);
+
+@JS('window.pokoinWallet.sendExternalTransaction')
+external JSPromise<JSString> _sendExternalTransaction(
+  JSString from,
+  JSString to,
+  JSString valueHex,
+  JSString chainIdHex,
+);
+
+@JS('window.pokoinWallet.sendExternalTokenTransfer')
+external JSPromise<JSString> _sendExternalTokenTransfer(
+  JSString from,
+  JSString tokenAddress,
+  JSString to,
+  JSString amountHex,
+  JSString chainIdHex,
+);
+
 @JS('window.pokoinAuth.signInWithGoogle')
 external JSPromise<JSObject> _signInWithGoogle();
 
@@ -162,6 +188,55 @@ class WalletBridge {
       from.toJS,
       to.toJS,
       '0x${valueWei.toRadixString(16)}'.toJS,
+    ).toDart;
+    return hash.toDart;
+  }
+
+  Future<String> sendDataTransaction({
+    required String from,
+    required String to,
+    required String dataHex,
+    BigInt? valueWei,
+    int? nonce,
+  }) async {
+    final hash = await _sendDataTransaction(
+      from.toJS,
+      to.toJS,
+      '0x${(valueWei ?? BigInt.zero).toRadixString(16)}'.toJS,
+      dataHex.toJS,
+      nonce == null ? ''.toJS : '0x${nonce.toRadixString(16)}'.toJS,
+    ).toDart;
+    return hash.toDart;
+  }
+
+  Future<String> sendExternalTransaction({
+    required String from,
+    required String to,
+    required BigInt valueWei,
+    required String chainIdHex,
+  }) async {
+    final hash = await _sendExternalTransaction(
+      from.toJS,
+      to.toJS,
+      '0x${valueWei.toRadixString(16)}'.toJS,
+      chainIdHex.toJS,
+    ).toDart;
+    return hash.toDart;
+  }
+
+  Future<String> sendExternalTokenTransfer({
+    required String from,
+    required String tokenAddress,
+    required String to,
+    required BigInt amountUnits,
+    required String chainIdHex,
+  }) async {
+    final hash = await _sendExternalTokenTransfer(
+      from.toJS,
+      tokenAddress.toJS,
+      to.toJS,
+      '0x${amountUnits.toRadixString(16)}'.toJS,
+      chainIdHex.toJS,
     ).toDart;
     return hash.toDart;
   }

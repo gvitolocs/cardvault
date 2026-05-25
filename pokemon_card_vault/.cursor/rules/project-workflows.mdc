@@ -6,7 +6,7 @@ alwaysApply: true
 # Pokoin/CardVault Workflows
 
 - Read `workflows/README.md` before deploy, Supabase/CardTrader import, or domain redirect work.
-- Do not deploy the web app with plain `vercel deploy`. Use `workflows/deploy-web.sh` or `deploy-pokoin-web.sh`.
+- Do not deploy the web app with plain `vercel deploy`. Production deploys must use the no-serverless command: `ORACLE_API_BASE_URL=https://api.pokoin.com POKOIN_WEB_DEPLOY_TARGET=production ./deploy-pokoin-web.sh`.
 - Keep account/auth/wallet/profile/checkout/orders canonical on `https://pokoin.com`; alternate subdomains must redirect protected routes there.
 - Never print `.env.local` secrets. Read env names/shape only, or pass values directly to commands.
 - Use CardTrader scripts for blueprint refresh:
@@ -15,3 +15,13 @@ alwaysApply: true
   - `workflows/verify-supabase-cardtrader-blueprints.sh`
 - The old Supabase project `msngrrrihwudtnyjatlo` is unrecoverable/inactive; use the active project from `.env.local`.
 - Cloudflare Worker routes need proxied DNS records. Deploying a Worker route alone does not make an unresolved domain work.
+- APIs are first-class project infrastructure. `api.pokoin.com` is the production Oracle API origin; verify `https://api.pokoin.com/healthz`, `/marketplace`, and `/api/__routes` before frontend production deploys.
+- Peer3 API access uses Oracle key files under `~/pokoinpos/keys/peer3`; do not print private key contents. The API host is `ubuntu@141.147.62.244`. If the bare `peer3` SSH alias is unavailable, deploy the Oracle API with `ORACLE_API_SSH_TARGET=ubuntu@141.147.62.244` and `ORACLE_API_SSH_KEY` pointing to the private key path under `/Users/giuseppe/pokoinpos/keys` or the repo-documented Oracle keys folder.
+- The production API runs on peer3 as Docker container `pokoin-oracle-api` bound to `127.0.0.1:18080`, behind Caddy container `pokoin-api-caddy` on ports 80/443.
+- Avoid Vercel serverless API fallback unless the user explicitly requests it for emergency rollback. Normal production web deploys must proxy `/api/*` to `https://api.pokoin.com`.
+- Competitive marketplace rollout is data-dependent. Before expecting `/marketplace/competitive` to show data, apply the non-destructive Oracle/Postgres schema `oracle-postgres/schema/014_limitless_competitive.sql` to the writable primary, then run `node scripts/sync-limitless-competitive.js --apply` after a dry-run/small test.
+- Public Limitless imports may include tournaments, games, standings, and pairings where the API allows. Restricted decklist endpoints may require Limitless approval/API key; document that as a blocker instead of assuming data exists.
+- Do not deploy frontend-only for features that require new Oracle schema/API data unless an intentional empty-state rollout is explicitly acceptable. For competitive rollout verify `https://api.pokoin.com/healthz`, `https://api.pokoin.com/api/marketplace-competitive`, `https://pokoin.com/marketplace/competitive`, and the trophy icon route.
+- Pokontact marketplace/card-price answers must use Oracle/API-backed data, never LLM guesses or stale text. Card links and tile/card navigation must use DB canonical paths from `marketplace_card_urls` or `/api/marketplace-card-url`; generated slug fallbacks are only for legacy direct URL repair.
+- Design language should call the canonical tile-price projection `cheapest_homepage_cache_blueprint`: daily backend listings cache/import -> cheapest eligible Zero + 1-Day Ready listing per blueprint -> marketplace/homepage/catalog tile pricing. If production still exposes `public.cardtrader_blueprint_listing_cache`, treat that as a legacy/compatibility physical table name until a migration renames it; do not describe new design language around the old name or call tile pricing live CardTrader.
+- Assistant page-opening/navigation actions must use sanitized internal paths through structured client actions or the user-current-page/session page API. Keep debug/session/current-page APIs covered by tests, `vercel.json`, `deploy-pokoin-web.sh`, and `server/api-route-manifest.js`.

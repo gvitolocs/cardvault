@@ -10,9 +10,17 @@ create table if not exists public.cardtrader_pokemon_expansions (
   symbol_image_url text,
   symbol_object_key text,
   symbol_imported_at timestamptz,
+  logo_image_url text,
+  logo_object_key text,
+  logo_imported_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.cardtrader_pokemon_expansions
+  add column if not exists logo_image_url text,
+  add column if not exists logo_object_key text,
+  add column if not exists logo_imported_at timestamptz;
 
 create index if not exists cardtrader_pokemon_expansions_code_idx
   on public.cardtrader_pokemon_expansions (code);

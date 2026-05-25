@@ -1,7 +1,11 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const { PutObjectCommand, S3Client } = require('@aws-sdk/client-s3');
+const { GetObjectCommand, PutObjectCommand, S3Client } = require('@aws-sdk/client-s3');
 const { Pool } = require('pg');
+const sharp = require('sharp');
+
+const POKOINPOS_ROOT = process.env.POKOINPOS_ROOT || '/Users/giuseppe/pokoinpos';
+const DEFAULT_ORACLE_ENV_FILE = path.join(POKOINPOS_ROOT, 'deploy/env/peer4-postgres.env');
 
 function readEnv(filePath) {
   const values = {};
@@ -73,9 +77,7 @@ function fullImageUrls(row) {
   if (fullCandidates.length > 0) {
     return [...new Set(fullCandidates)];
   }
-  // Some CardTrader rows only expose a preview asset. Import it as the full image
-  // too so the app never renders directly from CardTrader.
-  return previewImageUrls(row);
+  return [];
 }
 
 function previewImageUrls(row) {
@@ -173,6 +175,32 @@ async function download(sourceUrl, minBytes) {
   };
 }
 
+async function imageMetadata(body) {
+  try {
+    const metadata = await sharp(body).metadata();
+    return {
+      width: Number(metadata.width || 0),
+      height: Number(metadata.height || 0),
+      format: metadata.format || '',
+    };
+  } catch {
+    return { width: 0, height: 0, format: '' };
+  }
+}
+
+function imagePixels(metadata) {
+  return Number(metadata.width || 0) * Number(metadata.height || 0);
+}
+
+async function getR2Object(client, bucket, key) {
+  const object = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+  const chunks = [];
+  for await (const chunk of object.Body) {
+    chunks.push(Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
+}
+
 function objectKeyForRow(row, sourceUrl, ext) {
   const forceSuffix = String(process.env.ORACLE_IMAGE_FULL_KEY_SUFFIX || '').trim();
   if (forceSuffix) {
@@ -221,7 +249,17 @@ async function uploadObject(client, { bucket, key, body, ext }) {
   );
 }
 
-async function fetchRows(pool, { ids, limit, offset, cursorId, newestFirst, mode }) {
+async function fetchRows(pool, {
+  ids,
+  limit,
+  offset,
+  cursorId,
+  newestFirst,
+  mode,
+  auditQuality,
+  productType,
+  sourceMismatchOnly,
+}) {
   const values = [];
   const where = [];
   const useOffset = ids.length === 0 && cursorId < 0;
@@ -231,7 +269,7 @@ async function fetchRows(pool, { ids, limit, offset, cursorId, newestFirst, mode
     values.push(ids);
     where.push(`id = any($${values.length}::bigint[])`);
   } else {
-    if (mode !== 'preview' && !forceFull) {
+    if (mode !== 'preview' && !forceFull && !auditQuality) {
       where.push(`(coalesce(cdn_image_url, '') = '' or image_url like 'https://cardtrader.com/%')`);
     }
     if (mode !== 'full' && !forcePreview) {
@@ -252,6 +290,27 @@ async function fetchRows(pool, { ids, limit, offset, cursorId, newestFirst, mode
       values.push(cursorId);
       where.push(newestFirst ? `id < $${values.length}` : `id > $${values.length}`);
     }
+  }
+  if (productType) {
+    values.push(productType);
+    where.push(`
+      exists (
+        select 1
+        from public.marketplace_card_versions versions
+        where versions.card_id = public.cardtrader_pokemon_blueprints.id
+          and versions.product_type = $${values.length}
+      )
+    `);
+  }
+  if (sourceMismatchOnly) {
+    where.push(`
+      (
+        cardtrader_image_url like '%/preview_%'
+        or cardtrader_image_url like '%/show_%'
+        or cdn_object_key like 'previews/%'
+      )
+    `);
+    where.push(`coalesce(blueprint #>> '{image,url}', '') <> ''`);
   }
   values.push(limit);
   const limitPlaceholder = `$${values.length}`;
@@ -295,10 +354,17 @@ async function updateOracleRows(pool, row, updates) {
         image_url = coalesce($1, image_url),
         cdn_image_url = coalesce($2, cdn_image_url),
         preview_image_url = coalesce($3, preview_image_url),
+        homepage_image_url = coalesce($4, homepage_image_url),
         projected_at = now()
-      where card_id = $4
+      where card_id = $5
     `,
-    [updates.image_url || null, updates.cdn_image_url || null, updates.preview_image_url || null, row.id],
+    [
+      updates.image_url || null,
+      updates.cdn_image_url || null,
+      updates.preview_image_url || null,
+      updates.homepage_image_url || null,
+      row.id,
+    ],
   );
   await pool.query(
     `
@@ -307,10 +373,17 @@ async function updateOracleRows(pool, row, updates) {
         image_url = coalesce($1, image_url),
         cdn_image_url = coalesce($2, cdn_image_url),
         preview_image_url = coalesce($3, preview_image_url),
+        homepage_image_url = coalesce($4, homepage_image_url),
         projected_at = now()
-      where card_id = $4
+      where card_id = $5
     `,
-    [updates.image_url || null, updates.cdn_image_url || null, updates.preview_image_url || null, row.id],
+    [
+      updates.image_url || null,
+      updates.cdn_image_url || null,
+      updates.preview_image_url || null,
+      updates.homepage_image_url || null,
+      row.id,
+    ],
   );
   await pool.query(
     `
@@ -319,16 +392,24 @@ async function updateOracleRows(pool, row, updates) {
         image_url = coalesce($1, image_url),
         cdn_image_url = coalesce($2, cdn_image_url),
         preview_image_url = coalesce($3, preview_image_url),
+        homepage_image_url = coalesce($4, homepage_image_url),
         projected_at = now()
-      where card_id = $4
+      where card_id = $5
     `,
-    [updates.image_url || null, updates.cdn_image_url || null, updates.preview_image_url || null, row.id],
+    [
+      updates.image_url || null,
+      updates.cdn_image_url || null,
+      updates.preview_image_url || null,
+      updates.homepage_image_url || null,
+      row.id,
+    ],
   );
 }
 
 async function importRow({ client, pool, bucket, cdnBase, row, mode }) {
   const updates = {};
   const imported = [];
+  const skipped = [];
   const forceFull = process.env.ORACLE_IMAGE_FORCE_FULL === '1';
   const forcePreview = process.env.ORACLE_IMAGE_FORCE_PREVIEW === '1';
 
@@ -338,21 +419,24 @@ async function importRow({ client, pool, bucket, cdnBase, row, mode }) {
       !row.cdn_image_url ||
       String(row.image_url || '').includes('cardtrader.com'))
   ) {
-    const source = await firstDownload(fullImageUrls(row), 1024);
-    const ext =
-      imageFormatFromBytes(source.body) ||
-      extensionFromContentType(source.contentType) ||
-      extensionFromUrl(source.sourceUrl);
-    const key = objectKeyForRow(row, source.sourceUrl, ext);
-    await uploadObject(client, { bucket, key, body: source.body, ext });
-    const url = `${cdnBase}/${key}`;
-    updates.image_url = url;
-    updates.cdn_image_url = url;
-    updates.cdn_object_key = key;
-    if (process.env.ORACLE_IMAGE_KEEP_SOURCE_URLS === '1') {
+    const fullUrls = fullImageUrls(row);
+    if (fullUrls.length === 0) {
+      skipped.push('full:no-full-image');
+    } else {
+      const source = await firstDownload(fullUrls, 1024);
+      const ext =
+        imageFormatFromBytes(source.body) ||
+        extensionFromContentType(source.contentType) ||
+        extensionFromUrl(source.sourceUrl);
+      const key = objectKeyForRow(row, source.sourceUrl, ext);
+      await uploadObject(client, { bucket, key, body: source.body, ext });
+      const url = `${cdnBase}/${key}`;
+      updates.image_url = url;
+      updates.cdn_image_url = url;
+      updates.cdn_object_key = key;
       updates.cardtrader_image_url = source.sourceUrl;
+      imported.push(`full:${key}`);
     }
-    imported.push(`full:${key}`);
   }
 
   if (
@@ -376,12 +460,55 @@ async function importRow({ client, pool, bucket, cdnBase, row, mode }) {
   if (Object.keys(updates).length > 0) {
     await updateOracleRows(pool, row, updates);
   }
-  return imported;
+  return { imported, skipped };
+}
+
+async function shouldRepairFullImage({ client, bucket, row }) {
+  const candidates = fullImageUrls(row);
+  const preferredFullUrl = candidates[0];
+  if (!preferredFullUrl || preferredFullUrl.includes('/preview_')) {
+    return { repair: false, reason: 'no-preferred-full-source' };
+  }
+  const objectKey = String(row.cdn_object_key || '').trim();
+  if (!objectKey || objectKey.startsWith('previews/')) {
+    return { repair: true, reason: 'missing-full-object-key' };
+  }
+
+  const source = await download(preferredFullUrl, 1024);
+  const sourceMetadata = await imageMetadata(source.body);
+  const sourcePixels = imagePixels(sourceMetadata);
+  if (sourcePixels === 0) {
+    return { repair: false, reason: 'unreadable-source-metadata' };
+  }
+
+  const currentBody = await getR2Object(client, bucket, objectKey);
+  const currentMetadata = await imageMetadata(currentBody);
+  const currentPixels = imagePixels(currentMetadata);
+  const minRatio = Number(process.env.ORACLE_IMAGE_QUALITY_MIN_RATIO || 0.85);
+  const smallerThanSource = currentPixels > 0 && currentPixels < sourcePixels * minRatio;
+  const sourceIsDifferent = row.cardtrader_image_url !== preferredFullUrl;
+  const repairSourceMismatch = process.env.ORACLE_IMAGE_REPAIR_SOURCE_MISMATCH === '1';
+  if (!smallerThanSource && !(sourceIsDifferent && repairSourceMismatch)) {
+    return {
+      repair: false,
+      reason: sourceIsDifferent ? 'current-full-ok-source-metadata-stale' : 'current-full-ok',
+      currentMetadata,
+      sourceMetadata,
+      preferredFullUrl,
+    };
+  }
+  return {
+    repair: true,
+    reason: smallerThanSource ? 'current-full-lower-resolution' : 'current-source-not-preferred-full',
+    currentMetadata,
+    sourceMetadata,
+    preferredFullUrl,
+  };
 }
 
 async function main() {
   const localEnv = readEnv(path.resolve('.env.local'));
-  const oracleEnv = readEnv(process.env.ORACLE_ENV_FILE || '/Users/giuseppe/pokoinpos/deploy/env/peer4-postgres.env');
+  const oracleEnv = readEnv(process.env.ORACLE_ENV_FILE || DEFAULT_ORACLE_ENV_FILE);
   const env = { ...localEnv, ...oracleEnv, ...process.env };
   required(env, 'CLOUDFLARE_ACCOUNT_ID');
   required(env, 'R2_ACCESS_KEY_ID');
@@ -393,6 +520,9 @@ async function main() {
   const maxRows = Number(env.ORACLE_IMAGE_MAX_ROWS || 0);
   const newestFirst = env.ORACLE_IMAGE_NEWEST_FIRST === '1';
   const mode = env.ORACLE_IMAGE_MODE || 'both';
+  const auditQuality = env.ORACLE_IMAGE_AUDIT_QUALITY === '1';
+  const productType = String(env.ORACLE_IMAGE_PRODUCT_TYPE || '').trim();
+  const sourceMismatchOnly = env.ORACLE_IMAGE_SOURCE_MISMATCH_ONLY === '1';
   const ids = String(env.ORACLE_IMAGE_IDS || '')
     .split(',')
     .map((value) => value.trim())
@@ -429,16 +559,35 @@ async function main() {
         cursorId: useCursor ? cursorId : 0,
         newestFirst,
         mode,
+        auditQuality,
+        productType,
+        sourceMismatchOnly,
       });
       if (rows.length === 0) break;
 
       for (const row of rows) {
         attempted += 1;
         try {
+          if (auditQuality && mode !== 'preview') {
+            const decision = await shouldRepairFullImage({ client, bucket, row });
+            if (!decision.repair) {
+              console.log(`skipped ${row.id}: ${decision.reason}`);
+              continue;
+            }
+            process.env.ORACLE_IMAGE_FORCE_FULL = '1';
+            if (!process.env.ORACLE_IMAGE_FULL_KEY_SUFFIX) {
+              process.env.ORACLE_IMAGE_FULL_KEY_SUFFIX = `full-audit-${Date.now()}`;
+            }
+            console.log(
+              `repairing ${row.id}: ${decision.reason}; current=${decision.currentMetadata?.width || 0}x${decision.currentMetadata?.height || 0}; source=${decision.sourceMetadata?.width || 0}x${decision.sourceMetadata?.height || 0}`,
+            );
+          }
           const result = await importRow({ client, pool, bucket, cdnBase, row, mode });
-          if (result.length > 0) {
+          if (result.imported.length > 0) {
             imported += 1;
-            console.log(`imported ${row.id}: ${result.join(', ')}`);
+            console.log(`imported ${row.id}: ${result.imported.join(', ')}`);
+          } else if (result.skipped.length > 0) {
+            console.log(`skipped ${row.id}: ${result.skipped.join(', ')}`);
           } else {
             console.log(`skipped ${row.id}: already-cdn`);
           }

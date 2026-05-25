@@ -1,12 +1,55 @@
 const Stripe = require('stripe');
-const { getFirebaseAdmin, verifyBearerToken } = require('../server/_firebase');
-const { handleCompletedCheckout } = require('../server/_pkn_purchase');
+const path = require('path');
 
-const allowedPackages = new Map([
-  [500, 500],
-  [2500, 2500],
-  [10000, 10000],
+function requireServerHelper(name) {
+  const serverPath = path.join(__dirname, '..', 'server', name);
+  try {
+    return require(serverPath);
+  } catch (error) {
+    if (
+      error.code !== 'MODULE_NOT_FOUND' ||
+      !String(error.message).includes(serverPath)
+    ) {
+      throw error;
+    }
+    return require(`./${name}`);
+  }
+}
+
+const {
+  pknAmountForFiatCents,
+  pknCheckoutReferencePrice,
+} = requireServerHelper('_pkn_checkout_pricing');
+const { getFirebaseAdmin, verifyBearerToken } = requireServerHelper('_firebase');
+const { handleCompletedCheckout } = requireServerHelper('_pkn_purchase');
+
+const allowedFiatCents = new Set([500, 2500, 10000]);
+const packageLookupKeys = new Map([
+  [500, 'pkn_starter_1000_pkn_500_eur'],
+  [2500, 'pkn_collector_5000_pkn_2500_eur'],
+  [10000, 'pkn_validator_20000_pkn_10000_eur'],
 ]);
+
+async function stripePriceForPackage(stripe, { fiatCents, lookupKey }) {
+  const expectedLookupKey = packageLookupKeys.get(Number(fiatCents));
+  if (!expectedLookupKey || lookupKey !== expectedLookupKey) {
+    return null;
+  }
+  const prices = await stripe.prices.list({
+    lookup_keys: [lookupKey],
+    active: true,
+    limit: 1,
+  });
+  const price = prices.data[0];
+  if (
+    !price ||
+    price.unit_amount !== Number(fiatCents) ||
+    price.currency !== 'eur'
+  ) {
+    return null;
+  }
+  return price.id;
+}
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -21,7 +64,7 @@ module.exports = async function handler(req, res) {
     }
 
     const decoded = await verifyBearerToken(req);
-    const { pknAmount, fiatCents, checkoutSessionId } = req.body || {};
+    const { pknAmount, fiatCents, checkoutSessionId, lookupKey } = req.body || {};
     const stripeOptions = process.env.STRIPE_API_VERSION
       ? { apiVersion: process.env.STRIPE_API_VERSION }
       : {};
@@ -40,8 +83,9 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true, ...result });
     }
 
-    const expectedFiat = allowedPackages.get(Number(pknAmount));
-    if (!expectedFiat || expectedFiat !== Number(fiatCents)) {
+    const fiat = Number(fiatCents);
+    const expectedPknAmount = pknAmountForFiatCents(fiat);
+    if (!allowedFiatCents.has(fiat) || Number(pknAmount) !== expectedPknAmount) {
       return res.status(400).json({ error: 'Invalid PKN package.' });
     }
 
@@ -49,6 +93,10 @@ module.exports = async function handler(req, res) {
     const userData = userDoc.data() || {};
     const successUrl = `${process.env.PUBLIC_SITE_URL || 'https://pokoin.com'}/buy?status=success`;
     const cancelUrl = `${process.env.PUBLIC_SITE_URL || 'https://pokoin.com'}/buy?status=cancelled`;
+    const priceId = await stripePriceForPackage(stripe, {
+      fiatCents: fiat,
+      lookupKey: String(lookupKey || ''),
+    });
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
@@ -57,23 +105,29 @@ module.exports = async function handler(req, res) {
       success_url: `${successUrl}&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: cancelUrl,
       line_items: [
-        {
-          quantity: 1,
-          price_data: {
-            currency: process.env.PKN_CHECKOUT_CURRENCY || 'eur',
-            unit_amount: expectedFiat,
-            product_data: {
-              name: `${pknAmount} PKN`,
-              description: 'Pokoin account balance credit.',
+        priceId
+          ? {
+              quantity: 1,
+              price: priceId,
+            }
+          : {
+              quantity: 1,
+              price_data: {
+                currency: process.env.PKN_CHECKOUT_CURRENCY || 'eur',
+                unit_amount: fiat,
+                product_data: {
+                  name: `${expectedPknAmount} PKN`,
+                  description: `Pokoin account balance credit at 1 PKN = ${pknCheckoutReferencePrice()} USDT.`,
+                },
+              },
             },
-          },
-        },
       ],
       metadata: {
         uid: decoded.uid,
         email: decoded.email || userData.email || '',
-        pknAmount: String(pknAmount),
-        fiatCents: String(expectedFiat),
+        pknAmount: String(expectedPknAmount),
+        fiatCents: String(fiat),
+        lookupKey: String(lookupKey || ''),
         fulfillmentTarget: 'site_credit',
       },
     });

@@ -27,14 +27,50 @@ function getFirebaseAdmin() {
 }
 
 async function verifyBearerToken(req) {
-  const header = req.headers.authorization || '';
-  const token = header.startsWith('Bearer ') ? header.slice('Bearer '.length) : '';
+  const token = bearerTokenFromRequest(req);
   if (!token) {
-    const error = new Error('Missing Firebase ID token.');
+    const error = new Error('Missing Pokoin bearer token.');
     error.statusCode = 401;
     throw error;
   }
   return getFirebaseAdmin().auth().verifyIdToken(token);
 }
 
-module.exports = { getFirebaseAdmin, verifyBearerToken };
+function requestHeader(req, name) {
+  const headers = req?.headers;
+  if (!headers) return '';
+  if (typeof headers.get === 'function') {
+    return headers.get(name) || headers.get(String(name).toLowerCase()) || '';
+  }
+  const direct = headers[name] ?? headers[String(name).toLowerCase()];
+  if (direct !== undefined) {
+    return Array.isArray(direct) ? direct[0] || '' : String(direct);
+  }
+  const target = String(name).toLowerCase();
+  const key = Object.keys(headers).find((entry) => entry.toLowerCase() === target);
+  if (!key) return '';
+  const value = headers[key];
+  return Array.isArray(value) ? value[0] || '' : String(value || '');
+}
+
+function bearerTokenFromRequest(req) {
+  const header = requestHeader(req, 'authorization');
+  return header.startsWith('Bearer ') ? header.slice('Bearer '.length).trim() : '';
+}
+
+function authErrorResponse(error, fallback = 'Pokoin authentication failed.') {
+  return {
+    statusCode: error.statusCode || 401,
+    body: {
+      error: error.message || fallback,
+    },
+  };
+}
+
+module.exports = {
+  authErrorResponse,
+  bearerTokenFromRequest,
+  getFirebaseAdmin,
+  requestHeader,
+  verifyBearerToken,
+};

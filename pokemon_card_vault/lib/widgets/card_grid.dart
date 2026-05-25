@@ -327,7 +327,7 @@ class CardItem extends ConsumerWidget {
                             ),
                             const SizedBox(width: 2),
                             Text(
-                              card.rating.toStringAsFixed(1),
+                              card.starMetricCount.toString(),
                               style: const TextStyle(
                                 fontSize: 10,
                                 color: AppColors.textSecondary,

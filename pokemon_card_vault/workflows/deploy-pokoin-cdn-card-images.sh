@@ -4,10 +4,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT_DIR}"
 
-wrangler deploy scripts/pokoin-cdn-card-images-worker.js \
-  --name pokoin-cdn-card-images \
-  --compatibility-date 2026-05-17 \
-  --route 'cdn.pokoin.com/*'
+wrangler deploy --config wrangler.pokoin-cdn-card-images.jsonc
 
 echo "Worker route deployed."
-echo "Ensure cdn.pokoin.com has a proxied Cloudflare DNS record before relying on this hostname."
+echo "Verify https://pokoin.com/card-images/<object-key> returns x-pokoin-cdn-worker: r2-card-images."
+echo "The legacy cdn.pokoin.com route is still configured, but app image URLs should use same-origin /card-images paths."

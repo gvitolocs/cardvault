@@ -7,6 +7,40 @@ Pokoin cards are keyed by CardTrader blueprint IDs. Cardmarket does not expose
 that blueprint ID in the public product URL, so the association must be inferred
 from card metadata and then verified before it is stored.
 
+## Database-Backed Association
+
+Verified mappings now live in PostgreSQL, not primarily in code:
+
+```sql
+public.marketplace_cm_verified_links
+public.marketplace_cm_expansion_rules
+```
+
+`marketplace_cm_verified_links` is the fast path for exact product links:
+
+- `blueprint_id`
+- `cardmarket_locale`
+- canonical `cardmarket_url`
+- product slug, card name, expansion, collector number
+- source, confidence, notes, verification timestamps
+
+`marketplace_cm_expansion_rules` stores reusable expansion parsing knowledge:
+
+- Pokoin/CardTrader expansion name and code
+- Cardmarket expansion slug
+- Cardmarket set or context code
+- number format rule
+- card-type scope
+- confidence and notes
+
+Runtime redirect order:
+
+1. Exact verified link from `marketplace_cm_verified_links`.
+2. Compatibility lookup in `marketplace_cm_product_parsing`.
+3. Candidate generation from `marketplace_cm_expansion_rules`.
+4. Code fallback maps only when the database has no rule.
+5. Search fallback only when a direct product URL is not safe.
+
 ## Canonical URL Form
 
 Known Cardmarket single-card URL shape:
@@ -142,6 +176,9 @@ Rules not fully known:
 - Whether Cardmarket uses other variant markers.
 - Whether variants correspond to CardTrader `product_variant`, card image
   variants, artwork variants, language, or another Cardmarket-only concept.
+- Do not replace this path with a raw `idProduct` query. `card_market_ids` can
+  identify the same product internally, but user-facing links should use the
+  canonical slug path.
 
 Candidate generation should try both:
 
@@ -216,6 +253,88 @@ Parameters:
 - Cardmarket set code: `CRI`
 - Collector number: `022`
 - Product code: `CRI022`
+
+Storming Emergence Abundant trainer variant:
+
+```text
+https://www.cardmarket.com/en/Pokemon/Products/Singles/Storming-Emergence-Abundant/Cynthia-V2-CSM1cC186
+```
+
+Parameters:
+
+- Pokoin/CardTrader blueprint ID: `370392`
+- Expansion: `CSM1c: Storming Emergence - Abundant`
+- Cardmarket expansion slug: `Storming-Emergence-Abundant`
+- Card: `Cynthia`
+- Variant marker: `V2`
+- Cardmarket set code: `CSM1cC`
+- Collector number: `186/151`
+- Product code: `CSM1cC186`
+
+User-corrected sample exceptions:
+
+```text
+https://www.cardmarket.com/en/Pokemon/Products/Singles/WCD-2007/Double-Rainbow-Energy-WCD07CG-088
+https://www.cardmarket.com/en/Pokemon/Products/Singles/Neo-Discovery/Kabutops-NDI25
+https://www.cardmarket.com/en/Pokemon/Products/Singles/Sword-Shield-Simplified-Chinese-Promos/Friends-in-Alola-S-PCS081
+https://www.cardmarket.com/en/Pokemon/Products/Singles/SWSH-Black-Star-Promos/Rapidash-SWSH270
+https://www.cardmarket.com/en/Pokemon/Products/Singles/Clash-at-the-Summit/Lickitung-L3061
+https://www.cardmarket.com/en/Pokemon/Products/Singles/Dynamax-Clash-Flame/Lum-Berry-CS1bC130
+https://www.cardmarket.com/en/Pokemon/Products/Singles/SM-Black-Star-Promos/Detective-Pikachu-V2-OSSM194
+https://www.cardmarket.com/en/Pokemon/Products/Singles/MEGA-Start-Deck-100-Battle-Collection/Arvens-Mabosstiff-ex-mC484
+https://www.cardmarket.com/en/Pokemon/Products/Singles/Mega-Brave/Mega-Venusaur-ex-V2-m1L076
+https://www.cardmarket.com/en/Pokemon/Products/Singles/Perfect-Order/Mega-Zygarde-ex-V2-POR104
+https://www.cardmarket.com/en/Pokemon/Products/Singles/Astral-Radiance/Sweet-Honey-ASR153
+https://www.cardmarket.com/en/Pokemon/Products/Singles/Perfect-Order/Decidueye-ex-V1-POR012
+https://www.cardmarket.com/en/Pokemon/Products/Singles/WCD-2006/Girafarig-V1-WCD06LM-016
+https://www.cardmarket.com/en/Pokemon/Products/Singles/Paldean-Fates/Mew-ex-V2-PAF232
+https://www.cardmarket.com/en/Pokemon/Products/Singles/Dragon-Majesty/Hydreigon-DRM33
+https://www.cardmarket.com/en/Pokemon/Products/Singles/XY-Black-Star-Promos/Jirachi-V2-XYPRXY67a
+https://www.cardmarket.com/en/Pokemon/Products/Singles/White-Flare-Additionals/Durant-V2-xWHT070
+https://www.cardmarket.com/en/Pokemon/Products/Singles/Magma-Deck-Kit/Team-Magmas-Rhyhorn-advF007
+https://www.cardmarket.com/en/Pokemon/Products/Singles/Scarlet-Violet-Simplified-Chinese-Promos/Toedscool-SV-PCS005
+https://www.cardmarket.com/en/Pokemon/Products/Singles/XY-Black-Star-Promos/Rayquaza-XYPRXY141
+https://www.cardmarket.com/en/Pokemon/Products/Singles/Advent-of-Arceus/Pokemon-Rescue-Pt4080
+https://www.cardmarket.com/en/Pokemon/Products/Singles/EX-Holon-Phantoms/Mew-ex-HP100
+```
+
+Rules learned:
+
+- WCD products can require a deck/player context code, such as `WCD07CG-088`.
+- WCD 2006 can require player/deck context codes such as `WCD06LM-016`, plus
+  variant markers.
+- `Neo Discovery` uses Cardmarket code `NDI`; do not infer a variant marker just
+  because multiple local rows have the same card name.
+- `S-P: Sword & Shield Promos` can map to
+  `Sword-Shield-Simplified-Chinese-Promos` and `S-PCS081` style product codes.
+- Promo expansions need curated Cardmarket codes: `SWSH` for SWSH Black Star
+  Promos and `OSSM` for some SM Black Star Promos.
+- Chinese set slugs often drop the CardTrader prefix:
+  `CS1b: Dynamax Clash - Flame` -> `Dynamax-Clash-Flame`.
+- `MEGA Start Deck 100 Battle Collection` can use mixed-case `mC` product
+  codes, e.g. `Arvens-Mabosstiff-ex-mC484`.
+- `Mega Brave` can require both a variant marker and a mixed-case product code,
+  e.g. `Mega-Venusaur-ex-V2-m1L076`.
+- `Perfect Order` can use `POR` product codes and require a variant marker,
+  e.g. `Decidueye-ex-V1-POR012` and `Mega-Zygarde-ex-V2-POR104`.
+- `Paldean Fates` uses `PAF` product codes; known numbered rows such as
+  `Mew-ex-V2-PAF232` should remain direct product URLs, not search fallbacks.
+- Local variants such as `EX` are not Cardmarket `Vn` markers. Preserve the
+  inferred duplicate-name marker separately so `V1`/`V2` is not dropped.
+- Manual/refinement URLs must be persisted as exact slugs; never rebuild a
+  user-verified URL from parts if that would drop a marker like `V2`.
+- XY Black Star Promos can use `XYPR` plus the printed XY promo number
+  (`XYPRXY141`, `XYPRXY67a`) and may require `Vn`.
+- Additionals/reverse-holo products can live under Cardmarket-specific
+  additionals slugs, e.g. `White-Flare-Additionals` with `xWHT`.
+- Local names may differ from Cardmarket product names; preserve the verified
+  product slug, e.g. local `Rescue` -> `Pokemon-Rescue-Pt4080`.
+- `EX Holon Phantoms` maps to Cardmarket slug `EX-Holon-Phantoms` and `HP`
+  product codes, e.g. blueprint `116587` -> `Mew-ex-HP100`.
+- `Astral Radiance` Trainer/Item rows can be code-suffixed; do not make this
+  expansion name-only just because the card is a Trainer, e.g. `Sweet-Honey-ASR153`.
+- `Pokemon Misprints` is not a reliable per-card Cardmarket singles section;
+  Pokoin should show an explanatory popup instead of redirecting.
 
 ## Collector Number Cases
 
@@ -355,6 +474,50 @@ punctuation should be verified.
 Japanese sets and constructed decks:
 CardTrader expansion codes like `s5l`, `pt1`, or deck-specific codes are often
 not Cardmarket set codes. Candidates are useful for research but low confidence.
+
+## Direct URL Readiness
+
+The generator should know when it does not have enough information for a safe
+Cardmarket product URL. A direct product URL is ready only when these pieces are
+known or verified:
+
+- Cardmarket expansion slug.
+- Cardmarket set code, context code, or verified name-only rule.
+- Collector number formatting for that expansion.
+- Variant marker requirement (`V1`, `V2`, etc.) or verified absence of one.
+- Cardmarket card-name slug.
+
+If any piece is missing or only weakly inferred, the product URL should remain a
+candidate and the UI/report should prefer a fallback search URL. This is
+especially important for Japanese, Chinese, promo, deck, WCD, and duplicate-name
+variant cases.
+
+Weak API bridges are not enough on their own. For example, TCGdex ids such as
+`sm12`, `xy8`, and `swsh3` helped identify the set family, but Cardmarket used
+`CEC`, `BKT`, and `DAA` in product slugs. Without a curated bridge table, those
+API ids should not be emitted as direct Cardmarket product codes.
+
+## Fallback Search URLs
+
+When a blueprint has no verified Cardmarket product URL and generated candidates
+are incomplete, use a narrowed Cardmarket singles search URL as a fallback. This
+keeps users on Cardmarket results instead of sending them to a guessed product
+slug.
+
+Template:
+
+```text
+https://www.cardmarket.com/en/Pokemon/Products/Singles?searchMode=v2&idCategory=51&idExpansion=0&searchString=<encoded card name>&idRarity=0&perSite=30
+```
+
+Example for an unresolved `Reshiram GX`:
+
+```text
+https://www.cardmarket.com/en/Pokemon/Products/Singles?searchMode=v2&idCategory=51&idExpansion=0&searchString=reshiram&idRarity=0&perSite=30
+```
+
+Do not treat this as a verified product URL. It is a temporary search fallback
+until the exact `/Products/Singles/<ExpansionSlug>/<ProductSlug>` path is found.
 
 ## Data Needed for Reliable Automation
 

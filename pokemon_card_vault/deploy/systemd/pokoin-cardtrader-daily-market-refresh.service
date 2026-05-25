@@ -1,0 +1,14 @@
+[Unit]
+Description=Pokoin CardTrader daily market refresh
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=pokoin-import
+WorkingDirectory=/opt/pokemon_card_vault
+EnvironmentFile=/opt/pokemon_card_vault/.env.oracle-cardtrader-import
+Environment=CARDTRADER_DAILY_ENV_FILE=/opt/pokemon_card_vault/.env.oracle-cardtrader-import
+ExecStart=/usr/bin/env bash scripts/run-cardtrader-daily-market-refresh.sh
+NoNewPrivileges=true
+PrivateTmp=true

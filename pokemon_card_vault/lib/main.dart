@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -19,37 +20,85 @@ import 'screens/profile_screen.dart';
 import 'screens/favorites_screen.dart';
 import 'screens/card_detail_screen.dart';
 import 'screens/card_versions_screen.dart';
+import 'screens/artist_collection_screen.dart';
 import 'screens/marketplace_signal_screen.dart';
+import 'screens/marketplace_competitive_screen.dart';
+import 'screens/cardtrader_connect_screen.dart';
 import 'screens/marketplace_admin_edit_screen.dart';
-import 'screens/admin_screen.dart';
+import 'screens/marketplace_debug_screen.dart';
 import 'screens/checkout_screen.dart';
 import 'screens/orders_screen.dart';
 import 'screens/auth_screen.dart';
 import 'screens/buy_pkn_screen.dart';
+import 'screens/earn_pkn_screen.dart';
 import 'screens/docs_screen.dart';
+import 'screens/privacy_screen.dart';
+import 'screens/about_screen.dart';
+import 'screens/contact_screen.dart';
+import 'screens/whitepaper_screen.dart';
 import 'screens/forum_screen.dart';
 import 'screens/nft_screen.dart';
 import 'screens/collection_screen.dart';
+import 'screens/not_found_screen.dart';
 import 'screens/product_landing_screen.dart';
+import 'screens/extension_auth_bridge_screen.dart';
 import 'constants/app_colors.dart';
-import 'constants/project_links.dart';
+import 'models/app_user_profile.dart';
 import 'providers/marketplace_account_provider.dart';
 import 'services/card_service.dart';
+import 'services/flutter_debug_log.dart';
+import 'utils/browser_location.dart';
 import 'utils/card_url.dart';
 import 'wallet/wallet_bridge_stub.dart';
+import 'widgets/pokoin_assistant.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  usePathUrlStrategy();
+const double _assistantDesktopBreakpoint = 960;
 
-  await _initializeFirebase();
-  unawaited(_initializeLocalServices());
+void main() {
+  runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    _installFlutterDebugErrorHooks();
+    usePathUrlStrategy();
 
-  runApp(
-    const ProviderScope(
-      child: PokoinApp(),
-    ),
-  );
+    await _initializeFirebase();
+    await _initializeLocalServices();
+
+    runApp(
+      const ProviderScope(
+        child: PokoinApp(),
+      ),
+    );
+  }, (error, stackTrace) {
+    FlutterDebugLog.instance.recordError(
+      'flutter.zone_error',
+      error,
+      stackTrace: stackTrace,
+    );
+  });
+}
+
+void _installFlutterDebugErrorHooks() {
+  final previousFlutterError = FlutterError.onError;
+  FlutterError.onError = (details) {
+    previousFlutterError?.call(details);
+    FlutterDebugLog.instance.recordError(
+      'flutter.framework_error',
+      details.exception,
+      stackTrace: details.stack,
+      payload: {
+        'library': details.library,
+        'context': details.context?.toDescription(),
+      },
+    );
+  };
+  ui.PlatformDispatcher.instance.onError = (error, stackTrace) {
+    FlutterDebugLog.instance.recordError(
+      'flutter.platform_error',
+      error,
+      stackTrace: stackTrace,
+    );
+    return false;
+  };
 }
 
 Future<void> _initializeLocalServices() async {
@@ -83,6 +132,11 @@ class _PokoinAppState extends ConsumerState<PokoinApp> {
       GlobalKey<ScaffoldMessengerState>();
   bool _walletListenerAttached = false;
   bool _switchingWalletAccount = false;
+  GoRouter? _debugObservedRouter;
+  VoidCallback? _debugRouterListener;
+  String _lastDebugRoute = '';
+  String _lastDebugRouterSnapshotKey = '';
+  String _lastCardDetailRoute = '';
 
   @override
   void initState() {
@@ -100,6 +154,117 @@ class _PokoinAppState extends ConsumerState<PokoinApp> {
     _wallet.onAccountsChanged((address) {
       _handleWalletAccountChanged(address);
     });
+  }
+
+  void _attachRouterDebugListener(GoRouter router) {
+    if (identical(_debugObservedRouter, router)) {
+      return;
+    }
+    final previousListener = _debugRouterListener;
+    if (previousListener != null) {
+      _debugObservedRouter?.routeInformationProvider
+          .removeListener(previousListener);
+    }
+    _debugObservedRouter = router;
+    _lastDebugRoute = router.routeInformationProvider.value.uri.toString();
+    if (isMarketplaceCardDetailRoutePath(
+      router.routeInformationProvider.value.uri.path,
+    )) {
+      _lastCardDetailRoute = _lastDebugRoute;
+      CardDetailRouteGuard.instance.updateCardDetailRoute(_lastDebugRoute);
+    }
+    _debugRouterListener = () {
+      final routeInformation = router.routeInformationProvider.value;
+      final route = routeInformation.uri.toString();
+      if (route == _lastDebugRoute) {
+        return;
+      }
+      final previousRoute = _lastDebugRoute;
+      final previousCardRoute = _lastCardDetailRoute;
+      _lastDebugRoute = route;
+      final browserPath = (currentBrowserUri() ?? Uri.base).path;
+      final explicitNavigation =
+          CardDetailRouteGuard.instance.consumeExplicitNavigation(route);
+      if (isMarketplaceCardDetailRoutePath(routeInformation.uri.path)) {
+        _lastCardDetailRoute = route;
+        CardDetailRouteGuard.instance.updateCardDetailRoute(route);
+      } else if (shouldRepairCardDetailRootDrift(
+        previousPath: Uri.tryParse(previousRoute)?.path ?? previousRoute,
+        nextPath: routeInformation.uri.path,
+        lastCardDetailRoute: previousCardRoute.isNotEmpty
+            ? previousCardRoute
+            : _lastCardDetailRoute,
+        cardDetailMounted: CardDetailRouteGuard.instance.hasMountedCardDetail,
+        hasExplicitNavigationIntent: explicitNavigation,
+        browserPath: browserPath,
+      )) {
+        final repairedRoute = previousCardRoute.isNotEmpty
+            ? previousCardRoute
+            : _lastCardDetailRoute;
+        FlutterDebugLog.instance.record(
+          'router.root_drift.repaired',
+          category: 'navigation',
+          routePath: routeInformation.uri.path,
+          payload: {
+            'previousRoute': previousRoute,
+            'nextRoute': route,
+            'repairedRoute': repairedRoute,
+            'cardDetailMounted':
+                CardDetailRouteGuard.instance.hasMountedCardDetail,
+            'browserUrl': (currentBrowserUri() ?? Uri.base).toString(),
+          },
+        );
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) {
+            return;
+          }
+          final currentPath = router.routeInformationProvider.value.uri.path;
+          if (isProtectedCardDetailDriftTargetPath(currentPath) &&
+              !isMarketplaceCardDetailRoutePath(currentPath)) {
+            router.replace(repairedRoute);
+          }
+        });
+      }
+      FlutterDebugLog.instance.record(
+        'router.route_changed',
+        category: 'navigation',
+        routePath: routeInformation.uri.path,
+        payload: {
+          'previousRoute': previousRoute,
+          'route': route,
+          if (explicitNavigation) 'explicitNavigation': true,
+          'browserUrl': (currentBrowserUri() ?? Uri.base).toString(),
+        },
+      );
+    };
+    router.routeInformationProvider.addListener(_debugRouterListener!);
+    _recordCurrentRouterDebugSnapshot(router, reason: 'listener_attached');
+  }
+
+  void _recordCurrentRouterDebugSnapshot(
+    GoRouter router, {
+    required String reason,
+  }) {
+    if (!FlutterDebugLog.instance.enabled) {
+      return;
+    }
+    final routeInformation = router.routeInformationProvider.value;
+    final browserUrl = (currentBrowserUri() ?? Uri.base).toString();
+    final snapshotKey = '$reason|${routeInformation.uri}|$browserUrl';
+    if (snapshotKey == _lastDebugRouterSnapshotKey) {
+      return;
+    }
+    _lastDebugRouterSnapshotKey = snapshotKey;
+    FlutterDebugLog.instance.record(
+      'router.current_state',
+      category: 'navigation',
+      routePath: routeInformation.uri.path,
+      payload: {
+        'reason': reason,
+        'route': routeInformation.uri.toString(),
+        'browserUrl': browserUrl,
+      },
+    );
   }
 
   Future<void> _handleWalletAccountChanged(String? address) async {
@@ -193,8 +358,14 @@ class _PokoinAppState extends ConsumerState<PokoinApp> {
   @override
   Widget build(BuildContext context) {
     ref.watch(authBootstrapProvider);
+    final profile = ref.watch(userProfileProvider).valueOrNull;
+    final router = ref.watch(routerProvider);
+    syncFlutterDebugAuthorization(profile);
+    FlutterDebugLog.instance.configureFromUri(currentBrowserUri() ?? Uri.base);
+    _attachRouterDebugListener(router);
+    _recordCurrentRouterDebugSnapshot(router, reason: 'build');
     return MaterialApp.router(
-      title: 'Pokoin',
+      title: 'Pokoin Official - PKN Card Reserve Marketplace, Wallet and Scan',
       scaffoldMessengerKey: _scaffoldMessengerKey,
       debugShowCheckedModeBanner: false,
       scrollBehavior: const _WebScrollBehavior(),
@@ -234,8 +405,29 @@ class _PokoinAppState extends ConsumerState<PokoinApp> {
         ),
         useMaterial3: true,
       ),
-      routerConfig: ref.watch(routerProvider),
+      builder: (context, child) {
+        final routePath = router.routeInformationProvider.value.uri.path;
+        final showAssistant =
+            MediaQuery.sizeOf(context).width >= _assistantDesktopBreakpoint &&
+                routePath != '/pokontact';
+        return Stack(
+          children: [
+            child ?? const SizedBox.shrink(),
+            if (showAssistant) PokoinAssistant(router: router),
+          ],
+        );
+      },
+      routerConfig: router,
     );
+  }
+
+  @override
+  void dispose() {
+    final listener = _debugRouterListener;
+    if (listener != null) {
+      _debugObservedRouter?.routeInformationProvider.removeListener(listener);
+    }
+    super.dispose();
   }
 }
 
@@ -259,7 +451,23 @@ class _WebScrollBehavior extends MaterialScrollBehavior {
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authService = ref.watch(authServiceProvider);
+  final browserUri = currentBrowserUri() ?? Uri.base;
+  final initialLocation = browserInitialLocationForRouter(browserUri);
+  final initialDebugPath = initialLocation == null
+      ? browserUri.path
+      : (Uri.tryParse(initialLocation)?.path ?? initialLocation);
+  FlutterDebugLog.instance.record(
+    'router.initialized',
+    category: 'navigation',
+    routePath: initialDebugPath,
+    payload: {
+      'initialLocation': initialLocation,
+      'browserUrl': browserUri.toString(),
+    },
+  );
   return GoRouter(
+    initialLocation: initialLocation,
+    overridePlatformDefaultLocation: initialLocation != null,
     refreshListenable: GoRouterRefreshStream(
       Firebase.apps.isEmpty ? Stream.value(null) : authService.authStateChanges,
     ),
@@ -272,6 +480,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       final user = Firebase.apps.isEmpty ? null : authService.currentUser;
       final isLoggedIn = user != null;
       final isAuthRoute = state.matchedLocation == '/auth';
+      final isCloseOnAuth = _isCloseOnAuthRequest(state.uri.queryParameters);
       final isSignupVerification =
           state.uri.queryParameters['signupToken']?.isNotEmpty == true;
       final isProtectedRoute = {
@@ -282,13 +491,17 @@ final routerProvider = Provider<GoRouter>((ref) {
         '/nft',
         '/checkout',
         '/orders',
+        '/marketplace/connect',
       }.contains(state.matchedLocation);
 
       if (!isLoggedIn && isProtectedRoute) {
         final from = Uri.encodeComponent(state.uri.toString());
         return '/auth?from=$from';
       }
-      if (isLoggedIn && isAuthRoute && !isSignupVerification) {
+      if (isLoggedIn &&
+          isAuthRoute &&
+          !isSignupVerification &&
+          !isCloseOnAuth) {
         return state.uri.queryParameters['from'] ?? '/profile';
       }
       return null;
@@ -344,6 +557,33 @@ final routerProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) => _appPage(state, const DocsScreen()),
       ),
       GoRoute(
+        path: '/privacy',
+        pageBuilder: (context, state) => _appPage(state, const PrivacyScreen()),
+      ),
+      GoRoute(
+        path: '/about',
+        pageBuilder: (context, state) => _appPage(state, const AboutScreen()),
+      ),
+      GoRoute(
+        path: '/contact',
+        pageBuilder: (context, state) => _appPage(state, const ContactScreen()),
+      ),
+      GoRoute(
+        path: '/pokontact',
+        pageBuilder: (context, state) =>
+            _appPage(state, const PokontactChatScreen()),
+      ),
+      GoRoute(
+        path: '/whitepaper',
+        pageBuilder: (context, state) =>
+            _appPage(state, const WhitepaperScreen()),
+      ),
+      GoRoute(
+        path: '/extension/auth-bridge',
+        pageBuilder: (context, state) =>
+            _instantAppPage(state, const ExtensionAuthBridgeScreen()),
+      ),
+      GoRoute(
         path: '/wallet',
         pageBuilder: (context, state) => _appPage(
           state,
@@ -376,8 +616,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         routes: [
           GoRoute(
             path: '/marketplace',
-            pageBuilder: (context, state) =>
-                _appPage(state, const HomeScreen()),
+            pageBuilder: (context, state) {
+              final extra = state.extra;
+              return _appPage(
+                state,
+                HomeScreen(
+                  returnToRecentTop: extra is MarketplaceHomeRouteIntent &&
+                      extra.shouldReturnToRecentTop,
+                ),
+              );
+            },
           ),
           GoRoute(
             path: '/marketplace/search',
@@ -387,28 +635,148 @@ final routerProvider = Provider<GoRouter>((ref) {
                 initialQuery: state.uri.queryParameters['q'] ?? '',
                 expansion: state.uri.queryParameters['expansion'],
                 productType: state.uri.queryParameters['productType'],
-                searchLanguage: state.uri.queryParameters['lang'] ?? 'en',
+                searchLanguage: state.uri.queryParameters['lang'],
               ),
             ),
           ),
           GoRoute(
-            path: '/marketplace/:lang/cards/:cardPage/versions',
+            path: '/marketplace/:lang/cards/:cardPage/:cardSlug/versions',
             pageBuilder: (context, state) {
-              final cardId = cardIdFromSlug(state.pathParameters['cardPage']!);
+              final cardPage = state.pathParameters['cardPage']!;
+              final cardSlug = state.pathParameters['cardSlug']!;
+              final routeParts = parseMarketplaceCardRoute(
+                firstSegment: cardPage,
+                slugSegment: cardSlug,
+              );
               return _appPage(
                 state,
-                CardVersionsScreen(cardId: cardId),
+                CardVersionsScreen(
+                  cardId: routeParts.cardId,
+                  cardSlug: routeParts.cardSlug,
+                  language: state.pathParameters['lang'] ?? 'en',
+                ),
+              );
+            },
+          ),
+          GoRoute(
+            path: '/marketplace/:lang/cards/:cardPage/versions',
+            pageBuilder: (context, state) {
+              final cardPage = state.pathParameters['cardPage']!;
+              final routeParts = parseMarketplaceCardRoute(
+                firstSegment: cardPage,
+              );
+              return _appPage(
+                state,
+                CardVersionsScreen(
+                  cardId: routeParts.cardId,
+                  cardSlug: routeParts.cardSlug,
+                  language: state.pathParameters['lang'] ?? 'en',
+                ),
+              );
+            },
+          ),
+          GoRoute(
+            path: '/marketplace/:lang/artists/:artistSlug',
+            pageBuilder: (context, state) => _appPage(
+              state,
+              ArtistCollectionScreen(
+                artistSlug: state.pathParameters['artistSlug']!,
+                language: state.pathParameters['lang'] ?? 'en',
+              ),
+            ),
+          ),
+          GoRoute(
+            path: '/marketplace/:lang/artists/:artistSlug/illustration',
+            pageBuilder: (context, state) => _appPage(
+              state,
+              ArtistCollectionScreen(
+                artistSlug: state.pathParameters['artistSlug']!,
+                language: state.pathParameters['lang'] ?? 'en',
+                initialFilter: ArtistCardFilter.illustrations,
+              ),
+            ),
+          ),
+          GoRoute(
+            path: '/marketplace/:lang/artists/:artistSlug/full-arts',
+            pageBuilder: (context, state) => _appPage(
+              state,
+              ArtistCollectionScreen(
+                artistSlug: state.pathParameters['artistSlug']!,
+                language: state.pathParameters['lang'] ?? 'en',
+                initialFilter: ArtistCardFilter.fullArts,
+              ),
+            ),
+          ),
+          GoRoute(
+            path: '/marketplace/:lang/artists/:artistSlug/normal-cards',
+            pageBuilder: (context, state) => _appPage(
+              state,
+              ArtistCollectionScreen(
+                artistSlug: state.pathParameters['artistSlug']!,
+                language: state.pathParameters['lang'] ?? 'en',
+                initialFilter: ArtistCardFilter.normalCards,
+              ),
+            ),
+          ),
+          GoRoute(
+            path: '/marketplace/:lang/artists/:artistSlug/profile',
+            pageBuilder: (context, state) {
+              final extra = state.extra is ArtistProfileRouteExtra
+                  ? state.extra! as ArtistProfileRouteExtra
+                  : null;
+              return _appPage(
+                state,
+                ArtistCollectionScreen(
+                  artistSlug: state.pathParameters['artistSlug']!,
+                  language: state.pathParameters['lang'] ?? 'en',
+                  initialView: ArtistPageView.profile,
+                  initialSnapshot: extra?.snapshot,
+                  heroSourceSlug: extra?.heroSourceSlug,
+                ),
+              );
+            },
+          ),
+          GoRoute(
+            path: '/marketplace/:lang/cards/:cardPage/:cardSlug',
+            pageBuilder: (context, state) {
+              final cardPage = state.pathParameters['cardPage']!;
+              final cardSlug = state.pathParameters['cardSlug']!;
+              final routeParts = parseMarketplaceCardRoute(
+                firstSegment: cardPage,
+                slugSegment: cardSlug,
+              );
+              return _appPage(
+                state,
+                CardDetailScreen(
+                  cardId: routeParts.cardId,
+                  cardSlug: routeParts.cardSlug,
+                  language: state.pathParameters['lang'] ?? 'en',
+                  heroTag:
+                      state.extra is String ? state.extra! as String : null,
+                ),
               );
             },
           ),
           GoRoute(
             path: '/marketplace/:lang/cards/:cardPage',
+            redirect: (context, state) {
+              final cardPage = state.pathParameters['cardPage'] ?? '';
+              if (isRootCardShortLink(cardPage)) {
+                return marketplaceCardShortLinkRedirectPath(cardPage);
+              }
+              return null;
+            },
             pageBuilder: (context, state) {
-              final cardId = cardIdFromSlug(state.pathParameters['cardPage']!);
+              final cardPage = state.pathParameters['cardPage']!;
+              final routeParts = parseMarketplaceCardRoute(
+                firstSegment: cardPage,
+              );
               return _appPage(
                 state,
                 CardDetailScreen(
-                  cardId: cardId,
+                  cardId: routeParts.cardId,
+                  cardSlug: routeParts.cardSlug,
+                  language: state.pathParameters['lang'] ?? 'en',
                   heroTag:
                       state.extra is String ? state.extra! as String : null,
                 ),
@@ -421,14 +789,49 @@ final routerProvider = Provider<GoRouter>((ref) {
                 _appPage(state, const MarketplaceSignalScreen()),
           ),
           GoRoute(
+            path: '/marketplace/competitive',
+            pageBuilder: (context, state) =>
+                _appPage(state, const MarketplaceCompetitiveScreen()),
+          ),
+          GoRoute(
+            path: '/marketplace/connect',
+            pageBuilder: (context, state) =>
+                _appPage(state, const CardTraderConnectScreen()),
+          ),
+          GoRoute(
             path: '/marketplace/admin/edit',
             pageBuilder: (context, state) =>
                 _appPage(state, const MarketplaceAdminEditScreen()),
           ),
           GoRoute(
+            path: '/marketplace/debug',
+            pageBuilder: (context, state) =>
+                _appPage(state, const MarketplaceDebugScreen()),
+          ),
+          GoRoute(
+            path: '/marketplace/debug/refinement',
+            pageBuilder: (context, state) =>
+                _appPage(state, const MarketplaceDebugRefinementScreen()),
+          ),
+          GoRoute(
+            path: '/marketplace/debug/artists',
+            pageBuilder: (context, state) =>
+                _appPage(state, const MarketplaceDebugArtistScreen()),
+          ),
+          GoRoute(
+            path: '/marketplace/debug/events',
+            pageBuilder: (context, state) =>
+                _appPage(state, const MarketplaceDebugEventsScreen()),
+          ),
+          GoRoute(
+            path: '/marketplace/debug/cardmarket-guesses',
+            pageBuilder: (context, state) =>
+                _appPage(state, const MarketplaceCardmarketGuessReviewScreen()),
+          ),
+          GoRoute(
             path: '/admin',
             pageBuilder: (context, state) =>
-                _appPage(state, const AdminScreen()),
+                _appPage(state, const MarketplaceDebugScreen()),
           ),
           GoRoute(
             path: '/cart',
@@ -446,9 +849,25 @@ final routerProvider = Provider<GoRouter>((ref) {
                 _appPage(state, const InventoryScreen()),
           ),
           GoRoute(
+            path: '/:username/inventory',
+            pageBuilder: (context, state) => _appPage(
+              state,
+              InventoryScreen(username: state.pathParameters['username']),
+            ),
+          ),
+          GoRoute(
             path: '/collection',
             pageBuilder: (context, state) =>
                 _appPage(state, const CollectionScreen()),
+          ),
+          GoRoute(
+            path: '/collection/artists/:artistSlug',
+            pageBuilder: (context, state) => _appPage(
+              state,
+              CollectionArtistScreen(
+                artistSlug: state.pathParameters['artistSlug']!,
+              ),
+            ),
           ),
           GoRoute(
             path: '/collection/:expansionSlug',
@@ -501,6 +920,21 @@ final routerProvider = Provider<GoRouter>((ref) {
                 _appPage(state, const BuyPknScreen()),
           ),
           GoRoute(
+            path: '/earn',
+            pageBuilder: (context, state) =>
+                _appPage(state, const EarnPknScreen()),
+          ),
+          GoRoute(
+            path: '/shard-review',
+            pageBuilder: (context, state) =>
+                _appPage(state, const ShardReviewScreen()),
+          ),
+          GoRoute(
+            path: '/reserve',
+            pageBuilder: (context, state) =>
+                _appPage(state, const ReserveScreen()),
+          ),
+          GoRoute(
             path: '/forum',
             pageBuilder: (context, state) =>
                 _instantAppPage(state, const ForumScreen()),
@@ -534,13 +968,36 @@ final routerProvider = Provider<GoRouter>((ref) {
             },
           ),
           GoRoute(
+            path: '/:cardId/:cardSlug',
+            pageBuilder: (context, state) {
+              final cardId = cardIdFromSlug(state.pathParameters['cardId']!);
+              final cardSlug = state.pathParameters['cardSlug']!;
+              return _appPage(
+                state,
+                CardDetailScreen(
+                  cardId: cardId,
+                  cardSlug: cardSlug,
+                  heroTag:
+                      state.extra is String ? state.extra! as String : null,
+                ),
+              );
+            },
+          ),
+          GoRoute(
             path: '/:cardSlug',
-            pageBuilder: (context, state) => _appPage(
-              state,
-              ExpansionOrCardSlugScreen(
-                slug: state.pathParameters['cardSlug']!,
-              ),
-            ),
+            pageBuilder: (context, state) {
+              final slug = state.pathParameters['cardSlug']!;
+              if (isRootCardShortLink(slug)) {
+                return _appPage(
+                  state,
+                  CardDetailScreen(cardId: slug),
+                );
+              }
+              return _appPage(
+                state,
+                ExpansionOrCardSlugScreen(slug: slug),
+              );
+            },
           ),
         ],
       ),
@@ -555,13 +1012,20 @@ CustomTransitionPage<void> _appPage(GoRouterState state, Widget child) {
       (depth == _lastRouteDepth && _routeOrder(path) < _lastRouteOrder);
   _lastRouteDepth = depth;
   _lastRouteOrder = _routeOrder(path);
+  final keepPageChromeFixed = _keepsPageChromeFixed(path);
 
   return CustomTransitionPage<void>(
     key: state.pageKey,
-    child: child,
+    child: ColoredBox(
+      color: const Color(0xFF050816),
+      child: child,
+    ),
     transitionDuration: const Duration(milliseconds: 280),
     reverseTransitionDuration: const Duration(milliseconds: 240),
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      if (keepPageChromeFixed) {
+        return child;
+      }
       final curve = CurvedAnimation(
         parent: animation,
         curve: Curves.easeOutCubic,
@@ -577,6 +1041,53 @@ CustomTransitionPage<void> _appPage(GoRouterState state, Widget child) {
         ),
       );
     },
+  );
+}
+
+bool _keepsPageChromeFixed(String path) {
+  return path == '/marketplace' ||
+      path.startsWith('/marketplace/') ||
+      path.startsWith('/card/') ||
+      _isRootCardRoutePath(path) ||
+      path.startsWith('/wallet') ||
+      path.startsWith('/orders') ||
+      path.startsWith('/auth') ||
+      path.startsWith('/buy') ||
+      path.startsWith('/earn') ||
+      path.startsWith('/shard-review') ||
+      path.startsWith('/reserve') ||
+      path.startsWith('/admin') ||
+      path.startsWith('/cart') ||
+      path.startsWith('/checkout') ||
+      path.startsWith('/favorites') ||
+      path.startsWith('/inventory') ||
+      RegExp(r'^/[a-z0-9]{3,32}/inventory$').hasMatch(path.trim()) ||
+      path.startsWith('/collection') ||
+      path.startsWith('/product/') ||
+      path.startsWith('/profile');
+}
+
+bool _isCloseOnAuthRequest(Map<String, String> queryParameters) {
+  final closeOnAuth = queryParameters['closeOnAuth']?.toLowerCase();
+  final extension = queryParameters['extension']?.toLowerCase();
+  final from = queryParameters['from']?.toLowerCase();
+  return closeOnAuth == '1' ||
+      closeOnAuth == 'true' ||
+      extension == '1' ||
+      extension == 'true' ||
+      from == 'extension';
+}
+
+void syncFlutterDebugAuthorization(AppUserProfile? profile) {
+  final username = profile?.username.trim().toLowerCase() ?? '';
+  final email = profile?.email.trim().toLowerCase() ?? '';
+  final debugEnabled = username == 'vitologiuseppe17' ||
+      email == 'vitologiuseppe17@gmail.com' ||
+      email == 'pokoinpos@gmail.com' ||
+      (profile?.hasAdminAccess ?? false);
+  FlutterDebugLog.instance.setAuthorized(
+    debugEnabled,
+    userId: profile?.uid ?? '',
   );
 }
 
@@ -607,7 +1118,7 @@ int _routeOrder(String path) {
   if (path.startsWith('/marketplace')) {
     return 10;
   }
-  if (path.startsWith('/card/') || RegExp(r'^/\d+').hasMatch(path)) {
+  if (path.startsWith('/card/') || _isRootCardRoutePath(path)) {
     return 20;
   }
   if (path.startsWith('/cart')) {
@@ -625,119 +1136,8 @@ int _routeOrder(String path) {
   return 100;
 }
 
-class PokoinNotFoundScreen extends StatelessWidget {
-  const PokoinNotFoundScreen({super.key, required this.location});
-
-  final String location;
-
-  @override
-  Widget build(BuildContext context) {
-    final isExplorer = Uri.base.host == 'explorer.pokoin.com';
-    return Scaffold(
-      backgroundColor: const Color(0xFF050816),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 720),
-          child: Padding(
-            padding: const EdgeInsets.all(28),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: const Color(0xFF0B1020),
-                borderRadius: BorderRadius.circular(28),
-                border: Border.all(color: const Color(0x33FACC15)),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x66000000),
-                    blurRadius: 40,
-                    offset: Offset(0, 24),
-                  ),
-                ],
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(18),
-                      child: Image.network(
-                        ProjectLinks.logo,
-                        width: 72,
-                        height: 72,
-                        fit: BoxFit.contain,
-                        filterQuality: FilterQuality.none,
-                        errorBuilder: (_, __, ___) => const Icon(
-                          Icons.toll,
-                          size: 56,
-                          color: Color(0xFFFACC15),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 22),
-                    const Text(
-                      'Page not found',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 34,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.8,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      location.isEmpty
-                          ? 'This Pokoin page does not exist.'
-                          : 'No Pokoin route exists for $location.',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Color(0xFFCBD5E1),
-                        fontSize: 16,
-                        height: 1.45,
-                      ),
-                    ),
-                    const SizedBox(height: 26),
-                    Wrap(
-                      alignment: WrapAlignment.center,
-                      spacing: 12,
-                      runSpacing: 12,
-                      children: [
-                        FilledButton(
-                          onPressed: () => context.go(isExplorer ? '/' : '/'),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: const Color(0xFFFACC15),
-                            foregroundColor: const Color(0xFF111827),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 22,
-                              vertical: 16,
-                            ),
-                          ),
-                          child:
-                              Text(isExplorer ? 'Open PokoinScan' : 'Go home'),
-                        ),
-                        OutlinedButton(
-                          onPressed: () => context.go('/health'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.white,
-                            side: const BorderSide(color: Color(0xFF38BDF8)),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 22,
-                              vertical: 16,
-                            ),
-                          ),
-                          child: const Text('Network health'),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+bool _isRootCardRoutePath(String path) {
+  return RegExp(r'^/\d+(?:/[^/]+)?$').hasMatch(path.trim());
 }
 
 class GoRouterRefreshStream extends ChangeNotifier {

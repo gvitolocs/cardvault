@@ -8,21 +8,35 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
 import '../models/app_user_profile.dart';
+import 'pokoin_api_auth.dart';
+import 'pokoin_api_client.dart';
 
 class AuthService {
   static const inactivityLogoutAfter = Duration(days: 30);
+  static const sessionTouchInterval = Duration(hours: 6);
 
   AuthService({
     FirebaseAuth? auth,
     FirebaseFirestore? firestore,
     GoogleSignIn? googleSignIn,
+    PokoinApiAuthService? pokoinApiAuth,
+    PokoinApiClient? pokoinApiClient,
   })  : _providedAuth = auth,
         _providedFirestore = firestore,
-        _providedGoogleSignIn = googleSignIn;
+        _providedGoogleSignIn = googleSignIn,
+        _pokoinApiAuth =
+            pokoinApiAuth ?? PokoinApiAuthService.instance(auth: auth),
+        _pokoinApiClient = pokoinApiClient ??
+            PokoinApiClient(
+              auth: pokoinApiAuth ?? PokoinApiAuthService.instance(auth: auth),
+            );
 
   final FirebaseAuth? _providedAuth;
   final FirebaseFirestore? _providedFirestore;
   final GoogleSignIn? _providedGoogleSignIn;
+  final PokoinApiAuthService _pokoinApiAuth;
+  final PokoinApiClient _pokoinApiClient;
+  Future<void>? _initializeSessionOperation;
 
   GoogleSignIn get _googleSignIn => _providedGoogleSignIn ?? GoogleSignIn();
 
@@ -44,6 +58,12 @@ class AuthService {
 
   User? get currentUser => _auth.currentUser;
 
+  Future<PokoinAuthToken?> currentPokoinBearerToken({
+    bool forceRefresh = false,
+  }) {
+    return _pokoinApiAuth.currentToken(forceRefresh: forceRefresh);
+  }
+
   Set<String> get currentProviderIds {
     final user = _auth.currentUser;
     if (user == null) {
@@ -53,9 +73,24 @@ class AuthService {
   }
 
   Future<void> initializeSession() async {
+    final existing = _initializeSessionOperation;
+    if (existing != null) {
+      return existing;
+    }
+    final operation = _initializeSession();
+    _initializeSessionOperation = operation;
+    try {
+      await operation;
+    } finally {
+      _initializeSessionOperation = null;
+    }
+  }
+
+  Future<void> _initializeSession() async {
     if (kIsWeb) {
       await _auth.setPersistence(Persistence.LOCAL);
     }
+    await _pokoinApiAuth.initialize();
 
     final user = _auth.currentUser;
     if (user != null) {
@@ -64,7 +99,8 @@ class AuthService {
         await signOut();
         return;
       }
-      await _touchUserSession(user);
+      await _touchUserSessionIfStale(user);
+      await _pokoinApiAuth.currentToken();
     }
   }
 
@@ -81,6 +117,7 @@ class AuthService {
     );
     await ensureUserProfile(credential.user);
     await _markFreshLogin(credential.user);
+    await _pokoinApiAuth.currentToken();
     return credential;
   }
 
@@ -127,7 +164,8 @@ class AuthService {
     );
     final payload = _decodeJsonResponse(response.body);
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw StateError(payload['error'] as String? ?? 'Email verification failed.');
+      throw StateError(
+          payload['error'] as String? ?? 'Email verification failed.');
     }
     final token = payload['customToken'] as String? ?? '';
     if (token.isEmpty) {
@@ -137,6 +175,7 @@ class AuthService {
     await credential.user?.reload();
     await ensureUserProfile(_auth.currentUser ?? credential.user);
     await _markFreshLogin(_auth.currentUser ?? credential.user);
+    await _pokoinApiAuth.currentToken();
     final redirectPath = payload['redirectPath'] as String? ?? '/';
     return redirectPath.startsWith('/') ? redirectPath : '/';
   }
@@ -152,6 +191,7 @@ class AuthService {
       await ensureUserProfile(credential.user);
       await cacheGoogleProfilePicture();
       await _markFreshLogin(credential.user);
+      await _pokoinApiAuth.currentToken();
       if (credential.additionalUserInfo?.isNewUser == true) {
         await sendSignupNotification(provider: 'google');
       }
@@ -175,6 +215,7 @@ class AuthService {
     await ensureUserProfile(userCredential.user);
     await cacheGoogleProfilePicture();
     await _markFreshLogin(userCredential.user);
+    await _pokoinApiAuth.currentToken();
     if (userCredential.additionalUserInfo?.isNewUser == true) {
       await sendSignupNotification(provider: 'google');
     }
@@ -197,14 +238,9 @@ class AuthService {
     if (user == null) {
       return;
     }
-    final token = await user.getIdToken();
-    final response = await http.post(
+    final response = await _pokoinApiClient.postJson(
       Uri.parse('/api/signup-notification'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({'provider': provider}),
+      body: {'provider': provider},
     );
     if (response.statusCode < 200 || response.statusCode >= 300) {
       debugPrint('Signup notification failed: ${response.body}');
@@ -245,6 +281,7 @@ class AuthService {
     await ensureUserProfile(refreshed);
     await cacheGoogleProfilePicture();
     await _markFreshLogin(refreshed);
+    await _pokoinApiAuth.currentToken();
     return credential;
   }
 
@@ -286,6 +323,7 @@ class AuthService {
     final refreshed = _auth.currentUser ?? user;
     await ensureUserProfile(refreshed);
     await _markFreshLogin(refreshed);
+    await _pokoinApiAuth.currentToken(forceRefresh: true);
   }
 
   Future<void> signOut() async {
@@ -299,6 +337,7 @@ class AuthService {
       _auth.signOut(),
       _googleSignIn.signOut(),
     ]);
+    await _pokoinApiAuth.clearCachedToken();
   }
 
   Stream<AppUserProfile?> profileStream(String uid) async* {
@@ -417,13 +456,8 @@ class AuthService {
     if (user == null) {
       return null;
     }
-    final token = await user.getIdToken();
-    final response = await http.post(
+    final response = await _pokoinApiClient.postJson(
       Uri.parse('/api/ensure-username'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
     );
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
     if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -448,18 +482,14 @@ class AuthService {
       throw ArgumentError('Withdraw amount must be greater than zero.');
     }
 
-    final token = await user.getIdToken();
-    final response = await http.post(
+    final response = await _pokoinApiClient.postJson(
       Uri.parse('/api/request-pkn-withdraw'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({'toAddress': address, 'amountPkn': amountPkn}),
+      body: {'toAddress': address, 'amountPkn': amountPkn},
     );
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw StateError(payload['error'] as String? ?? 'Withdraw request failed.');
+      throw StateError(
+          payload['error'] as String? ?? 'Withdraw request failed.');
     }
     return payload;
   }
@@ -469,17 +499,33 @@ class AuthService {
     if (user == null) {
       throw StateError('Log in before unlocking Silver.');
     }
-    final token = await user.getIdToken();
-    final response = await http.post(
+    final response = await _pokoinApiClient.postJson(
       Uri.parse('/api/unlock-silver'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
     );
     final payload = _decodeJsonResponse(response.body);
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw StateError(payload['error'] as String? ?? 'Silver unlock failed.');
+    }
+    return payload;
+  }
+
+  Future<Map<String, dynamic>> quoteCryptoPknPurchase({
+    required String asset,
+    required double amountIn,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw StateError('Sign in before requesting a crypto purchase quote.');
+    }
+    final response = await _pokoinApiClient.postJson(
+      Uri.parse('/api/crypto-pkn-purchase/quote'),
+      body: {'asset': asset, 'amountIn': amountIn},
+    );
+    final payload = _decodeJsonResponse(response.body);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError(
+        payload['error'] as String? ?? 'Crypto purchase quote failed.',
+      );
     }
     return payload;
   }
@@ -525,6 +571,7 @@ class AuthService {
     final credential = await _auth.signInWithCustomToken(customToken);
     await ensureUserProfile(credential.user);
     await _markFreshLogin(credential.user);
+    await _pokoinApiAuth.currentToken();
   }
 
   Future<Map<String, dynamic>> linkSignedWallet({
@@ -535,17 +582,12 @@ class AuthService {
     if (user == null) {
       throw StateError('Log in before connecting a wallet.');
     }
-    final token = await user.getIdToken();
-    final response = await http.post(
+    final response = await _pokoinApiClient.postJson(
       Uri.parse('/api/wallet-link'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({
+      body: {
         'address': address.trim().toLowerCase(),
         'signature': signature,
-      }),
+      },
     );
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
     if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -561,14 +603,9 @@ class AuthService {
     if (user == null) {
       throw StateError('Log in before connecting a wallet.');
     }
-    final token = await user.getIdToken();
-    final response = await http.post(
+    final response = await _pokoinApiClient.postJson(
       Uri.parse('/api/wallet-link/session'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({'returnPath': returnPath}),
+      body: {'returnPath': returnPath},
     );
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
     if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -644,14 +681,9 @@ class AuthService {
     if (user == null) {
       throw StateError('Log in before updating your username.');
     }
-    final token = await user.getIdToken();
-    final response = await http.post(
+    final response = await _pokoinApiClient.postJson(
       Uri.parse('/api/ensure-username'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({'username': clean}),
+      body: {'username': clean},
     );
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
     if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -668,14 +700,9 @@ class AuthService {
     if (user == null) {
       throw StateError('Sign in before updating your profile picture.');
     }
-    final token = await user.getIdToken();
-    final response = await http.post(
+    final response = await _pokoinApiClient.postJson(
       Uri.parse('/api/upload-profile-picture'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({'imageBase64': base64Encode(imageBytes)}),
+      body: {'imageBase64': base64Encode(imageBytes)},
     );
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
     if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -691,15 +718,10 @@ class AuthService {
     if (user == null) {
       return null;
     }
-    final token = await user.getIdToken();
     try {
-      final response = await http.post(
+      final response = await _pokoinApiClient.postJson(
         Uri.parse('/api/cache-google-profile-picture'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({'photoUrl': user.photoURL}),
+        body: {'photoUrl': user.photoURL},
       );
       final payload = _decodeJsonResponse(response.body);
       if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -720,10 +742,8 @@ class AuthService {
     if (user == null) {
       throw StateError('Sign in before updating your profile picture.');
     }
-    final token = await user.getIdToken();
-    final response = await http.post(
+    final response = await _pokoinApiClient.postJson(
       Uri.parse('/api/remove-profile-picture'),
-      headers: {'Authorization': 'Bearer $token'},
     );
     if (response.statusCode < 200 || response.statusCode >= 300) {
       final payload = jsonDecode(response.body) as Map<String, dynamic>;
@@ -760,7 +780,17 @@ class AuthService {
     );
   }
 
-  Future<void> _touchUserSession(User user) async {
+  Future<void> _touchUserSessionIfStale(User user) async {
+    final prefs = await SharedPreferences.getInstance();
+    final cacheKey = 'pokoin_session_touch:${user.uid}';
+    final lastTouchMs = prefs.getInt(cacheKey) ?? 0;
+    final now = DateTime.now();
+    if (lastTouchMs > 0) {
+      final lastTouch = DateTime.fromMillisecondsSinceEpoch(lastTouchMs);
+      if (now.difference(lastTouch) < sessionTouchInterval) {
+        return;
+      }
+    }
     await _firestore.collection('users').doc(user.uid).set(
       {
         'lastSeenAt': FieldValue.serverTimestamp(),
@@ -768,6 +798,7 @@ class AuthService {
       },
       SetOptions(merge: true),
     );
+    await prefs.setInt(cacheKey, now.millisecondsSinceEpoch);
   }
 
   DateTime? _readTimestamp(Object? value) {

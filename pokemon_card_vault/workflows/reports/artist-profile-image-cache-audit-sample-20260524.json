@@ -1,0 +1,145 @@
+{
+  "generatedAt": "2026-05-24T10:01:41.275Z",
+  "mode": "image-cache-audit",
+  "options": {
+    "limit": 5,
+    "source": "all",
+    "concurrency": 2,
+    "artist": "",
+    "refreshExisting": false,
+    "cacheImages": true,
+    "auditImageCache": true,
+    "recacheMissingImages": false
+  },
+  "counts": {
+    "profile_rows": 367,
+    "source_images": 234,
+    "cached_images": 4,
+    "cache_needed": 230,
+    "reported_missing_rows": 5
+  },
+  "samples": [
+    {
+      "artist": "0313",
+      "normalizedArtist": "0313",
+      "status": "cache_needed",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/0313",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/0313",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/6940/main.png/t/250.png",
+      "profileImageCdnUrl": "",
+      "profileImageObjectKey": "",
+      "updatedAt": "2026-05-23T11:13:41.133Z"
+    },
+    {
+      "artist": "こむぎこ2000 (KG-2000)",
+      "normalizedArtist": "2000 kg 2000",
+      "status": "cache_needed",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7155",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7155/main.png/t/250.png",
+      "profileImageCdnUrl": "",
+      "profileImageObjectKey": "",
+      "updatedAt": "2026-05-22T21:17:04.349Z"
+    },
+    {
+      "artist": "2017 Pikachu Project",
+      "normalizedArtist": "2017 pikachu project",
+      "status": "cache_needed",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7099",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7099/main.png/t/250.png",
+      "profileImageCdnUrl": "",
+      "profileImageObjectKey": "",
+      "updatedAt": "2026-05-22T21:15:23.858Z"
+    },
+    {
+      "artist": "5ban Graphics",
+      "normalizedArtist": "5ban graphics",
+      "status": "cache_needed",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/5ban_Graphics",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/5ban_Graphics",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/6933/main.png/t/250.png",
+      "profileImageCdnUrl": "",
+      "profileImageObjectKey": "",
+      "updatedAt": "2026-05-23T11:13:41.700Z"
+    },
+    {
+      "artist": "Akagi",
+      "normalizedArtist": "akagi",
+      "status": "cache_needed",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Akagi",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Akagi",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7100/main.png/t/250.png",
+      "profileImageCdnUrl": "",
+      "profileImageObjectKey": "",
+      "updatedAt": "2026-05-23T11:13:42.065Z"
+    }
+  ],
+  "report": [
+    {
+      "artist": "0313",
+      "normalizedArtist": "0313",
+      "status": "cache_needed",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/0313",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/0313",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/6940/main.png/t/250.png",
+      "profileImageCdnUrl": "",
+      "profileImageObjectKey": "",
+      "updatedAt": "2026-05-23T11:13:41.133Z"
+    },
+    {
+      "artist": "こむぎこ2000 (KG-2000)",
+      "normalizedArtist": "2000 kg 2000",
+      "status": "cache_needed",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7155",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7155/main.png/t/250.png",
+      "profileImageCdnUrl": "",
+      "profileImageObjectKey": "",
+      "updatedAt": "2026-05-22T21:17:04.349Z"
+    },
+    {
+      "artist": "2017 Pikachu Project",
+      "normalizedArtist": "2017 pikachu project",
+      "status": "cache_needed",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7099",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7099/main.png/t/250.png",
+      "profileImageCdnUrl": "",
+      "profileImageObjectKey": "",
+      "updatedAt": "2026-05-22T21:15:23.858Z"
+    },
+    {
+      "artist": "5ban Graphics",
+      "normalizedArtist": "5ban graphics",
+      "status": "cache_needed",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/5ban_Graphics",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/5ban_Graphics",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/6933/main.png/t/250.png",
+      "profileImageCdnUrl": "",
+      "profileImageObjectKey": "",
+      "updatedAt": "2026-05-23T11:13:41.700Z"
+    },
+    {
+      "artist": "Akagi",
+      "normalizedArtist": "akagi",
+      "status": "cache_needed",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Akagi",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Akagi",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7100/main.png/t/250.png",
+      "profileImageCdnUrl": "",
+      "profileImageObjectKey": "",
+      "updatedAt": "2026-05-23T11:13:42.065Z"
+    }
+  ]
+}

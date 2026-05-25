@@ -1,0 +1,187 @@
+{
+  "mode": "missing-report",
+  "target": "oracle-peer4:public.marketplace_blueprint_tcg_metadata",
+  "generatedAt": "2026-05-22T14:45:05.475Z",
+  "primary": {
+    "database": "pokoin_marketplace",
+    "inRecovery": false
+  },
+  "options": {
+    "limit": 500,
+    "batchSize": 100,
+    "concurrency": 4,
+    "effectiveRemoteConcurrency": 4,
+    "startId": 0,
+    "language": "en",
+    "refreshExisting": false,
+    "reportSampleSize": 8
+  },
+  "coverage": {
+    "total_blueprints": 71215,
+    "metadata_rows": 4814,
+    "missing_metadata_rows": 66401,
+    "missing_eligible_rows": 59497,
+    "missing_non_card_product_rows": 6103,
+    "missing_name_rows": 0,
+    "missing_set_rows": 0,
+    "missing_collector_number_rows": 4554
+  },
+  "counts": {
+    "fetched": 500,
+    "matched": 0,
+    "inserted": 0,
+    "updated": 0,
+    "skipped": 496,
+    "ambiguous_set": 0,
+    "ambiguous_card": 0,
+    "set_not_found": 0,
+    "card_not_found": 0,
+    "low_confidence": 0,
+    "missing_field": 4,
+    "errors": 0,
+    "reasons": {
+      "non_card_product": 496,
+      "missing_collector_number": 4
+    }
+  },
+  "samplesByReason": {
+    "skipped": [
+      {
+        "blueprintId": "104439",
+        "name": "Battle Arena Decks: Rayquaza GX vs. Ultra Necrozma GX: Ultra Necrozma GX Deck",
+        "setName": "Pokémon Products",
+        "setCode": "popr",
+        "collectorNumber": "",
+        "rarity": "Card",
+        "status": "skipped",
+        "reason": "non_card_product",
+        "canonicalReason": "skipped"
+      },
+      {
+        "blueprintId": "104440",
+        "name": "Battle Arena Decks: Rayquaza GX vs. Ultra Necrozma GX: Rayquaza GX Deck",
+        "setName": "Pokémon Products",
+        "setCode": "popr",
+        "collectorNumber": "",
+        "rarity": "Card",
+        "status": "skipped",
+        "reason": "non_card_product",
+        "canonicalReason": "skipped"
+      },
+      {
+        "blueprintId": "104441",
+        "name": "WCD 2006: Suns and Moons Deck",
+        "setName": "Pokémon Products",
+        "setCode": "popr",
+        "collectorNumber": "",
+        "rarity": "Card",
+        "status": "skipped",
+        "reason": "non_card_product",
+        "canonicalReason": "skipped"
+      },
+      {
+        "blueprintId": "104442",
+        "name": "WCD 2004: Magma Spirit Deck",
+        "setName": "Pokémon Products",
+        "setCode": "popr",
+        "collectorNumber": "",
+        "rarity": "Card",
+        "status": "skipped",
+        "reason": "non_card_product",
+        "canonicalReason": "skipped"
+      },
+      {
+        "blueprintId": "104443",
+        "name": "WCD 2004: Rocky Beach Deck",
+        "setName": "Pokémon Products",
+        "setCode": "popr",
+        "collectorNumber": "",
+        "rarity": "Card",
+        "status": "skipped",
+        "reason": "non_card_product",
+        "canonicalReason": "skipped"
+      },
+      {
+        "blueprintId": "104444",
+        "name": "WCD 2004: Team Rushdown Deck",
+        "setName": "Pokémon Products",
+        "setCode": "popr",
+        "collectorNumber": "",
+        "rarity": "Card",
+        "status": "skipped",
+        "reason": "non_card_product",
+        "canonicalReason": "skipped"
+      },
+      {
+        "blueprintId": "104445",
+        "name": "WCD 2004: Blaziken Tech Deck",
+        "setName": "Pokémon Products",
+        "setCode": "popr",
+        "collectorNumber": "",
+        "rarity": "Card",
+        "status": "skipped",
+        "reason": "non_card_product",
+        "canonicalReason": "skipped"
+      },
+      {
+        "blueprintId": "104446",
+        "name": "WCD 2005: Queendom Deck",
+        "setName": "Pokémon Products",
+        "setCode": "popr",
+        "collectorNumber": "",
+        "rarity": "Card",
+        "status": "skipped",
+        "reason": "non_card_product",
+        "canonicalReason": "skipped"
+      }
+    ],
+    "missing_field": [
+      {
+        "blueprintId": "104486",
+        "name": "WCD 2015: The Flying Hammer",
+        "setName": "Pokémon Products",
+        "setCode": "popr",
+        "collectorNumber": "",
+        "rarity": "Card",
+        "status": "skipped",
+        "reason": "missing_collector_number",
+        "canonicalReason": "missing_field"
+      },
+      {
+        "blueprintId": "104487",
+        "name": "WCD 2015: Punch n Bites",
+        "setName": "Pokémon Products",
+        "setCode": "popr",
+        "collectorNumber": "",
+        "rarity": "Card",
+        "status": "skipped",
+        "reason": "missing_collector_number",
+        "canonicalReason": "missing_field"
+      },
+      {
+        "blueprintId": "104488",
+        "name": "WCD 2015: Honorstoise",
+        "setName": "Pokémon Products",
+        "setCode": "popr",
+        "collectorNumber": "",
+        "rarity": "Card",
+        "status": "skipped",
+        "reason": "missing_collector_number",
+        "canonicalReason": "missing_field"
+      },
+      {
+        "blueprintId": "104489",
+        "name": "WCD 2015: Primal Groudon",
+        "setName": "Pokémon Products",
+        "setCode": "popr",
+        "collectorNumber": "",
+        "rarity": "Card",
+        "status": "skipped",
+        "reason": "missing_collector_number",
+        "canonicalReason": "missing_field"
+      }
+    ]
+  },
+  "lastBlueprintId": 104999,
+  "nextStartId": 104999
+}

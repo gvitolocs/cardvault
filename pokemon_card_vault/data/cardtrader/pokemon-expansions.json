@@ -4990,5 +4990,23 @@
     "game_id": 5,
     "code": "pbl",
     "name": "Pitch Black"
+  },
+  {
+    "id": 4643,
+    "game_id": 5,
+    "code": "csv9-p",
+    "name": "CSV9: Poké Ball Reverse"
+  },
+  {
+    "id": 4644,
+    "game_id": 5,
+    "code": "csv9-m",
+    "name": "CSV9: Master Ball Reverse"
+  },
+  {
+    "id": 4645,
+    "game_id": 5,
+    "code": "csvn",
+    "name": "CSVNC: Land of Kitakami Special Pack"
   }
 ]

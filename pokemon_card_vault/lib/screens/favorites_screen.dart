@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../models/pokemon_card.dart';
 import '../providers/card_provider.dart';
 import '../providers/favorites_provider.dart';
-import '../utils/card_url.dart';
+import '../utils/card_navigation.dart';
 
 class FavoritesScreen extends ConsumerWidget {
   const FavoritesScreen({super.key});
@@ -156,7 +156,11 @@ class _WatchlistCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return InkWell(
-      onTap: () => context.go(cardDetailPath(card)),
+      onTap: () => navigateToCanonicalCardDetail(
+        context,
+        card,
+        source: 'favorites_card',
+      ),
       borderRadius: BorderRadius.circular(22),
       child: Container(
         padding: const EdgeInsets.all(14),
@@ -199,7 +203,7 @@ class _WatchlistCard extends ConsumerWidget {
                       : '${card.set} · ${card.number}')
                   : (card.number.trim().isEmpty
                       ? card.set
-                      : '${card.set} #${card.number}'),
+                      : '${card.set} ${card.number}'),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(color: Color(0xFF93A4C8), fontSize: 12),
@@ -220,7 +224,11 @@ class _WatchlistCard extends ConsumerWidget {
                 ),
                 const SizedBox(width: 8),
                 IconButton.filled(
-                  onPressed: () => context.go(cardDetailPath(card)),
+                  onPressed: () => navigateToCanonicalCardDetail(
+                    context,
+                    card,
+                    source: 'favorites_open_button',
+                  ),
                   icon: const Icon(Icons.open_in_new),
                 ),
               ],

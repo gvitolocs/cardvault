@@ -1,3 +1,30 @@
+# macOS
+.DS_Store
+
+# Local environment and secrets
+.env
+.env.local
+.env.*.local
+.env*.local
+pokemon_card_vault/.env.local
+pokemon_card_vault/keys/
+!pokemon_card_vault/keys/
+pokemon_card_vault/keys/*
+!pokemon_card_vault/keys/README.md
+pokemon_card_vault/deploy/env/
+
+# Generated tool caches
+.wrangler/
+pokemon_card_vault/.wrangler/
+pokemon_card_vault/.dart_tool/
+pokemon_card_vault/.flutter-plugins
+pokemon_card_vault/.flutter-plugins-dependencies
+pokemon_card_vault/linux/flutter/ephemeral/.plugin_symlinks/
+pokemon_card_vault/windows/flutter/ephemeral/.plugin_symlinks/
 
 # Large local CardTrader exports
 pokemon_card_vault/data/cardtrader/pokemon-blueprints.jsonl
+
+# Adjacent local support checkouts/assets
+pokemon-tcg-data/
+pokoin-brand/

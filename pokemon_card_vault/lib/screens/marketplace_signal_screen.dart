@@ -594,8 +594,7 @@ class _MarketplaceSignal {
     final topListed = activeListings.take(5).map((listing) {
       final title = [
         listing.cardName.isEmpty ? listing.cardId : listing.cardName,
-        if (listing.collectorNumber.trim().isNotEmpty)
-          '#${listing.collectorNumber}',
+        if (listing.collectorNumber.trim().isNotEmpty) listing.collectorNumber,
       ].join(' ');
       return _RankRow(title, formatPkn(listing.pricePkn));
     }).toList();

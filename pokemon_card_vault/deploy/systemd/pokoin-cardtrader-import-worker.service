@@ -1,0 +1,18 @@
+[Unit]
+Description=Pokoin CardTrader Oracle import worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pokoin-import
+WorkingDirectory=/opt/pokemon_card_vault
+EnvironmentFile=/opt/pokemon_card_vault/.env.oracle-cardtrader-import
+ExecStart=/usr/bin/node scripts/cardtrader-oracle-import-worker.js --poll
+Restart=always
+RestartSec=10
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

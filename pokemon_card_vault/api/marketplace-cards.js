@@ -1,4 +1,20 @@
 const { marketplaceQuery } = require('./_marketplace_db');
+const {
+  watchlistAnalyticsJoin,
+  watchlistCountColumn,
+} = require('./_marketplace_watchlist_analytics');
+const {
+  cartAnalyticsJoin,
+  cartHolderCountColumn,
+} = require('./_marketplace_cart_analytics');
+const { withCardEmojiFields } = require('./_marketplace_card_emoji');
+const { projectedRaritySql } = require('./_marketplace_card_rarity');
+
+const CHEAPEST_HOMEPAGE_CACHE_RELATIONS = new Set([
+  'public.cheapest_homepage_cache_blueprint',
+  'public.cardtrader_blueprint_listing_cache',
+]);
+let cachedCheapestHomepageCacheRelation = null;
 
 function cleanLimit(value, fallback = 240) {
   const limit = Number(value);
@@ -15,6 +31,7 @@ function cleanText(value, maxLength = 120) {
 function searchTerms(value) {
   return cleanText(value)
     .toLowerCase()
+    .replace(/\b([a-z0-9]+)s\b/g, "$1's")
     .split(/[^a-z0-9]+/)
     .map((term) => term.trim())
     .filter((term) => term.length >= 2 || /^[0-9]+$/.test(term));
@@ -28,14 +45,108 @@ function cleanLanguage(value) {
   return 'en';
 }
 
+function cardTraderEligiblePredicate(alias = 'snapshot') {
+  return `(
+    coalesce(${alias}.quantity, 0) > 0
+    and public.marketplace_price_pkn_from_cardtrader(${alias}.price, ${alias}.price_cents, ${alias}.currency) is not null
+    and (
+      lower(coalesce(${alias}.raw_metadata->'user'->>'can_sell_via_hub', ${alias}.raw_metadata->>'can_sell_via_hub', '')) in ('true', '1', 'yes', 'y')
+      or lower(coalesce(${alias}.raw_metadata->'user'->>'can_sell_sealed_with_ct_zero', ${alias}.raw_metadata->>'can_sell_sealed_with_ct_zero', '')) in ('true', '1', 'yes', 'y')
+    )
+  )`;
+}
+
+function availabilityColumns(prefix = 'price_summary', cardTraderPrefix = 'cardtrader') {
+  return `
+    (
+      coalesce(${prefix}.listed_quantity, 0) +
+      coalesce(${cardTraderPrefix}.eligible_listing_count, 0)
+    ) as listed_quantity,
+    case
+      when ${cardTraderPrefix}.cheapest_price_pkn is not null then ${cardTraderPrefix}.cheapest_price_pkn
+      else ${prefix}.lowest_ask_pkn
+    end as lowest_price_pkn,
+    coalesce(${cardTraderPrefix}.eligible_listing_count, 0) as cardtrader_eligible_listing_count,
+    coalesce(${cardTraderPrefix}.eligible_listing_count, 0) > 0 as has_cardtrader_listing,
+    coalesce(${cardTraderPrefix}.eligible_quantity, 0) as cardtrader_listed_quantity,
+    ${cardTraderPrefix}.cheapest_price_pkn as cardtrader_lowest_price_pkn,
+    coalesce(${cardTraderPrefix}.eligible_listing_count, 0) > 0 as cardtrader_available
+  `;
+}
+
+function cleanCheapestHomepageCacheRelation(value) {
+  const relation = String(value || '').trim();
+  return CHEAPEST_HOMEPAGE_CACHE_RELATIONS.has(relation)
+    ? relation
+    : 'public.cheapest_homepage_cache_blueprint';
+}
+
+function resetCheapestHomepageCacheRelationForTest() {
+  cachedCheapestHomepageCacheRelation = null;
+}
+
+async function cheapestHomepageCacheRelationName(query = marketplaceQuery) {
+  if (cachedCheapestHomepageCacheRelation) {
+    return cachedCheapestHomepageCacheRelation;
+  }
+  const result = await query(`
+    select case
+      when to_regclass('public.cheapest_homepage_cache_blueprint') is not null
+        then 'public.cheapest_homepage_cache_blueprint'
+      when to_regclass('public.cardtrader_blueprint_listing_cache') is not null
+        then 'public.cardtrader_blueprint_listing_cache'
+      else 'public.cheapest_homepage_cache_blueprint'
+    end as relation
+  `);
+  cachedCheapestHomepageCacheRelation = cleanCheapestHomepageCacheRelation(
+    result.rows[0]?.relation,
+  );
+  return cachedCheapestHomepageCacheRelation;
+}
+
+function cardTraderAvailabilityJoin(
+  candidateAlias = 'c',
+  relation = 'public.cheapest_homepage_cache_blueprint',
+) {
+  const candidateIdColumn = candidateAlias === 'versions'
+    ? `${candidateAlias}.card_id`
+    : `${candidateAlias}.card_id`;
+  const cacheRelation = cleanCheapestHomepageCacheRelation(relation);
+  return `
+    left join lateral (
+      select cardtrader_cache.*
+      from ${cacheRelation} cardtrader_cache
+      where cardtrader_cache.provider = 'cardtrader'
+        and cardtrader_cache.eligible_listing_count > 0
+        and cardtrader_cache.cheapest_price_pkn is not null
+        and (
+          cardtrader_cache.blueprint_id = ${candidateIdColumn}
+          or cardtrader_cache.pokoin_card_id = ${candidateIdColumn}::text
+        )
+      order by
+        case when cardtrader_cache.blueprint_id = ${candidateIdColumn} then 0 else 1 end,
+        cardtrader_cache.cheapest_price_pkn asc,
+        cardtrader_cache.eligible_listing_count desc,
+        cardtrader_cache.blueprint_id asc
+      limit 1
+    ) cardtrader on true
+  `;
+}
+
+function hasStructuredNameNumberQuery(query) {
+  const terms = searchTerms(query);
+  return terms.some((term) => /^[0-9]+$/.test(term)) &&
+    terms.some((term) => !/^[0-9]+$/.test(term));
+}
+
 function productTypeClause(productType, productSearchOnly, values) {
   const normalized = cleanText(productType, 60);
   if (normalized) {
     values.push(normalized);
-    return ` and product_type = $${values.length}`;
+    return ` and marketplace_search_candidates.product_type = $${values.length}`;
   }
   if (productSearchOnly) {
-    return " and item_kind = 'product'";
+    return " and marketplace_search_candidates.item_kind = 'product'";
   }
   return '';
 }
@@ -46,8 +157,21 @@ function searchClause(query, productSearchOnly, searchLanguage, values) {
     return '';
   }
   const fields = productSearchOnly
-    ? ['name', 'set_name', 'product_variant', 'trainer_name']
-    : ['name', 'set_name', 'trainer_name', 'card_type', 'rarity', 'card_number', 'product_variant'];
+    ? [
+        'marketplace_search_candidates.name',
+        'marketplace_search_candidates.set_name',
+        'marketplace_search_candidates.product_variant',
+        'marketplace_search_candidates.trainer_name',
+      ]
+    : [
+        'marketplace_search_candidates.name',
+        'marketplace_search_candidates.set_name',
+        'marketplace_search_candidates.trainer_name',
+        'marketplace_search_candidates.card_type',
+        'marketplace_search_candidates.rarity',
+        'marketplace_search_candidates.card_number',
+        'marketplace_search_candidates.product_variant',
+      ];
   const clauses = terms.map((term) => {
     values.push(`%${term}%`);
     const placeholder = `$${values.length}`;
@@ -65,28 +189,182 @@ function searchClause(query, productSearchOnly, searchLanguage, values) {
   return ` and ${clauses.join(' and ')}`;
 }
 
+async function fallbackRowsForStructuredCards({ query, limit, searchLanguage }) {
+  if (!hasStructuredNameNumberQuery(query)) return [];
+  const {
+    rankAutocompleteRows,
+    rowsForAutocompleteSearchTermWithQuery,
+  } = require('./marketplace-autocomplete');
+  const cleanResultLimit = cleanLimit(limit);
+  const raritySql = projectedRaritySql({
+    rarityColumn: 'c.rarity',
+    collectorNumberSql: "coalesce(nullif(c.card_number, ''), ranked.card_number)",
+    blueprintAlias: 'blueprints',
+  });
+  const candidateRows = await rowsForAutocompleteSearchTermWithQuery(
+    query,
+    Math.min(Math.max(cleanResultLimit * 8, 100), 500),
+    searchLanguage,
+    null,
+    null,
+  );
+  const rankedRows = rankAutocompleteRows(candidateRows, query, cleanResultLimit);
+  const ids = rankedRows
+    .map((row) => Number(row.card_id))
+    .filter((id) => Number.isSafeInteger(id) && id > 0);
+  if (ids.length === 0) return [];
+  const cheapestCacheRelation = await cheapestHomepageCacheRelationName();
+  const result = await marketplaceQuery(
+    `
+      with settings as (
+        select set_config('app.pkn_usdt_price', $2::text, true)
+      )
+      select
+        c.card_id, c.name, c.product_variant as version, c.image_url, c.cdn_image_url,
+        c.preview_image_url, c.set_name, ${raritySql} as rarity, c.card_type,
+        coalesce(nullif(c.card_number, ''), ranked.card_number) as card_number,
+        c.product_variant, false as is_holo, false as is_foil, c.item_kind, c.product_type,
+        c.trainer_name, artist.artist, artist.illustrator,
+        c.card_palette, c.emoji, c.imported_at,
+        ${watchlistCountColumn('watchlist_analytics')},
+        ${cartHolderCountColumn('cart_analytics')},
+        ${availabilityColumns('price_summary', 'cardtrader')},
+        ranked.ordinality
+      from settings,
+        unnest($1::bigint[], $3::text[]) with ordinality as ranked(card_id, card_number, ordinality)
+      join public.marketplace_search_candidates c on c.card_id = ranked.card_id
+      left join public.cardtrader_pokemon_blueprints blueprints
+        on blueprints.id = c.card_id
+      left join public.marketplace_blueprint_tcg_metadata tcg_metadata
+        on tcg_metadata.blueprint_id = c.card_id
+      left join public.marketplace_blueprint_price_summary price_summary
+        on price_summary.blueprint_id = c.card_id
+      ${cardTraderAvailabilityJoin('c', cheapestCacheRelation)}
+      ${watchlistAnalyticsJoin('c', 'watchlist_analytics')}
+      ${cartAnalyticsJoin('c', 'cart_analytics')}
+      left join public.marketplace_blueprint_artists artist
+        on artist.blueprint_id = c.card_id
+      order by ranked.ordinality
+    `,
+    [ids, String(process.env.PKN_CHECKOUT_USDT_PRICE || 0.005), rankedRows.map((row) => String(row.card_number || ''))],
+  );
+  return result.rows.map(({ ordinality, ...row }) => withCardEmojiFields(row));
+}
+
 async function rowsForCards({ query, limit, productType, productSearchOnly, searchLanguage }) {
   const values = [];
-  let where = 'where coalesce(preview_image_url, cdn_image_url, image_url) is not null';
+  const raritySql = projectedRaritySql({
+    rarityColumn: 'marketplace_search_candidates.rarity',
+    collectorNumberSql: 'marketplace_search_candidates.card_number',
+    blueprintAlias: 'blueprints',
+  });
+  let where = 'where coalesce(marketplace_search_candidates.preview_image_url, marketplace_search_candidates.cdn_image_url, marketplace_search_candidates.image_url) is not null';
   where += productTypeClause(productType, productSearchOnly, values);
   where += searchClause(query, productSearchOnly, searchLanguage, values);
   values.push(cleanLimit(limit));
+  values.push(String(process.env.PKN_CHECKOUT_USDT_PRICE || 0.005));
+  const limitIndex = values.length - 1;
+  const cheapestCacheRelation = await cheapestHomepageCacheRelationName();
 
   const result = await marketplaceQuery(
     `
+      with settings as (
+        select set_config('app.pkn_usdt_price', $${values.length}::text, true)
+      )
       select
-        card_id, name, product_variant as version, image_url, cdn_image_url,
-        preview_image_url, set_name, rarity, card_type, card_number, product_variant,
-        false as is_holo, false as is_foil, item_kind, product_type,
-        trainer_name, card_palette, emoji, imported_at
-      from public.marketplace_search_candidates
+        marketplace_search_candidates.card_id,
+        marketplace_search_candidates.name,
+        marketplace_search_candidates.product_variant as version,
+        marketplace_search_candidates.image_url,
+        marketplace_search_candidates.cdn_image_url,
+        marketplace_search_candidates.preview_image_url,
+        marketplace_search_candidates.set_name,
+        ${raritySql} as rarity,
+        marketplace_search_candidates.card_type,
+        marketplace_search_candidates.card_number,
+        marketplace_search_candidates.product_variant,
+        false as is_holo,
+        false as is_foil,
+        marketplace_search_candidates.item_kind,
+        marketplace_search_candidates.product_type,
+        marketplace_search_candidates.trainer_name,
+        artist.artist,
+        artist.illustrator,
+        marketplace_search_candidates.card_palette,
+        marketplace_search_candidates.emoji,
+        marketplace_search_candidates.imported_at,
+        ${watchlistCountColumn('watchlist_analytics')},
+        ${cartHolderCountColumn('cart_analytics')},
+        ${availabilityColumns('price_summary', 'cardtrader')}
+      from settings,
+        public.marketplace_search_candidates
+      left join public.cardtrader_pokemon_blueprints blueprints
+        on blueprints.id = marketplace_search_candidates.card_id
+      left join public.marketplace_blueprint_tcg_metadata tcg_metadata
+        on tcg_metadata.blueprint_id = marketplace_search_candidates.card_id
+      left join public.marketplace_blueprint_price_summary price_summary
+        on price_summary.blueprint_id = marketplace_search_candidates.card_id
+      ${cardTraderAvailabilityJoin('marketplace_search_candidates', cheapestCacheRelation)}
+      ${watchlistAnalyticsJoin('marketplace_search_candidates', 'watchlist_analytics')}
+      ${cartAnalyticsJoin('marketplace_search_candidates', 'cart_analytics')}
+      left join public.marketplace_blueprint_artists artist
+        on artist.blueprint_id = marketplace_search_candidates.card_id
       ${where}
-      order by search_weight desc, imported_at desc nulls last, card_id desc
-      limit $${values.length}
+      order by marketplace_search_candidates.search_weight desc,
+        marketplace_search_candidates.imported_at desc nulls last,
+        marketplace_search_candidates.card_id desc
+      limit $${limitIndex}
     `,
     values,
   );
-  return result.rows;
+  if (
+    result.rows.length > 0 ||
+    cleanText(productType, 60) ||
+    productSearchOnly
+  ) {
+    return result.rows.map(withCardEmojiFields);
+  }
+  return fallbackRowsForStructuredCards({ query, limit, searchLanguage });
+}
+
+async function productFacetRows({ query, searchLanguage, dbQuery = marketplaceQuery }) {
+  const values = [];
+  const productTypeSql = `case
+    when marketplace_search_candidates.item_kind = 'product'
+      then coalesce(nullif(marketplace_search_candidates.product_type, ''), 'sealed_product')
+    else 'card'
+  end`;
+  let where = 'where coalesce(marketplace_search_candidates.preview_image_url, marketplace_search_candidates.cdn_image_url, marketplace_search_candidates.image_url) is not null';
+  where += searchClause(query, false, searchLanguage, values);
+
+  const result = await dbQuery(
+    `
+      with product_facets as (
+        select
+          ${productTypeSql} as product_type,
+          count(*)::integer as count
+        from public.marketplace_search_candidates
+        ${where}
+        group by 1
+      )
+      select product_type, count
+      from product_facets
+      order by
+        case
+          when product_type = 'card' then 0
+          when product_type = 'booster_box' then 10
+          when product_type = 'booster_pack' then 20
+          else 100
+        end asc,
+        count desc,
+        product_type asc
+    `,
+    values,
+  );
+  return result.rows.map((row) => ({
+    productType: String(row.product_type || ''),
+    count: Number(row.count || 0),
+  })).filter((row) => row.productType && row.count > 0);
 }
 
 module.exports = async function handler(req, res) {
@@ -97,6 +375,14 @@ module.exports = async function handler(req, res) {
 
   try {
     const url = new URL(req.url, `https://${req.headers.host || 'pokoin.com'}`);
+    if (url.searchParams.get('facets') === 'products') {
+      const products = await productFacetRows({
+        query: url.searchParams.get('query'),
+        searchLanguage: url.searchParams.get('lang') || url.searchParams.get('language'),
+      });
+      res.setHeader('Cache-Control', 'public, max-age=20, s-maxage=120');
+      return res.status(200).json({ products });
+    }
     const rows = await rowsForCards({
       query: url.searchParams.get('query'),
       limit: url.searchParams.get('limit'),
@@ -115,3 +401,11 @@ module.exports = async function handler(req, res) {
 };
 
 module.exports.rowsForCards = rowsForCards;
+module.exports.productFacetRows = productFacetRows;
+module.exports.fallbackRowsForStructuredCards = fallbackRowsForStructuredCards;
+module.exports.availabilityColumns = availabilityColumns;
+module.exports.cardTraderAvailabilityJoin = cardTraderAvailabilityJoin;
+module.exports.cardTraderEligiblePredicate = cardTraderEligiblePredicate;
+module.exports.cheapestHomepageCacheRelationName = cheapestHomepageCacheRelationName;
+module.exports.resetCheapestHomepageCacheRelationForTest = resetCheapestHomepageCacheRelationForTest;
+module.exports.hasStructuredNameNumberQuery = hasStructuredNameNumberQuery;

@@ -271,6 +271,30 @@ class WalletAuthService {
     }
   }
 
+  Future<Map<String, dynamic>> reconcileRecentTopUps({required int amountPkn}) async {
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+    if (firebaseUser == null) {
+      return const <String, dynamic>{};
+    }
+    final token = await firebaseUser.getIdToken();
+    final response = await http.post(
+      Uri.parse('/api/top-up-account-balance'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'reconcileRecent': true,
+        'amountPkn': amountPkn,
+      }),
+    );
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError(payload['error'] as String? ?? 'Top-up reconciliation failed.');
+    }
+    return payload;
+  }
+
   Future<Map<String, dynamic>> requestPknWithdraw({
     required String toAddress,
     required int amountPkn,
@@ -299,6 +323,118 @@ class WalletAuthService {
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw StateError(
         payload['error'] as String? ?? 'Withdraw request failed.',
+      );
+    }
+    return payload;
+  }
+
+  Future<Map<String, dynamic>> quoteCryptoPknPurchase({
+    required String asset,
+    required double amountIn,
+  }) async {
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+    if (firebaseUser == null) {
+      throw StateError('Sign in before requesting a crypto purchase quote.');
+    }
+    final token = await firebaseUser.getIdToken();
+    final response = await http.post(
+      Uri.parse('/api/crypto-pkn-purchase/quote'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({'asset': asset, 'amountIn': amountIn}),
+    );
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError(
+        payload['error'] as String? ?? 'Crypto purchase quote failed.',
+      );
+    }
+    return payload;
+  }
+
+  Future<Map<String, dynamic>> requestCryptoPknPurchase({
+    required String quoteId,
+    required String depositTxHash,
+  }) async {
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+    if (firebaseUser == null) {
+      throw StateError('Sign in before requesting PKN credit.');
+    }
+    final token = await firebaseUser.getIdToken();
+    final response = await http.post(
+      Uri.parse('/api/crypto-pkn-purchase/request'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'quoteId': quoteId,
+        'depositTxHash': depositTxHash,
+      }),
+    );
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError(
+        payload['error'] as String? ?? 'Crypto purchase credit failed.',
+      );
+    }
+    return payload;
+  }
+
+  Future<Map<String, dynamic>> quoteCryptoPknSale({
+    required String asset,
+    required int amountPkn,
+  }) async {
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+    if (firebaseUser == null) {
+      throw StateError('Sign in before requesting a crypto sale quote.');
+    }
+    final token = await firebaseUser.getIdToken();
+    final response = await http.post(
+      Uri.parse('/api/crypto-pkn-sale/quote'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({'asset': asset, 'amountIn': amountPkn}),
+    );
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError(
+        payload['error'] as String? ?? 'Crypto sale quote failed.',
+      );
+    }
+    return payload;
+  }
+
+  Future<Map<String, dynamic>> requestCryptoPknSale({
+    required String quoteId,
+    required String depositTxHash,
+    required String payoutAddress,
+  }) async {
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+    if (firebaseUser == null) {
+      throw StateError('Sign in before requesting crypto payout.');
+    }
+    final token = await firebaseUser.getIdToken();
+    final response = await http.post(
+      Uri.parse('/api/crypto-pkn-sale/request'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'quoteId': quoteId,
+        'depositTxHash': depositTxHash.trim(),
+        'payoutAddress': payoutAddress.trim(),
+      }),
+    );
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError(
+        payload['error'] as String? ?? 'Crypto sale request failed.',
       );
     }
     return payload;

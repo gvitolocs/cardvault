@@ -1,0 +1,43 @@
+{
+  "generatedAt": "2026-05-23T09:43:57.432Z",
+  "mode": "apply",
+  "options": {
+    "limit": 1,
+    "source": "pocketmonsters",
+    "concurrency": 1,
+    "artist": "Shin Nagasawa",
+    "refreshExisting": false,
+    "cacheImages": true
+  },
+  "counts": {
+    "scanned": 1,
+    "matched": 1,
+    "upserted": 1,
+    "skipped": 0,
+    "ambiguous": 0,
+    "imageCached": 1,
+    "imageCacheNeeded": 0
+  },
+  "samples": [
+    {
+      "artist": "長澤真 (Shin Nagasawa)",
+      "displayName": "長澤真 (Shin Nagasawa)",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/6960",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/shin-nagasawa.png",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Shin_Nagasawa"
+    }
+  ],
+  "report": [
+    {
+      "artist": "長澤真 (Shin Nagasawa)",
+      "normalizedArtist": "shin nagasawa",
+      "status": "upserted",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/6960",
+      "pocketmonstersUrl": "https://www.pocketmonsters.net/staff/view/6960",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Shin_Nagasawa",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/6960/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/shin-nagasawa.png",
+      "imageCache": "cached"
+    }
+  ]
+}

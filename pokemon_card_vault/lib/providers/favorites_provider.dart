@@ -1,8 +1,14 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:http/http.dart' as http;
+
+import '../services/pokoin_api_auth.dart';
 
 final favoritesProvider =
     StateNotifierProvider<FavoritesNotifier, FavoritesState>((ref) {
@@ -36,7 +42,13 @@ class FavoritesState {
 }
 
 class FavoritesNotifier extends StateNotifier<FavoritesState> {
-  FavoritesNotifier() : super(FavoritesState()) {
+  FavoritesNotifier({
+    http.Client? httpClient,
+    PokoinApiAuthService? apiAuth,
+  })  : _httpClient = httpClient ?? http.Client(),
+        _ownsHttpClient = httpClient == null,
+        _apiAuth = apiAuth ?? PokoinApiAuthService.instance(),
+        super(FavoritesState()) {
     _authSubscription = Firebase.apps.isEmpty
         ? null
         : FirebaseAuth.instance.authStateChanges().listen((_) {
@@ -48,6 +60,9 @@ class FavoritesNotifier extends StateNotifier<FavoritesState> {
   static const String _favoritesBoxName = 'favorites';
   static const Duration _retentionWindow = Duration(days: 30);
   dynamic _authSubscription;
+  final http.Client _httpClient;
+  final bool _ownsHttpClient;
+  final PokoinApiAuthService _apiAuth;
 
   FirebaseFirestore get _firestore => FirebaseFirestore.instance;
   User? get _user =>
@@ -56,6 +71,9 @@ class FavoritesNotifier extends StateNotifier<FavoritesState> {
   @override
   void dispose() {
     _authSubscription?.cancel();
+    if (_ownsHttpClient) {
+      _httpClient.close();
+    }
     super.dispose();
   }
 
@@ -114,8 +132,14 @@ class FavoritesNotifier extends StateNotifier<FavoritesState> {
 
   Future<void> toggleFavorite(String cardId) async {
     final ids = state.favoriteCardIds.toSet();
-    ids.contains(cardId) ? ids.remove(cardId) : ids.add(cardId);
+    final action = ids.contains(cardId) ? 'remove' : 'add';
+    if (action == 'remove') {
+      ids.remove(cardId);
+    } else {
+      ids.add(cardId);
+    }
     await _persist(ids.toList()..sort());
+    _recordWatchlistAnalytics(cardId, action);
   }
 
   Future<void> addToFavorites(String cardId) async {
@@ -131,7 +155,11 @@ class FavoritesNotifier extends StateNotifier<FavoritesState> {
   }
 
   Future<void> clearFavorites() async {
+    final removedIds = [...state.favoriteCardIds];
     await _persist(const []);
+    for (final cardId in removedIds) {
+      _recordWatchlistAnalytics(cardId, 'remove');
+    }
   }
 
   Future<void> _persist(List<String> ids) async {
@@ -210,5 +238,35 @@ class FavoritesNotifier extends StateNotifier<FavoritesState> {
       }
     }
     return true;
+  }
+
+  void _recordWatchlistAnalytics(String cardId, String action) {
+    final numericId = int.tryParse(cardId.trim());
+    if (numericId == null || numericId <= 0) {
+      return;
+    }
+    unawaited(Future<void>(() async {
+      try {
+        final authHeaders = await _apiAuth.authorizationHeaders(
+          requireSignedIn: false,
+        );
+        await _httpClient
+            .post(
+              Uri.base.resolve('/api/marketplace-watchlist'),
+              headers: {
+                'content-type': 'application/json',
+                ...authHeaders,
+              },
+              body: jsonEncode({
+                'cardId': numericId,
+                'action': action,
+                'source': 'flutter',
+              }),
+            )
+            .timeout(const Duration(seconds: 3));
+      } catch (_) {
+        // Watchlist analytics should not affect local watchlist state.
+      }
+    }));
   }
 }

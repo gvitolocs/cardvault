@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../constants/project_links.dart';
 import '../providers/auth_provider.dart';
+import '../utils/auth_window_bridge_stub.dart';
 import '../wallet/wallet_bridge_stub.dart';
 import '../widgets/site_footer.dart';
 
@@ -29,6 +30,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   bool _autoWalletSignInStarted = false;
   bool _isVerifyingSignup = false;
   bool _isCompletingWalletLink = false;
+  bool _closeOnAuthHandled = false;
 
   String get _returnPath {
     final from = GoRouterState.of(context).uri.queryParameters['from'];
@@ -36,6 +38,18 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       return '/profile';
     }
     return from;
+  }
+
+  bool get _shouldCloseOnAuth {
+    final query = GoRouterState.of(context).uri.queryParameters;
+    final closeOnAuth = query['closeOnAuth']?.toLowerCase();
+    final extension = query['extension']?.toLowerCase();
+    final from = query['from']?.toLowerCase();
+    return closeOnAuth == '1' ||
+        closeOnAuth == 'true' ||
+        extension == '1' ||
+        extension == 'true' ||
+        from == 'extension';
   }
 
   @override
@@ -67,8 +81,32 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   void _redirectIfAlreadyLoggedIn() {
     final user = ref.read(authStateProvider).valueOrNull;
     if (user != null && mounted) {
+      if (_shouldCloseOnAuth) {
+        _handleCloseOnAuth();
+        return;
+      }
       context.go(_returnPath);
     }
+  }
+
+  void _handleAuthenticated() {
+    if (_shouldCloseOnAuth) {
+      _handleCloseOnAuth();
+      return;
+    }
+    context.go(_returnPath);
+  }
+
+  void _handleCloseOnAuth() {
+    if (_closeOnAuthHandled || !mounted) {
+      return;
+    }
+    _closeOnAuthHandled = true;
+    notifyAuthWindowAuthenticated();
+    setState(() {});
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      closeAuthWindow();
+    });
   }
 
   bool get _hasSignupVerificationToken {
@@ -94,8 +132,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     }
     setState(() => _isVerifyingSignup = true);
     try {
-      final redirectPath =
-          await ref.read(authServiceProvider).verifyEmailSignupToken(signupToken);
+      final redirectPath = await ref
+          .read(authServiceProvider)
+          .verifyEmailSignupToken(signupToken);
       ref.invalidate(authStateProvider);
       ref.invalidate(userProfileProvider);
       ref.invalidate(pknBalanceProvider);
@@ -126,7 +165,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       }
       final user = next.valueOrNull;
       if (user != null && mounted) {
-        context.go(_returnPath);
+        _handleAuthenticated();
       } else if (user == null && mounted) {
         _startAutoWalletSignIn();
       }
@@ -137,6 +176,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         backgroundColor: Color(0xFF050816),
         body: Center(child: CircularProgressIndicator()),
       );
+    }
+    if (_closeOnAuthHandled) {
+      return const _ExtensionAuthSuccessScreen();
     }
     final compact = MediaQuery.sizeOf(context).width < 860;
     return Scaffold(
@@ -238,7 +280,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       }
 
       if (mounted) {
-        context.go(_returnPath);
+        _handleAuthenticated();
       }
     } catch (e) {
       if (mounted) {
@@ -281,7 +323,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     try {
       await ref.read(authServiceProvider).signInWithGoogle();
       if (mounted) {
-        context.go(_returnPath);
+        _handleAuthenticated();
       }
     } catch (e) {
       if (mounted) {
@@ -314,7 +356,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     setState(() => _isWalletLoading = true);
     try {
       final auth = ref.read(authServiceProvider);
-      final session = await auth.createWalletLinkSession(returnPath: _returnPath);
+      final session =
+          await auth.createWalletLinkSession(returnPath: _returnPath);
       final sessionId = session['sessionId'] as String? ?? '';
       if (sessionId.isEmpty) {
         throw StateError('Wallet link session was empty.');
@@ -398,7 +441,11 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
           fallback: _returnPath,
         );
         if (mounted) {
-          context.go(returnPath);
+          if (_shouldCloseOnAuth) {
+            _handleCloseOnAuth();
+          } else {
+            context.go(returnPath);
+          }
         }
       });
     } catch (e) {
@@ -480,7 +527,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         ref.invalidate(userProfileProvider);
         ref.invalidate(pknBalanceProvider);
         if (mounted) {
-          context.go(_returnPath);
+          _handleAuthenticated();
         }
       });
     } catch (e) {
@@ -549,6 +596,55 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       return fallback;
     }
     return clean;
+  }
+}
+
+class _ExtensionAuthSuccessScreen extends StatelessWidget {
+  const _ExtensionAuthSuccessScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF050816),
+      body: Center(
+        child: Container(
+          width: 420,
+          margin: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0B1020),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          ),
+          child: const Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.check_circle,
+                color: Color(0xFF22C55E),
+                size: 34,
+              ),
+              SizedBox(height: 14),
+              Text(
+                'Pokoin Extension Authenticated',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'You are signed in. If this page stays open, you can close it and return to the extension.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Color(0xFF93A4C8)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

@@ -7,6 +7,7 @@ const { Pool } = require('pg');
 const ROOT_DIR = path.resolve(__dirname, '..');
 const SCHEMA_DIR = path.join(ROOT_DIR, 'oracle-postgres', 'schema');
 const BATCH_SIZE = Number(process.env.MARKETPLACE_MIGRATION_BATCH_SIZE || 1000);
+loadLocalEnv();
 
 const SOURCE_TABLES = [
   'cardtrader_pokemon_blueprints',
@@ -14,6 +15,40 @@ const SOURCE_TABLES = [
   'marketplace_trainers',
   'marketplace_card_events',
 ];
+
+function loadLocalEnv() {
+  const envPath = path.join(ROOT_DIR, '.env.local');
+  if (!fs.existsSync(envPath)) {
+    return;
+  }
+  const content = fs.readFileSync(envPath, 'utf8');
+  for (const line of content.split(/\r?\n/)) {
+    const stripped = line.trim();
+    if (!stripped || stripped.startsWith('#') || !stripped.includes('=')) {
+      continue;
+    }
+    const separator = stripped.indexOf('=');
+    const key = stripped
+      .slice(0, separator)
+      .replace(/^export\s+/, '')
+      .trim();
+    if (!key || process.env[key]) {
+      continue;
+    }
+    process.env[key] = cleanEnvValue(stripped.slice(separator + 1));
+  }
+}
+
+function cleanEnvValue(value) {
+  const trimmed = value.trim();
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1).replace(/\\n/g, '\n');
+  }
+  return trimmed;
+}
 
 function databaseUrl(name) {
   const value = process.env[name];
@@ -342,6 +377,36 @@ async function verifySearch(targetPool) {
   }
 }
 
+async function verifyCardUrls(targetPool) {
+  const summary = await targetPool.query(`
+    select
+      (select count(*)::integer from public.marketplace_card_urls) as url_rows,
+      (select count(*)::integer from public.marketplace_card_urls where is_unique) as unique_rows,
+      (select count(*)::integer from public.marketplace_card_urls where not is_unique) as duplicate_rows,
+      (select max(duplicate_group_size)::integer from public.marketplace_card_urls) as max_duplicate_group_size,
+      (
+        select count(*)::integer
+        from public.marketplace_search_candidates
+        where coalesce(preview_image_url, cdn_image_url, image_url) is not null
+      ) as eligible_cards,
+      (select count(*)::integer from public.marketplace_card_url_duplicate_report()) as duplicate_groups,
+      (select max(updated_at) from public.marketplace_card_urls) as last_updated_at
+  `);
+  const row = summary.rows[0] || {};
+  console.log(
+    `Card URL rows: ${row.url_rows || 0}/${row.eligible_cards || 0}; unique rows: ${row.unique_rows || 0}; duplicate rows: ${row.duplicate_rows || 0}; duplicate groups: ${row.duplicate_groups || 0}; max group size: ${row.max_duplicate_group_size || 0}; last updated: ${row.last_updated_at || 'never'}`,
+  );
+  if (Number(row.duplicate_groups || 0) > 0) {
+    const duplicates = await targetPool.query(`
+      select duplicate_key, duplicate_value, duplicate_count, card_ids[1:10] as sample_card_ids
+      from public.marketplace_card_url_duplicate_report()
+      order by duplicate_count desc, duplicate_key, duplicate_value
+      limit 20
+    `);
+    console.log(JSON.stringify(duplicates.rows, null, 2));
+  }
+}
+
 async function main() {
   const command = process.argv[2] || 'all';
   const sourcePool = ['copy', 'all'].includes(command) ? createPool('SUPABASE_DB_URL') : null;
@@ -359,6 +424,7 @@ async function main() {
     }
     if (['verify', 'all'].includes(command)) {
       await verifySearch(targetPool);
+      await verifyCardUrls(targetPool);
     }
   } finally {
     await closePools(sourcePool, targetPool);

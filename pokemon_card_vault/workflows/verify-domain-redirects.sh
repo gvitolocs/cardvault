@@ -8,6 +8,7 @@ hosts=(
   forum.pokoin.com
   cards.pokoin.com
   cardcaveau.pokoin.com
+  cardvault.pokoin.com
   www.pokoin.com
 )
 
@@ -25,6 +26,7 @@ for url in \
   https://forum.pokoin.com/ \
   https://cards.pokoin.com/ \
   https://cardcaveau.pokoin.com/ \
+  https://cardvault.pokoin.com/ \
   https://www.pokoin.com/; do
   line="$(/usr/bin/curl -I -s "$url" | /usr/bin/awk 'BEGIN{status="";loc=""} /^HTTP\//{status=$2} tolower($1)=="location:"{loc=$2} END{gsub("\r","",loc); print status, loc}')"
   echo "${url} -> ${line}"

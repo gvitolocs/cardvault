@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
@@ -19,13 +20,15 @@ class ScanScreen extends StatefulWidget {
 
 class _ScanScreenState extends State<ScanScreen> {
   final TextEditingController _searchController = TextEditingController();
-  late Future<ExplorerSnapshot> _snapshot;
+  ExplorerSnapshot? _snapshot;
+  bool _isRefreshingSnapshot = true;
+  Object? _snapshotError;
   Future<SearchResult?>? _search;
 
   @override
   void initState() {
     super.initState();
-    _snapshot = ExplorerSnapshot.load();
+    _loadSnapshot();
     _applyInitialQuery();
   }
 
@@ -44,9 +47,45 @@ class _ScanScreenState extends State<ScanScreen> {
   }
 
   void _refresh() {
-    setState(() {
-      _snapshot = ExplorerSnapshot.load();
-    });
+    _loadSnapshot(force: true);
+  }
+
+  Future<void> _loadSnapshot({bool force = false}) async {
+    if (!force) {
+      final cached = await ExplorerSnapshot.cached();
+      if (mounted && cached != null) {
+        setState(() {
+          _snapshot = cached;
+          _isRefreshingSnapshot = true;
+          _snapshotError = null;
+        });
+      }
+    } else if (mounted) {
+      setState(() {
+        _isRefreshingSnapshot = true;
+        _snapshotError = null;
+      });
+    }
+
+    try {
+      final fresh = await ExplorerSnapshot.load();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _snapshot = fresh;
+        _isRefreshingSnapshot = false;
+        _snapshotError = null;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isRefreshingSnapshot = false;
+        _snapshotError = error;
+      });
+    }
   }
 
   void _applyInitialQuery() {
@@ -73,10 +112,9 @@ class _ScanScreenState extends State<ScanScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF050816),
       appBar: _ExplorerTopBar(onRefresh: _refresh),
-      body: FutureBuilder<ExplorerSnapshot>(
-        future: _snapshot,
-        builder: (context, snapshot) {
-          final data = snapshot.data;
+      body: Builder(
+        builder: (context) {
+          final data = _snapshot;
           return SingleChildScrollView(
             physics: const ClampingScrollPhysics(),
             padding: const EdgeInsets.all(20),
@@ -87,15 +125,15 @@ class _ScanScreenState extends State<ScanScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _HeroSearch(
-                      loading: snapshot.connectionState != ConnectionState.done,
+                      loading: _isRefreshingSnapshot && data == null,
                       controller: _searchController,
                       onSearch: _runSearch,
                     ),
-                    if (snapshot.hasError) ...[
+                    if (_snapshotError != null) ...[
                       const SizedBox(height: 16),
                       _Notice(
                         title: 'Explorer data unavailable',
-                        body: snapshot.error.toString(),
+                        body: _snapshotError.toString(),
                       ),
                     ],
                     if (_search != null) ...[
@@ -141,6 +179,11 @@ class _ScanScreenState extends State<ScanScreen> {
 }
 
 class ExplorerSnapshot {
+  static const String _cacheBoxName = 'explorer_public_cache';
+  static const String _snapshotCacheKey = 'snapshot';
+  static const int _cacheSchemaVersion = 1;
+  static const Duration _cacheTtl = Duration(minutes: 2);
+
   final Map<String, dynamic> status;
   final List<ExplorerBlock> blocks;
   final List<ExplorerTransaction> transactions;
@@ -208,7 +251,7 @@ class ExplorerSnapshot {
       return b.transactionIndex.compareTo(a.transactionIndex);
     });
 
-    return ExplorerSnapshot(
+    final snapshot = ExplorerSnapshot(
       status: status,
       blocks: blocks,
       transactions: transactions,
@@ -220,6 +263,89 @@ class ExplorerSnapshot {
           int.tryParse((responses[7] as String? ?? '').trim()) ?? 0,
       refreshedAt: DateTime.now(),
     );
+    await snapshot.saveToCache();
+    return snapshot;
+  }
+
+  static Future<ExplorerSnapshot?> cached() async {
+    try {
+      final box = await Hive.openBox<Map>(_cacheBoxName);
+      final raw = box.get(_snapshotCacheKey);
+      if (raw == null) {
+        return null;
+      }
+      final data = Map<String, dynamic>.from(raw);
+      final schema = (data['_schemaVersion'] as num?)?.toInt();
+      final cachedAtMs = (data['_cachedAtMs'] as num?)?.toInt();
+      if (schema != _cacheSchemaVersion || cachedAtMs == null) {
+        return null;
+      }
+      final age = DateTime.now().difference(
+        DateTime.fromMillisecondsSinceEpoch(cachedAtMs),
+      );
+      if (age > _cacheTtl) {
+        return null;
+      }
+      return ExplorerSnapshot.fromJson(
+        Map<String, dynamic>.from(data['payload'] as Map? ?? const {}),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> saveToCache() async {
+    try {
+      final box = await Hive.openBox<Map>(_cacheBoxName);
+      await box.put(_snapshotCacheKey, {
+        '_schemaVersion': _cacheSchemaVersion,
+        '_cachedAtMs': DateTime.now().millisecondsSinceEpoch,
+        'payload': toJson(),
+      });
+    } catch (_) {
+      // Explorer cache is best-effort and should never block live data.
+    }
+  }
+
+  factory ExplorerSnapshot.fromJson(Map<String, dynamic> json) {
+    return ExplorerSnapshot(
+      status: Map<String, dynamic>.from(json['status'] as Map? ?? const {}),
+      blocks: (json['blocks'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map((row) => ExplorerBlock.fromJson(Map<String, dynamic>.from(row)))
+          .toList(),
+      transactions: (json['transactions'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map((row) =>
+              ExplorerTransaction.fromJson(Map<String, dynamic>.from(row)))
+          .toList(),
+      validators: (json['validators'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map((row) => ValidatorInfo.fromJson(Map<String, dynamic>.from(row)))
+          .toList(),
+      bootstrapRegistry: Map<String, dynamic>.from(
+          json['bootstrapRegistry'] as Map? ?? const {}),
+      reserve: Map<String, dynamic>.from(json['reserve'] as Map? ?? const {}),
+      totalSupply: (json['totalSupply'] as num?)?.toInt() ?? 0,
+      circulatingSupply: (json['circulatingSupply'] as num?)?.toInt() ?? 0,
+      refreshedAt: DateTime.tryParse('${json['refreshedAt'] ?? ''}') ??
+          DateTime.fromMillisecondsSinceEpoch(0),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'status': status,
+      'blocks': blocks.map((block) => block.toJson()).toList(),
+      'transactions':
+          transactions.map((transaction) => transaction.toJson()).toList(),
+      'validators': validators.map((validator) => validator.toJson()).toList(),
+      'bootstrapRegistry': bootstrapRegistry,
+      'reserve': reserve,
+      'totalSupply': totalSupply,
+      'circulatingSupply': circulatingSupply,
+      'refreshedAt': refreshedAt.toIso8601String(),
+    };
   }
 
   static List<ValidatorInfo> _dedupeValidators(List<ValidatorInfo> validators) {
@@ -540,6 +666,19 @@ class ExplorerBlock {
       finalized: json['finalized'] == true,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'number': number,
+      'hash': hash,
+      'parentHash': parentHash,
+      'slot': slot,
+      'draw': draw,
+      'miner': miner,
+      'transactionCount': transactionCount,
+      'finalized': finalized,
+    };
+  }
 }
 
 class ExplorerTransaction {
@@ -578,6 +717,20 @@ class ExplorerTransaction {
       finalized: json['finalized'] == true,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'hash': hash,
+      'from': from,
+      'to': to,
+      'amount': amount,
+      'kind': kind,
+      'nonce': nonce,
+      'blockNumber': blockNumber,
+      'transactionIndex': transactionIndex,
+      'finalized': finalized,
+    };
+  }
 }
 
 class ValidatorInfo {
@@ -608,6 +761,17 @@ class ValidatorInfo {
     );
   }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'peerId': peerId,
+      'validator': validator,
+      'stake': stake,
+      'authorized': authorized,
+      'local': local,
+      'connected': connected,
+    };
+  }
+
   bool isBetterDisplayThan(ValidatorInfo other) {
     if (stake != other.stake) {
       return stake > other.stake;
@@ -619,6 +783,16 @@ class ValidatorInfo {
       return authorized;
     }
     return peerId.length > other.peerId.length;
+  }
+
+  String get displayPeerId {
+    final value = peerId.trim();
+    final hash = value.startsWith('peer-') ? value.substring(5) : value;
+    if (hash.isEmpty) {
+      return 'peer';
+    }
+    final suffix = hash.length <= 5 ? hash : hash.substring(hash.length - 5);
+    return 'peer-$suffix';
   }
 }
 
@@ -724,7 +898,7 @@ class _StatsGrid extends StatelessWidget {
         icon: Icons.verified_user_outlined,
       ),
       _StatCard(
-        label: 'wPKN Backing',
+        label: 'BEP-20 wPKN backing',
         value: '$reserveAmount PKN',
         icon: Icons.account_balance,
       ),
@@ -847,17 +1021,10 @@ class _TransactionsPanel extends StatelessWidget {
             icon: Icons.receipt_long_outlined,
           ),
           const SizedBox(height: 12),
-          for (final tx in transactions.take(12))
-            _ListRow(
-              leading: tx.kind.toUpperCase(),
-              title:
-                  '${_formatAmount(tx.amount)} PKN · block ${tx.blockNumber}',
-              subtitle: '${_short(tx.from)} → ${_short(tx.to)}',
-              trailing: tx.finalized ? 'Final' : 'Pending',
-              onTap: () => context.go('/tx/${tx.hash}'),
-            ),
           if (transactions.isEmpty)
-            const _EmptyLine('No recent treasury transactions loaded.'),
+            const _EmptyLine('No recent treasury transactions loaded.')
+          else
+            _TransactionTable(transactions: transactions.take(12).toList()),
         ],
       ),
     );
@@ -895,7 +1062,7 @@ class _ValidatorsPanel extends StatelessWidget {
           const SizedBox(height: 12),
           for (final validator in validators)
             _ListRow(
-              leading: validator.peerId,
+              leading: validator.displayPeerId,
               title: '${validator.stake} PKN stake',
               subtitle: _short(validator.validator, head: 22, tail: 14),
               trailing: validator.connected || validator.local
@@ -963,9 +1130,20 @@ class _WPKNPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const _PanelHeader(
-            title: 'wPKN Bridge View',
-            subtitle: 'Wrapped PKN visibility on BNB Smart Chain',
+            title: 'wPKN and Native Swap View',
+            subtitle:
+                'BNB Chain wPKN reserve proof plus native PokoinSwap accounting',
             icon: Icons.hub_outlined,
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'Native PokoinSwap WPKN is an internal PokoinPoS accounting balance. It tracks a claim inside the PokoinPoS ledger, but it is not automatically the BEP-20 wPKN token in MetaMask on BNB Chain until a bridge/withdrawal settlement moves value across chains.',
+            style: TextStyle(color: Color(0xFFCBD5E1), height: 1.45),
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'BTC, ETH, and BNB are also supported as native PokoinSwap accounting assets. External deposits/withdrawals still need an operator or bridge service for settlement, then those claims trade against PKN on PokoinSwap.',
+            style: TextStyle(color: Color(0xFF93A4C8), height: 1.45),
           ),
           const SizedBox(height: 14),
           Wrap(
@@ -987,6 +1165,16 @@ class _WPKNPanel extends StatelessWidget {
                   label: 'Pancake pair',
                   value: pancake?['poolAddress'] ??
                       ProjectLinks.pancakePairAddress),
+            ],
+          ),
+          const SizedBox(height: 14),
+          const Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _InfoBox(label: 'Native swap asset', value: 'WPKN accounting'),
+              _InfoBox(label: 'External token', value: 'BEP-20 wPKN on BNB'),
+              _InfoBox(label: 'Active assets', value: 'BTC / ETH / BNB claims'),
             ],
           ),
           const SizedBox(height: 16),
@@ -1029,9 +1217,15 @@ class _SearchPanel extends StatelessWidget {
       return const _Notice(
           title: 'No result', body: 'Nothing matched that query.');
     }
-    final rows = result!.result.entries.take(10).map((e) {
-      return _InfoBox(label: e.key, value: e.value.toString());
-    }).toList();
+    final transactions = ((result!.result['transactions'] as List?) ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map(ExplorerTransaction.fromJson)
+        .toList();
+    final rows = result!.result.entries
+        .where((e) => e.key != 'transactions')
+        .take(10)
+        .map((e) => _InfoBox(label: e.key, value: e.value.toString()))
+        .toList();
     return _Panel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1042,7 +1236,12 @@ class _SearchPanel extends StatelessWidget {
             icon: Icons.manage_search,
           ),
           const SizedBox(height: 14),
-          Wrap(spacing: 12, runSpacing: 12, children: rows),
+          if (transactions.isNotEmpty) ...[
+            _TransactionTable(transactions: transactions),
+            if (rows.isNotEmpty) const SizedBox(height: 14),
+          ],
+          if (rows.isNotEmpty)
+            Wrap(spacing: 12, runSpacing: 12, children: rows),
         ],
       ),
     );
@@ -1207,7 +1406,8 @@ class _InfoBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final address = _addressValue(value);
+    final box = Container(
       width: 270,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -1222,10 +1422,141 @@ class _InfoBox extends StatelessWidget {
           const SizedBox(height: 6),
           SelectableText(
             value,
-            style: const TextStyle(
-                color: Colors.white, fontWeight: FontWeight.w700),
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              decoration: address == null ? null : TextDecoration.underline,
+              decorationColor: const Color(0xFFFACC15),
+            ),
           ),
         ],
+      ),
+    );
+    if (address == null) {
+      return box;
+    }
+    return InkWell(
+      onTap: () => _open('${ProjectLinks.rpcBase}/explorer/address/$address'),
+      borderRadius: BorderRadius.circular(16),
+      child: box,
+    );
+  }
+}
+
+class _TransactionTable extends StatelessWidget {
+  final List<ExplorerTransaction> transactions;
+
+  const _TransactionTable({required this.transactions});
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: const Color(0xFF080D1A),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: DataTable(
+            headingRowColor: WidgetStateProperty.all(const Color(0xFF111827)),
+            dataRowMinHeight: 56,
+            dataRowMaxHeight: 64,
+            columnSpacing: 24,
+            headingTextStyle: const TextStyle(
+              color: Color(0xFFE2E8F0),
+              fontWeight: FontWeight.w800,
+              fontSize: 12,
+            ),
+            dataTextStyle: const TextStyle(
+              color: Color(0xFFE2E8F0),
+              fontSize: 12,
+            ),
+            columns: const [
+              DataColumn(label: Text('Transaction Hash')),
+              DataColumn(label: Text('Action')),
+              DataColumn(label: Text('Block')),
+              DataColumn(label: Text('From')),
+              DataColumn(label: Text('To')),
+              DataColumn(label: Text('Amount'), numeric: true),
+              DataColumn(label: Text('Status')),
+            ],
+            rows: [
+              for (final tx in transactions)
+                DataRow(
+                  cells: [
+                    DataCell(_ExplorerCellLink(
+                      label: _short(tx.hash, head: 10, tail: 6),
+                      url: '${ProjectLinks.rpcBase}/explorer/tx/${tx.hash}',
+                    )),
+                    DataCell(_ActionPill(label: tx.kind)),
+                    DataCell(Text('${tx.blockNumber}')),
+                    DataCell(_ExplorerCellLink(
+                      label: _short(tx.from, head: 8, tail: 6),
+                      url:
+                          '${ProjectLinks.rpcBase}/explorer/address/${tx.from}',
+                    )),
+                    DataCell(_ExplorerCellLink(
+                      label: _short(tx.to, head: 8, tail: 6),
+                      url: '${ProjectLinks.rpcBase}/explorer/address/${tx.to}',
+                    )),
+                    DataCell(Text('${_formatAmount(tx.amount)} PKN')),
+                    DataCell(Text(tx.finalized ? 'Final' : 'Pending')),
+                  ],
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ExplorerCellLink extends StatelessWidget {
+  final String label;
+  final String url;
+
+  const _ExplorerCellLink({required this.label, required this.url});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () => _open(url),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Color(0xFF38BDF8),
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
+class _ActionPill extends StatelessWidget {
+  final String label;
+
+  const _ActionPill({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final text = label.trim().isEmpty ? 'Transfer' : label.trim();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111827),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+      ),
+      child: Text(
+        text[0].toUpperCase() + text.substring(1),
+        style: const TextStyle(
+          color: Color(0xFFE2E8F0),
+          fontWeight: FontWeight.w700,
+          fontSize: 11,
+        ),
       ),
     );
   }
@@ -1362,6 +1693,13 @@ String _formatAmount(int amount) {
     }
   }
   return buffer.toString();
+}
+
+String? _addressValue(String value) {
+  final trimmed = value.trim();
+  return RegExp(r'^0x[a-fA-F0-9]{40}$').hasMatch(trimmed)
+      ? trimmed.toLowerCase()
+      : null;
 }
 
 Future<void> _open(String url) async {

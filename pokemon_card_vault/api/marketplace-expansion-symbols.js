@@ -29,6 +29,17 @@ function defaultSymbolUrl(name) {
   return slug ? `https://cdn.pokoin.com/expansions/symbols/${slug}.png` : '';
 }
 
+function defaultLogoUrl(name) {
+  const slug = slugify(name);
+  return slug ? `https://cdn.pokoin.com/expansions/logos/${slug}.png` : '';
+}
+
+function objectKeyFromCdnUrl(value, prefix) {
+  const url = cleanText(value, 500);
+  const marker = `/${prefix}/`;
+  return url.includes(marker) ? `${prefix}/${url.split(marker)[1]}` : null;
+}
+
 function isValidHttpUrl(value) {
   try {
     const url = new URL(value);
@@ -38,11 +49,14 @@ function isValidHttpUrl(value) {
   }
 }
 
-async function requireAdmin(req) {
+async function requireDebugOrAdmin(req) {
   const decoded = await verifyBearerToken(req);
   const email = String(decoded.email || '').trim().toLowerCase();
   const allowlist = [
+    'vitologiuseppe17@gmail.com',
+    'pokoinpos@gmail.com',
     process.env.MARKETPLACE_ADMIN_EMAILS || '',
+    process.env.MARKETPLACE_DEBUG_EMAILS || '',
     process.env.ADMIN_SIGNUP_EMAIL || '',
   ]
     .join(',')
@@ -57,18 +71,31 @@ async function requireAdmin(req) {
   const userDoc = await admin.firestore().collection('users').doc(decoded.uid).get();
   const profile = userDoc.data() || {};
   const role = String(profile.role || '').trim().toLowerCase();
-  if (profile.admin === true || profile.isAdmin === true || role === 'admin') {
+  const username = String(profile.username || '').trim().toLowerCase();
+  if (
+    profile.admin === true ||
+    profile.isAdmin === true ||
+    profile.hasAdminAccess === true ||
+    role === 'admin' ||
+    username === 'vitologiuseppe17'
+  ) {
     return decoded;
   }
 
-  const error = new Error('Admin access required.');
+  const error = new Error('Debug access required.');
   error.statusCode = 403;
   throw error;
 }
 
-async function listExpansionSymbols({ query, missingOnly, limit }) {
+async function listExpansionSymbols({
+  query,
+  missingOnly,
+  missingLogoOnly,
+  limit,
+  dbQuery = marketplaceQuery,
+}) {
   const values = [];
-  let where = 'where expansion_name is not null and expansion_name <> \'\''; 
+  let where = 'where expansion_name is not null and expansion_name <> \'\'';
   const normalizedQuery = cleanText(query);
   if (normalizedQuery) {
     values.push(`%${normalizedQuery}%`);
@@ -79,9 +106,13 @@ async function listExpansionSymbols({ query, missingOnly, limit }) {
   if (missingFilter) {
     where += ' and coalesce(expansions.symbol_image_url, \'\') = \'\'';
   }
+  const missingLogoFilter = String(missingLogoOnly || '').trim() === '1';
+  if (missingLogoFilter) {
+    where += ' and coalesce(expansions.logo_image_url, \'\') = \'\'';
+  }
 
   values.push(cleanLimit(limit));
-  const result = await marketplaceQuery(
+  const result = await dbQuery(
     `
       select
         versions.expansion_name as name,
@@ -90,6 +121,8 @@ async function listExpansionSymbols({ query, missingOnly, limit }) {
         min(expansions.source_asset_code) as source_asset_code,
         min(expansions.symbol_image_url) as symbol_image_url,
         min(expansions.symbol_object_key) as symbol_object_key,
+        min(expansions.logo_image_url) as logo_image_url,
+        min(expansions.logo_object_key) as logo_object_key,
         count(*)::integer as card_count
       from public.marketplace_card_versions versions
       left join public.cardtrader_pokemon_expansions expansions
@@ -109,14 +142,23 @@ async function listExpansionSymbols({ query, missingOnly, limit }) {
     sourceAssetCode: row.source_asset_code || '',
     symbolImageUrl: row.symbol_image_url || '',
     symbolObjectKey: row.symbol_object_key || '',
+    logoImageUrl: row.logo_image_url || '',
+    logoObjectKey: row.logo_object_key || '',
     defaultSymbolUrl: defaultSymbolUrl(row.name),
+    defaultLogoUrl: defaultLogoUrl(row.name),
     cardCount: Number(row.card_count || 0),
   }));
 }
 
-async function updateExpansionSymbol({ name, symbolImageUrl, sourceAssetCode }) {
+async function updateExpansionSymbol({
+  name,
+  symbolImageUrl,
+  logoImageUrl,
+  sourceAssetCode,
+}) {
   const expansionName = cleanText(name);
   const symbolUrl = cleanText(symbolImageUrl, 500);
+  const logoUrl = cleanText(logoImageUrl, 500);
   const sourceCode = cleanText(sourceAssetCode, 120);
   if (!expansionName) {
     const error = new Error('Expansion name is required.');
@@ -124,6 +166,11 @@ async function updateExpansionSymbol({ name, symbolImageUrl, sourceAssetCode }) 
     throw error;
   }
   if (symbolUrl && !isValidHttpUrl(symbolUrl)) {
+    const error = new Error('Symbol URL must be a valid http(s) URL.');
+    error.statusCode = 400;
+    throw error;
+  }
+  if (logoUrl && !isValidHttpUrl(logoUrl)) {
     const error = new Error('Logo URL must be a valid http(s) URL.');
     error.statusCode = 400;
     throw error;
@@ -157,9 +204,8 @@ async function updateExpansionSymbol({ name, symbolImageUrl, sourceAssetCode }) 
     ? existingId
     : Math.abs(hashString(expansionName)) + 2_000_000_000;
 
-  const objectKey = symbolUrl.includes('/expansions/symbols/')
-    ? symbolUrl.split('/expansions/symbols/')[1]
-    : null;
+  const symbolObjectKey = objectKeyFromCdnUrl(symbolUrl, 'expansions/symbols');
+  const logoObjectKey = objectKeyFromCdnUrl(logoUrl, 'expansions/logos');
   const result = await marketplaceQuery(
     `
       insert into public.cardtrader_pokemon_expansions (
@@ -169,18 +215,39 @@ async function updateExpansionSymbol({ name, symbolImageUrl, sourceAssetCode }) 
         source_asset_code,
         symbol_image_url,
         symbol_object_key,
-        symbol_imported_at
+        symbol_imported_at,
+        logo_image_url,
+        logo_object_key,
+        logo_imported_at
       )
-      values ($1, 5, $2, nullif($3, ''), nullif($4, ''), $5, now())
+      values ($1, 5, $2, nullif($3, ''), nullif($4, ''), $5, now(), nullif($6, ''), $7, now())
       on conflict (expansion_id) do update set
         name = excluded.name,
         source_asset_code = excluded.source_asset_code,
         symbol_image_url = excluded.symbol_image_url,
         symbol_object_key = excluded.symbol_object_key,
-        symbol_imported_at = now()
-      returning expansion_id, name, source_asset_code, symbol_image_url, symbol_object_key
+        symbol_imported_at = now(),
+        logo_image_url = excluded.logo_image_url,
+        logo_object_key = excluded.logo_object_key,
+        logo_imported_at = now()
+      returning
+        expansion_id,
+        name,
+        source_asset_code,
+        symbol_image_url,
+        symbol_object_key,
+        logo_image_url,
+        logo_object_key
     `,
-    [expansionId, expansionName, sourceCode, symbolUrl, objectKey],
+    [
+      expansionId,
+      expansionName,
+      sourceCode,
+      symbolUrl,
+      symbolObjectKey,
+      logoUrl,
+      logoObjectKey,
+    ],
   );
 
   const row = result.rows[0] || {};
@@ -190,7 +257,10 @@ async function updateExpansionSymbol({ name, symbolImageUrl, sourceAssetCode }) 
     sourceAssetCode: row.source_asset_code || '',
     symbolImageUrl: row.symbol_image_url || '',
     symbolObjectKey: row.symbol_object_key || '',
+    logoImageUrl: row.logo_image_url || '',
+    logoObjectKey: row.logo_object_key || '',
     defaultSymbolUrl: defaultSymbolUrl(expansionName),
+    defaultLogoUrl: defaultLogoUrl(expansionName),
   };
 }
 
@@ -204,12 +274,13 @@ function hashString(value) {
 
 module.exports = async function handler(req, res) {
   try {
-    await requireAdmin(req);
+    await requireDebugOrAdmin(req);
     if (req.method === 'GET') {
       const url = new URL(req.url, `https://${req.headers.host || 'pokoin.com'}`);
       const rows = await listExpansionSymbols({
         query: url.searchParams.get('query'),
         missingOnly: url.searchParams.get('missingOnly'),
+        missingLogoOnly: url.searchParams.get('missingLogoOnly'),
         limit: url.searchParams.get('limit'),
       });
       res.setHeader('Cache-Control', 'private, no-store');
@@ -228,3 +299,9 @@ module.exports = async function handler(req, res) {
     });
   }
 };
+
+module.exports.defaultLogoUrl = defaultLogoUrl;
+module.exports.defaultSymbolUrl = defaultSymbolUrl;
+module.exports.listExpansionSymbols = listExpansionSymbols;
+module.exports.objectKeyFromCdnUrl = objectKeyFromCdnUrl;
+module.exports.updateExpansionSymbol = updateExpansionSymbol;

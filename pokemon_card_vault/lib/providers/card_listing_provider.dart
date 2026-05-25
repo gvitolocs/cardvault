@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/card_listing.dart';
+import '../services/card_service.dart';
 import '../services/card_listing_service.dart';
 
 final cardListingServiceProvider = Provider<CardListingService>((ref) {
@@ -19,4 +20,16 @@ final cardListingsProvider =
 final sellerListingsProvider =
     StreamProvider.family<List<CardListing>, String>((ref, sellerUid) {
   return ref.watch(cardListingServiceProvider).listingsForSeller(sellerUid);
+});
+
+final sellerUsernameListingsProvider =
+    StreamProvider.family<List<CardListing>, String>((ref, username) {
+  return ref
+      .watch(cardListingServiceProvider)
+      .activeListingsForSellerUsername(username);
+});
+
+final cardSalesHistoryProvider =
+    FutureProvider.family<List<CardSaleEvent>, String>((ref, cardId) {
+  return CardService().getCardSalesHistory(cardId);
 });

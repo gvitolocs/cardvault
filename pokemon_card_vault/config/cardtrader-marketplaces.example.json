@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "notes": [
+    "One card game maps to one isolated database/schema target.",
+    "Values in this file are non-secret placeholders. Put real connection strings only in environment variables."
+  ],
+  "games": {
+    "pokemon": {
+      "displayName": "Pokemon",
+      "slug": "pokemon",
+      "cardtraderGameId": 5,
+      "databaseUrlEnv": "MARKETPLACE_DATABASE_URL",
+      "schema": "public",
+      "table": "cardtrader_pokemon_blueprints",
+      "cdnKeyPrefix": "",
+      "refreshSql": "select public.refresh_marketplace_oracle_projections()",
+      "syncCommand": "node scripts/sync-card-name-index-to-supabase.js --apply --full-refresh --languages=en --limit=all --transport=rest"
+    },
+    "magic": {
+      "displayName": "Magic: the Gathering",
+      "slug": "magic",
+      "cardtraderGameId": 1,
+      "databaseUrlEnv": "MAGIC_MARKETPLACE_DATABASE_URL",
+      "schema": "marketplace_magic",
+      "table": "cardtrader_blueprints",
+      "cdnKeyPrefix": "magic/",
+      "refreshSql": "",
+      "syncCommand": "",
+      "notes": "Configure a separate database URL or isolated schema before using --apply."
+    },
+    "yugioh": {
+      "displayName": "Yu-Gi-Oh!",
+      "slug": "yugioh",
+      "cardtraderGameId": 4,
+      "databaseUrlEnv": "YUGIOH_MARKETPLACE_DATABASE_URL",
+      "schema": "marketplace_yugioh",
+      "table": "cardtrader_blueprints",
+      "cdnKeyPrefix": "yugioh/",
+      "refreshSql": "",
+      "syncCommand": ""
+    },
+    "one_piece": {
+      "displayName": "One Piece",
+      "slug": "one-piece",
+      "cardtraderGameId": 15,
+      "databaseUrlEnv": "ONE_PIECE_MARKETPLACE_DATABASE_URL",
+      "schema": "marketplace_one_piece",
+      "table": "cardtrader_blueprints",
+      "cdnKeyPrefix": "one-piece/",
+      "refreshSql": "",
+      "syncCommand": ""
+    },
+    "lorcana": {
+      "displayName": "Disney Lorcana",
+      "slug": "lorcana",
+      "cardtraderGameId": 18,
+      "databaseUrlEnv": "LORCANA_MARKETPLACE_DATABASE_URL",
+      "schema": "marketplace_lorcana",
+      "table": "cardtrader_blueprints",
+      "cdnKeyPrefix": "lorcana/",
+      "refreshSql": "",
+      "syncCommand": ""
+    }
+  }
+}

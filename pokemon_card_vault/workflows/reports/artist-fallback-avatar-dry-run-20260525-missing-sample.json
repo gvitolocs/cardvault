@@ -1,0 +1,253 @@
+{
+  "generatedAt": "2026-05-25T08:17:04.198Z",
+  "mode": "artist-fallback-avatar-dry-run",
+  "options": {
+    "limit": 5,
+    "concurrency": 2,
+    "artist": "",
+    "auditReport": "workflows/reports/artist-profile-grey-placeholder-audit-20260525.json",
+    "avatarSize": 512,
+    "cropYRatio": 0.1,
+    "includeMissing": true,
+    "includePlaceholders": false
+  },
+  "counts": {
+    "scanned": 5,
+    "placeholderProfileImage": 0,
+    "missingProfileImage": 5,
+    "candidatesWithCard": 5,
+    "generated": 0,
+    "uploaded": 0,
+    "upserted": 0,
+    "skipped": 0,
+    "failed": 0,
+    "reasons": {
+      "normal_art": 2,
+      "illustration": 3
+    }
+  },
+  "samples": [
+    {
+      "artist": "Aimi Tomita",
+      "normalizedArtist": "aimi tomita",
+      "status": "matched_dry_run",
+      "generationReason": "missing_profile_image",
+      "artCategory": "normal_art",
+      "sourceCardName": "Poochyena",
+      "sourceCardId": "115266",
+      "sourceBlueprintId": "115266",
+      "sourceRarity": "Common",
+      "sourceImageUrl": "https://cdn.pokoin.com/115266_poochyena-full-v4.jpg",
+      "sourceImageFetchUrl": "https://pokoin.com/card-images/115266_poochyena-full-v4.jpg",
+      "sourceImageObjectKey": "115266_poochyena-full-v4.jpg",
+      "sourceCardUrl": "https://pokoin.com/marketplace/en/cards/230532/card-poochyena-70-107-ex-deoxys",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/aimi-tomita.png",
+      "profileImageObjectKey": "artist-profiles/aimi-tomita.png",
+      "cropStrategy": {
+        "name": "top_center_square",
+        "yRatio": 0.1,
+        "outputSize": 512
+      }
+    },
+    {
+      "artist": "Akino Fukuji",
+      "normalizedArtist": "akino fukuji",
+      "status": "matched_dry_run",
+      "generationReason": "missing_profile_image",
+      "artCategory": "illustration",
+      "sourceCardName": "Tirtouga",
+      "sourceCardId": "342434",
+      "sourceBlueprintId": "342434",
+      "sourceRarity": "Illustration Rare",
+      "sourceImageUrl": "https://cdn.pokoin.com/342434_tirtouga.jpg",
+      "sourceImageFetchUrl": "https://pokoin.com/card-images/342434_tirtouga.jpg",
+      "sourceImageObjectKey": "342434_tirtouga.jpg",
+      "sourceCardUrl": "https://pokoin.com/marketplace/en/cards/684868/card-tirtouga-illustration-rare-106-086-black-bolt",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/akino-fukuji.png",
+      "profileImageObjectKey": "artist-profiles/akino-fukuji.png",
+      "cropStrategy": {
+        "name": "top_center_square",
+        "yRatio": 0.1,
+        "outputSize": 512
+      }
+    },
+    {
+      "artist": "AKIRA EGAWA",
+      "normalizedArtist": "akira egawa",
+      "status": "matched_dry_run",
+      "generationReason": "missing_profile_image",
+      "artCategory": "illustration",
+      "sourceCardName": "Mew VMAX",
+      "sourceCardId": "200763",
+      "sourceBlueprintId": "200763",
+      "sourceRarity": "Special Illustration Rare",
+      "sourceImageUrl": "https://cdn.pokoin.com/200763_mew-vmax-269-264-fusion-strike.png",
+      "sourceImageFetchUrl": "https://pokoin.com/card-images/200763_mew-vmax-269-264-fusion-strike.png",
+      "sourceImageObjectKey": "200763_mew-vmax-269-264-fusion-strike.png",
+      "sourceCardUrl": "https://pokoin.com/marketplace/en/cards/401526/card-mew-vmax-269-264-fusion-strike",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/akira-egawa.png",
+      "profileImageObjectKey": "artist-profiles/akira-egawa.png",
+      "cropStrategy": {
+        "name": "top_center_square",
+        "yRatio": 0.1,
+        "outputSize": 512
+      }
+    },
+    {
+      "artist": "Illus.＆Direc.The Pokémon Company Art Team",
+      "normalizedArtist": "and direc the pokemon company art team",
+      "status": "matched_dry_run",
+      "generationReason": "missing_profile_image",
+      "artCategory": "normal_art",
+      "sourceCardName": "Leafeon",
+      "sourceCardId": "111064",
+      "sourceBlueprintId": "111064",
+      "sourceRarity": "Holo Promo",
+      "sourceImageUrl": "https://cdn.pokoin.com/111064_leafeon-full-v4.jpg",
+      "sourceImageFetchUrl": "https://pokoin.com/card-images/111064_leafeon-full-v4.jpg",
+      "sourceImageObjectKey": "111064_leafeon-full-v4.jpg",
+      "sourceCardUrl": "https://pokoin.com/marketplace/en/cards/222128/card-leafeon-holo-promo-bw87-bw-black-star-promos",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/and-direc-the-pokemon-company-art-team.png",
+      "profileImageObjectKey": "artist-profiles/and-direc-the-pokemon-company-art-team.png",
+      "cropStrategy": {
+        "name": "top_center_square",
+        "yRatio": 0.1,
+        "outputSize": 512
+      }
+    },
+    {
+      "artist": "Anesaki Dynamic",
+      "normalizedArtist": "anesaki dynamic",
+      "status": "matched_dry_run",
+      "generationReason": "missing_profile_image",
+      "artCategory": "illustration",
+      "sourceCardName": "Kyogre",
+      "sourceCardId": "152975",
+      "sourceBlueprintId": "152975",
+      "sourceRarity": "Illustration Rare",
+      "sourceImageUrl": "https://cdn.pokoin.com/152975_kyogre-021-072-shining-fates.png",
+      "sourceImageFetchUrl": "https://pokoin.com/card-images/152975_kyogre-021-072-shining-fates.png",
+      "sourceImageObjectKey": "152975_kyogre-021-072-shining-fates.png",
+      "sourceCardUrl": "https://pokoin.com/marketplace/en/cards/305950/card-kyogre-021-072-shining-fates",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/anesaki-dynamic.png",
+      "profileImageObjectKey": "artist-profiles/anesaki-dynamic.png",
+      "cropStrategy": {
+        "name": "top_center_square",
+        "yRatio": 0.1,
+        "outputSize": 512
+      }
+    }
+  ],
+  "report": [
+    {
+      "artist": "Aimi Tomita",
+      "normalizedArtist": "aimi tomita",
+      "status": "matched_dry_run",
+      "generationReason": "missing_profile_image",
+      "artCategory": "normal_art",
+      "sourceCardName": "Poochyena",
+      "sourceCardId": "115266",
+      "sourceBlueprintId": "115266",
+      "sourceRarity": "Common",
+      "sourceImageUrl": "https://cdn.pokoin.com/115266_poochyena-full-v4.jpg",
+      "sourceImageFetchUrl": "https://pokoin.com/card-images/115266_poochyena-full-v4.jpg",
+      "sourceImageObjectKey": "115266_poochyena-full-v4.jpg",
+      "sourceCardUrl": "https://pokoin.com/marketplace/en/cards/230532/card-poochyena-70-107-ex-deoxys",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/aimi-tomita.png",
+      "profileImageObjectKey": "artist-profiles/aimi-tomita.png",
+      "cropStrategy": {
+        "name": "top_center_square",
+        "yRatio": 0.1,
+        "outputSize": 512
+      }
+    },
+    {
+      "artist": "Akino Fukuji",
+      "normalizedArtist": "akino fukuji",
+      "status": "matched_dry_run",
+      "generationReason": "missing_profile_image",
+      "artCategory": "illustration",
+      "sourceCardName": "Tirtouga",
+      "sourceCardId": "342434",
+      "sourceBlueprintId": "342434",
+      "sourceRarity": "Illustration Rare",
+      "sourceImageUrl": "https://cdn.pokoin.com/342434_tirtouga.jpg",
+      "sourceImageFetchUrl": "https://pokoin.com/card-images/342434_tirtouga.jpg",
+      "sourceImageObjectKey": "342434_tirtouga.jpg",
+      "sourceCardUrl": "https://pokoin.com/marketplace/en/cards/684868/card-tirtouga-illustration-rare-106-086-black-bolt",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/akino-fukuji.png",
+      "profileImageObjectKey": "artist-profiles/akino-fukuji.png",
+      "cropStrategy": {
+        "name": "top_center_square",
+        "yRatio": 0.1,
+        "outputSize": 512
+      }
+    },
+    {
+      "artist": "AKIRA EGAWA",
+      "normalizedArtist": "akira egawa",
+      "status": "matched_dry_run",
+      "generationReason": "missing_profile_image",
+      "artCategory": "illustration",
+      "sourceCardName": "Mew VMAX",
+      "sourceCardId": "200763",
+      "sourceBlueprintId": "200763",
+      "sourceRarity": "Special Illustration Rare",
+      "sourceImageUrl": "https://cdn.pokoin.com/200763_mew-vmax-269-264-fusion-strike.png",
+      "sourceImageFetchUrl": "https://pokoin.com/card-images/200763_mew-vmax-269-264-fusion-strike.png",
+      "sourceImageObjectKey": "200763_mew-vmax-269-264-fusion-strike.png",
+      "sourceCardUrl": "https://pokoin.com/marketplace/en/cards/401526/card-mew-vmax-269-264-fusion-strike",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/akira-egawa.png",
+      "profileImageObjectKey": "artist-profiles/akira-egawa.png",
+      "cropStrategy": {
+        "name": "top_center_square",
+        "yRatio": 0.1,
+        "outputSize": 512
+      }
+    },
+    {
+      "artist": "Illus.＆Direc.The Pokémon Company Art Team",
+      "normalizedArtist": "and direc the pokemon company art team",
+      "status": "matched_dry_run",
+      "generationReason": "missing_profile_image",
+      "artCategory": "normal_art",
+      "sourceCardName": "Leafeon",
+      "sourceCardId": "111064",
+      "sourceBlueprintId": "111064",
+      "sourceRarity": "Holo Promo",
+      "sourceImageUrl": "https://cdn.pokoin.com/111064_leafeon-full-v4.jpg",
+      "sourceImageFetchUrl": "https://pokoin.com/card-images/111064_leafeon-full-v4.jpg",
+      "sourceImageObjectKey": "111064_leafeon-full-v4.jpg",
+      "sourceCardUrl": "https://pokoin.com/marketplace/en/cards/222128/card-leafeon-holo-promo-bw87-bw-black-star-promos",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/and-direc-the-pokemon-company-art-team.png",
+      "profileImageObjectKey": "artist-profiles/and-direc-the-pokemon-company-art-team.png",
+      "cropStrategy": {
+        "name": "top_center_square",
+        "yRatio": 0.1,
+        "outputSize": 512
+      }
+    },
+    {
+      "artist": "Anesaki Dynamic",
+      "normalizedArtist": "anesaki dynamic",
+      "status": "matched_dry_run",
+      "generationReason": "missing_profile_image",
+      "artCategory": "illustration",
+      "sourceCardName": "Kyogre",
+      "sourceCardId": "152975",
+      "sourceBlueprintId": "152975",
+      "sourceRarity": "Illustration Rare",
+      "sourceImageUrl": "https://cdn.pokoin.com/152975_kyogre-021-072-shining-fates.png",
+      "sourceImageFetchUrl": "https://pokoin.com/card-images/152975_kyogre-021-072-shining-fates.png",
+      "sourceImageObjectKey": "152975_kyogre-021-072-shining-fates.png",
+      "sourceCardUrl": "https://pokoin.com/marketplace/en/cards/305950/card-kyogre-021-072-shining-fates",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/anesaki-dynamic.png",
+      "profileImageObjectKey": "artist-profiles/anesaki-dynamic.png",
+      "cropStrategy": {
+        "name": "top_center_square",
+        "yRatio": 0.1,
+        "outputSize": 512
+      }
+    }
+  ]
+}

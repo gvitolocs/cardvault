@@ -28,15 +28,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     ref.listen(authStateProvider, (previous, next) {
-      final previousUid = previous?.valueOrNull?.uid;
-      final nextUid = next.valueOrNull?.uid;
-      if (previousUid != nextUid) {
-        ref.invalidate(userProfileProvider);
-        ref.invalidate(pknBalanceProvider);
-        ref.invalidate(linkedWalletBalanceProvider);
-        ref.invalidate(userOrdersProvider);
-        ref.invalidate(withdrawRequestsProvider);
-      }
       if (!next.isLoading && next.valueOrNull == null && mounted) {
         context.go('/auth?from=/profile');
       }
@@ -112,12 +103,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             data: (profile) => _UserHeader(
                               username: profile?.username ?? '',
                               photoUrl: profile?.photoUrl,
-                              photoVersion: profile
-                                  ?.updatedAt.millisecondsSinceEpoch
-                                  .toString(),
                               walletAddress: profile?.walletAddress,
-                              hasSilverAccess:
-                                  profile?.hasSilverAccess == true,
+                              hasSilverAccess: profile?.hasSilverAccess == true,
                               silverUntil: profile?.silverUntil,
                               balance: balance,
                               walletBalance: walletBalanceState.valueOrNull,
@@ -150,7 +137,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             ordersCount: orders.length,
                             onInventory: () => context.go('/orders'),
                             onFavorites: () => context.go('/favorites'),
-                            onSell: () => context.go('/marketplace'),
+                            onSell: () => context.go('/marketplace/connect'),
                           ),
                           const SizedBox(height: 22),
                           _WalletPreferencesPanel(
@@ -365,7 +352,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         } catch (e) {
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+              SnackBar(
+                  content: Text(e.toString()), backgroundColor: Colors.red),
             );
           }
           return;
@@ -965,7 +953,6 @@ class _TopBarButton extends StatelessWidget {
 class _UserHeader extends StatelessWidget {
   final String username;
   final String? photoUrl;
-  final String? photoVersion;
   final String? walletAddress;
   final bool hasSilverAccess;
   final DateTime? silverUntil;
@@ -981,7 +968,6 @@ class _UserHeader extends StatelessWidget {
   const _UserHeader({
     required this.username,
     required this.photoUrl,
-    required this.photoVersion,
     required this.walletAddress,
     required this.hasSilverAccess,
     required this.silverUntil,
@@ -1018,10 +1004,7 @@ class _UserHeader extends StatelessWidget {
             runSpacing: 16,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              _ProfileAvatar(
-                  photoUrl: photoUrl,
-                  photoVersion: photoVersion,
-                  onTap: onEditPhoto),
+              _ProfileAvatar(photoUrl: photoUrl, onTap: onEditPhoto),
               SizedBox(
                 width: 520,
                 child: Column(
@@ -1168,19 +1151,17 @@ class _ProfileAvatar extends StatelessWidget {
   const _ProfileAvatar({
     required this.photoUrl,
     required this.onTap,
-    this.photoVersion,
     this.size = 50,
   });
 
   final String? photoUrl;
-  final String? photoVersion;
   final VoidCallback? onTap;
   final double size;
 
   @override
   Widget build(BuildContext context) {
     final radius = BorderRadius.circular(size * 0.32);
-    final versionedPhotoUrl = _versionedPhotoUrl(photoUrl, photoVersion);
+    final cleanPhotoUrl = photoUrl?.trim();
     final avatar = Container(
       width: size,
       height: size,
@@ -1190,10 +1171,10 @@ class _ProfileAvatar extends StatelessWidget {
         borderRadius: radius,
         border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
-      child: versionedPhotoUrl != null && versionedPhotoUrl.isNotEmpty
+      child: cleanPhotoUrl != null && cleanPhotoUrl.isNotEmpty
           ? Image.network(
-              versionedPhotoUrl,
-              key: ValueKey(versionedPhotoUrl),
+              cleanPhotoUrl,
+              key: ValueKey(cleanPhotoUrl),
               fit: BoxFit.cover,
               errorBuilder: (_, __, ___) => _DefaultProfileLogo(size: size),
             )
@@ -1232,15 +1213,6 @@ class _ProfileAvatar extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  static String? _versionedPhotoUrl(String? url, String? version) {
-    final clean = url?.trim();
-    if (clean == null || clean.isEmpty || version == null || version.isEmpty) {
-      return clean;
-    }
-    final separator = clean.contains('?') ? '&' : '?';
-    return '$clean${separator}v=$version';
   }
 }
 
@@ -1333,6 +1305,12 @@ class _ProfileSideMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     final items = [
       _ProfileMenuItem(
+        icon: Icons.savings_outlined,
+        title: 'Earn PKN',
+        subtitle: 'Shard cards into marketplace balance',
+        onTap: () => context.go('/earn'),
+      ),
+      _ProfileMenuItem(
         icon: Icons.inventory_2_outlined,
         title: 'Market inventory',
         subtitle: 'Listings, orders, saved cards',
@@ -1343,6 +1321,12 @@ class _ProfileSideMenu extends StatelessWidget {
         title: 'My collection',
         subtitle: 'Owned cards, expansions, NFT and trade shortcuts',
         onTap: () => context.go('/collection'),
+      ),
+      _ProfileMenuItem(
+        icon: Icons.hexagon_outlined,
+        title: 'My NFTs',
+        subtitle: 'Owned NFT cards and physical shipping requests',
+        onTap: () => context.go('/nft'),
       ),
       _ProfileMenuItem(
         icon: Icons.account_balance_wallet_outlined,
@@ -1502,15 +1486,21 @@ class _MarketplaceInventoryPanel extends StatelessWidget {
             onTap: onFavorites,
           ),
           _ProfileAction(
+            icon: Icons.hexagon_outlined,
+            title: 'My NFTs',
+            subtitle: 'Review NFT-only purchases and request physical cards.',
+            onTap: () => context.go('/nft'),
+          ),
+          _ProfileAction(
             icon: Icons.collections_bookmark_outlined,
             title: 'My collection',
-            subtitle: 'Browse expansions with unowned cards grayed out.',
+            subtitle: 'Browse expansions with owned cards shown in color.',
             onTap: () => context.go('/collection'),
           ),
           _ProfileAction(
             icon: Icons.add_business_outlined,
-            title: 'Seller tools',
-            subtitle: 'Start from a card page to list inventory for sale.',
+            title: 'Seller sync',
+            subtitle: 'Connect CardTrader and open seller marketplace tools.',
             onTap: onSell,
           ),
         ],

@@ -1,0 +1,355 @@
+{
+  "mode": "missing-report",
+  "target": "oracle-peer4:public.marketplace_blueprint_artists",
+  "generatedAt": "2026-05-22T15:44:48.339Z",
+  "primary": {
+    "database": "pokoin_marketplace",
+    "inRecovery": false
+  },
+  "options": {
+    "limit": "all",
+    "batchSize": 1000,
+    "concurrency": 64,
+    "startId": 0,
+    "language": "en",
+    "source": "pokemon_tcg_data",
+    "refreshExisting": false,
+    "reportEligibleOnly": true,
+    "reportSampleSize": 8
+  },
+  "coverage": {
+    "total_blueprints": 71215,
+    "artist_rows": 20883,
+    "missing_artist_rows": 50332,
+    "missing_eligible_rows": 43428,
+    "missing_non_card_product_rows": 6103,
+    "missing_name_rows": 0,
+    "missing_set_rows": 0,
+    "missing_collector_number_rows": 4554
+  },
+  "counts": {
+    "scanned": 43428,
+    "wouldMatch": 0,
+    "ambiguous": 0,
+    "notFound": 43428,
+    "skipped": 0,
+    "errors": 0,
+    "sources": {},
+    "reasons": {
+      "card_not_found": 40397,
+      "low_confidence": 2940,
+      "unknown_artist_not_in_artist_table": 91
+    },
+    "canonicalReasons": {
+      "card_not_found": 40397,
+      "low_confidence": 2940,
+      "unknown_artist_not_in_artist_table": 91
+    }
+  },
+  "samplesByReason": {
+    "card_not_found": [
+      {
+        "blueprintId": "105262",
+        "name": "EX Trainer Kit",
+        "setName": "EX Trainer Kit",
+        "setCode": "tk1",
+        "collectorNumber": "Latios & Latias Half Deck",
+        "rarity": "Card",
+        "status": "not_found",
+        "reason": "card_not_found",
+        "canonicalReason": "card_not_found",
+        "source": "pokemon_tcg_data"
+      },
+      {
+        "blueprintId": "105289",
+        "name": "EX Trainer Kit 2",
+        "setName": "EX Trainer Kit 2",
+        "setCode": "tk2",
+        "collectorNumber": "Plusle & Minun Half Deck",
+        "rarity": "Card",
+        "status": "not_found",
+        "reason": "card_not_found",
+        "canonicalReason": "card_not_found",
+        "source": "pokemon_tcg_data"
+      },
+      {
+        "blueprintId": "110020",
+        "name": "Bellossom",
+        "setName": "Theme Deck & Blisters Exclusives",
+        "setCode": "deckexclusives",
+        "collectorNumber": "Cosmos Holo | 4/98",
+        "rarity": "Promo",
+        "status": "not_found",
+        "reason": "card_not_found",
+        "canonicalReason": "card_not_found",
+        "source": "pokemon_tcg_data"
+      },
+      {
+        "blueprintId": "110021",
+        "name": "Virizion",
+        "setName": "Theme Deck & Blisters Exclusives",
+        "setCode": "deckexclusives",
+        "collectorNumber": "Non-Holo Theme Deck | 12/98",
+        "rarity": "Fixed",
+        "status": "not_found",
+        "reason": "card_not_found",
+        "canonicalReason": "card_not_found",
+        "source": "pokemon_tcg_data"
+      },
+      {
+        "blueprintId": "110022",
+        "name": "Flareon",
+        "setName": "Theme Deck & Blisters Exclusives",
+        "setCode": "deckexclusives",
+        "collectorNumber": "Cosmos Holo | 13/98",
+        "rarity": "Promo",
+        "status": "not_found",
+        "reason": "card_not_found",
+        "canonicalReason": "card_not_found",
+        "source": "pokemon_tcg_data"
+      },
+      {
+        "blueprintId": "110023",
+        "name": "Entei",
+        "setName": "Theme Deck & Blisters Exclusives",
+        "setCode": "deckexclusives",
+        "collectorNumber": "Cosmos Holo | 14/98",
+        "rarity": "Promo",
+        "status": "not_found",
+        "reason": "card_not_found",
+        "canonicalReason": "card_not_found",
+        "source": "pokemon_tcg_data"
+      },
+      {
+        "blueprintId": "110024",
+        "name": "Gyarados",
+        "setName": "Theme Deck & Blisters Exclusives",
+        "setCode": "deckexclusives",
+        "collectorNumber": "Cosmos Holo | 020/98",
+        "rarity": "Fixed",
+        "status": "not_found",
+        "reason": "card_not_found",
+        "canonicalReason": "card_not_found",
+        "source": "pokemon_tcg_data"
+      },
+      {
+        "blueprintId": "110025",
+        "name": "Gyarados",
+        "setName": "Theme Deck & Blisters Exclusives",
+        "setCode": "deckexclusives",
+        "collectorNumber": "Cosmos Holo | 21/98",
+        "rarity": "Rare",
+        "status": "not_found",
+        "reason": "card_not_found",
+        "canonicalReason": "card_not_found",
+        "source": "pokemon_tcg_data"
+      }
+    ],
+    "low_confidence": [
+      {
+        "blueprintId": "111627",
+        "name": "Pansage",
+        "setName": "Miscellaneous Promos",
+        "setCode": "pr",
+        "collectorNumber": "Energy Reverse Holo | Double Album Box Special Print | 7/114",
+        "rarity": "Promo",
+        "status": "not_found",
+        "reason": "low_confidence",
+        "canonicalReason": "low_confidence",
+        "source": "pokemon_tcg_data"
+      },
+      {
+        "blueprintId": "111633",
+        "name": "Pansear",
+        "setName": "Miscellaneous Promos",
+        "setCode": "pr",
+        "collectorNumber": "Energy Reverse Holo | 21/114",
+        "rarity": "Promo",
+        "status": "not_found",
+        "reason": "low_confidence",
+        "canonicalReason": "low_confidence",
+        "source": "pokemon_tcg_data"
+      },
+      {
+        "blueprintId": "111634",
+        "name": "Darmanitan",
+        "setName": "Miscellaneous Promos",
+        "setCode": "pr",
+        "collectorNumber": "Prerelease | 25/114",
+        "rarity": "Rare",
+        "status": "not_found",
+        "reason": "low_confidence",
+        "canonicalReason": "low_confidence",
+        "source": "pokemon_tcg_data"
+      },
+      {
+        "blueprintId": "111635",
+        "name": "Darmanitan",
+        "setName": "Miscellaneous Promos",
+        "setCode": "pr",
+        "collectorNumber": "STAFF Prerelease | 25/114",
+        "rarity": "Promo",
+        "status": "not_found",
+        "reason": "low_confidence",
+        "canonicalReason": "low_confidence",
+        "source": "pokemon_tcg_data"
+      },
+      {
+        "blueprintId": "111641",
+        "name": "Panpour",
+        "setName": "Miscellaneous Promos",
+        "setCode": "pr",
+        "collectorNumber": "Energy Reverse Holo | 33/114",
+        "rarity": "Promo",
+        "status": "not_found",
+        "reason": "low_confidence",
+        "canonicalReason": "low_confidence",
+        "source": "pokemon_tcg_data"
+      },
+      {
+        "blueprintId": "113271",
+        "name": "Oriocorio GX",
+        "setName": "Cosmic Eclipse",
+        "setCode": "cec",
+        "collectorNumber": "Full-Art | 217/236",
+        "rarity": "Ultra Rare",
+        "status": "not_found",
+        "reason": "low_confidence",
+        "canonicalReason": "low_confidence",
+        "source": "pokemon_tcg_data"
+      },
+      {
+        "blueprintId": "113892",
+        "name": "Bulbasaur",
+        "setName": "Miscellaneous Promos",
+        "setCode": "pr",
+        "collectorNumber": "Build-a-Bear Workshop | 1/108",
+        "rarity": "Promo",
+        "status": "not_found",
+        "reason": "low_confidence",
+        "canonicalReason": "low_confidence",
+        "source": "pokemon_tcg_data"
+      },
+      {
+        "blueprintId": "115234",
+        "name": "Barbaracle",
+        "setName": "EX Deoxys",
+        "setCode": "dx",
+        "collectorNumber": "54/107",
+        "rarity": "Common",
+        "status": "not_found",
+        "reason": "low_confidence",
+        "canonicalReason": "low_confidence",
+        "source": "pokemon_tcg_data"
+      }
+    ],
+    "unknown_artist_not_in_artist_table": [
+      {
+        "blueprintId": "113655",
+        "name": "Arceus Lv.100",
+        "setName": "DP Black Star Promos",
+        "setCode": "dpbsp",
+        "collectorNumber": "Holo Promo | DP50",
+        "rarity": "Promo",
+        "status": "not_found",
+        "reason": "unknown_artist_not_in_artist_table",
+        "canonicalReason": "unknown_artist_not_in_artist_table",
+        "source": "pokemon_tcg_data",
+        "bestConfidence": 0.899
+      },
+      {
+        "blueprintId": "113951",
+        "name": "Luxray Lv.48",
+        "setName": "Diamond & Pearl",
+        "setCode": "dp",
+        "collectorNumber": "Holo Rare | 7/130",
+        "rarity": "Holo Rare",
+        "status": "not_found",
+        "reason": "unknown_artist_not_in_artist_table",
+        "canonicalReason": "unknown_artist_not_in_artist_table",
+        "source": "pokemon_tcg_data",
+        "bestConfidence": 0.819
+      },
+      {
+        "blueprintId": "113957",
+        "name": "Mismagius Lv.37",
+        "setName": "Diamond & Pearl",
+        "setCode": "dp",
+        "collectorNumber": "Holo Rare | 10/130",
+        "rarity": "Holo Rare",
+        "status": "not_found",
+        "reason": "unknown_artist_not_in_artist_table",
+        "canonicalReason": "unknown_artist_not_in_artist_table",
+        "source": "pokemon_tcg_data",
+        "bestConfidence": 0.819
+      },
+      {
+        "blueprintId": "115137",
+        "name": "Crawdaunt",
+        "setName": "EX Deoxys",
+        "setCode": "dx",
+        "collectorNumber": "Holo Rare | 006/107",
+        "rarity": "Holo Rare",
+        "status": "not_found",
+        "reason": "unknown_artist_not_in_artist_table",
+        "canonicalReason": "unknown_artist_not_in_artist_table",
+        "source": "pokemon_tcg_data",
+        "bestConfidence": 0.88
+      },
+      {
+        "blueprintId": "115139",
+        "name": "Dusclops",
+        "setName": "EX Deoxys",
+        "setCode": "dx",
+        "collectorNumber": "Holo Rare | 007/107",
+        "rarity": "Holo Rare",
+        "status": "not_found",
+        "reason": "unknown_artist_not_in_artist_table",
+        "canonicalReason": "unknown_artist_not_in_artist_table",
+        "source": "pokemon_tcg_data",
+        "bestConfidence": 0.88
+      },
+      {
+        "blueprintId": "115242",
+        "name": "Duskull",
+        "setName": "EX Deoxys",
+        "setCode": "dx",
+        "collectorNumber": "58/107",
+        "rarity": "Common",
+        "status": "not_found",
+        "reason": "unknown_artist_not_in_artist_table",
+        "canonicalReason": "unknown_artist_not_in_artist_table",
+        "source": "pokemon_tcg_data",
+        "bestConfidence": 0.96
+      },
+      {
+        "blueprintId": "115722",
+        "name": "Tyranitar ex δ Delta Species",
+        "setName": "EX Dragon Frontiers",
+        "setCode": "df",
+        "collectorNumber": "Holo Rare | 99/101",
+        "rarity": "Holo Rare",
+        "status": "not_found",
+        "reason": "unknown_artist_not_in_artist_table",
+        "canonicalReason": "unknown_artist_not_in_artist_table",
+        "source": "pokemon_tcg_data",
+        "bestConfidence": 0.819
+      },
+      {
+        "blueprintId": "117617",
+        "name": "Dark Ampharos",
+        "setName": "EX Team Rocket Returns",
+        "setCode": "trr",
+        "collectorNumber": "Holo Rare | 002/109",
+        "rarity": "Holo Rare",
+        "status": "not_found",
+        "reason": "unknown_artist_not_in_artist_table",
+        "canonicalReason": "unknown_artist_not_in_artist_table",
+        "source": "pokemon_tcg_data",
+        "bestConfidence": 0.88
+      }
+    ]
+  },
+  "lastBlueprintId": 390274,
+  "nextStartId": 390274
+}

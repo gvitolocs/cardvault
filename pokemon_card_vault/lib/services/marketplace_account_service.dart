@@ -1,10 +1,19 @@
+import 'dart:convert';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:http/http.dart' as http;
+
+import 'pokoin_api_client.dart';
 
 class MarketplaceAccountService {
-  MarketplaceAccountService({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+  MarketplaceAccountService({
+    FirebaseFirestore? firestore,
+    PokoinApiClient? apiClient,
+  })  : _firestore = firestore ?? FirebaseFirestore.instance,
+        _apiClient = apiClient ?? PokoinApiClient();
 
   final FirebaseFirestore _firestore;
+  final PokoinApiClient _apiClient;
 
   Stream<List<Map<String, dynamic>>> ordersForUser(String uid) {
     return _firestore
@@ -74,6 +83,37 @@ class MarketplaceAccountService {
     return doc.id;
   }
 
+  Future<String> createPaidOrder({
+    required String buyerEmail,
+    required List<Map<String, dynamic>> items,
+    required double subtotalPkn,
+    required double taxPkn,
+    required double shippingPkn,
+    required double totalPkn,
+    required String fulfillmentMode,
+  }) async {
+    final response = await _apiClient.postJson(
+      Uri.base.resolve('/api/marketplace-orders'),
+      body: {
+        'buyerEmail': buyerEmail,
+        'items': items,
+        'subtotalPkn': subtotalPkn,
+        'taxPkn': taxPkn,
+        'shippingPkn': shippingPkn,
+        'totalPkn': totalPkn,
+        'fulfillmentMode': fulfillmentMode,
+      },
+    );
+    final decoded = _decode(response);
+    final order = Map<String, dynamic>.from(decoded['order'] as Map? ?? {});
+    final orderId = '${order['id'] ?? ''}'.trim();
+    if (orderId.isEmpty) {
+      throw StateError(
+          'Marketplace order was paid but no order id was returned.');
+    }
+    return orderId;
+  }
+
   Stream<List<Map<String, dynamic>>> ordersForSeller(String sellerUid) {
     if (sellerUid.trim().isEmpty) {
       return Stream.value(const []);
@@ -107,6 +147,46 @@ class MarketplaceAccountService {
     }, SetOptions(merge: true));
   }
 
+  Future<String> requestNftPhysicalShipping({
+    required String collectionItemId,
+    required Map<String, dynamic> shippingAddress,
+    String notes = '',
+  }) async {
+    final response = await _apiClient.postJson(
+      Uri.base.resolve('/api/marketplace-orders?action=nft-shipping-request'),
+      body: {
+        'collectionItemId': collectionItemId,
+        'shippingAddress': shippingAddress,
+        if (notes.trim().isNotEmpty) 'notes': notes.trim(),
+      },
+    );
+    final decoded = _decode(response);
+    final request = Map<String, dynamic>.from(decoded['request'] as Map? ?? {});
+    final requestId = '${request['id'] ?? ''}'.trim();
+    if (requestId.isEmpty) {
+      throw StateError('NFT shipping request was saved without an id.');
+    }
+    return requestId;
+  }
+
+  Future<int> requestAllNftPhysicalShipping({
+    required List<String> collectionItemIds,
+    required Map<String, dynamic> shippingAddress,
+    String notes = '',
+  }) async {
+    final response = await _apiClient.postJson(
+      Uri.base.resolve('/api/marketplace-orders?action=nft-shipping-request'),
+      body: {
+        'collectionItemIds': collectionItemIds,
+        'shippingAddress': shippingAddress,
+        if (notes.trim().isNotEmpty) 'notes': notes.trim(),
+      },
+    );
+    final decoded = _decode(response);
+    final requests = decoded['requests'];
+    return requests is List ? requests.length : 0;
+  }
+
   DateTime _readTimestamp(Object? value) {
     if (value is Timestamp) {
       return value.toDate();
@@ -119,4 +199,16 @@ class MarketplaceAccountService {
     }
     return DateTime.fromMillisecondsSinceEpoch(0);
   }
+}
+
+Map<String, dynamic> _decode(http.Response response) {
+  final decoded = response.body.isEmpty
+      ? <String, dynamic>{}
+      : jsonDecode(response.body) as Map<String, dynamic>;
+  if (response.statusCode >= 400) {
+    throw StateError(
+      decoded['error'] as String? ?? 'Marketplace order request failed.',
+    );
+  }
+  return decoded;
 }

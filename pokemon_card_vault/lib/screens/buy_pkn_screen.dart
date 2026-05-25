@@ -4,11 +4,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../constants/project_links.dart';
 import '../providers/auth_provider.dart';
+import '../services/pokoin_api_client.dart';
 import '../utils/price_format.dart';
 import '../widgets/site_footer.dart';
 
@@ -20,10 +20,23 @@ class BuyPknScreen extends ConsumerStatefulWidget {
 }
 
 class _BuyPknScreenState extends ConsumerState<BuyPknScreen> {
+  static const _pknUsdtReferencePrice = 0.005;
   static const _packages = [
-    _BuyPackage(label: 'Starter', fiatCents: 500, pknAmount: 500),
-    _BuyPackage(label: 'Collector', fiatCents: 2500, pknAmount: 2500),
-    _BuyPackage(label: 'Validator', fiatCents: 10000, pknAmount: 10000),
+    _BuyPackage(
+      label: 'Starter',
+      fiatCents: 500,
+      lookupKey: 'pkn_starter_1000_pkn_500_eur',
+    ),
+    _BuyPackage(
+      label: 'Collector',
+      fiatCents: 2500,
+      lookupKey: 'pkn_collector_5000_pkn_2500_eur',
+    ),
+    _BuyPackage(
+      label: 'Validator',
+      fiatCents: 10000,
+      lookupKey: 'pkn_validator_20000_pkn_10000_eur',
+    ),
   ];
 
   _BuyPackage _selected = _packages[1];
@@ -42,7 +55,8 @@ class _BuyPknScreenState extends ConsumerState<BuyPknScreen> {
     final user = ref.watch(authStateProvider).valueOrNull;
     final profile = ref.watch(userProfileProvider).valueOrNull;
     final cachedBalance = ref.watch(cachedPknBalanceProvider).valueOrNull;
-    final balance = ref.watch(pknBalanceProvider).valueOrNull ?? cachedBalance ?? 0;
+    final balance =
+        ref.watch(pknBalanceProvider).valueOrNull ?? cachedBalance ?? 0;
     final wallet = profile?.walletAddress;
 
     return Scaffold(
@@ -69,6 +83,7 @@ class _BuyPknScreenState extends ConsumerState<BuyPknScreen> {
                     signedIn: user != null,
                     walletAddress: wallet,
                     siteBalance: balance,
+                    pknUsdtReferencePrice: _pknUsdtReferencePrice,
                     paymentMessage: _paymentMessage,
                     verifyingPayment: _verifyingPayment,
                   ),
@@ -83,6 +98,14 @@ class _BuyPknScreenState extends ConsumerState<BuyPknScreen> {
                             color: Colors.white,
                             fontSize: 24,
                             fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Dynamic PKN pricing is fixed at 1 PKN = ${_formatUsdt(_pknUsdtReferencePrice)} USDT.',
+                          style: const TextStyle(
+                            color: Color(0xFFB8C4E6),
+                            height: 1.45,
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -140,21 +163,20 @@ class _BuyPknScreenState extends ConsumerState<BuyPknScreen> {
   Future<void> _startCheckout(User user) async {
     setState(() => _loading = true);
     try {
-      final token = await user.getIdToken();
+      final apiClient = PokoinApiClient(
+        auth: ref.read(pokoinApiAuthServiceProvider),
+      );
       final uri = Uri.base.resolve('/api/create-pkn-checkout-session');
-      final response = await http.post(
+      final response = await apiClient.postJson(
         uri,
-        headers: {
-          'content-type': 'application/json',
-          'authorization': 'Bearer $token',
-        },
-        body: jsonEncode({
+        body: {
           'pknAmount': _selected.pknAmount,
           'fiatCents': _selected.fiatCents,
-        }),
+          'lookupKey': _selected.lookupKey,
+        },
       );
 
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final data = _decodeCheckoutResponse(response.body);
       if (response.statusCode != 200) {
         throw StateError(data['error'] as String? ?? 'Checkout failed.');
       }
@@ -191,16 +213,14 @@ class _BuyPknScreenState extends ConsumerState<BuyPknScreen> {
       _paymentMessage = 'Confirming Stripe payment...';
     });
     try {
-      final token = await user.getIdToken();
-      final response = await http.post(
-        Uri.base.resolve('/api/create-pkn-checkout-session'),
-        headers: {
-          'content-type': 'application/json',
-          'authorization': 'Bearer $token',
-        },
-        body: jsonEncode({'checkoutSessionId': sessionId}),
+      final apiClient = PokoinApiClient(
+        auth: ref.read(pokoinApiAuthServiceProvider),
       );
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final response = await apiClient.postJson(
+        Uri.base.resolve('/api/create-pkn-checkout-session'),
+        body: {'checkoutSessionId': sessionId},
+      );
+      final data = _decodeCheckoutResponse(response.body);
       if (response.statusCode != 200) {
         throw StateError(
             data['error'] as String? ?? 'Payment confirmation failed.');
@@ -222,20 +242,46 @@ class _BuyPknScreenState extends ConsumerState<BuyPknScreen> {
       }
     }
   }
+
+  static String _formatUsdt(double value) {
+    return value
+        .toStringAsFixed(6)
+        .replaceFirst(RegExp(r'0+$'), '')
+        .replaceFirst(RegExp(r'\.$'), '');
+  }
+
+  static Map<String, dynamic> _decodeCheckoutResponse(String body) {
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+    } on FormatException {
+      // Vercel can return plain text when a function fails before our handler.
+    }
+    return const {
+      'error':
+          'Checkout service is temporarily unavailable. Please try again shortly.',
+    };
+  }
 }
 
 class _BuyPackage {
   const _BuyPackage({
     required this.label,
     required this.fiatCents,
-    required this.pknAmount,
+    required this.lookupKey,
   });
 
   final String label;
   final int fiatCents;
-  final int pknAmount;
+  final String lookupKey;
+  int get pknAmount =>
+      (fiatCents / 100 / _BuyPknScreenState._pknUsdtReferencePrice).round();
 
   String get fiatLabel => '€${(fiatCents / 100).toStringAsFixed(2)}';
+  String get rateLabel =>
+      '1 PKN = ${_BuyPknScreenState._formatUsdt(_BuyPknScreenState._pknUsdtReferencePrice)} USDT';
 }
 
 class _PaymentStatusBanner extends StatelessWidget {
@@ -282,6 +328,7 @@ class _BuyHero extends StatelessWidget {
     required this.signedIn,
     required this.walletAddress,
     required this.siteBalance,
+    required this.pknUsdtReferencePrice,
     required this.paymentMessage,
     required this.verifyingPayment,
   });
@@ -289,6 +336,7 @@ class _BuyHero extends StatelessWidget {
   final bool signedIn;
   final String? walletAddress;
   final int siteBalance;
+  final double pknUsdtReferencePrice;
   final String? paymentMessage;
   final bool verifyingPayment;
 
@@ -317,10 +365,10 @@ class _BuyHero extends StatelessWidget {
           ],
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 620),
-            child: const Column(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   'Buy PKN',
                   style: TextStyle(
                     color: Colors.white,
@@ -329,10 +377,15 @@ class _BuyHero extends StatelessWidget {
                     letterSpacing: -0.5,
                   ),
                 ),
-                SizedBox(height: 10),
-                Text(
+                const SizedBox(height: 10),
+                const Text(
                   'Pay securely with Stripe Checkout. PKN is credited to your account balance after payment.',
                   style: TextStyle(color: Color(0xFFB8C4E6), height: 1.5),
+                ),
+                const SizedBox(height: 12),
+                _RatePill(
+                  label:
+                      'Fixed rate: 1 PKN = ${_BuyPknScreenState._formatUsdt(pknUsdtReferencePrice)} USDT',
                 ),
               ],
             ),
@@ -359,6 +412,33 @@ class _BuyHero extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _RatePill extends StatelessWidget {
+  const _RatePill({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFACC15).withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border:
+            Border.all(color: const Color(0xFFFACC15).withValues(alpha: 0.3)),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Color(0xFFFDE68A),
+          fontSize: 12,
+          fontWeight: FontWeight.w900,
+        ),
       ),
     );
   }
@@ -413,6 +493,15 @@ class _PackageCard extends StatelessWidget {
               item.fiatLabel,
               style: const TextStyle(
                   color: Color(0xFFB8C4E6), fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              item.rateLabel,
+              style: const TextStyle(
+                color: Color(0xFF93A4C8),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ],
         ),

@@ -3,6 +3,8 @@ const path = require('node:path');
 const { Pool } = require('pg');
 
 const DEFAULT_LANGUAGES = ['it', 'fr', 'de', 'es', 'pt', 'ja', 'zh-cn', 'zh-tw'];
+const POKOINPOS_ROOT = process.env.POKOINPOS_ROOT || '/Users/giuseppe/pokoinpos';
+const DEFAULT_ORACLE_ENV_FILE = path.join(POKOINPOS_ROOT, 'deploy/env/peer4-postgres.env');
 
 function readEnv(filePath) {
   const values = {};
@@ -167,7 +169,7 @@ async function importLanguage(pool, language, options) {
 
 async function main() {
   const localEnv = readEnv(path.resolve('.env.local'));
-  const oracleEnv = readEnv(process.env.ORACLE_ENV_FILE || '/Users/giuseppe/pokoinpos/deploy/env/peer4-postgres.env');
+  const oracleEnv = readEnv(process.env.ORACLE_ENV_FILE || DEFAULT_ORACLE_ENV_FILE);
   const env = { ...localEnv, ...oracleEnv, ...process.env };
   const languages = String(env.TCGDEX_LANGUAGES || DEFAULT_LANGUAGES.join(','))
     .split(',')

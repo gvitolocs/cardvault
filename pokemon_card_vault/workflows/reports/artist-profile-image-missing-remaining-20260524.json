@@ -1,0 +1,2070 @@
+{
+  "generatedAt": "2026-05-24T14:55:13.389Z",
+  "summary": {
+    "authority_artists": 372,
+    "artists_with_profile_row": 345,
+    "artists_without_profile_row": 27,
+    "artists_with_source_image": 212,
+    "artists_with_cached_image": 212,
+    "artists_source_image_missing_cache": 0,
+    "artists_without_profile_image": 160,
+    "remainingMissingProfileImages": 160,
+    "remainingByReason": {
+      "verified_profile_has_no_source_image": 133,
+      "missing_page": 19,
+      "title_mismatch": 8
+    },
+    "sourceBackedCacheMissesAfterRecache": 0,
+    "brokenCachedUrls": 0,
+    "cachedImagesAddedThisRun": 230
+  },
+  "inputs": {
+    "initialAudit": "workflows/reports/artist-profile-image-cache-audit-20260524-full.json",
+    "recacheApply": "workflows/reports/artist-profile-image-recache-apply-20260524-full.json",
+    "postRecacheAudit": "workflows/reports/artist-profile-image-cache-audit-after-recache-20260524.json",
+    "noImageDiscoveryDryRun": "workflows/reports/artist-profile-no-image-source-discovery-dry-run-20260524.json",
+    "cachedUrlVerification": "workflows/reports/artist-profile-cached-url-verify-20260524.json"
+  },
+  "remainingArtists": [
+    {
+      "artist": "Aimi Tomita",
+      "normalizedArtist": "aimi tomita",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Aimi_Tomita",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Aimi_Tomita",
+      "updatedAt": "2026-05-23T11:13:41.899Z"
+    },
+    {
+      "artist": "Akino Fukuji",
+      "normalizedArtist": "akino fukuji",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Akino_Fukuji",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Akino_Fukuji",
+      "updatedAt": "2026-05-23T11:13:42.329Z"
+    },
+    {
+      "artist": "AKIRA EGAWA",
+      "normalizedArtist": "akira egawa",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/AKIRA_EGAWA",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/AKIRA_EGAWA",
+      "updatedAt": "2026-05-23T11:13:42.500Z"
+    },
+    {
+      "artist": "Illus.＆Direc.The Pokémon Company Art Team",
+      "normalizedArtist": "and direc the pokemon company art team",
+      "reason": "missing_page",
+      "reasonDetail": "No exact Bulbapedia/PocketMonsters/Wikidata profile page was found for this existing artist authority.",
+      "sourceUrl": "",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "Illus.＆Direc.The_Pokémon_Company_Art_Team",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Illus.＆Direc.The_Pokémon_Company_Art_Team_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Illus.＆Direc.The_Pokémon_Company_Art_Team_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      },
+      "updatedAt": null
+    },
+    {
+      "artist": "Anesaki Dynamic",
+      "normalizedArtist": "anesaki dynamic",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Anesaki_Dynamic",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Anesaki_Dynamic",
+      "updatedAt": "2026-05-23T11:13:43.671Z"
+    },
+    {
+      "artist": "Asuka Iwashita",
+      "normalizedArtist": "asuka iwashita",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Asuka_Iwashita",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Asuka_Iwashita",
+      "updatedAt": "2026-05-23T11:13:44.619Z"
+    },
+    {
+      "artist": "Atsuko Ujiie",
+      "normalizedArtist": "atsuko ujiie",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Atsuko_Ujiie",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Atsuko_Ujiie",
+      "updatedAt": "2026-05-23T11:13:44.962Z"
+    },
+    {
+      "artist": "Atsushi Furusawa",
+      "normalizedArtist": "atsushi furusawa",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Atsushi_Furusawa",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Atsushi_Furusawa",
+      "updatedAt": "2026-05-23T11:13:45.142Z"
+    },
+    {
+      "artist": "Atsuya Uki",
+      "normalizedArtist": "atsuya uki",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Atsuya_Uki",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Atsuya_Uki",
+      "updatedAt": "2026-05-23T11:13:45.277Z"
+    },
+    {
+      "artist": "Aya Kusube",
+      "normalizedArtist": "aya kusube",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Aya_Kusube",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Aya_Kusube",
+      "updatedAt": "2026-05-23T11:13:45.544Z"
+    },
+    {
+      "artist": "Ayaka Yoshida",
+      "normalizedArtist": "ayaka yoshida",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Ayaka_Yoshida",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Ayaka_Yoshida",
+      "updatedAt": "2026-05-23T11:13:45.677Z"
+    },
+    {
+      "artist": "Ayako Ozaki",
+      "normalizedArtist": "ayako ozaki",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Ayako_Ozaki",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Ayako_Ozaki",
+      "updatedAt": "2026-05-23T11:13:45.847Z"
+    },
+    {
+      "artist": "AYUMI ODASHIMA",
+      "normalizedArtist": "ayumi odashima",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/AYUMI_ODASHIMA",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/AYUMI_ODASHIMA",
+      "updatedAt": "2026-05-23T11:13:45.980Z"
+    },
+    {
+      "artist": "Benimaru Itoh",
+      "normalizedArtist": "benimaru itoh",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Benimaru_Itoh",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Benimaru_Itoh",
+      "updatedAt": "2026-05-23T11:13:46.113Z"
+    },
+    {
+      "artist": "Booota",
+      "normalizedArtist": "booota",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Booota",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Booota",
+      "updatedAt": "2026-05-23T11:13:46.561Z"
+    },
+    {
+      "artist": "Buchi",
+      "normalizedArtist": "buchi",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Buchi",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Buchi",
+      "updatedAt": "2026-05-23T11:13:46.728Z"
+    },
+    {
+      "artist": "Bun Toujo",
+      "normalizedArtist": "bun toujo",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Bun_Toujo",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Bun_Toujo",
+      "updatedAt": "2026-05-23T11:13:46.862Z"
+    },
+    {
+      "artist": "CHORISO",
+      "normalizedArtist": "choriso",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/CHORISO",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/CHORISO",
+      "updatedAt": "2026-05-23T11:13:47.410Z"
+    },
+    {
+      "artist": "Cona Nitanda",
+      "normalizedArtist": "cona nitanda",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Cona_Nitanda",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Cona_Nitanda",
+      "updatedAt": "2026-05-23T11:13:48.091Z"
+    },
+    {
+      "artist": "DemizuPosuka",
+      "normalizedArtist": "demizuposuka",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/DemizuPosuka",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/DemizuPosuka",
+      "updatedAt": "2026-05-23T11:13:49.480Z"
+    },
+    {
+      "artist": "Dr.Ooyama",
+      "normalizedArtist": "dr ooyama",
+      "reason": "missing_page",
+      "reasonDetail": "No exact Bulbapedia/PocketMonsters/Wikidata profile page was found for this existing artist authority.",
+      "sourceUrl": "",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "Dr.Ooyama",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Dr.Ooyama_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Dr.Ooyama_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      },
+      "updatedAt": null
+    },
+    {
+      "artist": "Emi Ando",
+      "normalizedArtist": "emi ando",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Emi_Ando",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Emi_Ando",
+      "updatedAt": "2026-05-23T11:13:50.447Z"
+    },
+    {
+      "artist": "Emi Yoshida",
+      "normalizedArtist": "emi yoshida",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Emi_Yoshida",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Emi_Yoshida",
+      "updatedAt": "2026-05-23T11:13:50.612Z"
+    },
+    {
+      "artist": "En Morikura",
+      "normalizedArtist": "en morikura",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/En_Morikura",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/En_Morikura",
+      "updatedAt": "2026-05-23T11:13:50.818Z"
+    },
+    {
+      "artist": "Eri Kamei",
+      "normalizedArtist": "eri kamei",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Eri_Kamei",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Eri_Kamei",
+      "updatedAt": "2026-05-23T11:13:50.988Z"
+    },
+    {
+      "artist": "Eri Yamaki",
+      "normalizedArtist": "eri yamaki",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Eri_Yamaki",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Eri_Yamaki",
+      "updatedAt": "2026-05-23T11:13:51.165Z"
+    },
+    {
+      "artist": "Etsuya Hattori",
+      "normalizedArtist": "etsuya hattori",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Etsuya_Hattori",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Etsuya_Hattori",
+      "updatedAt": "2026-05-23T11:13:51.486Z"
+    },
+    {
+      "artist": "Fujimoto Gold",
+      "normalizedArtist": "fujimoto gold",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Fujimoto_Gold",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Fujimoto_Gold",
+      "updatedAt": "2026-05-23T11:13:51.988Z"
+    },
+    {
+      "artist": "Fujmoto Gold",
+      "normalizedArtist": "fujmoto gold",
+      "reason": "missing_page",
+      "reasonDetail": "No exact Bulbapedia/PocketMonsters/Wikidata profile page was found for this existing artist authority.",
+      "sourceUrl": "",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "Fujmoto_Gold",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Fujmoto_Gold_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Fujmoto_Gold_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      },
+      "updatedAt": null
+    },
+    {
+      "artist": "Fumie Kittaka",
+      "normalizedArtist": "fumie kittaka",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Fumie_Kittaka",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Fumie_Kittaka",
+      "updatedAt": "2026-05-23T11:13:52.562Z"
+    },
+    {
+      "artist": "GAME FREAK inc.",
+      "normalizedArtist": "game freak inc",
+      "reason": "title_mismatch",
+      "reasonDetail": "A candidate page existed, but its normalized title did not exactly match the artist authority.",
+      "sourceUrl": "",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "GAME_FREAK_inc.",
+            "reason": "title_mismatch",
+            "pageTitle": "Game Freak"
+          },
+          {
+            "title": "GAME_FREAK_inc._(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "GAME_FREAK_inc._(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      },
+      "updatedAt": null
+    },
+    {
+      "artist": "Hanabushi",
+      "normalizedArtist": "hanabushi",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hanabushi",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Hanabushi",
+      "updatedAt": "2026-05-23T11:13:54.516Z"
+    },
+    {
+      "artist": "Hatachu",
+      "normalizedArtist": "hatachu",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hatachu",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Hatachu",
+      "updatedAt": "2026-05-23T11:13:55.166Z"
+    },
+    {
+      "artist": "Heisuke Kitazawa",
+      "normalizedArtist": "heisuke kitazawa",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Heisuke_Kitazawa",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Heisuke_Kitazawa",
+      "updatedAt": "2026-05-23T11:13:55.334Z"
+    },
+    {
+      "artist": "Hideki Ishikawa",
+      "normalizedArtist": "hideki ishikawa",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hideki_Ishikawa",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Hideki_Ishikawa",
+      "updatedAt": "2026-05-23T11:13:55.767Z"
+    },
+    {
+      "artist": "Hiroki Asanuma",
+      "normalizedArtist": "hiroki asanuma",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hiroki_Asanuma",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Hiroki_Asanuma",
+      "updatedAt": "2026-05-23T11:13:56.466Z"
+    },
+    {
+      "artist": "Hiroki Fuchino",
+      "normalizedArtist": "hiroki fuchino",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hiroki_Fuchino",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Hiroki_Fuchino",
+      "updatedAt": "2026-05-23T11:13:56.629Z"
+    },
+    {
+      "artist": "HiRON",
+      "normalizedArtist": "hiron",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/HiRON",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/HiRON",
+      "updatedAt": "2026-05-23T11:13:56.903Z"
+    },
+    {
+      "artist": "Hironobu Yoshida",
+      "normalizedArtist": "hironobu yoshida",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hironobu_Yoshida",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Hironobu_Yoshida",
+      "updatedAt": "2026-05-23T11:13:57.040Z"
+    },
+    {
+      "artist": "Hiroyuki Yamamoto",
+      "normalizedArtist": "hiroyuki yamamoto",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hiroyuki_Yamamoto",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Hiroyuki_Yamamoto",
+      "updatedAt": "2026-05-23T11:13:57.175Z"
+    },
+    {
+      "artist": "Hitoshi Ariga",
+      "normalizedArtist": "hitoshi ariga",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hitoshi_Ariga",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Hitoshi_Ariga",
+      "updatedAt": "2026-05-23T11:13:57.478Z"
+    },
+    {
+      "artist": "Hizuki Misono",
+      "normalizedArtist": "hizuki misono",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hizuki_Misono",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Hizuki_Misono",
+      "updatedAt": "2026-05-23T11:13:57.646Z"
+    },
+    {
+      "artist": "HYOGONOSUKE",
+      "normalizedArtist": "hyogonosuke",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/HYOGONOSUKE",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/HYOGONOSUKE",
+      "updatedAt": "2026-05-23T11:13:58.248Z"
+    },
+    {
+      "artist": "IKEDA Saki",
+      "normalizedArtist": "ikeda saki",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/IKEDA_Saki",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/IKEDA_Saki",
+      "updatedAt": "2026-05-23T11:13:58.381Z"
+    },
+    {
+      "artist": "Imakuni?",
+      "normalizedArtist": "imakuni",
+      "reason": "title_mismatch",
+      "reasonDetail": "A candidate page existed, but its normalized title did not exactly match the artist authority.",
+      "sourceUrl": "",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "Imakuni?",
+            "reason": "title_mismatch",
+            "pageTitle": "Tomoaki Imakuni"
+          },
+          {
+            "title": "Imakuni?_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Imakuni?_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      },
+      "updatedAt": null
+    },
+    {
+      "artist": "Iwamoto05",
+      "normalizedArtist": "iwamoto05",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Iwamoto05",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Iwamoto05",
+      "updatedAt": "2026-05-23T11:13:59.367Z"
+    },
+    {
+      "artist": "Izucch",
+      "normalizedArtist": "izucch",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Izucch",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Izucch",
+      "updatedAt": "2026-05-23T11:13:59.503Z"
+    },
+    {
+      "artist": "Kagemaru Himeno",
+      "normalizedArtist": "kagemaru himeno",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kagemaru_Himeno",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kagemaru_Himeno",
+      "updatedAt": "2026-05-23T11:14:01.108Z"
+    },
+    {
+      "artist": "Kamome Shirahama",
+      "normalizedArtist": "kamome shirahama",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kamome_Shirahama",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kamome_Shirahama",
+      "updatedAt": "2026-05-23T11:14:01.528Z"
+    },
+    {
+      "artist": "Kanako Eo",
+      "normalizedArtist": "kanako eo",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kanako_Eo",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kanako_Eo",
+      "updatedAt": "2026-05-23T11:14:02.008Z"
+    },
+    {
+      "artist": "Kanami Ogata",
+      "normalizedArtist": "kanami ogata",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kanami_Ogata",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kanami_Ogata",
+      "updatedAt": "2026-05-23T11:14:02.143Z"
+    },
+    {
+      "artist": "Katie Gross",
+      "normalizedArtist": "katie gross",
+      "reason": "title_mismatch",
+      "reasonDetail": "A candidate page existed, but its normalized title did not exactly match the artist authority.",
+      "sourceUrl": "",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "Katie_Gross",
+            "reason": "title_mismatch",
+            "pageTitle": "Illustration contests"
+          },
+          {
+            "title": "Katie_Gross_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Katie_Gross_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      },
+      "updatedAt": null
+    },
+    {
+      "artist": "Katsunori Sato",
+      "normalizedArtist": "katsunori sato",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Katsunori_Sato",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Katsunori_Sato",
+      "updatedAt": "2026-05-23T11:14:03.438Z"
+    },
+    {
+      "artist": "Kazuhisa Uragami",
+      "normalizedArtist": "kazuhisa uragami",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kazuhisa_Uragami",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kazuhisa_Uragami",
+      "updatedAt": "2026-05-23T11:14:04.075Z"
+    },
+    {
+      "artist": "Kazuma Koda",
+      "normalizedArtist": "kazuma koda",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kazuma_Koda",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kazuma_Koda",
+      "updatedAt": "2026-05-23T11:14:04.210Z"
+    },
+    {
+      "artist": "Kazumasa Yasukuni",
+      "normalizedArtist": "kazumasa yasukuni",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kazumasa_Yasukuni",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kazumasa_Yasukuni",
+      "updatedAt": "2026-05-23T11:14:04.378Z"
+    },
+    {
+      "artist": "Kedamahadaitai Yawarakai",
+      "normalizedArtist": "kedamahadaitai yawarakai",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kedamahadaitai_Yawarakai",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kedamahadaitai_Yawarakai",
+      "updatedAt": "2026-05-23T11:14:04.895Z"
+    },
+    {
+      "artist": "Keiji Kinebuchi",
+      "normalizedArtist": "keiji kinebuchi",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Keiji_Kinebuchi",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Keiji_Kinebuchi",
+      "updatedAt": "2026-05-23T11:14:05.622Z"
+    },
+    {
+      "artist": "Keiko Fukuyama",
+      "normalizedArtist": "keiko fukuyama",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Keiko_Fukuyama",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Keiko_Fukuyama",
+      "updatedAt": "2026-05-23T11:14:05.981Z"
+    },
+    {
+      "artist": "Ken Ikugi",
+      "normalizedArtist": "ken ikugi",
+      "reason": "missing_page",
+      "reasonDetail": "No exact Bulbapedia/PocketMonsters/Wikidata profile page was found for this existing artist authority.",
+      "sourceUrl": "",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "Ken_Ikugi",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Ken_Ikugi_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Ken_Ikugi_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      },
+      "updatedAt": null
+    },
+    {
+      "artist": "Ken Ikuji",
+      "normalizedArtist": "ken ikuji",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Ken_Ikuji",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Ken_Ikuji",
+      "updatedAt": "2026-05-23T11:14:08.383Z"
+    },
+    {
+      "artist": "Ken Sugimori",
+      "normalizedArtist": "ken sugimori",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Ken_Sugimori",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Ken_Sugimori",
+      "updatedAt": "2026-05-23T11:14:08.596Z"
+    },
+    {
+      "artist": "Ken Sugimori Yusuke Ohmura",
+      "normalizedArtist": "ken sugimori yusuke ohmura",
+      "reason": "missing_page",
+      "reasonDetail": "No exact Bulbapedia/PocketMonsters/Wikidata profile page was found for this existing artist authority.",
+      "sourceUrl": "",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "Ken_Sugimori_Yusuke_Ohmura",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Ken_Sugimori_Yusuke_Ohmura_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Ken_Sugimori_Yusuke_Ohmura_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      },
+      "updatedAt": null
+    },
+    {
+      "artist": "Kenkichi Toyama",
+      "normalizedArtist": "kenkichi toyama",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kenkichi_Toyama",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kenkichi_Toyama",
+      "updatedAt": "2026-05-23T11:14:09.129Z"
+    },
+    {
+      "artist": "Kent Kanetsuna/Direc. Shinji Higuchi",
+      "normalizedArtist": "kent kanetsuna direc shinji higuchi",
+      "reason": "missing_page",
+      "reasonDetail": "No exact Bulbapedia/PocketMonsters/Wikidata profile page was found for this existing artist authority.",
+      "sourceUrl": "",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "Kent_Kanetsuna/Direc._Shinji_Higuchi",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Kent_Kanetsuna/Direc._Shinji_Higuchi_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Kent_Kanetsuna/Direc._Shinji_Higuchi_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      },
+      "updatedAt": null
+    },
+    {
+      "artist": "KG-2000",
+      "normalizedArtist": "kg 2000",
+      "reason": "missing_page",
+      "reasonDetail": "No exact Bulbapedia/PocketMonsters/Wikidata profile page was found for this existing artist authority.",
+      "sourceUrl": "",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "KG_2000",
+            "reason": "missing_page"
+          },
+          {
+            "title": "KG_2000_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "KG_2000_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      },
+      "updatedAt": null
+    },
+    {
+      "artist": "Kimiya Masago",
+      "normalizedArtist": "kimiya masago",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kimiya_Masago",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kimiya_Masago",
+      "updatedAt": "2026-05-23T11:14:10.267Z"
+    },
+    {
+      "artist": "KIYOTAKA OSHIYAMA",
+      "normalizedArtist": "kiyotaka oshiyama",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/KIYOTAKA_OSHIYAMA",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/KIYOTAKA_OSHIYAMA",
+      "updatedAt": "2026-05-23T11:14:10.668Z"
+    },
+    {
+      "artist": "Koji Nakata",
+      "normalizedArtist": "koji nakata",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Koji_Nakata",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Koji_Nakata",
+      "updatedAt": "2026-05-23T11:14:10.936Z"
+    },
+    {
+      "artist": "Kouki Saitou",
+      "normalizedArtist": "kouki saitou",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kouki_Saitou",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kouki_Saitou",
+      "updatedAt": "2026-05-23T11:14:11.258Z"
+    },
+    {
+      "artist": "Kurata So",
+      "normalizedArtist": "kurata so",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kurata_So",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kurata_So",
+      "updatedAt": "2026-05-23T11:14:11.599Z"
+    },
+    {
+      "artist": "Kyoko Umemoto",
+      "normalizedArtist": "kyoko umemoto",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kyoko_Umemoto",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kyoko_Umemoto",
+      "updatedAt": "2026-05-23T11:14:12.035Z"
+    },
+    {
+      "artist": "Lee HyunJung",
+      "normalizedArtist": "lee hyunjung",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Lee_HyunJung",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Lee_HyunJung",
+      "updatedAt": "2026-05-23T11:14:12.349Z"
+    },
+    {
+      "artist": "Ligton",
+      "normalizedArtist": "ligton",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Ligton",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Ligton",
+      "updatedAt": "2026-05-23T11:14:12.482Z"
+    },
+    {
+      "artist": "Makura Tami",
+      "normalizedArtist": "makura tami",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Makura_Tami",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Makura_Tami",
+      "updatedAt": "2026-05-23T11:14:13.444Z"
+    },
+    {
+      "artist": "Mana Ibe",
+      "normalizedArtist": "mana ibe",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Mana_Ibe",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Mana_Ibe",
+      "updatedAt": "2026-05-23T11:14:13.578Z"
+    },
+    {
+      "artist": "Mark Kraus",
+      "normalizedArtist": "mark kraus",
+      "reason": "title_mismatch",
+      "reasonDetail": "A candidate page existed, but its normalized title did not exactly match the artist authority.",
+      "sourceUrl": "",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "Mark_Kraus",
+            "reason": "title_mismatch",
+            "pageTitle": "Illustration contests"
+          },
+          {
+            "title": "Mark_Kraus_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Mark_Kraus_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      },
+      "updatedAt": null
+    },
+    {
+      "artist": "Masakazu Fukuda",
+      "normalizedArtist": "masakazu fukuda",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Masakazu_Fukuda",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Masakazu_Fukuda",
+      "updatedAt": "2026-05-23T11:14:14.637Z"
+    },
+    {
+      "artist": "Masako Tomii",
+      "normalizedArtist": "masako tomii",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Masako_Tomii",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Masako_Tomii",
+      "updatedAt": "2026-05-23T11:14:14.804Z"
+    },
+    {
+      "artist": "Masako Yamashita",
+      "normalizedArtist": "masako yamashita",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Masako_Yamashita",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Masako_Yamashita",
+      "updatedAt": "2026-05-23T11:14:14.942Z"
+    },
+    {
+      "artist": "May Do",
+      "normalizedArtist": "may do",
+      "reason": "title_mismatch",
+      "reasonDetail": "A candidate page existed, but its normalized title did not exactly match the artist authority.",
+      "sourceUrl": "",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "May_Do",
+            "reason": "title_mismatch",
+            "pageTitle": "Illustration contests"
+          },
+          {
+            "title": "May_Do_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "May_Do_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      },
+      "updatedAt": null
+    },
+    {
+      "artist": "Megumi Mizutani",
+      "normalizedArtist": "megumi mizutani",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Megumi_Mizutani",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Megumi_Mizutani",
+      "updatedAt": "2026-05-23T11:14:16.117Z"
+    },
+    {
+      "artist": "Mékayu",
+      "normalizedArtist": "mekayu",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/M%C3%A9kayu",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/M%C3%A9kayu",
+      "updatedAt": "2026-05-23T11:14:16.285Z"
+    },
+    {
+      "artist": "Mele",
+      "normalizedArtist": "mele",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Mele",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Mele",
+      "updatedAt": "2026-05-23T11:14:16.420Z"
+    },
+    {
+      "artist": "Midori Harada",
+      "normalizedArtist": "midori harada",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Midori_Harada",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Midori_Harada",
+      "updatedAt": "2026-05-23T11:14:16.554Z"
+    },
+    {
+      "artist": "Mika Pikazo",
+      "normalizedArtist": "mika pikazo",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Mika_Pikazo",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Mika_Pikazo",
+      "updatedAt": "2026-05-23T11:14:16.688Z"
+    },
+    {
+      "artist": "Miki Tanaka",
+      "normalizedArtist": "miki tanaka",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Miki_Tanaka",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Miki_Tanaka",
+      "updatedAt": "2026-05-23T11:14:17.030Z"
+    },
+    {
+      "artist": "MikiTanaka",
+      "normalizedArtist": "mikitanaka",
+      "reason": "missing_page",
+      "reasonDetail": "No exact Bulbapedia/PocketMonsters/Wikidata profile page was found for this existing artist authority.",
+      "sourceUrl": "",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "MikiTanaka",
+            "reason": "missing_page"
+          },
+          {
+            "title": "MikiTanaka_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "MikiTanaka_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      },
+      "updatedAt": null
+    },
+    {
+      "artist": "Milky Isobe",
+      "normalizedArtist": "milky isobe",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Milky_Isobe",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Milky_Isobe",
+      "updatedAt": "2026-05-23T11:14:17.772Z"
+    },
+    {
+      "artist": "Mina Nakai",
+      "normalizedArtist": "mina nakai",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Mina_Nakai",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Mina_Nakai",
+      "updatedAt": "2026-05-23T11:14:17.906Z"
+    },
+    {
+      "artist": "Minahamu",
+      "normalizedArtist": "minahamu",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Minahamu",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Minahamu",
+      "updatedAt": "2026-05-23T11:14:18.042Z"
+    },
+    {
+      "artist": "MINAMINAMI Take",
+      "normalizedArtist": "minaminami take",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/MINAMINAMI_Take",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/MINAMINAMI_Take",
+      "updatedAt": "2026-05-23T11:14:18.177Z"
+    },
+    {
+      "artist": "Misaki Hashimoto",
+      "normalizedArtist": "misaki hashimoto",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Misaki_Hashimoto",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Misaki_Hashimoto",
+      "updatedAt": "2026-05-23T11:14:18.714Z"
+    },
+    {
+      "artist": "Mizue",
+      "normalizedArtist": "mizue",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Mizue",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Mizue",
+      "updatedAt": "2026-05-23T11:14:18.987Z"
+    },
+    {
+      "artist": "Mori Yuu",
+      "normalizedArtist": "mori yuu",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Mori_Yuu",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Mori_Yuu",
+      "updatedAt": "2026-05-23T11:14:19.178Z"
+    },
+    {
+      "artist": "Mousho",
+      "normalizedArtist": "mousho",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Mousho",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Mousho",
+      "updatedAt": "2026-05-23T11:14:19.487Z"
+    },
+    {
+      "artist": "Mugi Hamada",
+      "normalizedArtist": "mugi hamada",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Mugi_Hamada",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Mugi_Hamada",
+      "updatedAt": "2026-05-23T11:14:20.296Z"
+    },
+    {
+      "artist": "N-DESIGN Inc.",
+      "normalizedArtist": "n design inc",
+      "reason": "missing_page",
+      "reasonDetail": "No exact Bulbapedia/PocketMonsters/Wikidata profile page was found for this existing artist authority.",
+      "sourceUrl": "",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "N_DESIGN_Inc.",
+            "reason": "missing_page"
+          },
+          {
+            "title": "N_DESIGN_Inc._(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "N_DESIGN_Inc._(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      },
+      "updatedAt": null
+    },
+    {
+      "artist": "Nagimiso",
+      "normalizedArtist": "nagimiso",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Nagimiso",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Nagimiso",
+      "updatedAt": "2026-05-23T11:14:21.541Z"
+    },
+    {
+      "artist": "Nagomi Nijo",
+      "normalizedArtist": "nagomi nijo",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Nagomi_Nijo",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Nagomi_Nijo",
+      "updatedAt": "2026-05-23T11:14:21.676Z"
+    },
+    {
+      "artist": "Naoyo Kimura",
+      "normalizedArtist": "naoyo kimura",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Naoyo_Kimura",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Naoyo_Kimura",
+      "updatedAt": "2026-05-23T11:14:22.221Z"
+    },
+    {
+      "artist": "Narano",
+      "normalizedArtist": "narano",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Narano",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Narano",
+      "updatedAt": "2026-05-23T11:14:22.402Z"
+    },
+    {
+      "artist": "Natsumi Miyanose",
+      "normalizedArtist": "natsumi miyanose",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Natsumi_Miyanose",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Natsumi_Miyanose",
+      "updatedAt": "2026-05-23T11:14:22.710Z"
+    },
+    {
+      "artist": "Natsumi Yoshida",
+      "normalizedArtist": "natsumi yoshida",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Natsumi_Yoshida",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Natsumi_Yoshida",
+      "updatedAt": "2026-05-23T11:14:22.846Z"
+    },
+    {
+      "artist": "NC Empire",
+      "normalizedArtist": "nc empire",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/NC_Empire",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/NC_Empire",
+      "updatedAt": "2026-05-23T11:14:22.987Z"
+    },
+    {
+      "artist": "Nisota Niso",
+      "normalizedArtist": "nisota niso",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Nisota_Niso",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Nisota_Niso",
+      "updatedAt": "2026-05-23T11:14:23.401Z"
+    },
+    {
+      "artist": "Nobuhiro Imagawa",
+      "normalizedArtist": "nobuhiro imagawa",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Nobuhiro_Imagawa",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Nobuhiro_Imagawa",
+      "updatedAt": "2026-05-23T11:14:23.539Z"
+    },
+    {
+      "artist": "Nobusawa/Mochipuyo",
+      "normalizedArtist": "nobusawa mochipuyo",
+      "reason": "missing_page",
+      "reasonDetail": "No exact Bulbapedia/PocketMonsters/Wikidata profile page was found for this existing artist authority.",
+      "sourceUrl": "",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "Nobusawa/Mochipuyo",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Nobusawa/Mochipuyo_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Nobusawa/Mochipuyo_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      },
+      "updatedAt": null
+    },
+    {
+      "artist": "Nurikabe",
+      "normalizedArtist": "nurikabe",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Nurikabe",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Nurikabe",
+      "updatedAt": "2026-05-23T11:14:24.344Z"
+    },
+    {
+      "artist": "okawamatakatoshi",
+      "normalizedArtist": "okawamatakatoshi",
+      "reason": "missing_page",
+      "reasonDetail": "No exact Bulbapedia/PocketMonsters/Wikidata profile page was found for this existing artist authority.",
+      "sourceUrl": "",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "okawamatakatoshi",
+            "reason": "missing_page"
+          },
+          {
+            "title": "okawamatakatoshi_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "okawamatakatoshi_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      },
+      "updatedAt": null
+    },
+    {
+      "artist": "Oswaldo KATO",
+      "normalizedArtist": "oswaldo kato",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Oswaldo_KATO",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Oswaldo_KATO",
+      "updatedAt": "2026-05-23T11:14:26.286Z"
+    },
+    {
+      "artist": "Pani Kobayashi",
+      "normalizedArtist": "pani kobayashi",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Pani_Kobayashi",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Pani_Kobayashi",
+      "updatedAt": "2026-05-23T11:14:26.761Z"
+    },
+    {
+      "artist": "Reiko Tanoue",
+      "normalizedArtist": "reiko tanoue",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Reiko_Tanoue",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Reiko_Tanoue",
+      "updatedAt": "2026-05-23T11:14:28.994Z"
+    },
+    {
+      "artist": "Rond",
+      "normalizedArtist": "rond",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Rond",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Rond",
+      "updatedAt": "2026-05-23T11:14:29.856Z"
+    },
+    {
+      "artist": "Rowan Laidlaw",
+      "normalizedArtist": "rowan laidlaw",
+      "reason": "title_mismatch",
+      "reasonDetail": "A candidate page existed, but its normalized title did not exactly match the artist authority.",
+      "sourceUrl": "",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "Rowan_Laidlaw",
+            "reason": "title_mismatch",
+            "pageTitle": "Illustration contests"
+          },
+          {
+            "title": "Rowan_Laidlaw_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Rowan_Laidlaw_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      },
+      "updatedAt": null
+    },
+    {
+      "artist": "Ryo Ueda",
+      "normalizedArtist": "ryo ueda",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Ryo_Ueda",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Ryo_Ueda",
+      "updatedAt": "2026-05-23T11:14:30.331Z"
+    },
+    {
+      "artist": "Ryota Murayama",
+      "normalizedArtist": "ryota murayama",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Ryota_Murayama",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Ryota_Murayama",
+      "updatedAt": "2026-05-23T11:14:30.675Z"
+    },
+    {
+      "artist": "Ryuta Fuse",
+      "normalizedArtist": "ryuta fuse",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Ryuta_Fuse",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Ryuta_Fuse",
+      "updatedAt": "2026-05-23T11:14:30.975Z"
+    },
+    {
+      "artist": "Saki Hayashiro",
+      "normalizedArtist": "saki hayashiro",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Saki_Hayashiro",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Saki_Hayashiro",
+      "updatedAt": "2026-05-23T11:14:32.079Z"
+    },
+    {
+      "artist": "Sakiko Maeda",
+      "normalizedArtist": "sakiko maeda",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Sakiko_Maeda",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Sakiko_Maeda",
+      "updatedAt": "2026-05-23T11:14:32.259Z"
+    },
+    {
+      "artist": "Sanosuke Sakuma",
+      "normalizedArtist": "sanosuke sakuma",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Sanosuke_Sakuma",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Sanosuke_Sakuma",
+      "updatedAt": "2026-05-23T11:14:32.396Z"
+    },
+    {
+      "artist": "SATOSHI NAKAI",
+      "normalizedArtist": "satoshi nakai",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/SATOSHI_NAKAI",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/SATOSHI_NAKAI",
+      "updatedAt": "2026-05-23T11:14:32.709Z"
+    },
+    {
+      "artist": "Shigenori Negishi",
+      "normalizedArtist": "shigenori negishi",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Shigenori_Negishi",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Shigenori_Negishi",
+      "updatedAt": "2026-05-23T11:14:33.980Z"
+    },
+    {
+      "artist": "Shin-ichi Yoshida",
+      "normalizedArtist": "shin ichi yoshida",
+      "reason": "missing_page",
+      "reasonDetail": "No exact Bulbapedia/PocketMonsters/Wikidata profile page was found for this existing artist authority.",
+      "sourceUrl": "",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "Shin_ichi_Yoshida",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Shin_ichi_Yoshida_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Shin_ichi_Yoshida_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      },
+      "updatedAt": null
+    },
+    {
+      "artist": "Shinji Higuchi + Noriko Takaya/樋口真嗣+高屋法子",
+      "normalizedArtist": "shinji higuchi noriko takaya",
+      "reason": "missing_page",
+      "reasonDetail": "No exact Bulbapedia/PocketMonsters/Wikidata profile page was found for this existing artist authority.",
+      "sourceUrl": "",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "Shinji_Higuchi_+_Noriko_Takaya",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Shinji_Higuchi_+_Noriko_Takaya_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Shinji_Higuchi_+_Noriko_Takaya_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      },
+      "updatedAt": null
+    },
+    {
+      "artist": "Shinji Higuchi + Sachiko Eba/樋口真嗣+江場左知子",
+      "normalizedArtist": "shinji higuchi sachiko eba",
+      "reason": "missing_page",
+      "reasonDetail": "No exact Bulbapedia/PocketMonsters/Wikidata profile page was found for this existing artist authority.",
+      "sourceUrl": "",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "Shinji_Higuchi_+_Sachiko_Eba",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Shinji_Higuchi_+_Sachiko_Eba_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Shinji_Higuchi_+_Sachiko_Eba_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      },
+      "updatedAt": null
+    },
+    {
+      "artist": "Shinya Mizuno",
+      "normalizedArtist": "shinya mizuno",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Shinya_Mizuno",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Shinya_Mizuno",
+      "updatedAt": "2026-05-23T11:14:36.279Z"
+    },
+    {
+      "artist": "SIE NANAHARA",
+      "normalizedArtist": "sie nanahara",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/SIE_NANAHARA",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/SIE_NANAHARA",
+      "updatedAt": "2026-05-23T11:14:36.643Z"
+    },
+    {
+      "artist": "so-taro",
+      "normalizedArtist": "so taro",
+      "reason": "missing_page",
+      "reasonDetail": "No exact Bulbapedia/PocketMonsters/Wikidata profile page was found for this existing artist authority.",
+      "sourceUrl": "",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "so_taro",
+            "reason": "missing_page"
+          },
+          {
+            "title": "so_taro_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "so_taro_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      },
+      "updatedAt": null
+    },
+    {
+      "artist": "Sui",
+      "normalizedArtist": "sui",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Sui",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Sui",
+      "updatedAt": "2026-05-23T11:14:37.636Z"
+    },
+    {
+      "artist": "Sumiyoshi Kizuki",
+      "normalizedArtist": "sumiyoshi kizuki",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Sumiyoshi_Kizuki",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Sumiyoshi_Kizuki",
+      "updatedAt": "2026-05-23T11:14:37.803Z"
+    },
+    {
+      "artist": "Susumu Maeya",
+      "normalizedArtist": "susumu maeya",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Susumu_Maeya",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Susumu_Maeya",
+      "updatedAt": "2026-05-23T11:14:37.971Z"
+    },
+    {
+      "artist": "Sylvia Forrest",
+      "normalizedArtist": "sylvia forrest",
+      "reason": "title_mismatch",
+      "reasonDetail": "A candidate page existed, but its normalized title did not exactly match the artist authority.",
+      "sourceUrl": "",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "Sylvia_Forrest",
+            "reason": "title_mismatch",
+            "pageTitle": "Illustration contests"
+          },
+          {
+            "title": "Sylvia_Forrest_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Sylvia_Forrest_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      },
+      "updatedAt": null
+    },
+    {
+      "artist": "Taira Akitsu",
+      "normalizedArtist": "taira akitsu",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Taira_Akitsu",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Taira_Akitsu",
+      "updatedAt": "2026-05-23T11:14:39.249Z"
+    },
+    {
+      "artist": "Takao Unno",
+      "normalizedArtist": "takao unno",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Takao_Unno",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Takao_Unno",
+      "updatedAt": "2026-05-23T11:14:39.559Z"
+    },
+    {
+      "artist": "Takashi shiraishi",
+      "normalizedArtist": "takashi shiraishi",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Takashi_shiraishi",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Takashi_shiraishi",
+      "updatedAt": "2026-05-23T11:14:39.745Z"
+    },
+    {
+      "artist": "Takeshi Nakamura",
+      "normalizedArtist": "takeshi nakamura",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Takeshi_Nakamura",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Takeshi_Nakamura",
+      "updatedAt": "2026-05-23T11:14:40.462Z"
+    },
+    {
+      "artist": "Takumi Wada",
+      "normalizedArtist": "takumi wada",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Takumi_Wada",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Takumi_Wada",
+      "updatedAt": "2026-05-23T11:14:40.807Z"
+    },
+    {
+      "artist": "Terada Tera",
+      "normalizedArtist": "terada tera",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Terada_Tera",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Terada_Tera",
+      "updatedAt": "2026-05-23T11:14:41.291Z"
+    },
+    {
+      "artist": "Tetsuo Hara",
+      "normalizedArtist": "tetsuo hara",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Tetsuo_Hara",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Tetsuo_Hara",
+      "updatedAt": "2026-05-23T11:14:41.559Z"
+    },
+    {
+      "artist": "tetsuya koizumi",
+      "normalizedArtist": "tetsuya koizumi",
+      "reason": "title_mismatch",
+      "reasonDetail": "A candidate page existed, but its normalized title did not exactly match the artist authority.",
+      "sourceUrl": "",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "tetsuya_koizumi",
+            "reason": "title_mismatch",
+            "pageTitle": "Scav"
+          },
+          {
+            "title": "tetsuya_koizumi_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "tetsuya_koizumi_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      },
+      "updatedAt": null
+    },
+    {
+      "artist": "Tika Matsuno",
+      "normalizedArtist": "tika matsuno",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Tika_Matsuno",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Tika_Matsuno",
+      "updatedAt": "2026-05-23T11:14:42.106Z"
+    },
+    {
+      "artist": "Tokumi Akabane",
+      "normalizedArtist": "tokumi akabane",
+      "reason": "missing_page",
+      "reasonDetail": "No exact Bulbapedia/PocketMonsters/Wikidata profile page was found for this existing artist authority.",
+      "sourceUrl": "",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "Tokumi_Akabane",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Tokumi_Akabane_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Tokumi_Akabane_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      },
+      "updatedAt": null
+    },
+    {
+      "artist": "Tomoaki Imakuni",
+      "normalizedArtist": "tomoaki imakuni",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Tomoaki_Imakuni",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Tomoaki_Imakuni",
+      "updatedAt": "2026-05-23T11:14:43.021Z"
+    },
+    {
+      "artist": "Tomohiro Kitakaze",
+      "normalizedArtist": "tomohiro kitakaze",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Tomohiro_Kitakaze",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Tomohiro_Kitakaze",
+      "updatedAt": "2026-05-23T11:14:43.192Z"
+    },
+    {
+      "artist": "Tomokazu",
+      "normalizedArtist": "tomokazu",
+      "reason": "missing_page",
+      "reasonDetail": "No exact Bulbapedia/PocketMonsters/Wikidata profile page was found for this existing artist authority.",
+      "sourceUrl": "",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "Tomokazu",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Tomokazu_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Tomokazu_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      },
+      "updatedAt": null
+    },
+    {
+      "artist": "Tomokazu Kamiya",
+      "normalizedArtist": "tomokazu kamiya",
+      "reason": "missing_page",
+      "reasonDetail": "No exact Bulbapedia/PocketMonsters/Wikidata profile page was found for this existing artist authority.",
+      "sourceUrl": "",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "Tomokazu_Kamiya",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Tomokazu_Kamiya_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Tomokazu_Kamiya_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      },
+      "updatedAt": null
+    },
+    {
+      "artist": "Tomomi Ozaki",
+      "normalizedArtist": "tomomi ozaki",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Tomomi_Ozaki",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Tomomi_Ozaki",
+      "updatedAt": "2026-05-23T11:14:44.443Z"
+    },
+    {
+      "artist": "Tomowaka",
+      "normalizedArtist": "tomowaka",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Tomowaka",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Tomowaka",
+      "updatedAt": "2026-05-23T11:14:44.578Z"
+    },
+    {
+      "artist": "Toriyufu",
+      "normalizedArtist": "toriyufu",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Toriyufu",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Toriyufu",
+      "updatedAt": "2026-05-23T11:14:45.015Z"
+    },
+    {
+      "artist": "Ultimateinudog",
+      "normalizedArtist": "ultimateinudog",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Ultimateinudog",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Ultimateinudog",
+      "updatedAt": "2026-05-23T11:14:45.650Z"
+    },
+    {
+      "artist": "Wataru Kawahara/Direc. Shinji Higuchi",
+      "normalizedArtist": "wataru kawahara direc shinji higuchi",
+      "reason": "missing_page",
+      "reasonDetail": "No exact Bulbapedia/PocketMonsters/Wikidata profile page was found for this existing artist authority.",
+      "sourceUrl": "",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "diagnostics": {
+        "attempts": [
+          {
+            "title": "Wataru_Kawahara/Direc._Shinji_Higuchi",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Wataru_Kawahara/Direc._Shinji_Higuchi_(TCG_Illustrator)",
+            "reason": "missing_page"
+          },
+          {
+            "title": "Wataru_Kawahara/Direc._Shinji_Higuchi_(illustrator)",
+            "reason": "missing_page"
+          }
+        ]
+      },
+      "updatedAt": null
+    },
+    {
+      "artist": "Yoko Hishida",
+      "normalizedArtist": "yoko hishida",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yoko_Hishida",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Yoko_Hishida",
+      "updatedAt": "2026-05-23T11:14:48.382Z"
+    },
+    {
+      "artist": "Yoshimoto Yoshimon",
+      "normalizedArtist": "yoshimoto yoshimon",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yoshimoto_Yoshimon",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Yoshimoto_Yoshimon",
+      "updatedAt": "2026-05-23T11:14:48.833Z"
+    },
+    {
+      "artist": "Yoshinobu Saito",
+      "normalizedArtist": "yoshinobu saito",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yoshinobu_Saito",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Yoshinobu_Saito",
+      "updatedAt": "2026-05-23T11:14:48.968Z"
+    },
+    {
+      "artist": "Yoshioka",
+      "normalizedArtist": "yoshioka",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yoshioka",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Yoshioka",
+      "updatedAt": "2026-05-23T11:14:49.106Z"
+    },
+    {
+      "artist": "You Iribi",
+      "normalizedArtist": "you iribi",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/You_Iribi",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/You_Iribi",
+      "updatedAt": "2026-05-23T11:14:49.408Z"
+    },
+    {
+      "artist": "Yuka Morii",
+      "normalizedArtist": "yuka morii",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yuka_Morii",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Yuka_Morii",
+      "updatedAt": "2026-05-23T11:14:49.716Z"
+    },
+    {
+      "artist": "Yuka Tanaka",
+      "normalizedArtist": "yuka tanaka",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yuka_Tanaka",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Yuka_Tanaka",
+      "updatedAt": "2026-05-23T11:14:49.890Z"
+    },
+    {
+      "artist": "Yusuke Ohmura",
+      "normalizedArtist": "yusuke ohmura",
+      "reason": "verified_profile_has_no_source_image",
+      "reasonDetail": "Verified profile/reference exists, but the trusted source did not expose a usable profile image.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yusuke_Ohmura",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Yusuke_Ohmura",
+      "updatedAt": "2026-05-23T11:14:50.995Z"
+    }
+  ]
+}

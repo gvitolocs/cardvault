@@ -1,0 +1,90 @@
+{
+  "generatedAt": "2026-05-24T14:54:28.968Z",
+  "checked": 234,
+  "ok": 234,
+  "broken": 0,
+  "brokenRows": [],
+  "samples": [
+    {
+      "artist": "5ban Graphics",
+      "normalizedArtist": "5ban graphics",
+      "url": "https://pokoin.com/card-images/artist-profiles/5ban-graphics.png",
+      "objectKey": "artist-profiles/5ban-graphics.png",
+      "status": 200,
+      "contentType": "image/png",
+      "ok": true
+    },
+    {
+      "artist": "Akira Komayama",
+      "normalizedArtist": "akira komayama",
+      "url": "https://pokoin.com/card-images/artist-profiles/akira-komayama.png",
+      "objectKey": "artist-profiles/akira-komayama.png",
+      "status": 200,
+      "contentType": "image/png",
+      "ok": true
+    },
+    {
+      "artist": "Gemi",
+      "normalizedArtist": "gemi",
+      "url": "https://pokoin.com/card-images/artist-profiles/gemi.png",
+      "objectKey": "artist-profiles/gemi.png",
+      "status": 200,
+      "contentType": "image/png",
+      "ok": true
+    },
+    {
+      "artist": "有田満弘 (Mitsuhiro Arita)",
+      "normalizedArtist": "mitsuhiro arita",
+      "url": "https://pokoin.com/card-images/artist-profiles/mitsuhiro-arita.png",
+      "objectKey": "artist-profiles/mitsuhiro-arita.png",
+      "status": 200,
+      "contentType": "image/png",
+      "ok": true
+    },
+    {
+      "artist": "USGMEN",
+      "normalizedArtist": "usgmen",
+      "url": "https://pokoin.com/card-images/artist-profiles/usgmen.png",
+      "objectKey": "artist-profiles/usgmen.png",
+      "status": 200,
+      "contentType": "image/png",
+      "ok": true
+    },
+    {
+      "artist": "0313",
+      "normalizedArtist": "0313",
+      "url": "https://pokoin.com/card-images/artist-profiles/0313.png",
+      "objectKey": "artist-profiles/0313.png",
+      "status": 200,
+      "contentType": "image/png",
+      "ok": true
+    },
+    {
+      "artist": "こむぎこ2000 (KG-2000)",
+      "normalizedArtist": "2000 kg 2000",
+      "url": "https://pokoin.com/card-images/artist-profiles/2000-kg-2000.png",
+      "objectKey": "artist-profiles/2000-kg-2000.png",
+      "status": 200,
+      "contentType": "image/png",
+      "ok": true
+    },
+    {
+      "artist": "2017 Pikachu Project",
+      "normalizedArtist": "2017 pikachu project",
+      "url": "https://pokoin.com/card-images/artist-profiles/2017-pikachu-project.png",
+      "objectKey": "artist-profiles/2017-pikachu-project.png",
+      "status": 200,
+      "contentType": "image/png",
+      "ok": true
+    },
+    {
+      "artist": "Akagi",
+      "normalizedArtist": "akagi",
+      "url": "https://pokoin.com/card-images/artist-profiles/akagi.png",
+      "objectKey": "artist-profiles/akagi.png",
+      "status": 200,
+      "contentType": "image/png",
+      "ok": true
+    }
+  ]
+}

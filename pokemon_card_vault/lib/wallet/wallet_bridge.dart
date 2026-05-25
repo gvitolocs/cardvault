@@ -54,6 +54,35 @@ class WalletBridge {
     throw UnsupportedError('Browser wallet is not available on this platform.');
   }
 
+  Future<String> sendDataTransaction({
+    required String from,
+    required String to,
+    required String dataHex,
+    BigInt? valueWei,
+    int? nonce,
+  }) {
+    throw UnsupportedError('Browser wallet is not available on this platform.');
+  }
+
+  Future<String> sendExternalTransaction({
+    required String from,
+    required String to,
+    required BigInt valueWei,
+    required String chainIdHex,
+  }) {
+    throw UnsupportedError('Browser wallet is not available on this platform.');
+  }
+
+  Future<String> sendExternalTokenTransfer({
+    required String from,
+    required String tokenAddress,
+    required String to,
+    required BigInt amountUnits,
+    required String chainIdHex,
+  }) {
+    throw UnsupportedError('Browser wallet is not available on this platform.');
+  }
+
   Future<Map<String, String>> signInWithGoogle() {
     throw UnsupportedError('Google sign-in is only available in the browser.');
   }

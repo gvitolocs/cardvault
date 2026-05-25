@@ -5,15 +5,8 @@ const path = require('node:path');
 const { Pool } = require('pg');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
-const DEFAULT_ORACLE_ENV = path.resolve(
-  ROOT_DIR,
-  '..',
-  '..',
-  'pokoinpos',
-  'deploy',
-  'env',
-  'peer4-postgres.env',
-);
+const POKOINPOS_ROOT = process.env.POKOINPOS_ROOT || '/Users/giuseppe/pokoinpos';
+const DEFAULT_ORACLE_ENV = path.join(POKOINPOS_ROOT, 'deploy/env/peer4-postgres.env');
 
 const POKEMON_TO_PALETTE = {
   bug: 'grass',
@@ -155,8 +148,15 @@ const FORM_SUFFIXES = [
 
 const MANUAL_NAME_TYPES = new Map([
   ['Air Balloon', 'item'],
+  ['Aqua Patch', 'item'],
+  ['Ball Guy', 'supporter'],
+  ['Battle Compressor', 'item'],
+  ['Battle Compressor Team Flare Gear', 'item'],
+  ['Battle VIP Pass', 'item'],
+  ["Bebe's Search", 'supporter'],
   ['Buddy-Buddy Poffin', 'item'],
   ['Copycat', 'supporter'],
+  ['Cynthia', 'lightning'],
   ['Exp. Share', 'item'],
   ['No. 1 Trainer', 'supporter'],
   ['Piers', 'supporter'],
@@ -442,6 +442,11 @@ async function ensureIndexes(pool) {
   `);
 }
 
+async function seedSchemaMappings(pool) {
+  const result = await pool.query('select public.marketplace_seed_cards_name_type() as seeded');
+  return result.rows[0]?.seeded ?? 0;
+}
+
 async function refreshFullProjections(pool) {
   await pool.query('set statement_timeout = 0');
   const result = await pool.query(
@@ -459,6 +464,10 @@ async function refreshPaletteProjections(pool) {
         select distinct name
         from public.cards_name_type
         where source like 'palette-backfill%'
+           or source = 'seed-rule'
+        union
+        select distinct name
+        from public.marketplace_card_emoji_rules
       )
       update public.cardtrader_pokemon_blueprints b
       set card_palette = public.marketplace_card_palette(
@@ -474,6 +483,11 @@ async function refreshPaletteProjections(pool) {
       update public.marketplace_cards c
       set
         card_palette = b.card_palette,
+        emoji = concat_ws(
+          ' ',
+          nullif(public.marketplace_card_name_emoji(c.name), ''),
+          nullif(public.marketplace_card_variant_emoji(c.name, c.rarity, c.product_variant), '')
+        ),
         projected_at = now()
       from public.cardtrader_pokemon_blueprints b
       where b.id = c.card_id
@@ -481,12 +495,17 @@ async function refreshPaletteProjections(pool) {
           select distinct name
           from public.cards_name_type
           where source like 'palette-backfill%'
+             or source = 'seed-rule'
+          union
+          select distinct name
+          from public.marketplace_card_emoji_rules
         )
     `);
     const candidates = await pool.query(`
       update public.marketplace_search_candidates s
       set
         card_palette = c.card_palette,
+        emoji = c.emoji,
         projected_at = now()
       from public.marketplace_cards c
       where c.card_id = s.card_id
@@ -494,12 +513,17 @@ async function refreshPaletteProjections(pool) {
           select distinct name
           from public.cards_name_type
           where source like 'palette-backfill%'
+             or source = 'seed-rule'
+          union
+          select distinct name
+          from public.marketplace_card_emoji_rules
         )
     `);
     const versions = await pool.query(`
       update public.marketplace_card_versions v
       set
         card_palette = c.card_palette,
+        emoji = c.emoji,
         projected_at = now()
       from public.marketplace_cards c
       where c.card_id = v.card_id
@@ -507,6 +531,10 @@ async function refreshPaletteProjections(pool) {
           select distinct name
           from public.cards_name_type
           where source like 'palette-backfill%'
+             or source = 'seed-rule'
+          union
+          select distinct name
+          from public.marketplace_card_emoji_rules
         )
     `);
     await pool.query('commit');
@@ -587,6 +615,8 @@ async function main() {
     }
 
     if (apply) {
+      const seeded = await seedSchemaMappings(pool);
+      console.log(`Seeded schema mappings: ${seeded}`);
       const inserted = await upsertMappings(pool, classified);
       console.log(`Upserted mappings: ${inserted}`);
       if (refresh) {

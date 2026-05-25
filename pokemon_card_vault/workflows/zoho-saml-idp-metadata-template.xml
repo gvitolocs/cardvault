@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Zoho SAML Identity Provider metadata template for pokoin.com.
+
+  This file is NOT ready to upload until the placeholder values below are
+  replaced with values from the identity provider that will handle sign-in
+  for Zoho Mail, for example Google Workspace, Microsoft Entra ID, Okta,
+  Auth0, or Cloudflare Access.
+
+  Replace:
+  - __IDP_ENTITY_ID__
+  - __IDP_LOGIN_URL__
+  - __IDP_LOGOUT_URL__
+  - __IDP_X509_CERTIFICATE_BASE64__
+-->
+<md:EntityDescriptor
+  xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata"
+  entityID="__IDP_ENTITY_ID__">
+  <md:IDPSSODescriptor
+    protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol"
+    WantAuthnRequestsSigned="false">
+    <md:KeyDescriptor use="signing">
+      <ds:KeyInfo xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+        <ds:X509Data>
+          <ds:X509Certificate>__IDP_X509_CERTIFICATE_BASE64__</ds:X509Certificate>
+        </ds:X509Data>
+      </ds:KeyInfo>
+    </md:KeyDescriptor>
+    <md:NameIDFormat>
+      urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress
+    </md:NameIDFormat>
+    <md:SingleSignOnService
+      Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
+      Location="__IDP_LOGIN_URL__" />
+    <md:SingleSignOnService
+      Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
+      Location="__IDP_LOGIN_URL__" />
+    <md:SingleLogoutService
+      Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
+      Location="__IDP_LOGOUT_URL__" />
+  </md:IDPSSODescriptor>
+</md:EntityDescriptor>

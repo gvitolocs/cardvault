@@ -4,6 +4,9 @@ const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 
+const POKOINPOS_ROOT = process.env.POKOINPOS_ROOT || '/Users/giuseppe/pokoinpos';
+const DEFAULT_ENV_FILE = path.join(POKOINPOS_ROOT, 'deploy/env/peer4-postgres.env');
+
 function readEnvFile(filePath) {
   const values = {};
   const text = fs.readFileSync(filePath, 'utf8');
@@ -49,7 +52,7 @@ function runOptional(command, args, options = {}) {
 }
 
 function main() {
-  const envPath = process.argv[2] || '../pokoinpos/deploy/env/peer4-postgres.env';
+  const envPath = process.argv[2] || process.env.ORACLE_ENV_FILE || DEFAULT_ENV_FILE;
   const resolvedEnvPath = path.resolve(process.cwd(), envPath);
   if (!fs.existsSync(resolvedEnvPath)) {
     throw new Error(`Env file not found: ${resolvedEnvPath}`);

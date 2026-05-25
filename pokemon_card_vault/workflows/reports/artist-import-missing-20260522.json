@@ -1,0 +1,214 @@
+{
+  "mode": "missing-report",
+  "target": "oracle-peer4:public.marketplace_blueprint_artists",
+  "generatedAt": "2026-05-22T13:56:48.320Z",
+  "primary": {
+    "database": "pokoin_marketplace",
+    "inRecovery": false
+  },
+  "options": {
+    "limit": 1000,
+    "batchSize": 100,
+    "concurrency": 4,
+    "startId": 0,
+    "language": "en",
+    "source": "tcgdex",
+    "refreshExisting": false,
+    "reportSampleSize": 6
+  },
+  "coverage": {
+    "total_blueprints": 71215,
+    "artist_rows": 18115,
+    "missing_artist_rows": 53100,
+    "missing_eligible_rows": 46196,
+    "missing_non_card_product_rows": 6103,
+    "missing_name_rows": 0,
+    "missing_set_rows": 0,
+    "missing_collector_number_rows": 4554
+  },
+  "counts": {
+    "scanned": 1000,
+    "wouldMatch": 0,
+    "ambiguous": 2,
+    "notFound": 0,
+    "skipped": 998,
+    "errors": 0,
+    "sources": {},
+    "reasons": {
+      "non_card_product": 991,
+      "missing_collector_number": 7,
+      "ambiguous_set_name_contains": 2
+    },
+    "canonicalReasons": {
+      "non_card_product": 991,
+      "missing_collector_number": 7,
+      "ambiguous_set": 2
+    }
+  },
+  "samplesByReason": {
+    "non_card_product": [
+      {
+        "blueprintId": "104439",
+        "name": "Battle Arena Decks: Rayquaza GX vs. Ultra Necrozma GX: Ultra Necrozma GX Deck",
+        "setName": "Pokémon Products",
+        "setCode": "popr",
+        "collectorNumber": "",
+        "rarity": "Card",
+        "status": "skipped",
+        "reason": "non_card_product",
+        "canonicalReason": "non_card_product"
+      },
+      {
+        "blueprintId": "104440",
+        "name": "Battle Arena Decks: Rayquaza GX vs. Ultra Necrozma GX: Rayquaza GX Deck",
+        "setName": "Pokémon Products",
+        "setCode": "popr",
+        "collectorNumber": "",
+        "rarity": "Card",
+        "status": "skipped",
+        "reason": "non_card_product",
+        "canonicalReason": "non_card_product"
+      },
+      {
+        "blueprintId": "104441",
+        "name": "WCD 2006: Suns and Moons Deck",
+        "setName": "Pokémon Products",
+        "setCode": "popr",
+        "collectorNumber": "",
+        "rarity": "Card",
+        "status": "skipped",
+        "reason": "non_card_product",
+        "canonicalReason": "non_card_product"
+      },
+      {
+        "blueprintId": "104442",
+        "name": "WCD 2004: Magma Spirit Deck",
+        "setName": "Pokémon Products",
+        "setCode": "popr",
+        "collectorNumber": "",
+        "rarity": "Card",
+        "status": "skipped",
+        "reason": "non_card_product",
+        "canonicalReason": "non_card_product"
+      },
+      {
+        "blueprintId": "104443",
+        "name": "WCD 2004: Rocky Beach Deck",
+        "setName": "Pokémon Products",
+        "setCode": "popr",
+        "collectorNumber": "",
+        "rarity": "Card",
+        "status": "skipped",
+        "reason": "non_card_product",
+        "canonicalReason": "non_card_product"
+      },
+      {
+        "blueprintId": "104444",
+        "name": "WCD 2004: Team Rushdown Deck",
+        "setName": "Pokémon Products",
+        "setCode": "popr",
+        "collectorNumber": "",
+        "rarity": "Card",
+        "status": "skipped",
+        "reason": "non_card_product",
+        "canonicalReason": "non_card_product"
+      }
+    ],
+    "missing_collector_number": [
+      {
+        "blueprintId": "104486",
+        "name": "WCD 2015: The Flying Hammer",
+        "setName": "Pokémon Products",
+        "setCode": "popr",
+        "collectorNumber": "",
+        "rarity": "Card",
+        "status": "skipped",
+        "reason": "missing_collector_number",
+        "canonicalReason": "missing_collector_number"
+      },
+      {
+        "blueprintId": "104487",
+        "name": "WCD 2015: Punch n Bites",
+        "setName": "Pokémon Products",
+        "setCode": "popr",
+        "collectorNumber": "",
+        "rarity": "Card",
+        "status": "skipped",
+        "reason": "missing_collector_number",
+        "canonicalReason": "missing_collector_number"
+      },
+      {
+        "blueprintId": "104488",
+        "name": "WCD 2015: Honorstoise",
+        "setName": "Pokémon Products",
+        "setCode": "popr",
+        "collectorNumber": "",
+        "rarity": "Card",
+        "status": "skipped",
+        "reason": "missing_collector_number",
+        "canonicalReason": "missing_collector_number"
+      },
+      {
+        "blueprintId": "104489",
+        "name": "WCD 2015: Primal Groudon",
+        "setName": "Pokémon Products",
+        "setCode": "popr",
+        "collectorNumber": "",
+        "rarity": "Card",
+        "status": "skipped",
+        "reason": "missing_collector_number",
+        "canonicalReason": "missing_collector_number"
+      },
+      {
+        "blueprintId": "105369",
+        "name": "DP Trainer Kit",
+        "setName": "DP Trainer Kit",
+        "setCode": "tk3",
+        "collectorNumber": "",
+        "rarity": "Card",
+        "status": "skipped",
+        "reason": "missing_collector_number",
+        "canonicalReason": "missing_collector_number"
+      },
+      {
+        "blueprintId": "105446",
+        "name": "HS Trainer Kit",
+        "setName": "HS Trainer Kit",
+        "setCode": "tk4",
+        "collectorNumber": "",
+        "rarity": "Card",
+        "status": "skipped",
+        "reason": "missing_collector_number",
+        "canonicalReason": "missing_collector_number"
+      }
+    ],
+    "ambiguous_set": [
+      {
+        "blueprintId": "105262",
+        "name": "EX Trainer Kit",
+        "setName": "EX Trainer Kit",
+        "setCode": "tk1",
+        "collectorNumber": "Latios & Latias Half Deck",
+        "rarity": "Card",
+        "status": "ambiguous",
+        "reason": "ambiguous_set_name_contains",
+        "canonicalReason": "ambiguous_set",
+        "source": "tcgdex"
+      },
+      {
+        "blueprintId": "105289",
+        "name": "EX Trainer Kit 2",
+        "setName": "EX Trainer Kit 2",
+        "setCode": "tk2",
+        "collectorNumber": "Plusle & Minun Half Deck",
+        "rarity": "Card",
+        "status": "ambiguous",
+        "reason": "ambiguous_set_name_contains",
+        "canonicalReason": "ambiguous_set",
+        "source": "tcgdex"
+      }
+    ]
+  },
+  "lastBlueprintId": 105516,
+  "nextStartId": 105516
+}

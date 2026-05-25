@@ -4,9 +4,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/app_user_profile.dart';
 import '../services/auth_service.dart';
+import '../services/pokoin_api_auth.dart';
 
 final authServiceProvider = Provider<AuthService>((ref) {
   return AuthService();
+});
+
+final pokoinApiAuthServiceProvider = Provider<PokoinApiAuthService>((ref) {
+  final service = PokoinApiAuthService.instance();
+  ref.onDispose(() {
+    service.dispose();
+  });
+  return service;
 });
 
 final authStateProvider = StreamProvider<User?>((ref) {
@@ -21,6 +30,7 @@ final authBootstrapProvider = FutureProvider<void>((ref) async {
     return;
   }
   await ref.watch(authServiceProvider).initializeSession();
+  await ref.watch(pokoinApiAuthServiceProvider).initialize();
 });
 
 final userProfileProvider = StreamProvider<AppUserProfile?>((ref) {

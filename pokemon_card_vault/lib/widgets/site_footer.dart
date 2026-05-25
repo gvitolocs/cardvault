@@ -13,14 +13,18 @@ class SiteFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final compact = MediaQuery.sizeOf(context).width < 760;
+    final width = MediaQuery.sizeOf(context).width;
+    final compact = width < 760;
+    final stacked = width < 980;
+    final wide = width >= 1180;
+    final compactColumnWidth = width < 460 ? width - 36 : (width - 72) / 2;
     final year = DateTime.now().year;
 
     return Container(
       margin: const EdgeInsets.only(top: 28),
       padding: EdgeInsets.symmetric(
-        horizontal: compact ? 18 : 28,
-        vertical: compact ? 24 : 30,
+        horizontal: compact ? 18 : 34,
+        vertical: compact ? 24 : 34,
       ),
       decoration: BoxDecoration(
         color: const Color(0xE60A1026),
@@ -37,76 +41,147 @@ class SiteFooter extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Wrap(
-            spacing: 28,
-            runSpacing: 24,
-            alignment: WrapAlignment.spaceBetween,
-            children: [
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 360),
-                child: const _FooterBrand(),
-              ),
-              _FooterColumn(
-                title: 'Explore',
-                links: [
-                  _FooterLink('Home', () => context.go('/')),
-                  _FooterLink('Documentation', () => context.go('/docs')),
-                  _FooterLink('PokoinScan', () => context.go('/scan')),
-                  _FooterLink('Network health', () => context.go('/health')),
-                  _FooterLink('Account', () => context.go('/profile')),
-                ],
-              ),
-              _FooterColumn(
-                title: 'Network',
-                links: [
-                  _FooterLink(
-                      'RPC endpoint', () => _openExternal(ProjectLinks.rpc)),
-                  _FooterLink('Reserve proof',
-                      () => _openExternal(ProjectLinks.reserve)),
-                  _FooterLink('wPKN contract',
-                      () => _openExternal(ProjectLinks.bscContract)),
-                  _FooterLink('PancakeSwap',
-                      () => _openExternal(ProjectLinks.pancakeSwap)),
-                  _FooterLink('CoinMarketCap',
-                      () => _openExternal(ProjectLinks.coinMarketCap)),
-                ],
-              ),
-              const _FooterSignal(),
-            ],
-          ),
+          if (stacked) ...[
+            const _FooterBrand(),
+            const SizedBox(height: 22),
+            Wrap(
+              spacing: 18,
+              runSpacing: 22,
+              crossAxisAlignment: WrapCrossAlignment.start,
+              children: [
+                SizedBox(
+                  width: compactColumnWidth,
+                  child: _buildExploreColumn(context),
+                ),
+                SizedBox(
+                  width: compactColumnWidth,
+                  child: _buildNetworkColumn(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: 22),
+            const _FooterSignal(),
+          ] else
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Expanded(
+                  flex: 3,
+                  child: _FooterBrand(),
+                ),
+                SizedBox(width: wide ? 42 : 30),
+                Expanded(
+                  flex: 2,
+                  child: _buildExploreColumn(context),
+                ),
+                SizedBox(width: wide ? 34 : 24),
+                Expanded(
+                  flex: 2,
+                  child: _buildNetworkColumn(context),
+                ),
+                SizedBox(width: wide ? 34 : 24),
+                const SizedBox(
+                  width: 282,
+                  child: _FooterSignal(),
+                ),
+              ],
+            ),
           const SizedBox(height: 22),
           const Divider(color: Color(0x1AFFFFFF)),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 12,
-            runSpacing: 8,
-            alignment: WrapAlignment.spaceBetween,
+          const SizedBox(height: 16),
+          Flex(
+            direction: stacked ? Axis.vertical : Axis.horizontal,
+            crossAxisAlignment:
+                stacked ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                '© $year Pokoin. Card Reserve, PokoinPoS and wPKN are part of the Pokoin ecosystem.',
-                style: const TextStyle(color: Color(0xFF93A4C8), fontSize: 12),
-              ),
-              const Text(
-                'Built for transparent collectible commerce and on-chain settlement.',
-                style: TextStyle(
+              if (stacked)
+                Text(
+                  '© $year Pokoin. Card Reserve, PokoinPoS and wPKN are part of the Pokoin ecosystem.',
+                  style: const TextStyle(
+                    color: Color(0xFF93A4C8),
+                    fontSize: 12,
+                    height: 1.45,
+                  ),
+                )
+              else
+                Flexible(
+                  child: Text(
+                    '© $year Pokoin. Card Reserve, PokoinPoS and wPKN are part of the Pokoin ecosystem.',
+                    style: const TextStyle(
+                      color: Color(0xFF93A4C8),
+                      fontSize: 12,
+                      height: 1.45,
+                    ),
+                  ),
+                ),
+              if (!stacked) const SizedBox(width: 24),
+              Padding(
+                padding: EdgeInsets.only(top: stacked ? 10 : 0),
+                child: const Text(
+                  'Transparent collectible commerce. On-chain settlement.',
+                  style: TextStyle(
                     color: Color(0xFFFDE68A),
                     fontSize: 12,
-                    fontWeight: FontWeight.w700),
-              ),
-              TextButton(
-                onPressed: () => _openExternal('mailto:contact@pokoin.com'),
-                style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFFB8C4E6),
-                  padding: EdgeInsets.zero,
-                  minimumSize: const Size(0, 24),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    fontWeight: FontWeight.w700,
+                    height: 1.45,
+                  ),
                 ),
-                child: const Text('contact@pokoin.com'),
+              ),
+              if (!stacked) const SizedBox(width: 24),
+              Padding(
+                padding: EdgeInsets.only(top: stacked ? 8 : 0),
+                child: TextButton.icon(
+                  onPressed: () => _openExternal('mailto:contact@pokoin.com'),
+                  icon: const Icon(Icons.mail_outline, size: 16),
+                  label: const Text('contact@pokoin.com'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFFB8C4E6),
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(0, 28),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
               ),
             ],
           ),
         ],
       ),
+    );
+  }
+
+  static _FooterColumn _buildExploreColumn(BuildContext context) {
+    return _FooterColumn(
+      title: 'Explore',
+      links: [
+        _FooterLink('Home', () => context.go('/')),
+        _FooterLink('About Us', () => context.go('/about')),
+        _FooterLink('Earn PKN', () => context.go('/earn')),
+        _FooterLink('Whitepaper', () => context.go('/whitepaper')),
+        _FooterLink('Documentation', () => context.go('/docs')),
+        _FooterLink('Contact Us', () => context.go('/contact')),
+        _FooterLink('Privacy Policy', () => context.go('/privacy')),
+        _FooterLink('PokoinScan', () => context.go('/scan')),
+        _FooterLink('Network health', () => context.go('/health')),
+      ],
+    );
+  }
+
+  static _FooterColumn _buildNetworkColumn(BuildContext context) {
+    return _FooterColumn(
+      title: 'Account & Network',
+      links: [
+        _FooterLink('My Account', () => context.go('/profile')),
+        _FooterLink('Buy PKN', () => context.go('/buy')),
+        _FooterLink('RPC endpoint', () => _openExternal(ProjectLinks.rpc)),
+        _FooterLink('Reserve proof', () => _openExternal(ProjectLinks.reserve)),
+        _FooterLink(
+            'wPKN contract', () => _openExternal(ProjectLinks.bscContract)),
+        _FooterLink(
+            'PancakeSwap', () => _openExternal(ProjectLinks.pancakeSwap)),
+        _FooterLink(
+            'CoinMarketCap', () => _openExternal(ProjectLinks.coinMarketCap)),
+      ],
     );
   }
 }
@@ -183,33 +258,40 @@ class _FooterColumn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 170,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 0.2,
-            ),
-          ),
-          const SizedBox(height: 10),
-          for (final link in links)
-            TextButton(
-              onPressed: link.onTap,
-              style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFFB8C4E6),
-                padding: EdgeInsets.zero,
-                minimumSize: const Size(0, 32),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                alignment: Alignment.centerLeft,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 220),
+      child: SizedBox(
+        width: double.infinity,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.2,
               ),
-              child: Text(link.label),
             ),
-        ],
+            const SizedBox(height: 10),
+            for (final link in links)
+              TextButton(
+                onPressed: link.onTap,
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFFB8C4E6),
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  minimumSize: const Size(0, 30),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  alignment: Alignment.centerLeft,
+                ),
+                child: Text(
+                  link.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -221,7 +303,6 @@ class _FooterSignal extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 260,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         gradient: const LinearGradient(

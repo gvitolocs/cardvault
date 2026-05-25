@@ -8,11 +8,20 @@
   },
   "headers": [
     {
+      "source": "/",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
       "source": "/index.html",
       "headers": [
         {
           "key": "Cache-Control",
-          "value": "no-store, no-cache, must-revalidate, proxy-revalidate"
+          "value": "public, max-age=0, must-revalidate"
         }
       ]
     },
@@ -42,9 +51,145 @@
           "value": "no-store, no-cache, must-revalidate, proxy-revalidate"
         }
       ]
+    },
+    {
+      "source": "/favicon.ico",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/favicon-:size.png",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/pokoin-:size.png",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/apple-touch-icon.png",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/assets/:path*",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, stale-while-revalidate=86400"
+        }
+      ]
+    },
+    {
+      "source": "/canvaskit/:path*",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=604800, stale-while-revalidate=86400"
+        }
+      ]
     }
   ],
   "redirects": [
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.pokoin.com"
+        }
+      ],
+      "destination": "https://pokoin.com/",
+      "permanent": true
+    },
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.pokoin.com"
+        }
+      ],
+      "destination": "https://pokoin.com/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/index.html",
+      "destination": "https://pokoin.com/",
+      "permanent": true
+    },
+    {
+      "source": "/pokoin-crypto.html",
+      "destination": "https://pokoin.com/",
+      "permanent": true
+    },
+    {
+      "source": "/about.html",
+      "destination": "https://pokoin.com/about",
+      "permanent": true
+    },
+    {
+      "source": "/contact.html",
+      "destination": "https://pokoin.com/contact",
+      "permanent": true
+    },
+    {
+      "source": "/whitepaper.html",
+      "destination": "https://pokoin.com/whitepaper",
+      "permanent": true
+    },
+    {
+      "source": "/marketplace.html",
+      "destination": "https://pokoin.com/marketplace",
+      "permanent": true
+    },
+    {
+      "source": "/marketplace-signal.html",
+      "destination": "https://pokoin.com/marketplace/signal",
+      "permanent": true
+    },
+    {
+      "source": "/forum.html",
+      "destination": "https://pokoin.com/forum",
+      "permanent": true
+    },
+    {
+      "source": "/wallet.html",
+      "destination": "https://pokoin.com/wallet",
+      "permanent": true
+    },
+    {
+      "source": "/scan.html",
+      "destination": "https://pokoin.com/scan",
+      "permanent": true
+    },
+    {
+      "source": "/health.html",
+      "destination": "https://pokoin.com/health",
+      "permanent": true
+    },
+    {
+      "source": "/docs.html",
+      "destination": "https://pokoin.com/docs",
+      "permanent": true
+    },
     {
       "source": "/:protected(wallet|auth|profile|checkout|orders)",
       "has": [
@@ -95,6 +240,17 @@
         {
           "type": "host",
           "value": "cardcaveau.pokoin.com"
+        }
+      ],
+      "destination": "https://pokoin.com/:protected",
+      "permanent": true
+    },
+    {
+      "source": "/:protected(wallet|auth|profile|checkout|orders)",
+      "has": [
+        {
+          "type": "host",
+          "value": "cardvault.pokoin.com"
         }
       ],
       "destination": "https://pokoin.com/:protected",
@@ -156,6 +312,17 @@
       "permanent": true
     },
     {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "cardvault.pokoin.com"
+        }
+      ],
+      "destination": "https://pokoin.com/marketplace",
+      "permanent": true
+    },
+    {
       "source": "/total-supply.txt",
       "destination": "https://rpc.pokoin.com/chain/supply/total.txt",
       "permanent": false
@@ -200,6 +367,69 @@
         }
       ],
       "destination": "/marketplace-signal.html"
+    },
+    {
+      "source": "/about",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(.*bot.*|.*Bot.*|.*crawler.*|.*Crawler.*|.*spider.*|.*Spider.*|.*Google-InspectionTool.*|.*facebookexternalhit.*|.*Twitterbot.*|.*LinkedInBot.*|.*WhatsApp.*|.*Discordbot.*|.*TelegramBot.*)"
+        }
+      ],
+      "destination": "/about.html"
+    },
+    {
+      "source": "/contact",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(.*bot.*|.*Bot.*|.*crawler.*|.*Crawler.*|.*spider.*|.*Spider.*|.*Google-InspectionTool.*|.*facebookexternalhit.*|.*Twitterbot.*|.*LinkedInBot.*|.*WhatsApp.*|.*Discordbot.*|.*TelegramBot.*)"
+        }
+      ],
+      "destination": "/contact.html"
+    },
+    {
+      "source": "/whitepaper",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(.*bot.*|.*Bot.*|.*crawler.*|.*Crawler.*|.*spider.*|.*Spider.*|.*Google-InspectionTool.*|.*facebookexternalhit.*|.*Twitterbot.*|.*LinkedInBot.*|.*WhatsApp.*|.*Discordbot.*|.*TelegramBot.*)"
+        }
+      ],
+      "destination": "/whitepaper.html"
+    },
+    {
+      "source": "/marketplace/:language/cards/:cardId/:cardSlug",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(.*bot.*|.*Bot.*|.*crawler.*|.*Crawler.*|.*spider.*|.*Spider.*|.*Google-InspectionTool.*|.*facebookexternalhit.*|.*Twitterbot.*|.*LinkedInBot.*|.*WhatsApp.*|.*Discordbot.*|.*TelegramBot.*)"
+        }
+      ],
+      "destination": "/api/marketplace-card-seo.js?language=:language&cardPath=:cardId/:cardSlug"
+    },
+    {
+      "source": "/:cardId(\\d+)/:cardSlug",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(.*bot.*|.*Bot.*|.*crawler.*|.*Crawler.*|.*spider.*|.*Google-InspectionTool.*|.*facebookexternalhit.*|.*Twitterbot.*|.*LinkedInBot.*|.*WhatsApp.*|.*Discordbot.*|.*TelegramBot.*)"
+        }
+      ],
+      "destination": "/api/marketplace-card-seo.js?cardId=:cardId&cardSlug=:cardSlug"
+    },
+    {
+      "source": "/:cardId(\\d+)/:cardSlug",
+      "destination": "/api/marketplace-card-shortlink.js?path=/:cardId/:cardSlug"
+    },
+    {
+      "source": "/:cardId(\\d+)",
+      "destination": "/api/marketplace-card-shortlink.js?cardId=:cardId"
     },
     {
       "source": "/forum",
@@ -289,6 +519,14 @@
       "destination": "/api/wpkn-exchange.js?action=:action"
     },
     {
+      "source": "/api/crypto-pkn-purchase/:action",
+      "destination": "/api/crypto-pkn-purchase.js?action=:action"
+    },
+    {
+      "source": "/api/crypto-pkn-sale/:action",
+      "destination": "/api/crypto-pkn-sale.js?action=:action"
+    },
+    {
       "source": "/api/search-recipient-emails",
       "destination": "/api/search-recipient-emails.js"
     },
@@ -307,6 +545,26 @@
     {
       "source": "/api/signup-notification",
       "destination": "/api/signup-notification.js"
+    },
+    {
+      "source": "/api/pokoin-assistant",
+      "destination": "/api/pokoin-assistant.js"
+    },
+    {
+      "source": "/api/user-current-page",
+      "destination": "/api/user-current-page.js"
+    },
+    {
+      "source": "/api/social-autopost",
+      "destination": "/api/social-autopost.js"
+    },
+    {
+      "source": "/api/social-autopost/hot-card",
+      "destination": "/api/social-autopost-hot-card.js"
+    },
+    {
+      "source": "/api/social-post-agent",
+      "destination": "/api/social-post-agent.js"
     },
     {
       "source": "/api/wallet-auth/nonce",
@@ -337,8 +595,44 @@
       "destination": "/api/cardtrader-redirect.js"
     },
     {
+      "source": "/api/cardtrader-connect",
+      "destination": "/api/cardtrader-connect.js"
+    },
+    {
+      "source": "/api/cardtrader-blueprint-listings",
+      "destination": "/api/cardtrader-blueprint-listings.js"
+    },
+    {
+      "source": "/api/cardtrader-live-listings",
+      "destination": "/api/cardtrader-live-listings.js"
+    },
+    {
+      "source": "/api/cardtrader-daily-listings-refresh",
+      "destination": "/api/cardtrader-daily-listings-refresh.js"
+    },
+    {
+      "source": "/api/cardtrader-status",
+      "destination": "/api/cardtrader-status.js"
+    },
+    {
+      "source": "/api/cardtrader-disconnect",
+      "destination": "/api/cardtrader-disconnect.js"
+    },
+    {
+      "source": "/api/cardtrader-clean-listings",
+      "destination": "/api/cardtrader-clean-listings.js"
+    },
+    {
+      "source": "/api/cardtrader-import-dry-run",
+      "destination": "/api/cardtrader-import-dry-run.js"
+    },
+    {
       "source": "/api/cardmarket-redirect",
       "destination": "/api/cardmarket-redirect.js"
+    },
+    {
+      "source": "/api/cardmarket-scrape-observation",
+      "destination": "/api/cardmarket-scrape-observation.js"
     },
     {
       "source": "/api/unlock-silver",
@@ -349,12 +643,84 @@
       "destination": "/api/marketplace-home.js"
     },
     {
+      "source": "/api/marketplace-competitive",
+      "destination": "/api/marketplace-competitive.js"
+    },
+    {
+      "source": "/api/marketplace-blueprint-price",
+      "destination": "/api/marketplace-blueprint-price.js"
+    },
+    {
+      "source": "/api/marketplace-card-cheapest-price",
+      "destination": "/api/marketplace-card-cheapest-price.js"
+    },
+    {
+      "source": "/api/marketplace-artist-cards",
+      "destination": "/api/marketplace-artist-cards.js"
+    },
+    {
+      "source": "/api/marketplace-artist-suggestions",
+      "destination": "/api/marketplace-artist-suggestions.js"
+    },
+    {
+      "source": "/api/marketplace-debug-refinement",
+      "destination": "/api/marketplace-debug-refinement.js"
+    },
+    {
+      "source": "/api/marketplace-debug-artists",
+      "destination": "/api/marketplace-debug-artists.js"
+    },
+    {
+      "source": "/api/marketplace-debug-events",
+      "destination": "/api/marketplace-debug-events.js"
+    },
+    {
+      "source": "/api/marketplace-cardmarket-guess-review",
+      "destination": "/api/marketplace-cardmarket-guess-review.js"
+    },
+    {
+      "source": "/api/marketplace-debug-cardtrader-blueprints",
+      "destination": "/api/marketplace-debug-cardtrader-blueprints.js"
+    },
+    {
+      "source": "/api/marketplace-card-versions",
+      "destination": "/api/marketplace-card-versions.js"
+    },
+    {
+      "source": "/api/marketplace-card-sales",
+      "destination": "/api/marketplace-card-sales.js"
+    },
+    {
+      "source": "/api/marketplace-card-url",
+      "destination": "/api/marketplace-card-url.js"
+    },
+    {
       "source": "/api/marketplace-event",
       "destination": "/api/marketplace-event.js"
     },
     {
+      "source": "/api/marketplace-listings",
+      "destination": "/api/marketplace-listings.js"
+    },
+    {
+      "source": "/api/marketplace-orders",
+      "destination": "/api/marketplace-orders.js"
+    },
+    {
       "source": "/api/marketplace-autocomplete",
       "destination": "/api/marketplace-autocomplete.js"
+    },
+    {
+      "source": "/api/searchbar-cards",
+      "destination": "/api/searchbar-cards.js"
+    },
+    {
+      "source": "/api/searchbar-token-predict",
+      "destination": "/api/searchbar-token-predict.js"
+    },
+    {
+      "source": "/api/searchbar-cancel",
+      "destination": "/api/searchbar-cancel.js"
     },
     {
       "source": "/api/marketplace-search-candidates",
@@ -367,6 +733,10 @@
     {
       "source": "/api/marketplace-expansions",
       "destination": "/api/marketplace-expansions.js"
+    },
+    {
+      "source": "/api/flutter-debug-logs",
+      "destination": "/api/flutter-debug-logs.js"
     },
     {
       "source": "/api/forum",

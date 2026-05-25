@@ -87,6 +87,7 @@ flutter:
   
   assets:
     - web/pokoin.svg
+    - assets/brand/
     - assets/images/
     - assets/icons/
     - assets/animations/

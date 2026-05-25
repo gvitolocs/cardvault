@@ -1,0 +1,4170 @@
+{
+  "generatedAt": "2026-05-24T14:51:40.288Z",
+  "mode": "recache-missing-images",
+  "options": {
+    "limit": "all",
+    "source": "all",
+    "concurrency": 1,
+    "artist": "",
+    "refreshExisting": false,
+    "cacheImages": true,
+    "auditImageCache": false,
+    "recacheMissingImages": true
+  },
+  "counts": {
+    "scanned": 230,
+    "matched": 230,
+    "upserted": 230,
+    "skipped": 0,
+    "ambiguous": 0,
+    "imageCached": 230,
+    "imageCacheNeeded": 0,
+    "reasons": {
+      "cached": 230
+    }
+  },
+  "samples": [
+    {
+      "artist": "0313",
+      "displayName": "0313",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/0313",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/0313.png"
+    },
+    {
+      "artist": "こむぎこ2000 (KG-2000)",
+      "displayName": "こむぎこ2000 (KG-2000)",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7155",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/2000-kg-2000.png"
+    },
+    {
+      "artist": "2017 Pikachu Project",
+      "displayName": "2017 Pikachu Project",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7099",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/2017-pikachu-project.png"
+    },
+    {
+      "artist": "5ban Graphics",
+      "displayName": "5ban Graphics",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/5ban_Graphics",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/5ban-graphics.png"
+    },
+    {
+      "artist": "Akagi",
+      "displayName": "Akagi",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Akagi",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/akagi.png"
+    },
+    {
+      "artist": "Akira Komayama",
+      "displayName": "Akira Komayama",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Akira_Komayama",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/akira-komayama.png"
+    },
+    {
+      "artist": "Aky CG Works",
+      "displayName": "Aky CG Works",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Aky_CG_Works",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/aky-cg-works.png"
+    },
+    {
+      "artist": "Aliya Chen",
+      "displayName": "Aliya Chen",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Aliya_Chen",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/aliya-chen.png"
+    },
+    {
+      "artist": "Amelicart",
+      "displayName": "Amelicart",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Amelicart",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/amelicart.png"
+    },
+    {
+      "artist": "Aoki",
+      "displayName": "Aoki",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Aoki",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/aoki.png"
+    },
+    {
+      "artist": "Apios",
+      "displayName": "Apios",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Apios",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/apios.png"
+    },
+    {
+      "artist": "Arai Kiriko",
+      "displayName": "Arai Kiriko",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Arai_Kiriko",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/arai-kiriko.png"
+    },
+    {
+      "artist": "Asako Ito",
+      "displayName": "Asako Ito",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Asako_Ito",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/asako-ito.png"
+    },
+    {
+      "artist": "Aspara",
+      "displayName": "Aspara",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Aspara",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/aspara.png"
+    },
+    {
+      "artist": "Atsuko Nishida",
+      "displayName": "Atsuko Nishida",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Atsuko_Nishida",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/atsuko-nishida.png"
+    },
+    {
+      "artist": "Avec Yoko",
+      "displayName": "Avec Yoko",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Avec_Yoko",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/avec-yoko.png"
+    },
+    {
+      "artist": "BERUBURI",
+      "displayName": "BERUBURI",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/BERUBURI",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/beruburi.png"
+    },
+    {
+      "artist": "\"Big Mama\" Tagawa",
+      "displayName": "\"Big Mama\" Tagawa",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/%22Big_Mama%22_Tagawa",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/big-mama-tagawa.png"
+    },
+    {
+      "artist": "Burari",
+      "displayName": "Burari",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Burari",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/burari.png"
+    },
+    {
+      "artist": "Chibi",
+      "displayName": "Chibi",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Chibi",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/chibi.png"
+    },
+    {
+      "artist": "Christopher Rush",
+      "displayName": "Christopher Rush",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7110",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/christopher-rush.png"
+    },
+    {
+      "artist": "Cochi8i",
+      "displayName": "Cochi8i",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Cochi8i",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/cochi8i.png"
+    },
+    {
+      "artist": "ConceptLab",
+      "displayName": "ConceptLab",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/ConceptLab",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/conceptlab.png"
+    },
+    {
+      "artist": "CR CG gangs",
+      "displayName": "CR CG gangs",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/CR_CG_gangs",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/cr-cg-gangs.png"
+    },
+    {
+      "artist": "Craig Turvey",
+      "displayName": "Craig Turvey",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7112",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/craig-turvey.png"
+    },
+    {
+      "artist": "D.A.G Inc.",
+      "displayName": "D.A.G Inc.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/D.A.G_Inc.",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/d-a-g-inc.png"
+    },
+    {
+      "artist": "Daisuke Ito",
+      "displayName": "Daisuke Ito",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Daisuke_Ito",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/daisuke-ito.png"
+    },
+    {
+      "artist": "Daisuke Iwamoto",
+      "displayName": "Daisuke Iwamoto",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Daisuke_Iwamoto",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/daisuke-iwamoto.png"
+    },
+    {
+      "artist": "Danciao",
+      "displayName": "Danciao",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Danciao",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/danciao.png"
+    },
+    {
+      "artist": "DOM",
+      "displayName": "DOM",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/DOM",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/dom.png"
+    },
+    {
+      "artist": "Dsuke",
+      "displayName": "Dsuke",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Dsuke",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/dsuke.png"
+    },
+    {
+      "artist": "Ebila",
+      "displayName": "Ebila",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Ebila",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/ebila.png"
+    },
+    {
+      "artist": "Emi Miwa",
+      "displayName": "Emi Miwa",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7118",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/emi-miwa.png"
+    },
+    {
+      "artist": "Eske Yoshinob",
+      "displayName": "Eske Yoshinob",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Eske_Yoshinob",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/eske-yoshinob.png"
+    },
+    {
+      "artist": "Felicia Chen",
+      "displayName": "Felicia Chen",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Felicia_Chen",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/felicia-chen.png"
+    },
+    {
+      "artist": "Framestore",
+      "displayName": "Framestore",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Framestore",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/framestore.png"
+    },
+    {
+      "artist": "Gakuji Nomoto",
+      "displayName": "Gakuji Nomoto",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Gakuji_Nomoto",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/gakuji-nomoto.png"
+    },
+    {
+      "artist": "GAME FREAK",
+      "displayName": "GAME FREAK",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7126",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/game-freak.png"
+    },
+    {
+      "artist": "Gapao",
+      "displayName": "Gapao",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Gapao",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/gapao.png"
+    },
+    {
+      "artist": "Gemi",
+      "displayName": "Gemi",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Gemi",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/gemi.png"
+    },
+    {
+      "artist": "GIDORA",
+      "displayName": "GIDORA",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/GIDORA",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/gidora.png"
+    },
+    {
+      "artist": "GOSSAN",
+      "displayName": "GOSSAN",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/GOSSAN",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/gossan.png"
+    },
+    {
+      "artist": "GOTO minori",
+      "displayName": "GOTO minori",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/GOTO_minori",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/goto-minori.png"
+    },
+    {
+      "artist": "HACCAN",
+      "displayName": "HACCAN",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/HACCAN",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/haccan.png"
+    },
+    {
+      "artist": "HAGIYA Kaoru",
+      "displayName": "HAGIYA Kaoru",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/HAGIYA_Kaoru",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/hagiya-kaoru.png"
+    },
+    {
+      "artist": "Hajime Kusajima",
+      "displayName": "Hajime Kusajima",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hajime_Kusajima",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/hajime-kusajima.png"
+    },
+    {
+      "artist": "Haru Akasaka",
+      "displayName": "Haru Akasaka",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Haru_Akasaka",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/haru-akasaka.png"
+    },
+    {
+      "artist": "Hasegawa Saki",
+      "displayName": "Hasegawa Saki",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hasegawa_Saki",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/hasegawa-saki.png"
+    },
+    {
+      "artist": "Hasuno",
+      "displayName": "Hasuno",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hasuno",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/hasuno.png"
+    },
+    {
+      "artist": "HICO KIM",
+      "displayName": "HICO KIM",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/HICO_KIM",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/hico-kim.png"
+    },
+    {
+      "artist": "Hideaki Hakozaki",
+      "displayName": "Hideaki Hakozaki",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hideaki_Hakozaki",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/hideaki-hakozaki.png"
+    },
+    {
+      "artist": "Hideki Kazama",
+      "displayName": "Hideki Kazama",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hideki_Kazama",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/hideki-kazama.png"
+    },
+    {
+      "artist": "Hideyuki Nakajima",
+      "displayName": "Hideyuki Nakajima",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hideyuki_Nakajima",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/hideyuki-nakajima.png"
+    },
+    {
+      "artist": "Hikaru Koike",
+      "displayName": "Hikaru Koike",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hikaru_Koike",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/hikaru-koike.png"
+    },
+    {
+      "artist": "Hiroaki Ito",
+      "displayName": "Hiroaki Ito",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hiroaki_Ito",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/hiroaki-ito.png"
+    },
+    {
+      "artist": "Hiromichi Sugiyama",
+      "displayName": "Hiromichi Sugiyama",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hiromichi_Sugiyama",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/hiromichi-sugiyama.png"
+    },
+    {
+      "artist": "Hisao Nakamura",
+      "displayName": "Hisao Nakamura",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hisao_Nakamura",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/hisao-nakamura.png"
+    },
+    {
+      "artist": "Hncl",
+      "displayName": "Hncl",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hncl",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/hncl.png"
+    },
+    {
+      "artist": "Hoshino KURO",
+      "displayName": "Hoshino KURO",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hoshino_KURO",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/hoshino-kuro.png"
+    },
+    {
+      "artist": "Huang Tzu En",
+      "displayName": "Huang Tzu En",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Huang_Tzu_En",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/huang-tzu-en.png"
+    },
+    {
+      "artist": "Imakuni? 今国智章 (Tomoaki Imakuni)",
+      "displayName": "Imakuni? 今国智章 (Tomoaki Imakuni)",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7002",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/imakuni-tomoaki-imakuni.png"
+    },
+    {
+      "artist": "Imoniii",
+      "displayName": "Imoniii",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Imoniii",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/imoniii.png"
+    },
+    {
+      "artist": "Inose yukie",
+      "displayName": "Inose yukie",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Inose_yukie",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/inose-yukie.png"
+    },
+    {
+      "artist": "Iori Suzuki",
+      "displayName": "Iori Suzuki",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Iori_Suzuki",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/iori-suzuki.png"
+    },
+    {
+      "artist": "James Turner",
+      "displayName": "James Turner",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7139",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/james-turner.png"
+    },
+    {
+      "artist": "Jerky",
+      "displayName": "Jerky",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Jerky",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/jerky.png"
+    },
+    {
+      "artist": "Jiro Sasumo",
+      "displayName": "Jiro Sasumo",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Jiro_Sasumo",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/jiro-sasumo.png"
+    },
+    {
+      "artist": "Julie Hang",
+      "displayName": "Julie Hang",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Julie_Hang",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/julie-hang.png"
+    },
+    {
+      "artist": "Jumpei Akasaka",
+      "displayName": "Jumpei Akasaka",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7741",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/jumpei-akasaka.png"
+    },
+    {
+      "artist": "Jungo Suzuki",
+      "displayName": "Jungo Suzuki",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Jungo_Suzuki",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/jungo-suzuki.png"
+    },
+    {
+      "artist": "Junsei Kuninobu",
+      "displayName": "Junsei Kuninobu",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Junsei_Kuninobu",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/junsei-kuninobu.png"
+    },
+    {
+      "artist": "K. Hoshiba",
+      "displayName": "K. Hoshiba",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/K._Hoshiba",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/k-hoshiba.png"
+    },
+    {
+      "artist": "K. Utsunomiya",
+      "displayName": "K. Utsunomiya",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/K._Utsunomiya",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/k-utsunomiya.png"
+    },
+    {
+      "artist": "Kai Ishikawa",
+      "displayName": "Kai Ishikawa",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kai_Ishikawa",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/kai-ishikawa.png"
+    },
+    {
+      "artist": "Kamonabe",
+      "displayName": "Kamonabe",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kamonabe",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/kamonabe.png"
+    },
+    {
+      "artist": "Kanahei",
+      "displayName": "Kanahei",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kanahei",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/kanahei.png"
+    },
+    {
+      "artist": "Kannnu",
+      "displayName": "Kannnu",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kannnu",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/kannnu.png"
+    },
+    {
+      "artist": "Kantaro",
+      "displayName": "Kantaro",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kantaro",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/kantaro.png"
+    },
+    {
+      "artist": "Kariya",
+      "displayName": "Kariya",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kariya",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/kariya.png"
+    },
+    {
+      "artist": "Katsura Tabata",
+      "displayName": "Katsura Tabata",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Katsura_Tabata",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/katsura-tabata.png"
+    },
+    {
+      "artist": "Kawayoo",
+      "displayName": "Kawayoo",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kawayoo",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/kawayoo.png"
+    },
+    {
+      "artist": "Kazuaki Aihara",
+      "displayName": "Kazuaki Aihara",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kazuaki_Aihara",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/kazuaki-aihara.png"
+    },
+    {
+      "artist": "Kazuo Yazawa",
+      "displayName": "Kazuo Yazawa",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kazuo_Yazawa",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/kazuo-yazawa.png"
+    },
+    {
+      "artist": "Kazuyuki Kano",
+      "displayName": "Kazuyuki Kano",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kazuyuki_Kano",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/kazuyuki-kano.png"
+    },
+    {
+      "artist": "KEIICHIRO ITO",
+      "displayName": "KEIICHIRO ITO",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/KEIICHIRO_ITO",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/keiichiro-ito.png"
+    },
+    {
+      "artist": "Keisin",
+      "displayName": "Keisin",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Keisin",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/keisin.png"
+    },
+    {
+      "artist": "萩原慶汰 (Keita Hagiwara)",
+      "displayName": "萩原慶汰 (Keita Hagiwara)",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/5881",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/keita-hagiwara.png"
+    },
+    {
+      "artist": "Kent Kanetsuna",
+      "displayName": "Kent Kanetsuna",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kent_Kanetsuna",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/kent-kanetsuna.png"
+    },
+    {
+      "artist": "Kinu Nishimura",
+      "displayName": "Kinu Nishimura",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kinu_Nishimura",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/kinu-nishimura.png"
+    },
+    {
+      "artist": "KirisAki",
+      "displayName": "KirisAki",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/KirisAki",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/kirisaki.png"
+    },
+    {
+      "artist": "Kodama",
+      "displayName": "Kodama",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kodama",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/kodama.png"
+    },
+    {
+      "artist": "Kouji Tajima",
+      "displayName": "Kouji Tajima",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kouji_Tajima",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/kouji-tajima.png"
+    },
+    {
+      "artist": "Krgc",
+      "displayName": "Krgc",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Krgc",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/krgc.png"
+    },
+    {
+      "artist": "Kurumitsu",
+      "displayName": "Kurumitsu",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kurumitsu",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/kurumitsu.png"
+    },
+    {
+      "artist": "Kyoko Koizumi",
+      "displayName": "Kyoko Koizumi",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7018",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/kyoko-koizumi.png"
+    },
+    {
+      "artist": "KYUPIYAMA",
+      "displayName": "KYUPIYAMA",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/KYUPIYAMA",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/kyupiyama.png"
+    },
+    {
+      "artist": "LINNE",
+      "displayName": "LINNE",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/LINNE",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/linne.png"
+    },
+    {
+      "artist": "M. Akiyama",
+      "displayName": "M. Akiyama",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/M._Akiyama",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/m-akiyama.png"
+    },
+    {
+      "artist": "MAHOU",
+      "displayName": "MAHOU",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/MAHOU",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/mahou.png"
+    },
+    {
+      "artist": "Maiko Fujiwara",
+      "displayName": "Maiko Fujiwara",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Maiko_Fujiwara",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/maiko-fujiwara.png"
+    },
+    {
+      "artist": "Makoto Imai",
+      "displayName": "Makoto Imai",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Makoto_Imai",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/makoto-imai.png"
+    },
+    {
+      "artist": "MARINA Chikazawa",
+      "displayName": "MARINA Chikazawa",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/MARINA_Chikazawa",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/marina-chikazawa.png"
+    },
+    {
+      "artist": "Masa",
+      "displayName": "Masa",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Masa",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/masa.png"
+    },
+    {
+      "artist": "Masahiko Ishii",
+      "displayName": "Masahiko Ishii",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Masahiko_Ishii",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/masahiko-ishii.png"
+    },
+    {
+      "artist": "Mashu",
+      "displayName": "Mashu",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Mashu",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/mashu.png"
+    },
+    {
+      "artist": "Matazo",
+      "displayName": "Matazo",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Matazo",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/matazo.png"
+    },
+    {
+      "artist": "Match",
+      "displayName": "Match",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Match",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/match.png"
+    },
+    {
+      "artist": "Megumi Higuchi",
+      "displayName": "Megumi Higuchi",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Megumi_Higuchi",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/megumi-higuchi.png"
+    },
+    {
+      "artist": "Miki kudo",
+      "displayName": "Miki kudo",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Miki_kudo",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/miki-kudo.png"
+    },
+    {
+      "artist": "Mikiko Takeda",
+      "displayName": "Mikiko Takeda",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7177",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/mikiko-takeda.png"
+    },
+    {
+      "artist": "Mikio Menjo",
+      "displayName": "Mikio Menjo",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Mikio_Menjo",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/mikio-menjo.png"
+    },
+    {
+      "artist": "Minato",
+      "displayName": "Minato",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Minato",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/minato.png"
+    },
+    {
+      "artist": "Mingo",
+      "displayName": "Mingo",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Mingo",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/mingo.png"
+    },
+    {
+      "artist": "Miranda Branley",
+      "displayName": "Miranda Branley",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7182",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/miranda-branley.png"
+    },
+    {
+      "artist": "Misa Tsutsui",
+      "displayName": "Misa Tsutsui",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Misa_Tsutsui",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/misa-tsutsui.png"
+    },
+    {
+      "artist": "Motofumi Fujiwara",
+      "displayName": "Motofumi Fujiwara",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Motofumi_Fujiwara",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/motofumi-fujiwara.png"
+    },
+    {
+      "artist": "MPC Film",
+      "displayName": "MPC Film",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7027",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/mpc-film.png"
+    },
+    {
+      "artist": "Mt. TBT",
+      "displayName": "Mt. TBT",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Mt._TBT",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/mt-tbt.png"
+    },
+    {
+      "artist": "MUGENUP",
+      "displayName": "MUGENUP",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/MUGENUP",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/mugenup.png"
+    },
+    {
+      "artist": "菜花健作 (Nabana Kensaku)",
+      "displayName": "菜花健作 (Nabana Kensaku)",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7893",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/nabana-kensaku.png"
+    },
+    {
+      "artist": "Nabatame Kazutaka",
+      "displayName": "Nabatame Kazutaka",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Nabatame_Kazutaka",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/nabatame-kazutaka.png"
+    },
+    {
+      "artist": "nagano",
+      "displayName": "nagano",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7186",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/nagano.png"
+    },
+    {
+      "artist": "Nakamura Ippan",
+      "displayName": "Nakamura Ippan",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Nakamura_Ippan",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/nakamura-ippan.png"
+    },
+    {
+      "artist": "Nakaoka",
+      "displayName": "Nakaoka",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Nakaoka",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/nakaoka.png"
+    },
+    {
+      "artist": "Naoki Saito",
+      "displayName": "Naoki Saito",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Naoki_Saito",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/naoki-saito.png"
+    },
+    {
+      "artist": "Narumi Sato",
+      "displayName": "Narumi Sato",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Narumi_Sato",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/narumi-sato.png"
+    },
+    {
+      "artist": "NC帝國 (NC Empire)",
+      "displayName": "NC帝國 (NC Empire)",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7034",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/nc-nc-empire.png"
+    },
+    {
+      "artist": "Nelnal",
+      "displayName": "Nelnal",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Nelnal",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/nelnal.png"
+    },
+    {
+      "artist": "Nisimono",
+      "displayName": "Nisimono",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Nisimono",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/nisimono.png"
+    },
+    {
+      "artist": "Nobuyuki Fujimoto",
+      "displayName": "Nobuyuki Fujimoto",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7191",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/nobuyuki-fujimoto.png"
+    },
+    {
+      "artist": "Noriko Hotta",
+      "displayName": "Noriko Hotta",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Noriko_Hotta",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/noriko-hotta.png"
+    },
+    {
+      "artist": "Noriko Uono",
+      "displayName": "Noriko Uono",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Noriko_Uono",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/noriko-uono.png"
+    },
+    {
+      "artist": "OKACHEKE",
+      "displayName": "OKACHEKE",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/OKACHEKE",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/okacheke.png"
+    },
+    {
+      "artist": "Okayamatakatoshi",
+      "displayName": "Okayamatakatoshi",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Okayamatakatoshi",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/okayamatakatoshi.png"
+    },
+    {
+      "artist": "Oku",
+      "displayName": "Oku",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Oku",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/oku.png"
+    },
+    {
+      "artist": "OKUBO",
+      "displayName": "OKUBO",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/OKUBO",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/okubo.png"
+    },
+    {
+      "artist": "OOYAMA",
+      "displayName": "OOYAMA",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7040",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/ooyama.png"
+    },
+    {
+      "artist": "ORBITALLINK Inc.",
+      "displayName": "ORBITALLINK Inc.",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7194",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/orbitallink-inc.png"
+    },
+    {
+      "artist": "Orca",
+      "displayName": "Orca",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Orca",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/orca.png"
+    },
+    {
+      "artist": "Osare",
+      "displayName": "Osare",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Osare",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/osare.png"
+    },
+    {
+      "artist": "Otumami",
+      "displayName": "Otumami",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Otumami",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/otumami.png"
+    },
+    {
+      "artist": "Ounishi",
+      "displayName": "Ounishi",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Ounishi",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/ounishi.png"
+    },
+    {
+      "artist": "PLANETA",
+      "displayName": "PLANETA",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/PLANETA",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/planeta.png"
+    },
+    {
+      "artist": "PLANETA Hiiragi",
+      "displayName": "PLANETA Hiiragi",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/PLANETA_Hiiragi",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/planeta-hiiragi.png"
+    },
+    {
+      "artist": "PLANETA Igarashi",
+      "displayName": "PLANETA Igarashi",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/PLANETA_Igarashi",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/planeta-igarashi.png"
+    },
+    {
+      "artist": "PLANETA Mochizuki",
+      "displayName": "PLANETA Mochizuki",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7046",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/planeta-mochizuki.png"
+    },
+    {
+      "artist": "PLANETA Otani",
+      "displayName": "PLANETA Otani",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/PLANETA_Otani",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/planeta-otani.png"
+    },
+    {
+      "artist": "PLANETA Tsuji",
+      "displayName": "PLANETA Tsuji",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/PLANETA_Tsuji",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/planeta-tsuji.png"
+    },
+    {
+      "artist": "PLANETA Yamashita",
+      "displayName": "PLANETA Yamashita",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/PLANETA_Yamashita",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/planeta-yamashita.png"
+    },
+    {
+      "artist": "Po-Suzuki",
+      "displayName": "Po-Suzuki",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7198",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/po-suzuki.png"
+    },
+    {
+      "artist": "Pokémon Rumble",
+      "displayName": "Pokémon Rumble",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7050",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/pok-mon-rumble.png"
+    },
+    {
+      "artist": "Raita Kazama",
+      "displayName": "Raita Kazama",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Raita_Kazama",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/raita-kazama.png"
+    },
+    {
+      "artist": "REND",
+      "displayName": "REND",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/REND",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/rend.png"
+    },
+    {
+      "artist": "Rianti Hidayat",
+      "displayName": "Rianti Hidayat",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Rianti_Hidayat",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/rianti-hidayat.png"
+    },
+    {
+      "artist": "Rika (illustrator)",
+      "displayName": "Rika (illustrator)",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Rika_(illustrator)",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/rika.png"
+    },
+    {
+      "artist": "Ryoma uratsuka",
+      "displayName": "Ryoma uratsuka",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Ryoma_uratsuka",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/ryoma-uratsuka.png"
+    },
+    {
+      "artist": "Ryota Saito",
+      "displayName": "Ryota Saito",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Ryota_Saito",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/ryota-saito.png"
+    },
+    {
+      "artist": "Saboteri",
+      "displayName": "Saboteri",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Saboteri",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/saboteri.png"
+    },
+    {
+      "artist": "Sachi Matoba",
+      "displayName": "Sachi Matoba",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Sachi_Matoba",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/sachi-matoba.png"
+    },
+    {
+      "artist": "Sachiko Adachi",
+      "displayName": "Sachiko Adachi",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Sachiko_Adachi",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/sachiko-adachi.png"
+    },
+    {
+      "artist": "Sachiko Eba",
+      "displayName": "Sachiko Eba",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7208",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/sachiko-eba.png"
+    },
+    {
+      "artist": "Sadaji",
+      "displayName": "Sadaji",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Sadaji",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/sadaji.png"
+    },
+    {
+      "artist": "Saino misaki",
+      "displayName": "Saino misaki",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Saino_misaki",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/saino-misaki.png"
+    },
+    {
+      "artist": "Satoma",
+      "displayName": "Satoma",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Satoma",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/satoma.png"
+    },
+    {
+      "artist": "Satoshi Ohta",
+      "displayName": "Satoshi Ohta",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Satoshi_Ohta",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/satoshi-ohta.png"
+    },
+    {
+      "artist": "Satoshi Shirai",
+      "displayName": "Satoshi Shirai",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Satoshi_Shirai",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/satoshi-shirai.png"
+    },
+    {
+      "artist": "Saya Tsuruta",
+      "displayName": "Saya Tsuruta",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Saya_Tsuruta",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/saya-tsuruta.png"
+    },
+    {
+      "artist": "Scav",
+      "displayName": "Scav",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Scav",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/scav.png"
+    },
+    {
+      "artist": "Sekio",
+      "displayName": "Sekio",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Sekio",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/sekio.png"
+    },
+    {
+      "artist": "Shiburingaru",
+      "displayName": "Shiburingaru",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Shiburingaru",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/shiburingaru.png"
+    },
+    {
+      "artist": "Shibuzoh.",
+      "displayName": "Shibuzoh.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Shibuzoh.",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/shibuzoh.png"
+    },
+    {
+      "artist": "Shimaris Yukichi",
+      "displayName": "Shimaris Yukichi",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Shimaris_Yukichi",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/shimaris-yukichi.png"
+    },
+    {
+      "artist": "Shin-ichi Yoshikawa",
+      "displayName": "Shin-ichi Yoshikawa",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7068",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/shin-ichi-yoshikawa.png"
+    },
+    {
+      "artist": "Shinji Kanda",
+      "displayName": "Shinji Kanda",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Shinji_Kanda",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/shinji-kanda.png"
+    },
+    {
+      "artist": "Shinya Komatsu",
+      "displayName": "Shinya Komatsu",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Shinya_Komatsu",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/shinya-komatsu.png"
+    },
+    {
+      "artist": "Shizurow",
+      "displayName": "Shizurow",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Shizurow",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/shizurow.png"
+    },
+    {
+      "artist": "Souichirou Gunjima",
+      "displayName": "Souichirou Gunjima",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Souichirou_Gunjima",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/souichirou-gunjima.png"
+    },
+    {
+      "artist": "Sowsow",
+      "displayName": "Sowsow",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Sowsow",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/sowsow.png"
+    },
+    {
+      "artist": "スパイク・チュンソフト (Spike Chunsoft)",
+      "displayName": "スパイク・チュンソフト (Spike Chunsoft)",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7215",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/spike-chunsoft.png"
+    },
+    {
+      "artist": "Studio Bora Inc.",
+      "displayName": "Studio Bora Inc.",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Studio_Bora_Inc.",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/studio-bora-inc.png"
+    },
+    {
+      "artist": "Suwama Chiaki",
+      "displayName": "Suwama Chiaki",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Suwama_Chiaki",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/suwama-chiaki.png"
+    },
+    {
+      "artist": "Svlt",
+      "displayName": "Svlt",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Svlt",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/svlt.png"
+    },
+    {
+      "artist": "T. Honda",
+      "displayName": "T. Honda",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/T._Honda",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/t-honda.png"
+    },
+    {
+      "artist": "Taiga Kasai",
+      "displayName": "Taiga Kasai",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Taiga_Kasai",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/taiga-kasai.png"
+    },
+    {
+      "artist": "Taiga Kayama",
+      "displayName": "Taiga Kayama",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Taiga_Kayama",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/taiga-kayama.png"
+    },
+    {
+      "artist": "Takabon",
+      "displayName": "Takabon",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Takabon",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/takabon.png"
+    },
+    {
+      "artist": "Takashi Yamaguchi",
+      "displayName": "Takashi Yamaguchi",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Takashi_Yamaguchi",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/takashi-yamaguchi.png"
+    },
+    {
+      "artist": "Take",
+      "displayName": "Take",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Take",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/take.png"
+    },
+    {
+      "artist": "Takumi Akabane",
+      "displayName": "Takumi Akabane",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Takumi_Akabane",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/takumi-akabane.png"
+    },
+    {
+      "artist": "Takuyoa",
+      "displayName": "Takuyoa",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Takuyoa",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/takuyoa.png"
+    },
+    {
+      "artist": "Teeziro",
+      "displayName": "Teeziro",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Teeziro",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/teeziro.png"
+    },
+    {
+      "artist": "Tetsu Kayama",
+      "displayName": "Tetsu Kayama",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Tetsu_Kayama",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/tetsu-kayama.png"
+    },
+    {
+      "artist": "The Pokémon Company",
+      "displayName": "The Pokémon Company",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7224",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/the-pok-mon-company.png"
+    },
+    {
+      "artist": "Toi8",
+      "displayName": "Toi8",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Toi8",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/toi8.png"
+    },
+    {
+      "artist": "TOKIYA",
+      "displayName": "TOKIYA",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/TOKIYA",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/tokiya.png"
+    },
+    {
+      "artist": "Tomokazu Komiya",
+      "displayName": "Tomokazu Komiya",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Tomokazu_Komiya",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/tomokazu-komiya.png"
+    },
+    {
+      "artist": "Tomoki Sone",
+      "displayName": "Tomoki Sone",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/10372",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/tomoki-sone.png"
+    },
+    {
+      "artist": "Tomoko Wakai",
+      "displayName": "Tomoko Wakai",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7227",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/tomoko-wakai.png"
+    },
+    {
+      "artist": "Tomomi Kaneko",
+      "displayName": "Tomomi Kaneko",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Tomomi_Kaneko",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/tomomi-kaneko.png"
+    },
+    {
+      "artist": "Tonji Matsuno",
+      "displayName": "Tonji Matsuno",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Tonji_Matsuno",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/tonji-matsuno.png"
+    },
+    {
+      "artist": "Tono",
+      "displayName": "Tono",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Tono",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/tono.png"
+    },
+    {
+      "artist": "Toshinao Aoki",
+      "displayName": "Toshinao Aoki",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Toshinao_Aoki",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/toshinao-aoki.png"
+    },
+    {
+      "artist": "Toyste Beach",
+      "displayName": "Toyste Beach",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Toyste_Beach",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/toyste-beach.png"
+    },
+    {
+      "artist": "Tsuyoshi Nagano",
+      "displayName": "Tsuyoshi Nagano",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Tsuyoshi_Nagano",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/tsuyoshi-nagano.png"
+    },
+    {
+      "artist": "Uninori",
+      "displayName": "Uninori",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Uninori",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/uninori.png"
+    },
+    {
+      "artist": "Uta",
+      "displayName": "Uta",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Uta",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/uta.png"
+    },
+    {
+      "artist": "Wataru Kawahara",
+      "displayName": "Wataru Kawahara",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Wataru_Kawahara",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/wataru-kawahara.png"
+    },
+    {
+      "artist": "Whisker",
+      "displayName": "Whisker",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Whisker",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/whisker.png"
+    },
+    {
+      "artist": "Wintr Wandr",
+      "displayName": "Wintr Wandr",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Wintr_Wandr",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/wintr-wandr.png"
+    },
+    {
+      "artist": "Yano Keiji",
+      "displayName": "Yano Keiji",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yano_Keiji",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/yano-keiji.png"
+    },
+    {
+      "artist": "YASHIRO Nanaco",
+      "displayName": "YASHIRO Nanaco",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/YASHIRO_Nanaco",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/yashiro-nanaco.png"
+    },
+    {
+      "artist": "Yasuki Watanabe",
+      "displayName": "Yasuki Watanabe",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yasuki_Watanabe",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/yasuki-watanabe.png"
+    },
+    {
+      "artist": "Yoriyuki Ikegami",
+      "displayName": "Yoriyuki Ikegami",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yoriyuki_Ikegami",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/yoriyuki-ikegami.png"
+    },
+    {
+      "artist": "Yoshimi Miyoshi",
+      "displayName": "Yoshimi Miyoshi",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yoshimi_Miyoshi",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/yoshimi-miyoshi.png"
+    },
+    {
+      "artist": "Yosuke Da Silva",
+      "displayName": "Yosuke Da Silva",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yosuke_Da_Silva",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/yosuke-da-silva.png"
+    },
+    {
+      "artist": "長場雄 (YU NAGABA)",
+      "displayName": "長場雄 (YU NAGABA)",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7239",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/yu-nagaba.png"
+    },
+    {
+      "artist": "Yuichi Sawayama",
+      "displayName": "Yuichi Sawayama",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yuichi_Sawayama",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/yuichi-sawayama.png"
+    },
+    {
+      "artist": "Yukihiro Tada",
+      "displayName": "Yukihiro Tada",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yukihiro_Tada",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/yukihiro-tada.png"
+    },
+    {
+      "artist": "Yukiko Baba",
+      "displayName": "Yukiko Baba",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yukiko_Baba",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/yukiko-baba.png"
+    },
+    {
+      "artist": "Yumi",
+      "displayName": "Yumi",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yumi",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/yumi.png"
+    },
+    {
+      "artist": "Yuri Umemura",
+      "displayName": "Yuri Umemura",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yuri_Umemura",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/yuri-umemura.png"
+    },
+    {
+      "artist": "Yuriko Akase",
+      "displayName": "Yuriko Akase",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yuriko_Akase",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/yuriko-akase.png"
+    },
+    {
+      "artist": "Yusuke Ishikawa",
+      "displayName": "Yusuke Ishikawa",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yusuke_Ishikawa",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/yusuke-ishikawa.png"
+    },
+    {
+      "artist": "コザキユースケ (Yusuke Kozaki)",
+      "displayName": "コザキユースケ (Yusuke Kozaki)",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7202",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/yusuke-kozaki.png"
+    },
+    {
+      "artist": "Yusuke Shimada",
+      "displayName": "Yusuke Shimada",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7201",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/yusuke-shimada.png"
+    },
+    {
+      "artist": "Yuu",
+      "displayName": "Yuu",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yuu",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/yuu.png"
+    },
+    {
+      "artist": "Yuu Nishida",
+      "displayName": "Yuu Nishida",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yuu_Nishida",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/yuu-nishida.png"
+    },
+    {
+      "artist": "Yuya Oka",
+      "displayName": "Yuya Oka",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yuya_Oka",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/yuya-oka.png"
+    },
+    {
+      "artist": "Zig",
+      "displayName": "Zig",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Zig",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/zig.png"
+    },
+    {
+      "artist": "Zu-Ka",
+      "displayName": "Zu-Ka",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7200",
+      "imageUrl": "https://pokoin.com/card-images/artist-profiles/zu-ka.png"
+    }
+  ],
+  "report": [
+    {
+      "artist": "0313",
+      "normalizedArtist": "0313",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/0313",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/0313",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/6940/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/0313.png",
+      "profileImageObjectKey": "artist-profiles/0313.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "こむぎこ2000 (KG-2000)",
+      "normalizedArtist": "2000 kg 2000",
+      "status": "recached",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7155",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7155/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/2000-kg-2000.png",
+      "profileImageObjectKey": "artist-profiles/2000-kg-2000.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "2017 Pikachu Project",
+      "normalizedArtist": "2017 pikachu project",
+      "status": "recached",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7099",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7099/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/2017-pikachu-project.png",
+      "profileImageObjectKey": "artist-profiles/2017-pikachu-project.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "5ban Graphics",
+      "normalizedArtist": "5ban graphics",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/5ban_Graphics",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/5ban_Graphics",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/6933/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/5ban-graphics.png",
+      "profileImageObjectKey": "artist-profiles/5ban-graphics.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Akagi",
+      "normalizedArtist": "akagi",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Akagi",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Akagi",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7100/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/akagi.png",
+      "profileImageObjectKey": "artist-profiles/akagi.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Akira Komayama",
+      "normalizedArtist": "akira komayama",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Akira_Komayama",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Akira_Komayama",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/6934/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/akira-komayama.png",
+      "profileImageObjectKey": "artist-profiles/akira-komayama.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Aky CG Works",
+      "normalizedArtist": "aky cg works",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Aky_CG_Works",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Aky_CG_Works",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/6972/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/aky-cg-works.png",
+      "profileImageObjectKey": "artist-profiles/aky-cg-works.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Aliya Chen",
+      "normalizedArtist": "aliya chen",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Aliya_Chen",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Aliya_Chen",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7574/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/aliya-chen.png",
+      "profileImageObjectKey": "artist-profiles/aliya-chen.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Amelicart",
+      "normalizedArtist": "amelicart",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Amelicart",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Amelicart",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7101/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/amelicart.png",
+      "profileImageObjectKey": "artist-profiles/amelicart.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Aoki",
+      "normalizedArtist": "aoki",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Aoki",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Aoki",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/6974/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/aoki.png",
+      "profileImageObjectKey": "artist-profiles/aoki.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Apios",
+      "normalizedArtist": "apios",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Apios",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Apios",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/8041/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/apios.png",
+      "profileImageObjectKey": "artist-profiles/apios.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Arai Kiriko",
+      "normalizedArtist": "arai kiriko",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Arai_Kiriko",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Arai_Kiriko",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7102/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/arai-kiriko.png",
+      "profileImageObjectKey": "artist-profiles/arai-kiriko.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Asako Ito",
+      "normalizedArtist": "asako ito",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Asako_Ito",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Asako_Ito",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/6975/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/asako-ito.png",
+      "profileImageObjectKey": "artist-profiles/asako-ito.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Aspara",
+      "normalizedArtist": "aspara",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Aspara",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Aspara",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7103/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/aspara.png",
+      "profileImageObjectKey": "artist-profiles/aspara.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Atsuko Nishida",
+      "normalizedArtist": "atsuko nishida",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Atsuko_Nishida",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Atsuko_Nishida",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/6935/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/atsuko-nishida.png",
+      "profileImageObjectKey": "artist-profiles/atsuko-nishida.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Avec Yoko",
+      "normalizedArtist": "avec yoko",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Avec_Yoko",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Avec_Yoko",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7897/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/avec-yoko.png",
+      "profileImageObjectKey": "artist-profiles/avec-yoko.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "BERUBURI",
+      "normalizedArtist": "beruburi",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/BERUBURI",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/BERUBURI",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7108/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/beruburi.png",
+      "profileImageObjectKey": "artist-profiles/beruburi.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "\"Big Mama\" Tagawa",
+      "normalizedArtist": "big mama tagawa",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/%22Big_Mama%22_Tagawa",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/%22Big_Mama%22_Tagawa",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7098/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/big-mama-tagawa.png",
+      "profileImageObjectKey": "artist-profiles/big-mama-tagawa.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Burari",
+      "normalizedArtist": "burari",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Burari",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Burari",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7572/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/burari.png",
+      "profileImageObjectKey": "artist-profiles/burari.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Chibi",
+      "normalizedArtist": "chibi",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Chibi",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Chibi",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/6978/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/chibi.png",
+      "profileImageObjectKey": "artist-profiles/chibi.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Christopher Rush",
+      "normalizedArtist": "christopher rush",
+      "status": "recached",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7110",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7110/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/christopher-rush.png",
+      "profileImageObjectKey": "artist-profiles/christopher-rush.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Cochi8i",
+      "normalizedArtist": "cochi8i",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Cochi8i",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Cochi8i",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7111/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/cochi8i.png",
+      "profileImageObjectKey": "artist-profiles/cochi8i.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "ConceptLab",
+      "normalizedArtist": "conceptlab",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/ConceptLab",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/ConceptLab",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/8157/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/conceptlab.png",
+      "profileImageObjectKey": "artist-profiles/conceptlab.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "CR CG gangs",
+      "normalizedArtist": "cr cg gangs",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/CR_CG_gangs",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/CR_CG_gangs",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/6980/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/cr-cg-gangs.png",
+      "profileImageObjectKey": "artist-profiles/cr-cg-gangs.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Craig Turvey",
+      "normalizedArtist": "craig turvey",
+      "status": "recached",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7112",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7112/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/craig-turvey.png",
+      "profileImageObjectKey": "artist-profiles/craig-turvey.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "D.A.G Inc.",
+      "normalizedArtist": "d a g inc",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/D.A.G_Inc.",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/D.A.G_Inc.",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7113/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/d-a-g-inc.png",
+      "profileImageObjectKey": "artist-profiles/d-a-g-inc.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Daisuke Ito",
+      "normalizedArtist": "daisuke ito",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Daisuke_Ito",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Daisuke_Ito",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/6981/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/daisuke-ito.png",
+      "profileImageObjectKey": "artist-profiles/daisuke-ito.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Daisuke Iwamoto",
+      "normalizedArtist": "daisuke iwamoto",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Daisuke_Iwamoto",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Daisuke_Iwamoto",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7114/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/daisuke-iwamoto.png",
+      "profileImageObjectKey": "artist-profiles/daisuke-iwamoto.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Danciao",
+      "normalizedArtist": "danciao",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Danciao",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Danciao",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7244/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/danciao.png",
+      "profileImageObjectKey": "artist-profiles/danciao.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "DOM",
+      "normalizedArtist": "dom",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/DOM",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/DOM",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/6982/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/dom.png",
+      "profileImageObjectKey": "artist-profiles/dom.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Dsuke",
+      "normalizedArtist": "dsuke",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Dsuke",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Dsuke",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7116/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/dsuke.png",
+      "profileImageObjectKey": "artist-profiles/dsuke.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Ebila",
+      "normalizedArtist": "ebila",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Ebila",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Ebila",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/8260/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/ebila.png",
+      "profileImageObjectKey": "artist-profiles/ebila.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Emi Miwa",
+      "normalizedArtist": "emi miwa",
+      "status": "recached",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7118",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7118/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/emi-miwa.png",
+      "profileImageObjectKey": "artist-profiles/emi-miwa.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Eske Yoshinob",
+      "normalizedArtist": "eske yoshinob",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Eske_Yoshinob",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Eske_Yoshinob",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/6939/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/eske-yoshinob.png",
+      "profileImageObjectKey": "artist-profiles/eske-yoshinob.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Felicia Chen",
+      "normalizedArtist": "felicia chen",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Felicia_Chen",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Felicia_Chen",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/8022/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/felicia-chen.png",
+      "profileImageObjectKey": "artist-profiles/felicia-chen.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Framestore",
+      "normalizedArtist": "framestore",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Framestore",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Framestore",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7122/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/framestore.png",
+      "profileImageObjectKey": "artist-profiles/framestore.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Gakuji Nomoto",
+      "normalizedArtist": "gakuji nomoto",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Gakuji_Nomoto",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Gakuji_Nomoto",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7125/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/gakuji-nomoto.png",
+      "profileImageObjectKey": "artist-profiles/gakuji-nomoto.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "GAME FREAK",
+      "normalizedArtist": "game freak",
+      "status": "recached",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7126",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7126/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/game-freak.png",
+      "profileImageObjectKey": "artist-profiles/game-freak.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Gapao",
+      "normalizedArtist": "gapao",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Gapao",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Gapao",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7127/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/gapao.png",
+      "profileImageObjectKey": "artist-profiles/gapao.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Gemi",
+      "normalizedArtist": "gemi",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Gemi",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Gemi",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/6984/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/gemi.png",
+      "profileImageObjectKey": "artist-profiles/gemi.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "GIDORA",
+      "normalizedArtist": "gidora",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/GIDORA",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/GIDORA",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/6985/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/gidora.png",
+      "profileImageObjectKey": "artist-profiles/gidora.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "GOSSAN",
+      "normalizedArtist": "gossan",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/GOSSAN",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/GOSSAN",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/6986/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/gossan.png",
+      "profileImageObjectKey": "artist-profiles/gossan.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "GOTO minori",
+      "normalizedArtist": "goto minori",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/GOTO_minori",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/GOTO_minori",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7128/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/goto-minori.png",
+      "profileImageObjectKey": "artist-profiles/goto-minori.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "HACCAN",
+      "normalizedArtist": "haccan",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/HACCAN",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/HACCAN",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/10370/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/haccan.png",
+      "profileImageObjectKey": "artist-profiles/haccan.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "HAGIYA Kaoru",
+      "normalizedArtist": "hagiya kaoru",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/HAGIYA_Kaoru",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/HAGIYA_Kaoru",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7577/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/hagiya-kaoru.png",
+      "profileImageObjectKey": "artist-profiles/hagiya-kaoru.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Hajime Kusajima",
+      "normalizedArtist": "hajime kusajima",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hajime_Kusajima",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Hajime_Kusajima",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/6941/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/hajime-kusajima.png",
+      "profileImageObjectKey": "artist-profiles/hajime-kusajima.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Haru Akasaka",
+      "normalizedArtist": "haru akasaka",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Haru_Akasaka",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Haru_Akasaka",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/6987/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/haru-akasaka.png",
+      "profileImageObjectKey": "artist-profiles/haru-akasaka.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Hasegawa Saki",
+      "normalizedArtist": "hasegawa saki",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hasegawa_Saki",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Hasegawa_Saki",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7131/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/hasegawa-saki.png",
+      "profileImageObjectKey": "artist-profiles/hasegawa-saki.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Hasuno",
+      "normalizedArtist": "hasuno",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hasuno",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Hasuno",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/6989/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/hasuno.png",
+      "profileImageObjectKey": "artist-profiles/hasuno.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "HICO KIM",
+      "normalizedArtist": "hico kim",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/HICO_KIM",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/HICO_KIM",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/9207/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/hico-kim.png",
+      "profileImageObjectKey": "artist-profiles/hico-kim.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Hideaki Hakozaki",
+      "normalizedArtist": "hideaki hakozaki",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hideaki_Hakozaki",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Hideaki_Hakozaki",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/6992/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/hideaki-hakozaki.png",
+      "profileImageObjectKey": "artist-profiles/hideaki-hakozaki.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Hideki Kazama",
+      "normalizedArtist": "hideki kazama",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hideki_Kazama",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Hideki_Kazama",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7132/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/hideki-kazama.png",
+      "profileImageObjectKey": "artist-profiles/hideki-kazama.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Hideyuki Nakajima",
+      "normalizedArtist": "hideyuki nakajima",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hideyuki_Nakajima",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Hideyuki_Nakajima",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7133/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/hideyuki-nakajima.png",
+      "profileImageObjectKey": "artist-profiles/hideyuki-nakajima.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Hikaru Koike",
+      "normalizedArtist": "hikaru koike",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hikaru_Koike",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Hikaru_Koike",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/6994/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/hikaru-koike.png",
+      "profileImageObjectKey": "artist-profiles/hikaru-koike.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Hiroaki Ito",
+      "normalizedArtist": "hiroaki ito",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hiroaki_Ito",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Hiroaki_Ito",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7134/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/hiroaki-ito.png",
+      "profileImageObjectKey": "artist-profiles/hiroaki-ito.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Hiromichi Sugiyama",
+      "normalizedArtist": "hiromichi sugiyama",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hiromichi_Sugiyama",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Hiromichi_Sugiyama",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/6996/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/hiromichi-sugiyama.png",
+      "profileImageObjectKey": "artist-profiles/hiromichi-sugiyama.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Hisao Nakamura",
+      "normalizedArtist": "hisao nakamura",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hisao_Nakamura",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Hisao_Nakamura",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/6999/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/hisao-nakamura.png",
+      "profileImageObjectKey": "artist-profiles/hisao-nakamura.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Hncl",
+      "normalizedArtist": "hncl",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hncl",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Hncl",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7000/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/hncl.png",
+      "profileImageObjectKey": "artist-profiles/hncl.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Hoshino KURO",
+      "normalizedArtist": "hoshino kuro",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Hoshino_KURO",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Hoshino_KURO",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/8254/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/hoshino-kuro.png",
+      "profileImageObjectKey": "artist-profiles/hoshino-kuro.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Huang Tzu En",
+      "normalizedArtist": "huang tzu en",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Huang_Tzu_En",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Huang_Tzu_En",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7896/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/huang-tzu-en.png",
+      "profileImageObjectKey": "artist-profiles/huang-tzu-en.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Imakuni? 今国智章 (Tomoaki Imakuni)",
+      "normalizedArtist": "imakuni tomoaki imakuni",
+      "status": "recached",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7002",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7002/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/imakuni-tomoaki-imakuni.png",
+      "profileImageObjectKey": "artist-profiles/imakuni-tomoaki-imakuni.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Imoniii",
+      "normalizedArtist": "imoniii",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Imoniii",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Imoniii",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7604/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/imoniii.png",
+      "profileImageObjectKey": "artist-profiles/imoniii.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Inose yukie",
+      "normalizedArtist": "inose yukie",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Inose_yukie",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Inose_yukie",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7138/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/inose-yukie.png",
+      "profileImageObjectKey": "artist-profiles/inose-yukie.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Iori Suzuki",
+      "normalizedArtist": "iori suzuki",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Iori_Suzuki",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Iori_Suzuki",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/8249/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/iori-suzuki.png",
+      "profileImageObjectKey": "artist-profiles/iori-suzuki.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "James Turner",
+      "normalizedArtist": "james turner",
+      "status": "recached",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7139",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7139/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/james-turner.png",
+      "profileImageObjectKey": "artist-profiles/james-turner.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Jerky",
+      "normalizedArtist": "jerky",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Jerky",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Jerky",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7003/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/jerky.png",
+      "profileImageObjectKey": "artist-profiles/jerky.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Jiro Sasumo",
+      "normalizedArtist": "jiro sasumo",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Jiro_Sasumo",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Jiro_Sasumo",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7004/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/jiro-sasumo.png",
+      "profileImageObjectKey": "artist-profiles/jiro-sasumo.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Julie Hang",
+      "normalizedArtist": "julie hang",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Julie_Hang",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Julie_Hang",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7140/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/julie-hang.png",
+      "profileImageObjectKey": "artist-profiles/julie-hang.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Jumpei Akasaka",
+      "normalizedArtist": "jumpei akasaka",
+      "status": "recached",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7741",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7741/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/jumpei-akasaka.png",
+      "profileImageObjectKey": "artist-profiles/jumpei-akasaka.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Jungo Suzuki",
+      "normalizedArtist": "jungo suzuki",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Jungo_Suzuki",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Jungo_Suzuki",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7143/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/jungo-suzuki.png",
+      "profileImageObjectKey": "artist-profiles/jungo-suzuki.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Junsei Kuninobu",
+      "normalizedArtist": "junsei kuninobu",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Junsei_Kuninobu",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Junsei_Kuninobu",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7891/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/junsei-kuninobu.png",
+      "profileImageObjectKey": "artist-profiles/junsei-kuninobu.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "K. Hoshiba",
+      "normalizedArtist": "k hoshiba",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/K._Hoshiba",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/K._Hoshiba",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7145/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/k-hoshiba.png",
+      "profileImageObjectKey": "artist-profiles/k-hoshiba.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "K. Utsunomiya",
+      "normalizedArtist": "k utsunomiya",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/K._Utsunomiya",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/K._Utsunomiya",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7144/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/k-utsunomiya.png",
+      "profileImageObjectKey": "artist-profiles/k-utsunomiya.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Kai Ishikawa",
+      "normalizedArtist": "kai ishikawa",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kai_Ishikawa",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kai_Ishikawa",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7146/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/kai-ishikawa.png",
+      "profileImageObjectKey": "artist-profiles/kai-ishikawa.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Kamonabe",
+      "normalizedArtist": "kamonabe",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kamonabe",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kamonabe",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/8255/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/kamonabe.png",
+      "profileImageObjectKey": "artist-profiles/kamonabe.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Kanahei",
+      "normalizedArtist": "kanahei",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kanahei",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kanahei",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7723/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/kanahei.png",
+      "profileImageObjectKey": "artist-profiles/kanahei.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Kannnu",
+      "normalizedArtist": "kannnu",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kannnu",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kannnu",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/10371/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/kannnu.png",
+      "profileImageObjectKey": "artist-profiles/kannnu.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Kantaro",
+      "normalizedArtist": "kantaro",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kantaro",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kantaro",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7005/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/kantaro.png",
+      "profileImageObjectKey": "artist-profiles/kantaro.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Kariya",
+      "normalizedArtist": "kariya",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kariya",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kariya",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7147/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/kariya.png",
+      "profileImageObjectKey": "artist-profiles/kariya.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Katsura Tabata",
+      "normalizedArtist": "katsura tabata",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Katsura_Tabata",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Katsura_Tabata",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7006/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/katsura-tabata.png",
+      "profileImageObjectKey": "artist-profiles/katsura-tabata.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Kawayoo",
+      "normalizedArtist": "kawayoo",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kawayoo",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kawayoo",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/6947/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/kawayoo.png",
+      "profileImageObjectKey": "artist-profiles/kawayoo.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Kazuaki Aihara",
+      "normalizedArtist": "kazuaki aihara",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kazuaki_Aihara",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kazuaki_Aihara",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7007/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/kazuaki-aihara.png",
+      "profileImageObjectKey": "artist-profiles/kazuaki-aihara.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Kazuo Yazawa",
+      "normalizedArtist": "kazuo yazawa",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kazuo_Yazawa",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kazuo_Yazawa",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7150/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/kazuo-yazawa.png",
+      "profileImageObjectKey": "artist-profiles/kazuo-yazawa.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Kazuyuki Kano",
+      "normalizedArtist": "kazuyuki kano",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kazuyuki_Kano",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kazuyuki_Kano",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7008/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/kazuyuki-kano.png",
+      "profileImageObjectKey": "artist-profiles/kazuyuki-kano.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "KEIICHIRO ITO",
+      "normalizedArtist": "keiichiro ito",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/KEIICHIRO_ITO",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/KEIICHIRO_ITO",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7009/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/keiichiro-ito.png",
+      "profileImageObjectKey": "artist-profiles/keiichiro-ito.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Keisin",
+      "normalizedArtist": "keisin",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Keisin",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Keisin",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7153/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/keisin.png",
+      "profileImageObjectKey": "artist-profiles/keisin.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "萩原慶汰 (Keita Hagiwara)",
+      "normalizedArtist": "keita hagiwara",
+      "status": "recached",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/5881",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/5881/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/keita-hagiwara.png",
+      "profileImageObjectKey": "artist-profiles/keita-hagiwara.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Kent Kanetsuna",
+      "normalizedArtist": "kent kanetsuna",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kent_Kanetsuna",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kent_Kanetsuna",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7012/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/kent-kanetsuna.png",
+      "profileImageObjectKey": "artist-profiles/kent-kanetsuna.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Kinu Nishimura",
+      "normalizedArtist": "kinu nishimura",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kinu_Nishimura",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kinu_Nishimura",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7156/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/kinu-nishimura.png",
+      "profileImageObjectKey": "artist-profiles/kinu-nishimura.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "KirisAki",
+      "normalizedArtist": "kirisaki",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/KirisAki",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/KirisAki",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/6951/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/kirisaki.png",
+      "profileImageObjectKey": "artist-profiles/kirisaki.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Kodama",
+      "normalizedArtist": "kodama",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kodama",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kodama",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7015/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/kodama.png",
+      "profileImageObjectKey": "artist-profiles/kodama.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Kouji Tajima",
+      "normalizedArtist": "kouji tajima",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kouji_Tajima",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kouji_Tajima",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7157/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/kouji-tajima.png",
+      "profileImageObjectKey": "artist-profiles/kouji-tajima.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Krgc",
+      "normalizedArtist": "krgc",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Krgc",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Krgc",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7158/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/krgc.png",
+      "profileImageObjectKey": "artist-profiles/krgc.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Kurumitsu",
+      "normalizedArtist": "kurumitsu",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Kurumitsu",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Kurumitsu",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7017/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/kurumitsu.png",
+      "profileImageObjectKey": "artist-profiles/kurumitsu.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Kyoko Koizumi",
+      "normalizedArtist": "kyoko koizumi",
+      "status": "recached",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7018",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7018/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/kyoko-koizumi.png",
+      "profileImageObjectKey": "artist-profiles/kyoko-koizumi.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "KYUPIYAMA",
+      "normalizedArtist": "kyupiyama",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/KYUPIYAMA",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/KYUPIYAMA",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7160/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/kyupiyama.png",
+      "profileImageObjectKey": "artist-profiles/kyupiyama.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "LINNE",
+      "normalizedArtist": "linne",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/LINNE",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/LINNE",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7162/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/linne.png",
+      "profileImageObjectKey": "artist-profiles/linne.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "M. Akiyama",
+      "normalizedArtist": "m akiyama",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/M._Akiyama",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/M._Akiyama",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7163/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/m-akiyama.png",
+      "profileImageObjectKey": "artist-profiles/m-akiyama.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "MAHOU",
+      "normalizedArtist": "mahou",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/MAHOU",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/MAHOU",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/6954/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/mahou.png",
+      "profileImageObjectKey": "artist-profiles/mahou.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Maiko Fujiwara",
+      "normalizedArtist": "maiko fujiwara",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Maiko_Fujiwara",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Maiko_Fujiwara",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7164/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/maiko-fujiwara.png",
+      "profileImageObjectKey": "artist-profiles/maiko-fujiwara.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Makoto Imai",
+      "normalizedArtist": "makoto imai",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Makoto_Imai",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Makoto_Imai",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7020/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/makoto-imai.png",
+      "profileImageObjectKey": "artist-profiles/makoto-imai.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "MARINA Chikazawa",
+      "normalizedArtist": "marina chikazawa",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/MARINA_Chikazawa",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/MARINA_Chikazawa",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7247/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/marina-chikazawa.png",
+      "profileImageObjectKey": "artist-profiles/marina-chikazawa.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Masa",
+      "normalizedArtist": "masa",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Masa",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Masa",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7168/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/masa.png",
+      "profileImageObjectKey": "artist-profiles/masa.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Masahiko Ishii",
+      "normalizedArtist": "masahiko ishii",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Masahiko_Ishii",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Masahiko_Ishii",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7169/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/masahiko-ishii.png",
+      "profileImageObjectKey": "artist-profiles/masahiko-ishii.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Mashu",
+      "normalizedArtist": "mashu",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Mashu",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Mashu",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7570/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/mashu.png",
+      "profileImageObjectKey": "artist-profiles/mashu.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Matazo",
+      "normalizedArtist": "matazo",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Matazo",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Matazo",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7171/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/matazo.png",
+      "profileImageObjectKey": "artist-profiles/matazo.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Match",
+      "normalizedArtist": "match",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Match",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Match",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/6955/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/match.png",
+      "profileImageObjectKey": "artist-profiles/match.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Megumi Higuchi",
+      "normalizedArtist": "megumi higuchi",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Megumi_Higuchi",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Megumi_Higuchi",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7173/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/megumi-higuchi.png",
+      "profileImageObjectKey": "artist-profiles/megumi-higuchi.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Miki kudo",
+      "normalizedArtist": "miki kudo",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Miki_kudo",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Miki_kudo",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7023/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/miki-kudo.png",
+      "profileImageObjectKey": "artist-profiles/miki-kudo.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Mikiko Takeda",
+      "normalizedArtist": "mikiko takeda",
+      "status": "recached",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7177",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7177/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/mikiko-takeda.png",
+      "profileImageObjectKey": "artist-profiles/mikiko-takeda.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Mikio Menjo",
+      "normalizedArtist": "mikio menjo",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Mikio_Menjo",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Mikio_Menjo",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7178/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/mikio-menjo.png",
+      "profileImageObjectKey": "artist-profiles/mikio-menjo.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Minato",
+      "normalizedArtist": "minato",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Minato",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Minato",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7180/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/minato.png",
+      "profileImageObjectKey": "artist-profiles/minato.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Mingo",
+      "normalizedArtist": "mingo",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Mingo",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Mingo",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7181/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/mingo.png",
+      "profileImageObjectKey": "artist-profiles/mingo.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Miranda Branley",
+      "normalizedArtist": "miranda branley",
+      "status": "recached",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7182",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7182/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/miranda-branley.png",
+      "profileImageObjectKey": "artist-profiles/miranda-branley.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Misa Tsutsui",
+      "normalizedArtist": "misa tsutsui",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Misa_Tsutsui",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Misa_Tsutsui",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7026/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/misa-tsutsui.png",
+      "profileImageObjectKey": "artist-profiles/misa-tsutsui.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Motofumi Fujiwara",
+      "normalizedArtist": "motofumi fujiwara",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Motofumi_Fujiwara",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Motofumi_Fujiwara",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7172/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/motofumi-fujiwara.png",
+      "profileImageObjectKey": "artist-profiles/motofumi-fujiwara.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "MPC Film",
+      "normalizedArtist": "mpc film",
+      "status": "recached",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7027",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7027/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/mpc-film.png",
+      "profileImageObjectKey": "artist-profiles/mpc-film.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Mt. TBT",
+      "normalizedArtist": "mt tbt",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Mt._TBT",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Mt._TBT",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7185/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/mt-tbt.png",
+      "profileImageObjectKey": "artist-profiles/mt-tbt.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "MUGENUP",
+      "normalizedArtist": "mugenup",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/MUGENUP",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/MUGENUP",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7028/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/mugenup.png",
+      "profileImageObjectKey": "artist-profiles/mugenup.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "菜花健作 (Nabana Kensaku)",
+      "normalizedArtist": "nabana kensaku",
+      "status": "recached",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7893",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7893/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/nabana-kensaku.png",
+      "profileImageObjectKey": "artist-profiles/nabana-kensaku.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Nabatame Kazutaka",
+      "normalizedArtist": "nabatame kazutaka",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Nabatame_Kazutaka",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Nabatame_Kazutaka",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/8263/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/nabatame-kazutaka.png",
+      "profileImageObjectKey": "artist-profiles/nabatame-kazutaka.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "nagano",
+      "normalizedArtist": "nagano",
+      "status": "recached",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7186",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7186/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/nagano.png",
+      "profileImageObjectKey": "artist-profiles/nagano.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Nakamura Ippan",
+      "normalizedArtist": "nakamura ippan",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Nakamura_Ippan",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Nakamura_Ippan",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/8277/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/nakamura-ippan.png",
+      "profileImageObjectKey": "artist-profiles/nakamura-ippan.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Nakaoka",
+      "normalizedArtist": "nakaoka",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Nakaoka",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Nakaoka",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7032/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/nakaoka.png",
+      "profileImageObjectKey": "artist-profiles/nakaoka.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Naoki Saito",
+      "normalizedArtist": "naoki saito",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Naoki_Saito",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Naoki_Saito",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/6959/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/naoki-saito.png",
+      "profileImageObjectKey": "artist-profiles/naoki-saito.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Narumi Sato",
+      "normalizedArtist": "narumi sato",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Narumi_Sato",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Narumi_Sato",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7033/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/narumi-sato.png",
+      "profileImageObjectKey": "artist-profiles/narumi-sato.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "NC帝國 (NC Empire)",
+      "normalizedArtist": "nc nc empire",
+      "status": "recached",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7034",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7034/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/nc-nc-empire.png",
+      "profileImageObjectKey": "artist-profiles/nc-nc-empire.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Nelnal",
+      "normalizedArtist": "nelnal",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Nelnal",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Nelnal",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7035/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/nelnal.png",
+      "profileImageObjectKey": "artist-profiles/nelnal.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Nisimono",
+      "normalizedArtist": "nisimono",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Nisimono",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Nisimono",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7189/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/nisimono.png",
+      "profileImageObjectKey": "artist-profiles/nisimono.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Nobuyuki Fujimoto",
+      "normalizedArtist": "nobuyuki fujimoto",
+      "status": "recached",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7191",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7191/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/nobuyuki-fujimoto.png",
+      "profileImageObjectKey": "artist-profiles/nobuyuki-fujimoto.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Noriko Hotta",
+      "normalizedArtist": "noriko hotta",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Noriko_Hotta",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Noriko_Hotta",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7037/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/noriko-hotta.png",
+      "profileImageObjectKey": "artist-profiles/noriko-hotta.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Noriko Uono",
+      "normalizedArtist": "noriko uono",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Noriko_Uono",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Noriko_Uono",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7892/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/noriko-uono.png",
+      "profileImageObjectKey": "artist-profiles/noriko-uono.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "OKACHEKE",
+      "normalizedArtist": "okacheke",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/OKACHEKE",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/OKACHEKE",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7039/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/okacheke.png",
+      "profileImageObjectKey": "artist-profiles/okacheke.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Okayamatakatoshi",
+      "normalizedArtist": "okayamatakatoshi",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Okayamatakatoshi",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Okayamatakatoshi",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/9278/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/okayamatakatoshi.png",
+      "profileImageObjectKey": "artist-profiles/okayamatakatoshi.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Oku",
+      "normalizedArtist": "oku",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Oku",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Oku",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7192/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/oku.png",
+      "profileImageObjectKey": "artist-profiles/oku.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "OKUBO",
+      "normalizedArtist": "okubo",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/OKUBO",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/OKUBO",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7193/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/okubo.png",
+      "profileImageObjectKey": "artist-profiles/okubo.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "OOYAMA",
+      "normalizedArtist": "ooyama",
+      "status": "recached",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7040",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7040/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/ooyama.png",
+      "profileImageObjectKey": "artist-profiles/ooyama.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "ORBITALLINK Inc.",
+      "normalizedArtist": "orbitallink inc",
+      "status": "recached",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7194",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7194/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/orbitallink-inc.png",
+      "profileImageObjectKey": "artist-profiles/orbitallink-inc.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Orca",
+      "normalizedArtist": "orca",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Orca",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Orca",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7195/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/orca.png",
+      "profileImageObjectKey": "artist-profiles/orca.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Osare",
+      "normalizedArtist": "osare",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Osare",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Osare",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7196/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/osare.png",
+      "profileImageObjectKey": "artist-profiles/osare.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Otumami",
+      "normalizedArtist": "otumami",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Otumami",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Otumami",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7041/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/otumami.png",
+      "profileImageObjectKey": "artist-profiles/otumami.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Ounishi",
+      "normalizedArtist": "ounishi",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Ounishi",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Ounishi",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7197/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/ounishi.png",
+      "profileImageObjectKey": "artist-profiles/ounishi.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "PLANETA",
+      "normalizedArtist": "planeta",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/PLANETA",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/PLANETA",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7043/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/planeta.png",
+      "profileImageObjectKey": "artist-profiles/planeta.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "PLANETA Hiiragi",
+      "normalizedArtist": "planeta hiiragi",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/PLANETA_Hiiragi",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/PLANETA_Hiiragi",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7044/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/planeta-hiiragi.png",
+      "profileImageObjectKey": "artist-profiles/planeta-hiiragi.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "PLANETA Igarashi",
+      "normalizedArtist": "planeta igarashi",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/PLANETA_Igarashi",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/PLANETA_Igarashi",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7045/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/planeta-igarashi.png",
+      "profileImageObjectKey": "artist-profiles/planeta-igarashi.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "PLANETA Mochizuki",
+      "normalizedArtist": "planeta mochizuki",
+      "status": "recached",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7046",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7046/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/planeta-mochizuki.png",
+      "profileImageObjectKey": "artist-profiles/planeta-mochizuki.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "PLANETA Otani",
+      "normalizedArtist": "planeta otani",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/PLANETA_Otani",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/PLANETA_Otani",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7047/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/planeta-otani.png",
+      "profileImageObjectKey": "artist-profiles/planeta-otani.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "PLANETA Tsuji",
+      "normalizedArtist": "planeta tsuji",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/PLANETA_Tsuji",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/PLANETA_Tsuji",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7048/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/planeta-tsuji.png",
+      "profileImageObjectKey": "artist-profiles/planeta-tsuji.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "PLANETA Yamashita",
+      "normalizedArtist": "planeta yamashita",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/PLANETA_Yamashita",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/PLANETA_Yamashita",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7049/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/planeta-yamashita.png",
+      "profileImageObjectKey": "artist-profiles/planeta-yamashita.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Po-Suzuki",
+      "normalizedArtist": "po suzuki",
+      "status": "recached",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7198",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7198/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/po-suzuki.png",
+      "profileImageObjectKey": "artist-profiles/po-suzuki.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Pokémon Rumble",
+      "normalizedArtist": "pok mon rumble",
+      "status": "recached",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7050",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7050/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/pok-mon-rumble.png",
+      "profileImageObjectKey": "artist-profiles/pok-mon-rumble.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Raita Kazama",
+      "normalizedArtist": "raita kazama",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Raita_Kazama",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Raita_Kazama",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/10180/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/raita-kazama.png",
+      "profileImageObjectKey": "artist-profiles/raita-kazama.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "REND",
+      "normalizedArtist": "rend",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/REND",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/REND",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7142/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/rend.png",
+      "profileImageObjectKey": "artist-profiles/rend.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Rianti Hidayat",
+      "normalizedArtist": "rianti hidayat",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Rianti_Hidayat",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Rianti_Hidayat",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7204/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/rianti-hidayat.png",
+      "profileImageObjectKey": "artist-profiles/rianti-hidayat.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Rika (illustrator)",
+      "normalizedArtist": "rika",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Rika_(illustrator)",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Rika_(illustrator)",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7205/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/rika.png",
+      "profileImageObjectKey": "artist-profiles/rika.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Ryoma uratsuka",
+      "normalizedArtist": "ryoma uratsuka",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Ryoma_uratsuka",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Ryoma_uratsuka",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7051/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/ryoma-uratsuka.png",
+      "profileImageObjectKey": "artist-profiles/ryoma-uratsuka.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Ryota Saito",
+      "normalizedArtist": "ryota saito",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Ryota_Saito",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Ryota_Saito",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7053/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/ryota-saito.png",
+      "profileImageObjectKey": "artist-profiles/ryota-saito.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Saboteri",
+      "normalizedArtist": "saboteri",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Saboteri",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Saboteri",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7206/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/saboteri.png",
+      "profileImageObjectKey": "artist-profiles/saboteri.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Sachi Matoba",
+      "normalizedArtist": "sachi matoba",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Sachi_Matoba",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Sachi_Matoba",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7207/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/sachi-matoba.png",
+      "profileImageObjectKey": "artist-profiles/sachi-matoba.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Sachiko Adachi",
+      "normalizedArtist": "sachiko adachi",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Sachiko_Adachi",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Sachiko_Adachi",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7055/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/sachiko-adachi.png",
+      "profileImageObjectKey": "artist-profiles/sachiko-adachi.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Sachiko Eba",
+      "normalizedArtist": "sachiko eba",
+      "status": "recached",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7208",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7208/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/sachiko-eba.png",
+      "profileImageObjectKey": "artist-profiles/sachiko-eba.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Sadaji",
+      "normalizedArtist": "sadaji",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Sadaji",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Sadaji",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7056/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/sadaji.png",
+      "profileImageObjectKey": "artist-profiles/sadaji.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Saino misaki",
+      "normalizedArtist": "saino misaki",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Saino_misaki",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Saino_misaki",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7057/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/saino-misaki.png",
+      "profileImageObjectKey": "artist-profiles/saino-misaki.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Satoma",
+      "normalizedArtist": "satoma",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Satoma",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Satoma",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7209/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/satoma.png",
+      "profileImageObjectKey": "artist-profiles/satoma.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Satoshi Ohta",
+      "normalizedArtist": "satoshi ohta",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Satoshi_Ohta",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Satoshi_Ohta",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7210/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/satoshi-ohta.png",
+      "profileImageObjectKey": "artist-profiles/satoshi-ohta.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Satoshi Shirai",
+      "normalizedArtist": "satoshi shirai",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Satoshi_Shirai",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Satoshi_Shirai",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7061/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/satoshi-shirai.png",
+      "profileImageObjectKey": "artist-profiles/satoshi-shirai.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Saya Tsuruta",
+      "normalizedArtist": "saya tsuruta",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Saya_Tsuruta",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Saya_Tsuruta",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7062/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/saya-tsuruta.png",
+      "profileImageObjectKey": "artist-profiles/saya-tsuruta.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Scav",
+      "normalizedArtist": "scav",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Scav",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Scav",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7063/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/scav.png",
+      "profileImageObjectKey": "artist-profiles/scav.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Sekio",
+      "normalizedArtist": "sekio",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Sekio",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Sekio",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7065/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/sekio.png",
+      "profileImageObjectKey": "artist-profiles/sekio.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Shiburingaru",
+      "normalizedArtist": "shiburingaru",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Shiburingaru",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Shiburingaru",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7066/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/shiburingaru.png",
+      "profileImageObjectKey": "artist-profiles/shiburingaru.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Shibuzoh.",
+      "normalizedArtist": "shibuzoh",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Shibuzoh.",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Shibuzoh.",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7097/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/shibuzoh.png",
+      "profileImageObjectKey": "artist-profiles/shibuzoh.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Shimaris Yukichi",
+      "normalizedArtist": "shimaris yukichi",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Shimaris_Yukichi",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Shimaris_Yukichi",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7211/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/shimaris-yukichi.png",
+      "profileImageObjectKey": "artist-profiles/shimaris-yukichi.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Shin-ichi Yoshikawa",
+      "normalizedArtist": "shin ichi yoshikawa",
+      "status": "recached",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7068",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7068/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/shin-ichi-yoshikawa.png",
+      "profileImageObjectKey": "artist-profiles/shin-ichi-yoshikawa.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Shinji Kanda",
+      "normalizedArtist": "shinji kanda",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Shinji_Kanda",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Shinji_Kanda",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7069/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/shinji-kanda.png",
+      "profileImageObjectKey": "artist-profiles/shinji-kanda.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Shinya Komatsu",
+      "normalizedArtist": "shinya komatsu",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Shinya_Komatsu",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Shinya_Komatsu",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7070/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/shinya-komatsu.png",
+      "profileImageObjectKey": "artist-profiles/shinya-komatsu.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Shizurow",
+      "normalizedArtist": "shizurow",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Shizurow",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Shizurow",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7071/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/shizurow.png",
+      "profileImageObjectKey": "artist-profiles/shizurow.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Souichirou Gunjima",
+      "normalizedArtist": "souichirou gunjima",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Souichirou_Gunjima",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Souichirou_Gunjima",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7072/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/souichirou-gunjima.png",
+      "profileImageObjectKey": "artist-profiles/souichirou-gunjima.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Sowsow",
+      "normalizedArtist": "sowsow",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Sowsow",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Sowsow",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7073/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/sowsow.png",
+      "profileImageObjectKey": "artist-profiles/sowsow.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "スパイク・チュンソフト (Spike Chunsoft)",
+      "normalizedArtist": "spike chunsoft",
+      "status": "recached",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7215",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7215/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/spike-chunsoft.png",
+      "profileImageObjectKey": "artist-profiles/spike-chunsoft.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Studio Bora Inc.",
+      "normalizedArtist": "studio bora inc",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Studio_Bora_Inc.",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Studio_Bora_Inc.",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7074/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/studio-bora-inc.png",
+      "profileImageObjectKey": "artist-profiles/studio-bora-inc.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Suwama Chiaki",
+      "normalizedArtist": "suwama chiaki",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Suwama_Chiaki",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Suwama_Chiaki",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7075/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/suwama-chiaki.png",
+      "profileImageObjectKey": "artist-profiles/suwama-chiaki.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Svlt",
+      "normalizedArtist": "svlt",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Svlt",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Svlt",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/8023/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/svlt.png",
+      "profileImageObjectKey": "artist-profiles/svlt.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "T. Honda",
+      "normalizedArtist": "t honda",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/T._Honda",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/T._Honda",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7217/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/t-honda.png",
+      "profileImageObjectKey": "artist-profiles/t-honda.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Taiga Kasai",
+      "normalizedArtist": "taiga kasai",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Taiga_Kasai",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Taiga_Kasai",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7141/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/taiga-kasai.png",
+      "profileImageObjectKey": "artist-profiles/taiga-kasai.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Taiga Kayama",
+      "normalizedArtist": "taiga kayama",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Taiga_Kayama",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Taiga_Kayama",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7218/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/taiga-kayama.png",
+      "profileImageObjectKey": "artist-profiles/taiga-kayama.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Takabon",
+      "normalizedArtist": "takabon",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Takabon",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Takabon",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7219/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/takabon.png",
+      "profileImageObjectKey": "artist-profiles/takabon.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Takashi Yamaguchi",
+      "normalizedArtist": "takashi yamaguchi",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Takashi_Yamaguchi",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Takashi_Yamaguchi",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7078/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/takashi-yamaguchi.png",
+      "profileImageObjectKey": "artist-profiles/takashi-yamaguchi.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Take",
+      "normalizedArtist": "take",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Take",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Take",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7221/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/take.png",
+      "profileImageObjectKey": "artist-profiles/take.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Takumi Akabane",
+      "normalizedArtist": "takumi akabane",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Takumi_Akabane",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Takumi_Akabane",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7079/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/takumi-akabane.png",
+      "profileImageObjectKey": "artist-profiles/takumi-akabane.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Takuyoa",
+      "normalizedArtist": "takuyoa",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Takuyoa",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Takuyoa",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7081/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/takuyoa.png",
+      "profileImageObjectKey": "artist-profiles/takuyoa.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Teeziro",
+      "normalizedArtist": "teeziro",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Teeziro",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Teeziro",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7080/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/teeziro.png",
+      "profileImageObjectKey": "artist-profiles/teeziro.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Tetsu Kayama",
+      "normalizedArtist": "tetsu kayama",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Tetsu_Kayama",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Tetsu_Kayama",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7096/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/tetsu-kayama.png",
+      "profileImageObjectKey": "artist-profiles/tetsu-kayama.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "The Pokémon Company",
+      "normalizedArtist": "the pok mon company",
+      "status": "recached",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7224",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7224/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/the-pok-mon-company.png",
+      "profileImageObjectKey": "artist-profiles/the-pok-mon-company.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Toi8",
+      "normalizedArtist": "toi8",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Toi8",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Toi8",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7225/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/toi8.png",
+      "profileImageObjectKey": "artist-profiles/toi8.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "TOKIYA",
+      "normalizedArtist": "tokiya",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/TOKIYA",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/TOKIYA",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7083/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/tokiya.png",
+      "profileImageObjectKey": "artist-profiles/tokiya.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Tomokazu Komiya",
+      "normalizedArtist": "tomokazu komiya",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Tomokazu_Komiya",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Tomokazu_Komiya",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/6969/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/tomokazu-komiya.png",
+      "profileImageObjectKey": "artist-profiles/tomokazu-komiya.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Tomoki Sone",
+      "normalizedArtist": "tomoki sone",
+      "status": "recached",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/10372",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/10372/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/tomoki-sone.png",
+      "profileImageObjectKey": "artist-profiles/tomoki-sone.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Tomoko Wakai",
+      "normalizedArtist": "tomoko wakai",
+      "status": "recached",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7227",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7227/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/tomoko-wakai.png",
+      "profileImageObjectKey": "artist-profiles/tomoko-wakai.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Tomomi Kaneko",
+      "normalizedArtist": "tomomi kaneko",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Tomomi_Kaneko",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Tomomi_Kaneko",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7228/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/tomomi-kaneko.png",
+      "profileImageObjectKey": "artist-profiles/tomomi-kaneko.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Tonji Matsuno",
+      "normalizedArtist": "tonji matsuno",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Tonji_Matsuno",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Tonji_Matsuno",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7230/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/tonji-matsuno.png",
+      "profileImageObjectKey": "artist-profiles/tonji-matsuno.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Tono",
+      "normalizedArtist": "tono",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Tono",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Tono",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/8250/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/tono.png",
+      "profileImageObjectKey": "artist-profiles/tono.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Toshinao Aoki",
+      "normalizedArtist": "toshinao aoki",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Toshinao_Aoki",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Toshinao_Aoki",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7084/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/toshinao-aoki.png",
+      "profileImageObjectKey": "artist-profiles/toshinao-aoki.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Toyste Beach",
+      "normalizedArtist": "toyste beach",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Toyste_Beach",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Toyste_Beach",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/6970/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/toyste-beach.png",
+      "profileImageObjectKey": "artist-profiles/toyste-beach.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Tsuyoshi Nagano",
+      "normalizedArtist": "tsuyoshi nagano",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Tsuyoshi_Nagano",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Tsuyoshi_Nagano",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7603/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/tsuyoshi-nagano.png",
+      "profileImageObjectKey": "artist-profiles/tsuyoshi-nagano.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Uninori",
+      "normalizedArtist": "uninori",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Uninori",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Uninori",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7232/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/uninori.png",
+      "profileImageObjectKey": "artist-profiles/uninori.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Uta",
+      "normalizedArtist": "uta",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Uta",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Uta",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7085/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/uta.png",
+      "profileImageObjectKey": "artist-profiles/uta.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Wataru Kawahara",
+      "normalizedArtist": "wataru kawahara",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Wataru_Kawahara",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Wataru_Kawahara",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7086/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/wataru-kawahara.png",
+      "profileImageObjectKey": "artist-profiles/wataru-kawahara.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Whisker",
+      "normalizedArtist": "whisker",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Whisker",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Whisker",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7234/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/whisker.png",
+      "profileImageObjectKey": "artist-profiles/whisker.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Wintr Wandr",
+      "normalizedArtist": "wintr wandr",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Wintr_Wandr",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Wintr_Wandr",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/8055/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/wintr-wandr.png",
+      "profileImageObjectKey": "artist-profiles/wintr-wandr.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Yano Keiji",
+      "normalizedArtist": "yano keiji",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yano_Keiji",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Yano_Keiji",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7235/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/yano-keiji.png",
+      "profileImageObjectKey": "artist-profiles/yano-keiji.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "YASHIRO Nanaco",
+      "normalizedArtist": "yashiro nanaco",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/YASHIRO_Nanaco",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/YASHIRO_Nanaco",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/8261/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/yashiro-nanaco.png",
+      "profileImageObjectKey": "artist-profiles/yashiro-nanaco.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Yasuki Watanabe",
+      "normalizedArtist": "yasuki watanabe",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yasuki_Watanabe",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Yasuki_Watanabe",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7238/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/yasuki-watanabe.png",
+      "profileImageObjectKey": "artist-profiles/yasuki-watanabe.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Yoriyuki Ikegami",
+      "normalizedArtist": "yoriyuki ikegami",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yoriyuki_Ikegami",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Yoriyuki_Ikegami",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7087/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/yoriyuki-ikegami.png",
+      "profileImageObjectKey": "artist-profiles/yoriyuki-ikegami.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Yoshimi Miyoshi",
+      "normalizedArtist": "yoshimi miyoshi",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yoshimi_Miyoshi",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Yoshimi_Miyoshi",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7571/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/yoshimi-miyoshi.png",
+      "profileImageObjectKey": "artist-profiles/yoshimi-miyoshi.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Yosuke Da Silva",
+      "normalizedArtist": "yosuke da silva",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yosuke_Da_Silva",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Yosuke_Da_Silva",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7237/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/yosuke-da-silva.png",
+      "profileImageObjectKey": "artist-profiles/yosuke-da-silva.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "長場雄 (YU NAGABA)",
+      "normalizedArtist": "yu nagaba",
+      "status": "recached",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7239",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7239/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/yu-nagaba.png",
+      "profileImageObjectKey": "artist-profiles/yu-nagaba.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Yuichi Sawayama",
+      "normalizedArtist": "yuichi sawayama",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yuichi_Sawayama",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Yuichi_Sawayama",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7240/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/yuichi-sawayama.png",
+      "profileImageObjectKey": "artist-profiles/yuichi-sawayama.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Yukihiro Tada",
+      "normalizedArtist": "yukihiro tada",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yukihiro_Tada",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Yukihiro_Tada",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7249/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/yukihiro-tada.png",
+      "profileImageObjectKey": "artist-profiles/yukihiro-tada.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Yukiko Baba",
+      "normalizedArtist": "yukiko baba",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yukiko_Baba",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Yukiko_Baba",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/6965/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/yukiko-baba.png",
+      "profileImageObjectKey": "artist-profiles/yukiko-baba.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Yumi",
+      "normalizedArtist": "yumi",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yumi",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Yumi",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7241/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/yumi.png",
+      "profileImageObjectKey": "artist-profiles/yumi.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Yuri Umemura",
+      "normalizedArtist": "yuri umemura",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yuri_Umemura",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Yuri_Umemura",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7242/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/yuri-umemura.png",
+      "profileImageObjectKey": "artist-profiles/yuri-umemura.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Yuriko Akase",
+      "normalizedArtist": "yuriko akase",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yuriko_Akase",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Yuriko_Akase",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7250/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/yuriko-akase.png",
+      "profileImageObjectKey": "artist-profiles/yuriko-akase.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Yusuke Ishikawa",
+      "normalizedArtist": "yusuke ishikawa",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yusuke_Ishikawa",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Yusuke_Ishikawa",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7090/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/yusuke-ishikawa.png",
+      "profileImageObjectKey": "artist-profiles/yusuke-ishikawa.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "コザキユースケ (Yusuke Kozaki)",
+      "normalizedArtist": "yusuke kozaki",
+      "status": "recached",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7202",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7202/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/yusuke-kozaki.png",
+      "profileImageObjectKey": "artist-profiles/yusuke-kozaki.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Yusuke Shimada",
+      "normalizedArtist": "yusuke shimada",
+      "status": "recached",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7201",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7201/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/yusuke-shimada.png",
+      "profileImageObjectKey": "artist-profiles/yusuke-shimada.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Yuu",
+      "normalizedArtist": "yuu",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yuu",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Yuu",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7092/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/yuu.png",
+      "profileImageObjectKey": "artist-profiles/yuu.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Yuu Nishida",
+      "normalizedArtist": "yuu nishida",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yuu_Nishida",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Yuu_Nishida",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7093/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/yuu-nishida.png",
+      "profileImageObjectKey": "artist-profiles/yuu-nishida.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Yuya Oka",
+      "normalizedArtist": "yuya oka",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Yuya_Oka",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Yuya_Oka",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7094/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/yuya-oka.png",
+      "profileImageObjectKey": "artist-profiles/yuya-oka.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Zig",
+      "normalizedArtist": "zig",
+      "status": "recached",
+      "sourceUrl": "https://bulbapedia.bulbagarden.net/wiki/Zig",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "https://bulbapedia.bulbagarden.net/wiki/Zig",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7095/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/zig.png",
+      "profileImageObjectKey": "artist-profiles/zig.png",
+      "imageCache": "cached"
+    },
+    {
+      "artist": "Zu-Ka",
+      "normalizedArtist": "zu ka",
+      "status": "recached",
+      "sourceUrl": "https://www.pocketmonsters.net/staff/view/7200",
+      "pocketmonstersUrl": "",
+      "bulbapediaUrl": "",
+      "profileImageUrl": "https://media.pocketmonsters.net/staff/7200/main.png/t/250.png",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/zu-ka.png",
+      "profileImageObjectKey": "artist-profiles/zu-ka.png",
+      "imageCache": "cached"
+    }
+  ]
+}

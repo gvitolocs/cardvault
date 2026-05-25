@@ -3,9 +3,9 @@ import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:http/http.dart' as http;
 
 import '../providers/auth_provider.dart';
+import '../services/pokoin_api_client.dart';
 
 class MarketplaceAdminEditScreen extends ConsumerStatefulWidget {
   const MarketplaceAdminEditScreen({super.key});
@@ -49,20 +49,19 @@ class _MarketplaceAdminEditScreenState
       _error = null;
     });
     try {
-      final token = await user.getIdToken();
+      final apiClient = PokoinApiClient(
+        auth: ref.read(pokoinApiAuthServiceProvider),
+      );
       final uri = Uri(
         path: '/api/marketplace-expansion-symbols',
         queryParameters: {
           if (_queryController.text.trim().isNotEmpty)
             'query': _queryController.text.trim(),
-          if (_missingOnly) 'missingOnly': '1',
+          if (_missingOnly) 'missingLogoOnly': '1',
           'limit': '500',
         },
       );
-      final response = await http.get(
-        uri,
-        headers: {'Authorization': 'Bearer $token'},
-      );
+      final response = await apiClient.get(uri);
       final payload = jsonDecode(response.body) as Map<String, dynamic>;
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw StateError(payload['error'] as String? ?? 'Load failed.');
@@ -100,18 +99,17 @@ class _MarketplaceAdminEditScreenState
       row.error = null;
     });
     try {
-      final token = await user.getIdToken();
-      final response = await http.post(
+      final apiClient = PokoinApiClient(
+        auth: ref.read(pokoinApiAuthServiceProvider),
+      );
+      final response = await apiClient.postJson(
         Uri.parse('/api/marketplace-expansion-symbols'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
+        body: {
           'name': row.name,
-          'symbolImageUrl': row.controller.text.trim(),
+          'symbolImageUrl': row.symbolController.text.trim(),
+          'logoImageUrl': row.logoController.text.trim(),
           'sourceAssetCode': row.sourceController.text.trim(),
-        }),
+        },
       );
       final payload = jsonDecode(response.body) as Map<String, dynamic>;
       if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -120,11 +118,14 @@ class _MarketplaceAdminEditScreenState
       final updated = _ExpansionSymbolRow.fromJson(
         Map<String, dynamic>.from(payload['expansion'] as Map? ?? const {}),
       );
-      row.controller.text = updated.symbolImageUrl;
+      row.symbolController.text = updated.symbolImageUrl;
+      row.logoController.text = updated.logoImageUrl;
       row.sourceController.text = updated.sourceAssetCode;
       row.symbolImageUrl = updated.symbolImageUrl;
+      row.logoImageUrl = updated.logoImageUrl;
       row.sourceAssetCode = updated.sourceAssetCode;
       row.defaultSymbolUrl = updated.defaultSymbolUrl;
+      row.defaultLogoUrl = updated.defaultLogoUrl;
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Saved ${row.name}')),
@@ -183,7 +184,10 @@ class _MarketplaceAdminEditScreenState
                   _ExpansionSymbolEditor(
                     row: row,
                     onUseDefault: () {
-                      setState(() => row.controller.text = row.defaultSymbolUrl);
+                      setState(() {
+                        row.symbolController.text = row.defaultSymbolUrl;
+                        row.logoController.text = row.defaultLogoUrl;
+                      });
                     },
                     onSave: () => _saveRow(row),
                   ),
@@ -202,9 +206,12 @@ class _ExpansionSymbolRow {
     required this.name,
     required this.cardCount,
     required this.symbolImageUrl,
+    required this.logoImageUrl,
     required this.defaultSymbolUrl,
+    required this.defaultLogoUrl,
     required this.sourceAssetCode,
-  })  : controller = TextEditingController(text: symbolImageUrl),
+  })  : symbolController = TextEditingController(text: symbolImageUrl),
+        logoController = TextEditingController(text: logoImageUrl),
         sourceController = TextEditingController(text: sourceAssetCode);
 
   factory _ExpansionSymbolRow.fromJson(Map<String, dynamic> json) {
@@ -212,7 +219,9 @@ class _ExpansionSymbolRow {
       name: '${json['name'] ?? ''}',
       cardCount: (json['cardCount'] as num?)?.toInt() ?? 0,
       symbolImageUrl: '${json['symbolImageUrl'] ?? ''}',
+      logoImageUrl: '${json['logoImageUrl'] ?? ''}',
       defaultSymbolUrl: '${json['defaultSymbolUrl'] ?? ''}',
+      defaultLogoUrl: '${json['defaultLogoUrl'] ?? ''}',
       sourceAssetCode: '${json['sourceAssetCode'] ?? ''}',
     );
   }
@@ -220,9 +229,12 @@ class _ExpansionSymbolRow {
   final String name;
   final int cardCount;
   String symbolImageUrl;
+  String logoImageUrl;
   String defaultSymbolUrl;
+  String defaultLogoUrl;
   String sourceAssetCode;
-  final TextEditingController controller;
+  final TextEditingController symbolController;
+  final TextEditingController logoController;
   final TextEditingController sourceController;
   bool saving = false;
   String? error;
@@ -257,7 +269,7 @@ class _AdminHero extends StatelessWidget {
           Text(
             user == null
                 ? 'You are not signed in.'
-                : 'Signed in as ${user!.email ?? user!.uid}. Changes persist in the marketplace expansion symbol table.',
+                : 'Signed in as ${user!.email ?? user!.uid}. Changes persist compact symbols and full set logos in the marketplace expansion table.',
             style: const TextStyle(color: Color(0xFFB8C4E6), height: 1.45),
           ),
         ],
@@ -328,7 +340,8 @@ class _ExpansionSymbolEditor extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final previewUrl = row.controller.text.trim();
+    final symbolPreviewUrl = row.symbolController.text.trim();
+    final logoPreviewUrl = row.logoController.text.trim();
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -341,7 +354,9 @@ class _ExpansionSymbolEditor extends StatelessWidget {
         children: [
           Row(
             children: [
-              _SymbolPreview(url: previewUrl),
+              _SymbolPreview(url: symbolPreviewUrl),
+              const SizedBox(width: 10),
+              _LogoPreview(url: logoPreviewUrl),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -376,11 +391,21 @@ class _ExpansionSymbolEditor extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           TextField(
-            controller: row.controller,
+            controller: row.symbolController,
             style: const TextStyle(color: Colors.white),
             decoration: const InputDecoration(
-              labelText: 'Logo URL',
+              labelText: 'Symbol URL',
               hintText: 'https://cdn.pokoin.com/expansions/symbols/...',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: row.logoController,
+            style: const TextStyle(color: Colors.white),
+            decoration: const InputDecoration(
+              labelText: 'Full logo URL',
+              hintText: 'https://cdn.pokoin.com/expansions/logos/...',
               border: OutlineInputBorder(),
             ),
           ),
@@ -402,11 +427,16 @@ class _ExpansionSymbolEditor extends StatelessWidget {
               OutlinedButton.icon(
                 onPressed: row.defaultSymbolUrl.isEmpty ? null : onUseDefault,
                 icon: const Icon(Icons.auto_fix_high),
-                label: const Text('Use static CDN path'),
+                label: const Text('Use static CDN paths'),
               ),
               if (row.defaultSymbolUrl.isNotEmpty)
                 SelectableText(
-                  row.defaultSymbolUrl,
+                  'Symbol: ${row.defaultSymbolUrl}',
+                  style: const TextStyle(color: Color(0xFF93A4C8)),
+                ),
+              if (row.defaultLogoUrl.isNotEmpty)
+                SelectableText(
+                  'Logo: ${row.defaultLogoUrl}',
                   style: const TextStyle(color: Color(0xFF93A4C8)),
                 ),
             ],
@@ -443,6 +473,39 @@ class _SymbolPreview extends StatelessWidget {
           : Image.network(
               url,
               width: 42,
+              height: 42,
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => const Icon(
+                Icons.broken_image_outlined,
+                color: Color(0xFFFCA5A5),
+              ),
+            ),
+    );
+  }
+}
+
+class _LogoPreview extends StatelessWidget {
+  const _LogoPreview({required this.url});
+
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 112,
+      height: 56,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: const Color(0xFF111936),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: url.isEmpty
+          ? const Icon(Icons.image_not_supported_outlined,
+              color: Color(0xFF93A4C8))
+          : Image.network(
+              url,
+              width: 96,
               height: 42,
               fit: BoxFit.contain,
               errorBuilder: (_, __, ___) => const Icon(

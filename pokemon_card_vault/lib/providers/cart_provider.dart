@@ -1,15 +1,44 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/card_listing.dart';
 import '../models/pokemon_card.dart';
+import '../services/card_listing_service.dart';
+import '../services/pokoin_api_auth.dart';
 
 final cartProvider = StateNotifierProvider<CartNotifier, CartState>((ref) {
   return CartNotifier();
 });
+
+const double temporaryFixedCheckoutShippingPkn = 2000;
+
+enum CartFulfillmentMode {
+  physical,
+  nftOnly;
+
+  String get wireValue {
+    switch (this) {
+      case CartFulfillmentMode.physical:
+        return 'physical';
+      case CartFulfillmentMode.nftOnly:
+        return 'nft_only';
+    }
+  }
+
+  static CartFulfillmentMode fromWireValue(Object? value) {
+    return '${value ?? ''}' == 'nft_only'
+        ? CartFulfillmentMode.nftOnly
+        : CartFulfillmentMode.physical;
+  }
+}
 
 class CartItem {
   final PokemonCard card;
@@ -22,12 +51,17 @@ class CartItem {
   final double? unitPricePkn;
   final int? quantityAvailable;
   final bool reverse;
+  final bool sealed;
   final bool graded;
   final String? gradingCompany;
   final String? grade;
   final String? certificationId;
   final bool shippingAvailable;
+  final bool reserveAvailable;
   final bool nftAvailable;
+  final String source;
+  final String sourceListingId;
+  final Map<String, dynamic> sourceMetadata;
 
   CartItem({
     required this.card,
@@ -40,12 +74,17 @@ class CartItem {
     this.unitPricePkn,
     this.quantityAvailable,
     this.reverse = false,
+    this.sealed = false,
     this.graded = false,
     this.gradingCompany,
     this.grade,
     this.certificationId,
     this.shippingAvailable = false,
+    this.reserveAvailable = false,
     this.nftAvailable = false,
+    this.source = 'pokoin_user_listing',
+    this.sourceListingId = '',
+    this.sourceMetadata = const <String, dynamic>{},
   });
 
   String get cartKey =>
@@ -56,6 +95,8 @@ class CartItem {
   int get maxQuantity => quantityAvailable ?? card.stock;
 
   double get totalPrice => unitPrice * quantity;
+
+  bool get isNftEligible => nftAvailable;
 
   CartItem copyWith({
     PokemonCard? card,
@@ -68,12 +109,17 @@ class CartItem {
     double? unitPricePkn,
     int? quantityAvailable,
     bool? reverse,
+    bool? sealed,
     bool? graded,
     String? gradingCompany,
     String? grade,
     String? certificationId,
     bool? shippingAvailable,
+    bool? reserveAvailable,
     bool? nftAvailable,
+    String? source,
+    String? sourceListingId,
+    Map<String, dynamic>? sourceMetadata,
   }) {
     return CartItem(
       card: card ?? this.card,
@@ -86,12 +132,17 @@ class CartItem {
       unitPricePkn: unitPricePkn ?? this.unitPricePkn,
       quantityAvailable: quantityAvailable ?? this.quantityAvailable,
       reverse: reverse ?? this.reverse,
+      sealed: sealed ?? this.sealed,
       graded: graded ?? this.graded,
       gradingCompany: gradingCompany ?? this.gradingCompany,
       grade: grade ?? this.grade,
       certificationId: certificationId ?? this.certificationId,
       shippingAvailable: shippingAvailable ?? this.shippingAvailable,
+      reserveAvailable: reserveAvailable ?? this.reserveAvailable,
       nftAvailable: nftAvailable ?? this.nftAvailable,
+      source: source ?? this.source,
+      sourceListingId: sourceListingId ?? this.sourceListingId,
+      sourceMetadata: sourceMetadata ?? this.sourceMetadata,
     );
   }
 
@@ -107,12 +158,17 @@ class CartItem {
       'unitPricePkn': unitPricePkn,
       'quantityAvailable': quantityAvailable,
       'reverse': reverse,
+      'sealed': sealed,
       'graded': graded,
       'gradingCompany': gradingCompany,
       'grade': grade,
       'certificationId': certificationId,
       'shippingAvailable': shippingAvailable,
+      'reserveAvailable': reserveAvailable,
       'nftAvailable': nftAvailable,
+      'source': source,
+      'sourceListingId': sourceListingId,
+      'sourceMetadata': sourceMetadata,
     };
   }
 
@@ -129,12 +185,18 @@ class CartItem {
       unitPricePkn: (json['unitPricePkn'] as num?)?.toDouble(),
       quantityAvailable: (json['quantityAvailable'] as num?)?.toInt(),
       reverse: json['reverse'] == true,
+      sealed: json['sealed'] == true,
       graded: json['graded'] == true,
       gradingCompany: json['gradingCompany'] as String?,
       grade: json['grade'] as String?,
       certificationId: json['certificationId'] as String?,
       shippingAvailable: json['shippingAvailable'] == true,
+      reserveAvailable: json['reserveAvailable'] == true,
       nftAvailable: json['nftAvailable'] == true,
+      source: '${json['source'] ?? 'pokoin_user_listing'}',
+      sourceListingId: '${json['sourceListingId'] ?? ''}',
+      sourceMetadata:
+          Map<String, dynamic>.from(json['sourceMetadata'] as Map? ?? const {}),
     );
   }
 
@@ -158,12 +220,17 @@ class CartItem {
       unitPricePkn: listing.pricePkn,
       quantityAvailable: listing.quantityAvailable,
       reverse: listing.reverse,
+      sealed: listing.sealed,
       graded: listing.graded,
       gradingCompany: listing.gradingCompany,
       grade: listing.grade,
       certificationId: listing.certificationId,
       shippingAvailable: listing.shippingAvailable,
-      nftAvailable: listing.nftAvailable,
+      reserveAvailable: listing.reserveAvailable,
+      nftAvailable: listing.isNftEligible,
+      source: listing.source,
+      sourceListingId: listing.sourceListingId,
+      sourceMetadata: listing.sourceMetadata,
     );
   }
 }
@@ -172,11 +239,15 @@ class CartState {
   final List<CartItem> items;
   final bool isLoading;
   final String? error;
+  final bool hasHydratedLocalCache;
+  final CartFulfillmentMode fulfillmentMode;
 
   CartState({
     this.items = const [],
     this.isLoading = false,
     this.error,
+    this.hasHydratedLocalCache = false,
+    this.fulfillmentMode = CartFulfillmentMode.physical,
   });
 
   double get subtotal =>
@@ -184,7 +255,19 @@ class CartState {
 
   double get tax => subtotal * 0.08;
 
-  double get shipping => subtotal > 50 ? 0 : 5.99;
+  bool get canCheckoutNftOnly =>
+      items.isNotEmpty && items.every((item) => item.isNftEligible);
+
+  CartFulfillmentMode get effectiveFulfillmentMode =>
+      fulfillmentMode == CartFulfillmentMode.nftOnly && canCheckoutNftOnly
+          ? CartFulfillmentMode.nftOnly
+          : CartFulfillmentMode.physical;
+
+  bool get isNftOnlyCheckout =>
+      effectiveFulfillmentMode == CartFulfillmentMode.nftOnly;
+
+  double get shipping =>
+      isNftOnlyCheckout ? 0 : temporaryFixedCheckoutShippingPkn;
 
   double get total => subtotal + tax + shipping;
 
@@ -208,27 +291,68 @@ class CartState {
     List<CartItem>? items,
     bool? isLoading,
     String? error,
+    bool? hasHydratedLocalCache,
+    CartFulfillmentMode? fulfillmentMode,
   }) {
     return CartState(
       items: items ?? this.items,
       isLoading: isLoading ?? this.isLoading,
       error: error,
+      hasHydratedLocalCache:
+          hasHydratedLocalCache ?? this.hasHydratedLocalCache,
+      fulfillmentMode: fulfillmentMode ?? this.fulfillmentMode,
     );
   }
 }
 
 class CartNotifier extends StateNotifier<CartState> {
-  CartNotifier() : super(CartState()) {
-    _authSubscription = Firebase.apps.isEmpty
-        ? null
-        : FirebaseAuth.instance.authStateChanges().listen((_) {
-            _loadCart();
-          });
-    _loadCart();
+  CartNotifier({
+    http.Client? httpClient,
+    PokoinApiAuthService? apiAuth,
+    CardListingService? listingService,
+  })  : _httpClient = httpClient ?? http.Client(),
+        _ownsHttpClient = httpClient == null,
+        _apiAuth = apiAuth ?? PokoinApiAuthService.instance(),
+        _listingService = listingService ?? CardListingService(),
+        super(CartState()) {
+    _lastUid = _user?.uid;
+    if (Firebase.apps.isEmpty) {
+      _authSubscription = null;
+    } else {
+      _authSubscription =
+          FirebaseAuth.instance.authStateChanges().listen((user) {
+        final nextUid = user?.uid;
+        final previousUid = _lastUid;
+        if (nextUid == previousUid &&
+            (_loadOperation != null || state.hasHydratedLocalCache)) {
+          return;
+        }
+        if (previousUid != null && nextUid != previousUid) {
+          state = state.copyWith(
+            items: const [],
+            isLoading: true,
+            error: null,
+            hasHydratedLocalCache: false,
+            fulfillmentMode: CartFulfillmentMode.physical,
+          );
+        }
+        _lastUid = nextUid;
+        unawaited(_loadCartForUid(nextUid, clearPreviousUser: previousUid));
+      });
+    }
+    unawaited(_loadCartForUid(_lastUid));
   }
 
   static const String _cartBoxName = 'cart_items';
+  static const String _cartAnalyticsHolderKey = 'cart_analytics_holder_id';
   dynamic _authSubscription;
+  final http.Client _httpClient;
+  final bool _ownsHttpClient;
+  final PokoinApiAuthService _apiAuth;
+  final CardListingService _listingService;
+  String? _lastUid;
+  Future<void>? _loadOperation;
+  int _loadGeneration = 0;
 
   FirebaseFirestore get _firestore => FirebaseFirestore.instance;
   User? get _user =>
@@ -237,30 +361,85 @@ class CartNotifier extends StateNotifier<CartState> {
   @override
   void dispose() {
     _authSubscription?.cancel();
+    if (_ownsHttpClient) {
+      _httpClient.close();
+    }
     super.dispose();
   }
 
-  Future<void> _loadCart() async {
+  Future<void> _loadCartForUid(
+    String? uid, {
+    String? clearPreviousUser,
+  }) {
+    final generation = ++_loadGeneration;
+    final previous = _loadOperation ?? Future<void>.value();
+    final operation = previous.catchError((_) {}).then((_) async {
+      await _loadCartSnapshot(
+        uid,
+        generation,
+        clearPreviousUser: clearPreviousUser,
+      );
+    });
+    _loadOperation = operation;
+    return operation;
+  }
+
+  Future<void> _loadCartSnapshot(
+    String? uid,
+    int generation, {
+    String? clearPreviousUser,
+  }) async {
+    if (clearPreviousUser != null && clearPreviousUser != uid) {
+      await _saveLocalItemsForUid(clearPreviousUser, const []);
+      await _saveLegacyLocalItems(const []);
+    }
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final localItems = await _loadLocalItems();
-      final user = _user;
-      if (user == null) {
-        state =
-            state.copyWith(items: localItems, isLoading: false, error: null);
+      final localItems = await _loadLocalItemsForUid(uid);
+      if (!_isCurrentLoad(uid, generation)) {
+        return;
+      }
+      state = state.copyWith(
+        items: localItems,
+        isLoading: uid != null,
+        error: null,
+        hasHydratedLocalCache: true,
+      );
+      if (uid == null) {
+        final refreshed = await _refreshListingSnapshots(localItems);
+        if (!_sameItems(refreshed, localItems)) {
+          await _saveLocalItemsForUid(null, refreshed);
+          if (!_isCurrentLoad(uid, generation)) {
+            return;
+          }
+          state = state.copyWith(
+            items: refreshed,
+            isLoading: false,
+            error: null,
+          );
+        }
         return;
       }
 
-      final doc = await _cartDoc(user.uid).get();
+      final doc = await _cartDoc(uid).get();
+      if (!_isCurrentLoad(uid, generation)) {
+        return;
+      }
       final remoteItems = _itemsFromData(doc.data());
       final merged = _mergeItems(remoteItems, localItems);
-      if (!_sameItems(merged, remoteItems)) {
-        await _saveRemote(user.uid, merged);
+      final refreshed = await _refreshListingSnapshots(merged);
+      if (!_sameItems(refreshed, remoteItems)) {
+        await _saveRemote(uid, refreshed);
       }
-      await _saveLocalItems(merged);
-      state = state.copyWith(items: merged, isLoading: false, error: null);
+      await _saveLocalItemsForUid(uid, refreshed);
+      if (!_isCurrentLoad(uid, generation)) {
+        return;
+      }
+      state = state.copyWith(items: refreshed, isLoading: false, error: null);
     } catch (error) {
-      state = state.copyWith(isLoading: false, error: error.toString());
+      if (_isCurrentLoad(uid, generation)) {
+        state = state.copyWith(isLoading: false, error: error.toString());
+      }
     }
   }
 
@@ -287,6 +466,7 @@ class CartNotifier extends StateNotifier<CartState> {
     PokemonCard card,
     CardListing listing, {
     int quantity = 1,
+    CartFulfillmentMode? fulfillmentMode,
   }) async {
     if (!listing.isActive) {
       state = state.copyWith(error: '${card.name} is currently unavailable');
@@ -323,10 +503,14 @@ class CartNotifier extends StateNotifier<CartState> {
         grade: listing.grade,
         certificationId: listing.certificationId,
         shippingAvailable: listing.shippingAvailable,
-        nftAvailable: listing.nftAvailable,
+        reserveAvailable: listing.reserveAvailable,
+        nftAvailable: listing.isNftEligible,
+        source: listing.source,
+        sourceListingId: listing.sourceListingId,
+        sourceMetadata: listing.sourceMetadata,
       );
     }
-    await _persist(items);
+    await _persist(items, fulfillmentMode: fulfillmentMode);
   }
 
   Future<void> removeFromCart(String cardId) async {
@@ -335,13 +519,13 @@ class CartNotifier extends StateNotifier<CartState> {
         .toList());
   }
 
-  Future<void> updateQuantity(String cardId, int quantity) async {
+  Future<void> updateQuantity(String cartKey, int quantity) async {
     if (quantity <= 0) {
-      await removeFromCart(cardId);
+      await removeFromCart(cartKey);
       return;
     }
     final items = state.items.map((item) {
-      if (item.card.id != cardId) {
+      if (item.card.id != cartKey && item.cartKey != cartKey) {
         return item;
       }
       return item.copyWith(quantity: quantity.clamp(1, item.maxQuantity));
@@ -353,29 +537,158 @@ class CartNotifier extends StateNotifier<CartState> {
     await _persist(const []);
   }
 
+  void setFulfillmentMode(CartFulfillmentMode mode) {
+    final nextMode =
+        mode == CartFulfillmentMode.nftOnly && !state.canCheckoutNftOnly
+            ? CartFulfillmentMode.physical
+            : mode;
+    state = state.copyWith(fulfillmentMode: nextMode, error: null);
+  }
+
   bool isInCart(String cardId) => state.isInCart(cardId);
 
   int getQuantity(String cardId) => state.getQuantity(cardId);
 
-  Future<void> _persist(List<CartItem> items) async {
-    state = state.copyWith(items: items, isLoading: true, error: null);
+  Future<void> _persist(
+    List<CartItem> items, {
+    CartFulfillmentMode? fulfillmentMode,
+  }) async {
+    final previousItems = state.items;
+    final requestedMode = fulfillmentMode ?? state.fulfillmentMode;
+    final mode = requestedMode == CartFulfillmentMode.nftOnly &&
+            (items.isEmpty || items.any((item) => !item.isNftEligible))
+        ? CartFulfillmentMode.physical
+        : requestedMode;
+    state = state.copyWith(
+      items: items,
+      isLoading: true,
+      error: null,
+      fulfillmentMode: mode,
+    );
     try {
-      await _saveLocalItems(items);
       final user = _user;
+      await _saveLocalItemsForUid(user?.uid, items);
       if (user != null) {
         await _saveRemote(user.uid, items);
       }
-      state = state.copyWith(items: items, isLoading: false, error: null);
+      state = state.copyWith(
+        items: items,
+        isLoading: false,
+        error: null,
+        hasHydratedLocalCache: true,
+        fulfillmentMode: mode,
+      );
+      _recordCartAnalyticsDiff(previousItems, items);
     } catch (error) {
       state = state.copyWith(isLoading: false, error: error.toString());
     }
+  }
+
+  void _recordCartAnalyticsDiff(
+    List<CartItem> previousItems,
+    List<CartItem> nextItems,
+  ) {
+    final previousIds = _cartCardIds(previousItems);
+    final nextIds = _cartCardIds(nextItems);
+    for (final cardId in nextIds.difference(previousIds)) {
+      _recordCartAnalytics(cardId, 'add');
+    }
+    for (final cardId in previousIds.difference(nextIds)) {
+      _recordCartAnalytics(cardId, 'remove');
+    }
+  }
+
+  Set<String> _cartCardIds(List<CartItem> items) {
+    final ids = <String>{};
+    for (final item in items) {
+      final id = item.card.id.trim();
+      final numericId = int.tryParse(id);
+      if (numericId != null && numericId > 0) {
+        ids.add(id);
+      }
+    }
+    return ids;
+  }
+
+  void _recordCartAnalytics(String cardId, String action) {
+    final numericId = int.tryParse(cardId.trim());
+    if (numericId == null || numericId <= 0) {
+      return;
+    }
+    unawaited(Future<void>(() async {
+      try {
+        final authHeaders = await _apiAuth.authorizationHeaders(
+          requireSignedIn: false,
+        );
+        final anonymousId = await _cartAnalyticsHolderId();
+        await _httpClient
+            .post(
+              Uri.base.resolve('/api/marketplace-cart'),
+              headers: {
+                'content-type': 'application/json',
+                ...authHeaders,
+              },
+              body: jsonEncode({
+                'cardId': numericId,
+                'action': action,
+                'anonymousId': anonymousId,
+                'source': 'flutter',
+              }),
+            )
+            .timeout(const Duration(seconds: 3));
+      } catch (_) {
+        // Cart analytics should not affect local cart state.
+      }
+    }));
+  }
+
+  Future<String> _cartAnalyticsHolderId() async {
+    final prefs = await SharedPreferences.getInstance();
+    final existing = prefs.getString(_cartAnalyticsHolderKey);
+    if (existing != null && existing.trim().isNotEmpty) {
+      return existing;
+    }
+    final generated =
+        'cart-${DateTime.now().microsecondsSinceEpoch}-${identityHashCode(this)}';
+    await prefs.setString(_cartAnalyticsHolderKey, generated);
+    return generated;
   }
 
   DocumentReference<Map<String, dynamic>> _cartDoc(String uid) {
     return _firestore.collection('user_carts').doc(uid);
   }
 
-  Future<List<CartItem>> _loadLocalItems() async {
+  Future<List<CartItem>> _loadLocalItemsForUid(String? uid) async {
+    final box = await _openLocalBox(uid);
+    final items = box.values
+        .map((value) => CartItem.fromJson(Map<String, dynamic>.from(value)))
+        .where((item) => item.card.id.isNotEmpty)
+        .toList();
+    if (items.isNotEmpty) {
+      return items;
+    }
+    if (uid != null && uid.isNotEmpty) {
+      return const [];
+    }
+    return _loadLegacyLocalItems();
+  }
+
+  Future<void> _saveLocalItemsForUid(String? uid, List<CartItem> items) async {
+    final box = await _openLocalBox(uid);
+    await box.clear();
+    for (final item in items) {
+      await box.put(item.cartKey, item.toJson());
+    }
+    await _saveLegacyLocalItems(const []);
+  }
+
+  Future<Box<Map>> _openLocalBox(String? uid) {
+    final suffix =
+        uid == null || uid.isEmpty ? 'guest' : uid.replaceAll(':', '_');
+    return Hive.openBox<Map>('${_cartBoxName}_$suffix');
+  }
+
+  Future<List<CartItem>> _loadLegacyLocalItems() async {
     final box = await Hive.openBox<Map>(_cartBoxName);
     return box.values
         .map((value) => CartItem.fromJson(Map<String, dynamic>.from(value)))
@@ -383,11 +696,11 @@ class CartNotifier extends StateNotifier<CartState> {
         .toList();
   }
 
-  Future<void> _saveLocalItems(List<CartItem> items) async {
+  Future<void> _saveLegacyLocalItems(List<CartItem> items) async {
     final box = await Hive.openBox<Map>(_cartBoxName);
     await box.clear();
     for (final item in items) {
-      await box.put(item.card.id, item.toJson());
+      await box.put(item.cartKey, item.toJson());
     }
   }
 
@@ -425,6 +738,67 @@ class CartNotifier extends StateNotifier<CartState> {
       ..sort((a, b) => a.card.name.compareTo(b.card.name));
   }
 
+  Future<List<CartItem>> _refreshListingSnapshots(List<CartItem> items) async {
+    final listingIds = items
+        .map((item) => item.listingId?.trim() ?? '')
+        .where((id) => _isNativeListingId(id))
+        .toSet();
+    if (listingIds.isEmpty) {
+      return items;
+    }
+    try {
+      final listings = await _listingService.listingsByIds(listingIds);
+      if (listings.isEmpty) {
+        return items;
+      }
+      final byId = {
+        for (final listing in listings)
+          if (listing.id.trim().isNotEmpty) listing.id: listing,
+      };
+      return items.map((item) {
+        final listing = byId[item.listingId?.trim()];
+        if (listing == null) {
+          return item;
+        }
+        final quantity = item.quantity.clamp(1, listing.quantityAvailable);
+        return item.copyWith(
+          card: item.card.copyWith(
+            price: listing.pricePkn,
+            stock: listing.quantityAvailable,
+            condition: listing.condition,
+          ),
+          quantity: quantity,
+          sellerUid: listing.sellerUid,
+          sellerName: listing.sellerName,
+          condition: listing.condition,
+          language: listing.language,
+          unitPricePkn: listing.pricePkn,
+          quantityAvailable: listing.quantityAvailable,
+          reverse: listing.reverse,
+          sealed: listing.sealed,
+          graded: listing.graded,
+          gradingCompany: listing.gradingCompany,
+          grade: listing.grade,
+          certificationId: listing.certificationId,
+          shippingAvailable: listing.shippingAvailable,
+          reserveAvailable: listing.reserveAvailable,
+          nftAvailable: listing.isNftEligible,
+          source: listing.source,
+          sourceListingId: listing.sourceListingId,
+          sourceMetadata: listing.sourceMetadata,
+        );
+      }).toList(growable: false);
+    } catch (_) {
+      return items;
+    }
+  }
+
+  bool _isNativeListingId(String id) {
+    return RegExp(
+      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$',
+    ).hasMatch(id);
+  }
+
   bool _sameItems(List<CartItem> a, List<CartItem> b) {
     if (a.length != b.length) {
       return false;
@@ -433,10 +807,22 @@ class CartNotifier extends StateNotifier<CartState> {
     final bSorted = [...b]..sort((x, y) => x.cartKey.compareTo(y.cartKey));
     for (var index = 0; index < aSorted.length; index++) {
       if (aSorted[index].cartKey != bSorted[index].cartKey ||
-          aSorted[index].quantity != bSorted[index].quantity) {
+          aSorted[index].quantity != bSorted[index].quantity ||
+          aSorted[index].sellerName != bSorted[index].sellerName ||
+          aSorted[index].unitPricePkn != bSorted[index].unitPricePkn ||
+          aSorted[index].quantityAvailable !=
+              bSorted[index].quantityAvailable ||
+          aSorted[index].condition != bSorted[index].condition ||
+          aSorted[index].language != bSorted[index].language ||
+          aSorted[index].reserveAvailable != bSorted[index].reserveAvailable ||
+          aSorted[index].nftAvailable != bSorted[index].nftAvailable) {
         return false;
       }
     }
     return true;
+  }
+
+  bool _isCurrentLoad(String? uid, int generation) {
+    return mounted && generation == _loadGeneration && uid == _lastUid;
   }
 }

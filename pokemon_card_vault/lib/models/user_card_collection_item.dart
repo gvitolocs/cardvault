@@ -22,6 +22,13 @@ class UserCardCollectionItem {
     required this.cardImageUrl,
     required this.setName,
     required this.collectorNumber,
+    this.ownershipType = 'physical',
+    this.nftStatus = '',
+    this.fulfillmentMode = 'physical',
+    this.physicalShippingStatus = '',
+    this.physicalShippingRequestId = '',
+    this.sourceOrderId = '',
+    this.sourceListingId = '',
     this.createdAt,
     this.updatedAt,
   });
@@ -43,8 +50,25 @@ class UserCardCollectionItem {
   final String cardImageUrl;
   final String setName;
   final String collectorNumber;
+  final String ownershipType;
+  final String nftStatus;
+  final String fulfillmentMode;
+  final String physicalShippingStatus;
+  final String physicalShippingRequestId;
+  final String sourceOrderId;
+  final String sourceListingId;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+
+  bool get isNft =>
+      ownershipType == 'nft' ||
+      fulfillmentMode == 'nft_only' ||
+      nftStatus == 'owned';
+
+  bool get canRequestPhysicalShipping =>
+      isNft &&
+      (physicalShippingStatus.isEmpty ||
+          physicalShippingStatus == 'not_requested');
 
   Map<String, dynamic> toFirestore() {
     return {
@@ -65,6 +89,13 @@ class UserCardCollectionItem {
       'cardImageUrl': cardImageUrl,
       'setName': setName,
       'collectorNumber': collectorNumber,
+      'ownershipType': ownershipType,
+      'nftStatus': nftStatus,
+      'fulfillmentMode': fulfillmentMode,
+      'physicalShippingStatus': physicalShippingStatus,
+      'physicalShippingRequestId': physicalShippingRequestId,
+      'sourceOrderId': sourceOrderId,
+      'sourceListingId': sourceListingId,
       'updatedAt': FieldValue.serverTimestamp(),
     };
   }
@@ -100,6 +131,13 @@ class UserCardCollectionItem {
       cardImageUrl: '${json['cardImageUrl'] ?? ''}',
       setName: '${json['setName'] ?? ''}',
       collectorNumber: '${json['collectorNumber'] ?? ''}',
+      ownershipType: '${json['ownershipType'] ?? 'physical'}',
+      nftStatus: '${json['nftStatus'] ?? ''}',
+      fulfillmentMode: '${json['fulfillmentMode'] ?? 'physical'}',
+      physicalShippingStatus: '${json['physicalShippingStatus'] ?? ''}',
+      physicalShippingRequestId: '${json['physicalShippingRequestId'] ?? ''}',
+      sourceOrderId: '${json['sourceOrderId'] ?? ''}',
+      sourceListingId: '${json['sourceListingId'] ?? ''}',
       createdAt: _readDate(json['createdAt']),
       updatedAt: _readDate(json['updatedAt']),
     );
@@ -137,6 +175,8 @@ class UserCardCollectionItem {
       cardImageUrl: card.imageUrl,
       setName: card.set,
       collectorNumber: card.number,
+      ownershipType: 'physical',
+      fulfillmentMode: 'physical',
     );
   }
 
@@ -165,6 +205,11 @@ class UserCardCollectionItem {
       cardImageUrl: listing.cardImageUrl,
       setName: listing.setName,
       collectorNumber: listing.collectorNumber,
+      ownershipType: listing.isNftEligible ? 'nft' : 'physical',
+      nftStatus: listing.isNftEligible ? 'owned' : '',
+      fulfillmentMode: listing.isNftEligible ? 'nft_only' : 'physical',
+      physicalShippingStatus: listing.isNftEligible ? 'not_requested' : '',
+      sourceListingId: listing.id,
     );
   }
 

@@ -45,16 +45,22 @@ class PokemonCardAdapter extends TypeAdapter<PokemonCard> {
       productType: fields[25] as String? ?? 'card',
       trainerName: fields[26] as String? ?? '',
       expansionSymbolUrl: fields[27] as String? ?? '',
-      cardPalette:
-          (fields[28] as Map?)?.cast<String, dynamic>() ?? const {},
+      cardPalette: (fields[28] as Map?)?.cast<String, dynamic>() ?? const {},
       emoji: fields[29] as String? ?? '',
+      homepageImageUrl: fields[30] as String?,
+      expansionLogoUrl: fields[31] as String? ?? '',
+      canonicalPath: fields[32] as String? ?? '',
+      hasCardTraderListing: fields[33] as bool? ?? false,
+      cardtraderEligibleListingCount: fields[34] as int? ?? 0,
+      watchlistCount: fields[35] as int? ?? 0,
+      cartHolderCount: fields[36] as int? ?? 0,
     );
   }
 
   @override
   void write(BinaryWriter writer, PokemonCard obj) {
     writer
-      ..writeByte(30)
+      ..writeByte(37)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -114,7 +120,21 @@ class PokemonCardAdapter extends TypeAdapter<PokemonCard> {
       ..writeByte(28)
       ..write(obj.cardPalette)
       ..writeByte(29)
-      ..write(obj.emoji);
+      ..write(obj.emoji)
+      ..writeByte(30)
+      ..write(obj.homepageImageUrl)
+      ..writeByte(31)
+      ..write(obj.expansionLogoUrl)
+      ..writeByte(32)
+      ..write(obj.canonicalPath)
+      ..writeByte(33)
+      ..write(obj.hasCardTraderListing)
+      ..writeByte(34)
+      ..write(obj.cardtraderEligibleListingCount)
+      ..writeByte(35)
+      ..write(obj.watchlistCount)
+      ..writeByte(36)
+      ..write(obj.cartHolderCount);
   }
 
   @override

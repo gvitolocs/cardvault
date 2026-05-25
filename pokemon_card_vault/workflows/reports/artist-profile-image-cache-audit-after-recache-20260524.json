@@ -1,0 +1,23 @@
+{
+  "generatedAt": "2026-05-24T14:52:24.593Z",
+  "mode": "image-cache-audit",
+  "options": {
+    "limit": "all",
+    "source": "all",
+    "concurrency": 2,
+    "artist": "",
+    "refreshExisting": false,
+    "cacheImages": true,
+    "auditImageCache": true,
+    "recacheMissingImages": false
+  },
+  "counts": {
+    "profile_rows": 367,
+    "source_images": 234,
+    "cached_images": 234,
+    "cache_needed": 0,
+    "reported_missing_rows": 0
+  },
+  "samples": [],
+  "report": []
+}

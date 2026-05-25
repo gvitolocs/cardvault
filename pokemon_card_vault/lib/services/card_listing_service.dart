@@ -1,77 +1,80 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:http/http.dart' as http;
 
 import '../models/card_listing.dart';
+import 'pokoin_api_auth.dart';
+import 'pokoin_api_client.dart';
 
 class CardListingService {
-  CardListingService({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+  CardListingService({
+    http.Client? client,
+    FirebaseAuth? auth,
+    PokoinApiClient? apiClient,
+  })  : _auth = auth,
+        _apiClient = apiClient ??
+            PokoinApiClient(
+              client: client ?? http.Client(),
+              auth: PokoinApiAuthService.instance(
+                auth: auth,
+              ),
+            );
 
-  final FirebaseFirestore _firestore;
+  final FirebaseAuth? _auth;
+  final PokoinApiClient _apiClient;
 
   Stream<List<CardListing>> activeListings({int limit = 500}) {
-    if (Firebase.apps.isEmpty) {
-      return Stream.value(const []);
-    }
-    return _firestore
-        .collection('card_listings')
-        .where('status', isEqualTo: 'active')
-        .limit(limit)
-        .snapshots()
-        .map((snapshot) {
-      final listings = snapshot.docs
-          .map(CardListing.fromDocument)
-          .where((listing) => listing.isActive)
-          .toList();
-      listings.sort((a, b) => a.pricePkn.compareTo(b.pricePkn));
-      return listings;
-    });
+    return Stream.fromFuture(_getListings(limit: limit));
   }
 
   Stream<List<CardListing>> activeListingsForCard(String cardId) {
-    if (Firebase.apps.isEmpty) {
-      return Stream.value(const []);
-    }
-    return _firestore
-        .collection('card_listings')
-        .where('cardId', isEqualTo: cardId)
-        .where('status', isEqualTo: 'active')
-        .snapshots()
-        .map((snapshot) {
-      final listings = snapshot.docs
-          .map(CardListing.fromDocument)
-          .where((listing) => listing.isActive)
-          .toList();
-      listings.sort((a, b) => a.pricePkn.compareTo(b.pricePkn));
-      return listings;
-    });
+    return Stream.fromFuture(_getListings(cardId: cardId));
   }
 
   Stream<List<CardListing>> listingsForSeller(String sellerUid) {
-    if (Firebase.apps.isEmpty || sellerUid.trim().isEmpty) {
+    if (sellerUid.trim().isEmpty) {
       return Stream.value(const []);
     }
-    return _firestore
-        .collection('card_listings')
-        .where('sellerUid', isEqualTo: sellerUid)
-        .snapshots()
-        .map((snapshot) {
-      final listings = snapshot.docs.map(CardListing.fromDocument).toList();
-      listings.sort((a, b) {
-        final aDate = a.updatedAt ?? a.createdAt ?? DateTime(1970);
-        final bDate = b.updatedAt ?? b.createdAt ?? DateTime(1970);
-        return bDate.compareTo(aDate);
-      });
-      return listings;
-    });
+    return Stream.fromFuture(_getListings(sellerUid: sellerUid));
   }
 
-  Future<String> createListing(CardListing listing) async {
-    final doc = await _firestore.collection('card_listings').add({
-      ...listing.toFirestore(),
-      'createdAt': FieldValue.serverTimestamp(),
+  Stream<List<CardListing>> activeListingsForSellerUsername(String username) {
+    if (username.trim().isEmpty) {
+      return Stream.value(const []);
+    }
+    return Stream.fromFuture(_getListings(sellerUsername: username));
+  }
+
+  Future<CardListing> createListing(CardListing listing) async {
+    final data = await _request('POST', body: {
+      ...listing.toSnapshotJson(),
     });
-    return doc.id;
+    final created = CardListing.fromJson(
+      '${data['id'] ?? ''}',
+      Map<String, dynamic>.from(data),
+    );
+    return created;
+  }
+
+  Future<List<CardListing>> listingsByIds(Iterable<String> listingIds) async {
+    final ids = listingIds
+        .map((id) => id.trim())
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+    if (ids.isEmpty) {
+      return const [];
+    }
+    final listings = await Future.wait(
+      ids.map((id) async {
+        final rows = await _getListings(listingId: id, limit: 1);
+        return rows.isEmpty ? null : rows.first;
+      }),
+    );
+    return listings.whereType<CardListing>().toList(growable: false);
   }
 
   Future<void> updateListingStatus({
@@ -79,16 +82,10 @@ class CardListingService {
     required String sellerUid,
     required String status,
   }) async {
-    final ref = _firestore.collection('card_listings').doc(listingId);
-    final snapshot = await ref.get();
-    final listing = CardListing.fromDocument(snapshot);
-    if (!snapshot.exists || listing.sellerUid != sellerUid) {
-      throw StateError('Listing not found for this seller.');
-    }
-    await ref.set({
+    await _request('PATCH', listingId: listingId, body: {
+      'sellerUid': sellerUid,
       'status': status,
-      'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    });
   }
 
   Future<void> updateListingQuantity({
@@ -99,17 +96,35 @@ class CardListingService {
     if (quantityAvailable < 0) {
       throw ArgumentError('Quantity cannot be negative.');
     }
-    final ref = _firestore.collection('card_listings').doc(listingId);
-    final snapshot = await ref.get();
-    final listing = CardListing.fromDocument(snapshot);
-    if (!snapshot.exists || listing.sellerUid != sellerUid) {
-      throw StateError('Listing not found for this seller.');
-    }
-    await ref.set({
+    await _request('PATCH', listingId: listingId, body: {
+      'sellerUid': sellerUid,
       'quantityAvailable': quantityAvailable,
-      'status': quantityAvailable == 0 ? 'paused' : listing.status,
-      'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    });
+  }
+
+  Future<CardListing> updateListing(CardListing listing) async {
+    if (listing.id.trim().isEmpty) {
+      throw ArgumentError('Listing id is required.');
+    }
+    final data = await _request('PATCH', listingId: listing.id, body: {
+      ...listing.toSnapshotJson(),
+      'sellerUid': listing.sellerUid,
+    });
+    return CardListing.fromJson(
+      '${data['id'] ?? listing.id}',
+      Map<String, dynamic>.from(data),
+    );
+  }
+
+  Future<void> removeListing({
+    required String listingId,
+    required String sellerUid,
+  }) async {
+    await updateListingStatus(
+      listingId: listingId,
+      sellerUid: sellerUid,
+      status: 'inactive',
+    );
   }
 
   Future<void> decrementListingQuantity({
@@ -119,19 +134,76 @@ class CardListingService {
     if (listingId.isEmpty || quantity <= 0) {
       return;
     }
-    final ref = _firestore.collection('card_listings').doc(listingId);
-    await _firestore.runTransaction((transaction) async {
-      final snapshot = await transaction.get(ref);
-      if (!snapshot.exists) {
-        return;
-      }
-      final listing = CardListing.fromDocument(snapshot);
-      final nextQuantity = (listing.quantityAvailable - quantity).clamp(0, 999999);
-      transaction.set(ref, {
-        'quantityAvailable': nextQuantity,
-        'status': nextQuantity == 0 ? 'sold_out' : listing.status,
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+    await _request('POST', listingId: listingId, action: 'decrement', body: {
+      'quantity': quantity,
     });
   }
+
+  Future<List<CardListing>> _getListings({
+    int limit = 500,
+    String? listingId,
+    String? cardId,
+    String? sellerUid,
+    String? sellerUsername,
+  }) async {
+    final query = {
+      'limit': '$limit',
+      if (listingId != null && listingId.trim().isNotEmpty)
+        'id': listingId.trim(),
+      if (cardId != null && cardId.trim().isNotEmpty) 'cardId': cardId.trim(),
+      if (sellerUid != null && sellerUid.trim().isNotEmpty)
+        'sellerUid': sellerUid.trim(),
+      if (sellerUsername != null && sellerUsername.trim().isNotEmpty)
+        'sellerUsername': sellerUsername.trim().toLowerCase(),
+    };
+    final uri = Uri.base.resolve('/api/marketplace-listings').replace(
+          queryParameters: query,
+        );
+    final response = await _apiClient.get(
+      uri,
+      requireAuth: sellerUid != null,
+    );
+    final data = _decode(response);
+    final rows = (data['listings'] as List<dynamic>? ?? const []);
+    return rows
+        .whereType<Map>()
+        .map((row) => CardListing.fromJson(
+              '${row['id'] ?? ''}',
+              Map<String, dynamic>.from(row),
+            ))
+        .toList();
+  }
+
+  Future<Map<String, dynamic>> _request(
+    String method, {
+    String? listingId,
+    String? action,
+    Map<String, dynamic>? body,
+  }) async {
+    final auth =
+        _auth ?? (Firebase.apps.isEmpty ? null : FirebaseAuth.instance);
+    if (auth?.currentUser == null) {
+      throw StateError('Sign in before updating marketplace listings.');
+    }
+    final uri = Uri.base.resolve('/api/marketplace-listings').replace(
+      queryParameters: {
+        if (listingId != null && listingId.isNotEmpty) 'id': listingId,
+        if (action != null && action.isNotEmpty) 'action': action,
+      },
+    );
+    final response = await _apiClient.sendJson(method, uri, body: body);
+    return _decode(response);
+  }
+}
+
+Map<String, dynamic> _decode(http.Response response) {
+  final decoded = response.body.isEmpty
+      ? <String, dynamic>{}
+      : jsonDecode(response.body) as Map<String, dynamic>;
+  if (response.statusCode >= 400) {
+    throw StateError(
+      decoded['error'] as String? ?? 'Marketplace listing request failed.',
+    );
+  }
+  return decoded;
 }
