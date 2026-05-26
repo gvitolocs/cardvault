@@ -14,6 +14,7 @@ COPY requirements.txt .
 RUN pip install -r requirements.txt
 
 COPY app.py .
+COPY data ./data
 
 EXPOSE 7860
 CMD ["python", "app.py"]

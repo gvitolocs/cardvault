@@ -641,6 +641,8 @@ as $$
   parts as (
     select
       case
+        when text ~ '(numel|camerupt)' then '🐫'
+        when text ~ '(carvanha|sharpedo)' then '🦈'
         when text ~ '(zubat|golbat|crobat|noibat|noivern|woobat|swoobat)' then '🦇'
         when text ~ '(caterpie|metapod|butterfree|weedle|kakuna|beedrill|pinsir|scyther|scizor|heracross|yanma|yanmega|wurmple|silcoon|cascoon|beautifly|dustox|kricketot|kricketune|burmy|wormadam|mothim|combee|vespiquen|sewaddle|swadloon|leavanny|venipede|whirlipede|scolipede|dwebble|crustle|joltik|galvantula|larvesta|volcarona|grubbin|charjabug|vikavolt|cutiefly|ribombee|sizzlipede|centiskorch|tarountula|spidops|nymble|lokix|rellor|rabsca)' then '🐛'
         when text ~ '(ekans|arbok|seviper|snivy|servine|serperior|silicobra|sandaconda)' then '🐍'
@@ -670,6 +672,8 @@ as $$
         else ''
       end as pokemon_emoji_a,
       case
+        when text ~ '(numel|camerupt)' then '🌋'
+        when text ~ '(carvanha|sharpedo)' then '🌊'
         when text ~ '(zubat|golbat|crobat|noibat|noivern|woobat|swoobat)' then '🌙'
         when text ~ '(caterpie|metapod|butterfree|weedle|kakuna|beedrill|pinsir|scyther|scizor|heracross|yanma|yanmega|wurmple|silcoon|cascoon|beautifly|dustox|kricketot|kricketune|burmy|wormadam|mothim|combee|vespiquen|sewaddle|swadloon|leavanny|venipede|whirlipede|scolipede|dwebble|crustle|joltik|galvantula|larvesta|volcarona|grubbin|charjabug|vikavolt|cutiefly|ribombee|sizzlipede|centiskorch|tarountula|spidops|nymble|lokix|rellor|rabsca)' then '🪽'
         when text ~ '(ekans|arbok|seviper|snivy|servine|serperior|silicobra|sandaconda)' then '🌿'

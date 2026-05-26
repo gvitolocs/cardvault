@@ -603,34 +603,30 @@ class _CardDetailScreenState extends ConsumerState<CardDetailScreen> {
     ));
   }
 
-  Future<void> _returnToMarketplaceFromArtwork(PokemonCard card) async {
+  void _returnToMarketplaceFromArtwork(PokemonCard card) {
     if (_isReturningToMarketplaceFromArtwork) {
       return;
     }
     final recentlySeenTag = _recentlySeenHeroTag(card, 0);
+    final cardNotifier = ref.read(cardProvider.notifier);
+    cardNotifier.beginNavigationTransition();
     setState(() {
       _isReturningToMarketplaceFromArtwork = true;
       _activeHeroTag = recentlySeenTag;
     });
     _seedRecentlySeenDestination(card);
-    await WidgetsBinding.instance.endOfFrame;
-    if (!mounted || card.id != _currentCardId) {
-      return;
-    }
-    if (_activeHeroTag != recentlySeenTag) {
-      setState(() => _activeHeroTag = recentlySeenTag);
-      await WidgetsBinding.instance.endOfFrame;
-      if (!mounted || card.id != _currentCardId) {
-        return;
-      }
-    }
     CardDetailRouteGuard.instance.markExplicitNavigation(
       '/marketplace',
     );
-    context.go(
-      '/marketplace',
-      extra: const MarketplaceHomeRouteIntent.returnToRecentTop(),
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || card.id != _currentCardId) {
+        return;
+      }
+      context.go(
+        '/marketplace',
+        extra: const MarketplaceHomeRouteIntent.returnToRecentTop(),
+      );
+    });
   }
 
   Future<void> _showAdjacentCardOrLoad(
@@ -6082,6 +6078,23 @@ String _listingDisplaySellerComment(String comment) {
       .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
       .replaceAll(RegExp(r'\s+'), ' ')
       .trim();
+  const hiddenPromoTerms = <String>[
+    'store',
+    'arcana',
+    'huge selection',
+    'strict grading',
+    'we buy cards',
+    'selection',
+    'grading',
+    'buy cards',
+  ];
+  if (hiddenPromoTerms.any(
+    (term) => RegExp(
+      r'(^| )' + RegExp.escape(term) + r'( |$)',
+    ).hasMatch(normalized),
+  )) {
+    return '';
+  }
   const hiddenExactLabels = <String>{
     'cardtrader zero',
     'ct zero',

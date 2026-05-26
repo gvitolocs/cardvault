@@ -1,0 +1,234 @@
+{
+  "generatedAt": "2026-05-25T20:06:25.264Z",
+  "mode": "artist-fallback-avatar-dry-run",
+  "options": {
+    "limit": 100,
+    "concurrency": 2,
+    "artist": "Aky CG Works, AKIRA EGAWA, Masa",
+    "auditReport": "workflows/reports/artist-profile-grey-placeholder-audit-20260525.json",
+    "avatarSize": 512,
+    "cropYRatio": 0.18,
+    "includeMissing": true,
+    "includePlaceholders": true,
+    "regenerateGeneratedFallbacks": true,
+    "sampleDir": "workflows/reports/artist-fallback-avatar-samples-20260525-v2",
+    "sampleLimit": 3
+  },
+  "counts": {
+    "scanned": 3,
+    "placeholderProfileImage": 2,
+    "missingProfileImage": 1,
+    "candidatesWithCard": 3,
+    "generated": 0,
+    "uploaded": 0,
+    "upserted": 0,
+    "skipped": 0,
+    "skippedRealProfileImages": 0,
+    "failed": 0,
+    "reasons": {
+      "illustration": 3
+    }
+  },
+  "samples": [
+    {
+      "artist": "Aky CG Works",
+      "normalizedArtist": "aky cg works",
+      "status": "sampled_dry_run",
+      "generationReason": "placeholder_profile_image",
+      "artCategory": "illustration",
+      "sourceCardName": "Zamazenta",
+      "sourceCardId": "150415",
+      "sourceBlueprintId": "150415",
+      "sourceRarity": "Illustration Rare",
+      "sourceImageUrl": "https://cdn.pokoin.com/150415_zamazenta-102-185-vivid-voltage.jpg",
+      "sourceImageFetchUrl": "https://pokoin.com/card-images/150415_zamazenta-102-185-vivid-voltage.jpg",
+      "sourceImageObjectKey": "150415_zamazenta-102-185-vivid-voltage.jpg",
+      "sourceCardUrl": "https://pokoin.com/marketplace/en/cards/300830/card-zamazenta-102-185-vivid-voltage",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/generated/aky-cg-works.png",
+      "profileImageObjectKey": "artist-profiles/generated/aky-cg-works.png",
+      "samplePath": "workflows/reports/artist-fallback-avatar-samples-20260525-v2/aky-cg-works-150415.png",
+      "cropStrategy": {
+        "name": "upper_artwork_square_v2",
+        "yRatio": 0.18,
+        "outputSize": 512,
+        "sourceWidth": 323,
+        "sourceHeight": 450,
+        "sourceFormat": "jpeg",
+        "artCategory": "illustration",
+        "crop": {
+          "left": 99,
+          "top": 81,
+          "width": 126,
+          "height": 126
+        }
+      }
+    },
+    {
+      "artist": "Masa",
+      "normalizedArtist": "masa",
+      "status": "sampled_dry_run",
+      "generationReason": "placeholder_profile_image",
+      "artCategory": "illustration",
+      "sourceCardName": "Meltan",
+      "sourceCardId": "281180",
+      "sourceBlueprintId": "281180",
+      "sourceRarity": "Illustration Rare",
+      "sourceImageUrl": "https://cdn.pokoin.com/281180_meltan-illustration-rare-179-162-temporal-forces.jpg",
+      "sourceImageFetchUrl": "https://pokoin.com/card-images/281180_meltan-illustration-rare-179-162-temporal-forces.jpg",
+      "sourceImageObjectKey": "281180_meltan-illustration-rare-179-162-temporal-forces.jpg",
+      "sourceCardUrl": "https://pokoin.com/marketplace/en/cards/562360/card-meltan-179-162-temporal-forces",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/generated/masa.png",
+      "profileImageObjectKey": "artist-profiles/generated/masa.png",
+      "samplePath": "workflows/reports/artist-fallback-avatar-samples-20260525-v2/masa-281180.png",
+      "cropStrategy": {
+        "name": "upper_artwork_square_v2",
+        "yRatio": 0.18,
+        "outputSize": 512,
+        "sourceWidth": 500,
+        "sourceHeight": 696,
+        "sourceFormat": "jpeg",
+        "artCategory": "illustration",
+        "crop": {
+          "left": 153,
+          "top": 125,
+          "width": 195,
+          "height": 195
+        }
+      }
+    },
+    {
+      "artist": "AKIRA EGAWA",
+      "normalizedArtist": "akira egawa",
+      "status": "sampled_dry_run",
+      "generationReason": "missing_profile_image",
+      "artCategory": "illustration",
+      "sourceCardName": "Mew VMAX",
+      "sourceCardId": "200763",
+      "sourceBlueprintId": "200763",
+      "sourceRarity": "Special Illustration Rare",
+      "sourceImageUrl": "https://cdn.pokoin.com/200763_mew-vmax-269-264-fusion-strike.png",
+      "sourceImageFetchUrl": "https://pokoin.com/card-images/200763_mew-vmax-269-264-fusion-strike.png",
+      "sourceImageObjectKey": "200763_mew-vmax-269-264-fusion-strike.png",
+      "sourceCardUrl": "https://pokoin.com/marketplace/en/cards/401526/card-mew-vmax-269-264-fusion-strike",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/generated/akira-egawa.png",
+      "profileImageObjectKey": "artist-profiles/generated/akira-egawa.png",
+      "samplePath": "workflows/reports/artist-fallback-avatar-samples-20260525-v2/akira-egawa-200763.png",
+      "cropStrategy": {
+        "name": "upper_artwork_square_v2",
+        "yRatio": 0.18,
+        "outputSize": 512,
+        "sourceWidth": 500,
+        "sourceHeight": 696,
+        "sourceFormat": "png",
+        "artCategory": "illustration",
+        "crop": {
+          "left": 153,
+          "top": 125,
+          "width": 195,
+          "height": 195
+        }
+      }
+    }
+  ],
+  "report": [
+    {
+      "artist": "Aky CG Works",
+      "normalizedArtist": "aky cg works",
+      "status": "sampled_dry_run",
+      "generationReason": "placeholder_profile_image",
+      "artCategory": "illustration",
+      "sourceCardName": "Zamazenta",
+      "sourceCardId": "150415",
+      "sourceBlueprintId": "150415",
+      "sourceRarity": "Illustration Rare",
+      "sourceImageUrl": "https://cdn.pokoin.com/150415_zamazenta-102-185-vivid-voltage.jpg",
+      "sourceImageFetchUrl": "https://pokoin.com/card-images/150415_zamazenta-102-185-vivid-voltage.jpg",
+      "sourceImageObjectKey": "150415_zamazenta-102-185-vivid-voltage.jpg",
+      "sourceCardUrl": "https://pokoin.com/marketplace/en/cards/300830/card-zamazenta-102-185-vivid-voltage",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/generated/aky-cg-works.png",
+      "profileImageObjectKey": "artist-profiles/generated/aky-cg-works.png",
+      "samplePath": "workflows/reports/artist-fallback-avatar-samples-20260525-v2/aky-cg-works-150415.png",
+      "cropStrategy": {
+        "name": "upper_artwork_square_v2",
+        "yRatio": 0.18,
+        "outputSize": 512,
+        "sourceWidth": 323,
+        "sourceHeight": 450,
+        "sourceFormat": "jpeg",
+        "artCategory": "illustration",
+        "crop": {
+          "left": 99,
+          "top": 81,
+          "width": 126,
+          "height": 126
+        }
+      }
+    },
+    {
+      "artist": "Masa",
+      "normalizedArtist": "masa",
+      "status": "sampled_dry_run",
+      "generationReason": "placeholder_profile_image",
+      "artCategory": "illustration",
+      "sourceCardName": "Meltan",
+      "sourceCardId": "281180",
+      "sourceBlueprintId": "281180",
+      "sourceRarity": "Illustration Rare",
+      "sourceImageUrl": "https://cdn.pokoin.com/281180_meltan-illustration-rare-179-162-temporal-forces.jpg",
+      "sourceImageFetchUrl": "https://pokoin.com/card-images/281180_meltan-illustration-rare-179-162-temporal-forces.jpg",
+      "sourceImageObjectKey": "281180_meltan-illustration-rare-179-162-temporal-forces.jpg",
+      "sourceCardUrl": "https://pokoin.com/marketplace/en/cards/562360/card-meltan-179-162-temporal-forces",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/generated/masa.png",
+      "profileImageObjectKey": "artist-profiles/generated/masa.png",
+      "samplePath": "workflows/reports/artist-fallback-avatar-samples-20260525-v2/masa-281180.png",
+      "cropStrategy": {
+        "name": "upper_artwork_square_v2",
+        "yRatio": 0.18,
+        "outputSize": 512,
+        "sourceWidth": 500,
+        "sourceHeight": 696,
+        "sourceFormat": "jpeg",
+        "artCategory": "illustration",
+        "crop": {
+          "left": 153,
+          "top": 125,
+          "width": 195,
+          "height": 195
+        }
+      }
+    },
+    {
+      "artist": "AKIRA EGAWA",
+      "normalizedArtist": "akira egawa",
+      "status": "sampled_dry_run",
+      "generationReason": "missing_profile_image",
+      "artCategory": "illustration",
+      "sourceCardName": "Mew VMAX",
+      "sourceCardId": "200763",
+      "sourceBlueprintId": "200763",
+      "sourceRarity": "Special Illustration Rare",
+      "sourceImageUrl": "https://cdn.pokoin.com/200763_mew-vmax-269-264-fusion-strike.png",
+      "sourceImageFetchUrl": "https://pokoin.com/card-images/200763_mew-vmax-269-264-fusion-strike.png",
+      "sourceImageObjectKey": "200763_mew-vmax-269-264-fusion-strike.png",
+      "sourceCardUrl": "https://pokoin.com/marketplace/en/cards/401526/card-mew-vmax-269-264-fusion-strike",
+      "profileImageCdnUrl": "https://pokoin.com/card-images/artist-profiles/generated/akira-egawa.png",
+      "profileImageObjectKey": "artist-profiles/generated/akira-egawa.png",
+      "samplePath": "workflows/reports/artist-fallback-avatar-samples-20260525-v2/akira-egawa-200763.png",
+      "cropStrategy": {
+        "name": "upper_artwork_square_v2",
+        "yRatio": 0.18,
+        "outputSize": 512,
+        "sourceWidth": 500,
+        "sourceHeight": 696,
+        "sourceFormat": "png",
+        "artCategory": "illustration",
+        "crop": {
+          "left": 153,
+          "top": 125,
+          "width": 195,
+          "height": 195
+        }
+      }
+    }
+  ]
+}

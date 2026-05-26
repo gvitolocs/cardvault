@@ -119,6 +119,7 @@ for endpoint in \
   cardtrader-redirect \
   cardtrader-status \
   create-pkn-checkout-session \
+  deck-card-version-lookup \
   crypto-pkn-purchase \
   crypto-pkn-sale \
   extension-card-search \
@@ -128,13 +129,14 @@ for endpoint in \
   forum-create-topic \
   forum-upload-media \
   marketplace-artist-cards \
+  limitless-expansion-blueprints \
   marketplace-blueprint-price \
   marketplace-card-cheapest-price \
+  marketplace-card-versions \
   marketplace-card-seo \
   marketplace-card-sales \
   marketplace-card-shortlink \
   marketplace-card-url \
-  marketplace-card-versions \
   marketplace-cards \
   marketplace-cardmarket-guess-review \
   marketplace-debug-cardtrader-blueprints \
@@ -177,7 +179,7 @@ for endpoint in \
   wpkn-exchange; do
   cp "$ROOT_DIR/api/${endpoint}.js" "$ROOT_DIR/build/web/api/${endpoint}.js"
 done
-for marketplace_endpoint in cardmarket-redirect cardmarket-scrape-observation cardtrader-blueprint-listings cardtrader-clean-listings cardtrader-connect cardtrader-daily-listings-refresh cardtrader-disconnect cardtrader-import-dry-run cardtrader-live-listings cardtrader-status extension-card-search flutter-debug-logs marketplace-artist-cards marketplace-autocomplete marketplace-blueprint-price marketplace-card-cheapest-price marketplace-card-sales marketplace-card-seo marketplace-card-shortlink marketplace-card-url marketplace-card-versions marketplace-cards marketplace-cardmarket-guess-review marketplace-debug-cardtrader-blueprints marketplace-debug-artists marketplace-debug-events marketplace-debug-refinement marketplace-event marketplace-listings marketplace-orders marketplace-expansion-symbols marketplace-expansions marketplace-hot-blueprints marketplace-home marketplace-search-candidates searchbar-cards searchbar-token-predict user-current-page; do
+for marketplace_endpoint in cardmarket-redirect cardmarket-scrape-observation cardtrader-blueprint-listings cardtrader-clean-listings cardtrader-connect cardtrader-daily-listings-refresh cardtrader-disconnect cardtrader-import-dry-run cardtrader-live-listings cardtrader-status deck-card-version-lookup extension-card-search flutter-debug-logs limitless-expansion-blueprints marketplace-artist-cards marketplace-autocomplete marketplace-blueprint-price marketplace-card-cheapest-price marketplace-card-sales marketplace-card-seo marketplace-card-shortlink marketplace-card-url marketplace-card-versions marketplace-cards marketplace-cardmarket-guess-review marketplace-debug-cardtrader-blueprints marketplace-debug-artists marketplace-debug-events marketplace-debug-refinement marketplace-event marketplace-listings marketplace-orders marketplace-expansion-symbols marketplace-expansions marketplace-hot-blueprints marketplace-home marketplace-search-candidates searchbar-cards searchbar-token-predict user-current-page; do
   sed -i.bak "s|require('./_marketplace_db')|require('../server/_marketplace_db')|" \
     "$ROOT_DIR/build/web/api/${marketplace_endpoint}.js"
   sed -i.bak 's|require("./_marketplace_db")|require("../server/_marketplace_db")|' \
@@ -367,7 +369,7 @@ if [[ ! -f "$ROOT_DIR/build/web/server/_pkn_checkout_pricing.js" ]]; then
   echo "ERROR: PKN checkout pricing helper missing from Vercel build output." >&2
   exit 1
 fi
-if [[ ! -f "$ROOT_DIR/build/web/api/marketplace-card-seo.js" || ! -f "$ROOT_DIR/build/web/api/marketplace-card-sales.js" || ! -f "$ROOT_DIR/build/web/api/marketplace-card-versions.js" || ! -f "$ROOT_DIR/build/web/api/marketplace-orders.js" || ! -f "$ROOT_DIR/build/web/api/flutter-debug-logs.js" || ! -f "$ROOT_DIR/build/web/server/_marketplace_sale_notifications.js" ]]; then
+if [[ ! -f "$ROOT_DIR/build/web/api/marketplace-card-seo.js" || ! -f "$ROOT_DIR/build/web/api/marketplace-card-sales.js" || ! -f "$ROOT_DIR/build/web/api/marketplace-card-versions.js" || ! -f "$ROOT_DIR/build/web/api/deck-card-version-lookup.js" || ! -f "$ROOT_DIR/build/web/api/limitless-expansion-blueprints.js" || ! -f "$ROOT_DIR/build/web/api/marketplace-orders.js" || ! -f "$ROOT_DIR/build/web/api/flutter-debug-logs.js" || ! -f "$ROOT_DIR/build/web/server/_marketplace_sale_notifications.js" ]]; then
   echo "ERROR: marketplace SEO/orders API files missing from Vercel build output." >&2
   exit 1
 fi

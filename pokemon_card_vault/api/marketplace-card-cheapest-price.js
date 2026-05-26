@@ -104,14 +104,18 @@ function nullableNumber(value) {
 function cheapestPriceRow(row = {}) {
   const cardTraderPrice = finitePositiveNumber(row.cardtrader_lowest_price_pkn);
   const nativePrice = finitePositiveNumber(row.native_lowest_ask_pkn);
-  const usesCardTrader = cardTraderPrice != null;
-  const pricePkn = usesCardTrader ? cardTraderPrice : nativePrice;
-  const listingCount = usesCardTrader
+  const cacheProvider = cleanText(row.homepage_cache_provider || row.cardtrader_provider, 80);
+  const cacheSource = cacheProvider === 'pokoin_native'
+    ? 'pokoin_native_homepage_cache'
+    : 'cheapest_homepage_cache_blueprint';
+  const usesHomepageCache = cardTraderPrice != null;
+  const pricePkn = usesHomepageCache ? cardTraderPrice : null;
+  const listingCount = usesHomepageCache
     ? Number(row.cardtrader_eligible_listing_count || 0)
-    : Number(row.native_active_listing_count || 0);
-  const listedQuantity = usesCardTrader
+    : 0;
+  const listedQuantity = usesHomepageCache
     ? Number(row.cardtrader_listed_quantity || 0)
-    : Number(row.native_listed_quantity || 0);
+    : 0;
   const pknReferencePrice = finitePositiveNumber(process.env.PKN_CHECKOUT_USDT_PRICE) ||
     PKN_USD_REFERENCE_PRICE;
   const priceUsdt = pricePkn == null ? null : pricePkn * pknReferencePrice;
@@ -132,17 +136,16 @@ function cheapestPriceRow(row = {}) {
     pknReferencePriceUsdt: pknReferencePrice,
     source: pricePkn == null
       ? null
-      : usesCardTrader
-        ? 'cardtrader_homepage_cache'
-        : 'marketplace_blueprint_price_summary',
-    listingId: usesCardTrader ? row.cardtrader_sample_listing_id || '' : '',
+      : cacheSource,
+    provider: pricePkn == null ? null : (cacheProvider || 'cardtrader'),
+    listingId: usesHomepageCache ? row.cardtrader_sample_listing_id || '' : '',
     listingCount,
     listedQuantity,
     available: pricePkn != null && listingCount > 0,
     inStock: pricePkn != null && listedQuantity > 0,
-    updatedAt: usesCardTrader
+    updatedAt: usesHomepageCache
       ? row.cardtrader_updated_at || row.cardtrader_source_snapshot_at || null
-      : row.native_refreshed_at || null,
+      : null,
     nativeListing: {
       source: 'marketplace_blueprint_price_summary',
       pricePkn: nativePrice,
@@ -151,7 +154,8 @@ function cheapestPriceRow(row = {}) {
       updatedAt: row.native_refreshed_at || null,
     },
     cardtrader: {
-      source: 'cheapest_homepage_cache_blueprint',
+      source: cacheSource,
+      provider: cacheProvider || (cardTraderPrice == null ? '' : 'cardtrader'),
       available: cardTraderPrice != null && Number(row.cardtrader_eligible_listing_count || 0) > 0,
       pricePkn: cardTraderPrice,
       priceEur: nullableNumber(row.cardtrader_lowest_price_eur),
@@ -265,6 +269,8 @@ async function readCheapestPrices(input = {}, query = marketplaceQuery) {
         coalesce(price_summary.active_listing_count, 0) as native_active_listing_count,
         coalesce(price_summary.listed_quantity, 0) as native_listed_quantity,
         price_summary.refreshed_at as native_refreshed_at,
+        native_listing.id::text as native_sample_listing_id,
+        cardtrader.provider as homepage_cache_provider,
         cardtrader.cheapest_price_pkn as cardtrader_lowest_price_pkn,
         cardtrader.cheapest_price_eur as cardtrader_lowest_price_eur,
         coalesce(cardtrader.eligible_listing_count, 0) as cardtrader_eligible_listing_count,
@@ -283,6 +289,27 @@ async function readCheapestPrices(input = {}, query = marketplaceQuery) {
         and urls.language = $5::text
       left join public.marketplace_blueprint_price_summary price_summary
         on price_summary.blueprint_id = candidate_ids.card_id
+      left join lateral (
+        select listing.id
+        from (
+          select
+            native_listing.*,
+            case when native_listing.card_id ~ '^[0-9]+$' then native_listing.card_id::bigint else null end as card_id_bigint
+          from public.marketplace_user_listings
+          native_listing
+        ) listing
+        where listing.card_id_bigint = candidate_ids.card_id
+          and listing.status = 'active'
+          and listing.quantity_available > 0
+          and listing.price_pkn > 0
+          and coalesce(listing.shipping_available, true) = true
+          and not (
+            listing.nft_available = true
+            and coalesce(listing.shipping_available, false) = false
+          )
+        order by listing.price_pkn asc, listing.updated_at desc, listing.id asc
+        limit 1
+      ) native_listing on true
       ${cardTraderAvailabilityJoin('candidate_ids', cheapestCacheRelation)}
       order by candidate_ids.ordinality asc, candidate_ids.card_id asc
     `,

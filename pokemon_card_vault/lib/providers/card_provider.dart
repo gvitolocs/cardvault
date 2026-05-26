@@ -249,6 +249,26 @@ class CardState {
   }
 }
 
+class _MergedMarketplaceFields {
+  const _MergedMarketplaceFields({
+    required this.price,
+    required this.stock,
+    required this.hasCardTraderListing,
+    required this.cardtraderEligibleListingCount,
+    required this.watchlistCount,
+    required this.cartHolderCount,
+    required this.rating,
+  });
+
+  final double price;
+  final int stock;
+  final bool hasCardTraderListing;
+  final int cardtraderEligibleListingCount;
+  final int watchlistCount;
+  final int cartHolderCount;
+  final double rating;
+}
+
 class CardNotifier extends StateNotifier<CardState> {
   CardNotifier({
     CardService? cardService,
@@ -272,9 +292,13 @@ class CardNotifier extends StateNotifier<CardState> {
   int _searchPreviewRequestId = 0;
   int _searchRequestId = 0;
   int _searchTokenPredictRequestId = 0;
+  int _navigationPriorityToken = 0;
   bool _marketplaceWarmStarted = false;
+  bool _navigationTransitionActive = false;
+  bool _refreshCardsAfterNavigation = false;
   Timer? _searchPreviewDebounce;
   Timer? _searchTokenPredictDebounce;
+  Timer? _navigationPriorityTimer;
   SearchAutocompleteContext? _searchAutocompleteContext;
   String? _searchSessionId;
   String _lastSearchSessionQuery = '';
@@ -292,9 +316,45 @@ class CardNotifier extends StateNotifier<CardState> {
   bool get _hasWarmMarketplaceData =>
       state.hasMarketplaceLoadCompleted || state.homeSections != null;
 
+  int get navigationPriorityToken => _navigationPriorityToken;
+  bool get isNavigationTransitionActive => _navigationTransitionActive;
+
   Future<void> ensureSearchLanguageLoaded() => _searchLanguageLoad;
 
   Future<void> searchLanguagePersistForTest() => _searchLanguagePersist;
+
+  int beginNavigationTransition({
+    Duration duration = const Duration(milliseconds: 850),
+  }) {
+    _navigationPriorityToken++;
+    _navigationTransitionActive = true;
+    _marketplaceWarmStarted = false;
+    _searchRequestId++;
+    _searchPreviewRequestId++;
+    _searchTokenPredictRequestId++;
+    _searchPreviewDebounce?.cancel();
+    _searchTokenPredictDebounce?.cancel();
+    _navigationPriorityTimer?.cancel();
+    _navigationPriorityTimer = Timer(duration, _finishNavigationTransition);
+    return _navigationPriorityToken;
+  }
+
+  bool shouldSkipNavigationDeferredResult(int token) {
+    return !mounted ||
+        token != _navigationPriorityToken ||
+        _navigationTransitionActive;
+  }
+
+  void _finishNavigationTransition() {
+    if (!mounted) {
+      return;
+    }
+    _navigationTransitionActive = false;
+    if (_refreshCardsAfterNavigation) {
+      _refreshCardsAfterNavigation = false;
+      unawaited(refreshCards());
+    }
+  }
 
   Future<void> _loadStoredSearchLanguage() async {
     try {
@@ -332,11 +392,15 @@ class CardNotifier extends StateNotifier<CardState> {
   }
 
   Future<void> _loadCachedCards() async {
+    final token = _navigationPriorityToken;
     try {
       final cachedCards = await _cardService.getCachedCards();
       final cachedSnapshot =
           await _cardService.getCachedMarketplaceHomeSnapshot();
       final cachedSpotlightCards = await _cardService.getCachedSpotlightCards();
+      if (!mounted || token != _navigationPriorityToken) {
+        return;
+      }
       if (cachedCards.isNotEmpty || cachedSnapshot != null) {
         final warmedCards = cachedSnapshot == null
             ? cachedCards
@@ -361,6 +425,9 @@ class CardNotifier extends StateNotifier<CardState> {
         state = state.copyWith(isLoading: true, error: null);
       }
     } catch (e) {
+      if (!mounted || token != _navigationPriorityToken) {
+        return;
+      }
       state = state.copyWith(
         isLoading: false,
         error: e.toString(),
@@ -368,7 +435,11 @@ class CardNotifier extends StateNotifier<CardState> {
     }
   }
 
-  Future<void> _loadCards({bool preserveCurrent = true}) async {
+  Future<void> _loadCards({
+    bool preserveCurrent = true,
+    int? navigationToken,
+  }) async {
+    final token = navigationToken ?? _navigationPriorityToken;
     FlutterDebugLog.instance.record(
       'provider.load_cards.start',
       category: 'provider',
@@ -379,27 +450,49 @@ class CardNotifier extends StateNotifier<CardState> {
     );
     try {
       await _initialCacheLoad;
+      if (!mounted || token != _navigationPriorityToken) {
+        _marketplaceWarmStarted = false;
+        return;
+      }
       if (state.cards.isEmpty && !state.isLoading) {
         state = state.copyWith(isLoading: true, error: null);
       }
 
       final snapshot = await _cardService.getMarketplaceHomeSnapshot();
+      if (!mounted || token != _navigationPriorityToken) {
+        _marketplaceWarmStarted = false;
+        return;
+      }
       final cards = snapshot == null
           ? await _cardService.getAllCards()
           : await _cardService.getCachedCards();
+      if (!mounted || token != _navigationPriorityToken) {
+        _marketplaceWarmStarted = false;
+        return;
+      }
       final loadedCards =
           snapshot == null ? cards : _mergeCards(cards, snapshot.cards);
-      final mergedCards =
-          preserveCurrent ? _mergeCards(loadedCards, state.cards) : loadedCards;
+      final mergedCards = preserveCurrent
+          ? _mergeCards(
+              loadedCards,
+              state.cards,
+              preserveExistingMarketplaceFields: true,
+            )
+          : loadedCards;
       _hotSearchPreviewCache =
           _hotCardsFromSnapshot(snapshot) ?? _hotCardsFromCards(mergedCards);
+      final cachedSpotlightCards = await _cardService.getCachedSpotlightCards();
+      if (!mounted || token != _navigationPriorityToken) {
+        _marketplaceWarmStarted = false;
+        return;
+      }
       state = state.copyWith(
         cards: mergedCards,
         filteredCards: mergedCards,
         spotlightCards: _spotlightCardsFromSources(
           snapshot,
           mergedCards,
-          await _cardService.getCachedSpotlightCards(),
+          cachedSpotlightCards,
         ),
         homeSections: snapshot?.sections,
         isLoading: false,
@@ -416,6 +509,10 @@ class CardNotifier extends StateNotifier<CardState> {
         },
       );
     } catch (e) {
+      if (!mounted || token != _navigationPriorityToken) {
+        _marketplaceWarmStarted = false;
+        return;
+      }
       state = state.copyWith(
         isLoading: false,
         error: e.toString(),
@@ -485,6 +582,8 @@ class CardNotifier extends StateNotifier<CardState> {
         state.searchPreviews.isNotEmpty &&
         !state.isSearchingPreviews;
     final normalizedQuery = query.trim();
+    final isQueryBranchChange = normalizedQuery.isNotEmpty &&
+        _isSearchSessionBranchChange(normalizedQuery);
     if (normalizedQuery.isNotEmpty) {
       _prepareSearchSessionForQuery(normalizedQuery);
     }
@@ -530,7 +629,14 @@ class CardNotifier extends StateNotifier<CardState> {
         'reason': 'typed_remote_authoritative',
       });
     }
-    final filteredPreviews = _fallbackPreviewsForQuery(normalizedQuery);
+    final emptyFocusPreviews = wasShowingEmptyFocusPreviews
+        ? state.searchPreviews
+        : const <PokemonCard>[];
+    final filteredPreviews = _pendingSearchPreviewFallbackForQuery(
+      normalizedQuery,
+      retainedPreviews: emptyFocusPreviews,
+      includeHotFallback: !isQueryBranchChange,
+    );
     if (_meaningfulSearchLength(normalizedQuery) < searchPreviewWarmupChars &&
         !_isStandaloneVariationQuery(normalizedQuery)) {
       SearchDebugTrace.instance.record('provider.preview.clear_short_query', {
@@ -807,10 +913,17 @@ class CardNotifier extends StateNotifier<CardState> {
     return card;
   }
 
-  Future<PokemonCard?> _refreshCardById(String id) async {
+  Future<PokemonCard?> _refreshCardById(
+    String id, {
+    int? navigationToken,
+  }) async {
     try {
       final card = await _cardService.getCardById(id);
-      if (card == null || !mounted) {
+      if (card == null ||
+          !mounted ||
+          (navigationToken != null &&
+              (navigationToken != _navigationPriorityToken ||
+                  _navigationTransitionActive))) {
         return null;
       }
       state = state.copyWith(cards: _mergeCards(state.cards, [card]));
@@ -874,7 +987,8 @@ class CardNotifier extends StateNotifier<CardState> {
       'reason': 'remote_authoritative',
       'localHotCount': 0,
     });
-    final filteredPreviews = _fallbackPreviewsForQuery(normalizedQuery);
+    final filteredPreviews =
+        _pendingSearchPreviewFallbackForQuery(normalizedQuery);
     state = state.copyWith(
       searchPreviews: canShowAutocomplete ? filteredPreviews : const [],
       isSearchingPreviews: canShowAutocomplete,
@@ -1106,14 +1220,15 @@ class CardNotifier extends StateNotifier<CardState> {
   }
 
   Future<void> _warmSearchPreviews() async {
+    final token = _navigationPriorityToken;
     await Future<void>.delayed(const Duration(milliseconds: 80));
-    if (!mounted) {
+    if (!mounted || token != _navigationPriorityToken) {
       return;
     }
     try {
       await _initialCacheLoad;
       final snapshot = await _cardService.getMarketplaceHomeSnapshot();
-      if (!mounted) {
+      if (!mounted || token != _navigationPriorityToken) {
         return;
       }
       if (snapshot != null) {
@@ -1375,11 +1490,15 @@ class CardNotifier extends StateNotifier<CardState> {
       _marketplaceWarmStarted = true;
       return;
     }
+    if (_navigationTransitionActive) {
+      _refreshCardsAfterNavigation = true;
+      return;
+    }
     if (_marketplaceWarmStarted) {
       return;
     }
     _marketplaceWarmStarted = true;
-    unawaited(_loadCards());
+    unawaited(_loadCards(navigationToken: _navigationPriorityToken));
   }
 
   Future<void> warmMarketplaceAfterDetail() async {
@@ -1396,7 +1515,21 @@ class CardNotifier extends StateNotifier<CardState> {
       );
       return;
     }
+    if (_navigationTransitionActive) {
+      _refreshCardsAfterNavigation = true;
+      FlutterDebugLog.instance.record(
+        'provider.warm_after_detail.skipped',
+        category: 'provider',
+        payload: {
+          'reason': 'navigation_active',
+          'hasMarketplaceLoadCompleted': state.hasMarketplaceLoadCompleted,
+          'hasHomeSections': state.homeSections != null,
+        },
+      );
+      return;
+    }
     _marketplaceWarmStarted = true;
+    final token = _navigationPriorityToken;
     FlutterDebugLog.instance.record(
       'provider.warm_after_detail.start',
       category: 'provider',
@@ -1406,12 +1539,27 @@ class CardNotifier extends StateNotifier<CardState> {
       },
     );
     await Future<void>.delayed(const Duration(milliseconds: 250));
-    if (!mounted || _hasWarmMarketplaceData) {
+    if (!mounted ||
+        token != _navigationPriorityToken ||
+        _navigationTransitionActive ||
+        _hasWarmMarketplaceData) {
+      if (mounted && !_hasWarmMarketplaceData) {
+        _marketplaceWarmStarted = false;
+        if (_navigationTransitionActive) {
+          _refreshCardsAfterNavigation = true;
+        }
+      }
       FlutterDebugLog.instance.record(
         'provider.warm_after_detail.skipped',
         category: 'provider',
         payload: {
-          'reason': mounted ? 'became_warm_during_delay' : 'disposed',
+          'reason': !mounted
+              ? 'disposed'
+              : token != _navigationPriorityToken
+                  ? 'navigation_started'
+                  : _navigationTransitionActive
+                      ? 'navigation_active'
+                      : 'became_warm_during_delay',
           'hasMarketplaceLoadCompleted': state.hasMarketplaceLoadCompleted,
           'hasHomeSections': state.homeSections != null,
         },
@@ -1419,7 +1567,7 @@ class CardNotifier extends StateNotifier<CardState> {
       return;
     }
     try {
-      await _loadCards();
+      await _loadCards(navigationToken: token);
       FlutterDebugLog.instance.record(
         'provider.warm_after_detail.end',
         category: 'provider',
@@ -1440,8 +1588,12 @@ class CardNotifier extends StateNotifier<CardState> {
     if (_marketplaceWarmStarted || _hasWarmMarketplaceData) {
       return;
     }
+    if (_navigationTransitionActive) {
+      _refreshCardsAfterNavigation = true;
+      return;
+    }
     _marketplaceWarmStarted = true;
-    await _loadCards();
+    await _loadCards(navigationToken: _navigationPriorityToken);
   }
 
   Future<void> addCard(PokemonCard card) async {
@@ -1462,6 +1614,10 @@ class CardNotifier extends StateNotifier<CardState> {
   }
 
   Future<void> warmDetailCards(Iterable<PokemonCard> cards) async {
+    if (_navigationTransitionActive) {
+      return;
+    }
+    final token = _navigationPriorityToken;
     final ids = <String>[];
     final seen = <String>{};
     for (final card in cards) {
@@ -1479,10 +1635,10 @@ class CardNotifier extends StateNotifier<CardState> {
       }
     }
     for (final id in ids) {
-      if (!mounted) {
+      if (!mounted || token != _navigationPriorityToken) {
         return;
       }
-      await _refreshCardById(id);
+      await _refreshCardById(id, navigationToken: token);
     }
   }
 
@@ -1945,20 +2101,27 @@ class CardNotifier extends StateNotifier<CardState> {
   }
 
   void _prepareSearchSessionForQuery(String query) {
+    if (!_isSearchSessionBranchChange(query)) {
+      return;
+    }
+    _cancelSearchSession(reason: 'query_branch');
+    _searchAutocompleteContext = null;
+    _clearSearchPrefixPoolHistory();
+  }
+
+  bool _isSearchSessionBranchChange(String query) {
     final currentSessionId = _searchSessionId;
     if (currentSessionId == null || currentSessionId.isEmpty) {
-      return;
+      return false;
     }
     final lastQuery = _normalizePrefixPoolQuery(_lastSearchSessionQuery);
     final nextQuery = _normalizePrefixPoolQuery(query);
     if (lastQuery.isEmpty ||
         nextQuery.isEmpty ||
         _prefixPoolQueryExtends(lastQuery, nextQuery)) {
-      return;
+      return false;
     }
-    _cancelSearchSession(reason: 'query_branch');
-    _searchAutocompleteContext = null;
-    _clearSearchPrefixPoolHistory();
+    return true;
   }
 
   String _previewRetentionKey(
@@ -2009,6 +2172,30 @@ class CardNotifier extends StateNotifier<CardState> {
       latestOrders: _searchCandidateLatestOrderById,
       limit: searchPreviewLimit,
     );
+  }
+
+  List<PokemonCard> _pendingSearchPreviewFallbackForQuery(
+    String query, {
+    List<PokemonCard> retainedPreviews = const [],
+    bool includeHotFallback = true,
+  }) {
+    final fallbackPreviews = _fallbackPreviewsForQuery(query);
+    if (fallbackPreviews.isNotEmpty) {
+      return fallbackPreviews;
+    }
+    if (_meaningfulSearchLength(query.trim()) < searchPreviewVisibleChars) {
+      return const [];
+    }
+    if (retainedPreviews.isNotEmpty) {
+      return _remoteSearchResults(retainedPreviews, limit: searchPreviewLimit);
+    }
+    if (!includeHotFallback) {
+      return const [];
+    }
+    final hotCards = _hotSearchPreviewCache.isNotEmpty
+        ? _hotSearchPreviewCache
+        : _hotCardsFromCards(state.cards);
+    return _emptyFocusPreviews(hotCards, const []);
   }
 
   Future<void> updateCard(PokemonCard card) async {
@@ -2064,6 +2251,7 @@ class CardNotifier extends StateNotifier<CardState> {
   void dispose() {
     _searchPreviewDebounce?.cancel();
     _searchTokenPredictDebounce?.cancel();
+    _navigationPriorityTimer?.cancel();
     _cancelSearchSession(reason: 'dispose');
     _clearSearchPrefixPoolHistory();
     super.dispose();
@@ -2161,19 +2349,36 @@ class CardNotifier extends StateNotifier<CardState> {
 
   List<PokemonCard> _mergeCards(
     List<PokemonCard> current,
-    List<PokemonCard> incoming,
-  ) {
+    List<PokemonCard> incoming, {
+    bool preserveExistingMarketplaceFields = false,
+  }) {
     final byId = <String, PokemonCard>{
       for (final card in current) card.id: card,
     };
     for (final card in incoming) {
       final existing = byId[card.id];
-      byId[card.id] = existing == null ? card : _mergeCard(existing, card);
+      byId[card.id] = existing == null
+          ? card
+          : _mergeCard(
+              existing,
+              card,
+              preserveExistingMarketplaceFields:
+                  preserveExistingMarketplaceFields,
+            );
     }
     return byId.values.toList();
   }
 
-  PokemonCard _mergeCard(PokemonCard existing, PokemonCard incoming) {
+  PokemonCard _mergeCard(
+    PokemonCard existing,
+    PokemonCard incoming, {
+    bool preserveExistingMarketplaceFields = false,
+  }) {
+    final marketplace = _mergedMarketplaceFields(
+      existing,
+      incoming,
+      preserveExistingMarketplaceFields: preserveExistingMarketplaceFields,
+    );
     return incoming.copyWith(
       imageUrl: _preferRicherText(incoming.imageUrl, existing.imageUrl),
       previewImageUrl:
@@ -2206,6 +2411,38 @@ class CardNotifier extends StateNotifier<CardState> {
           ? incoming.cardPalette
           : existing.cardPalette,
       emoji: _preferRicherText(incoming.emoji, existing.emoji),
+      price: marketplace.price,
+      stock: marketplace.stock,
+      canonicalPath:
+          _preferRicherText(incoming.canonicalPath, existing.canonicalPath),
+      hasCardTraderListing: marketplace.hasCardTraderListing,
+      cardtraderEligibleListingCount:
+          marketplace.cardtraderEligibleListingCount,
+      watchlistCount: marketplace.watchlistCount,
+      cartHolderCount: marketplace.cartHolderCount,
+      rating: marketplace.rating,
+    );
+  }
+
+  _MergedMarketplaceFields _mergedMarketplaceFields(
+    PokemonCard existing,
+    PokemonCard incoming, {
+    required bool preserveExistingMarketplaceFields,
+  }) {
+    final source = preserveExistingMarketplaceFields ? existing : incoming;
+    return _MergedMarketplaceFields(
+      price: source.price,
+      stock: source.stock,
+      hasCardTraderListing: source.hasCardTraderListing,
+      cardtraderEligibleListingCount: source.cardtraderEligibleListingCount,
+      watchlistCount: existing.watchlistCount > incoming.watchlistCount
+          ? existing.watchlistCount
+          : incoming.watchlistCount,
+      cartHolderCount: existing.cartHolderCount > incoming.cartHolderCount
+          ? existing.cartHolderCount
+          : incoming.cartHolderCount,
+      rating:
+          existing.rating > incoming.rating ? existing.rating : incoming.rating,
     );
   }
 
@@ -3096,8 +3333,8 @@ List<String> _previewVariationTargets(String term) {
 
 List<String> _typedPreviewTerms(String query) {
   return query
-      .replaceAll(RegExp(r'\bhearth\s+gold\b', caseSensitive: false),
-          'hearthgold')
+      .replaceAll(
+          RegExp(r'\bhearth\s+gold\b', caseSensitive: false), 'hearthgold')
       .replaceAll(
           RegExp(r'\bheart\s+gold\b', caseSensitive: false), 'heartgold')
       .replaceAll(

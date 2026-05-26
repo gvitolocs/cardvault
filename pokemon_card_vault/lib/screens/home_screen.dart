@@ -426,7 +426,7 @@ class _MarketplaceSearchScreenState
                     'click',
                     source: 'search_preview',
                   );
-              _goToCardDetail(context, card, heroTag: selection.heroTag);
+              _goToCardDetail(ref, context, card, heroTag: selection.heroTag);
             },
             searchQueryParameters: {
               if (productType?.isNotEmpty == true) 'productType': productType!,
@@ -632,10 +632,25 @@ List<PokemonCard> _mergeSearchResults(
   final byId = <String, PokemonCard>{};
   for (final card in [...primary, ...secondary]) {
     if (card.id.isNotEmpty) {
-      byId.putIfAbsent(card.id, () => card);
+      final existing = byId[card.id];
+      byId[card.id] =
+          existing == null ? card : _preferredSearchResultCard(existing, card);
     }
   }
   return byId.values.toList();
+}
+
+PokemonCard _preferredSearchResultCard(PokemonCard current, PokemonCard next) {
+  if (!current.isMarketAvailable && next.isMarketAvailable) {
+    return next;
+  }
+  if (current.isMarketAvailable &&
+      next.isMarketAvailable &&
+      next.price > 0 &&
+      (current.price <= 0 || next.price < current.price)) {
+    return next;
+  }
+  return current;
 }
 
 List<PokemonCard> _applyMarketplaceSearchFilters(
@@ -978,6 +993,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   void _scheduleRecentCheapestPriceHydration(List<RecentCardView> views) {
+    final navigationToken = _cardNotifier.navigationPriorityToken;
     final ids = <String>[];
     final seen = <String>{};
     for (final view in views.take(9)) {
@@ -1010,7 +1026,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       });
     }
     _cardService.getCheapestPricesForCardIds(ids).then((prices) {
-      if (!mounted || _recentCheapestPriceKey != key || prices.isEmpty) {
+      if (!mounted ||
+          _recentCheapestPriceKey != key ||
+          prices.isEmpty ||
+          _cardNotifier.shouldSkipNavigationDeferredResult(navigationToken)) {
         return;
       }
       final indexedPrices = _indexRecentCheapestPrices(prices);
@@ -1182,7 +1201,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     List<PokemonCard> cards, {
     required bool enabled,
   }) {
-    if (!mounted || !enabled || cards.isEmpty) {
+    if (!mounted ||
+        !enabled ||
+        cards.isEmpty ||
+        _cardNotifier.isNavigationTransitionActive) {
       return;
     }
     final urls = <String>[];
@@ -1199,7 +1221,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
+      if (!mounted || _cardNotifier.isNavigationTransitionActive) {
         return;
       }
       for (final url in urls) {
@@ -1215,7 +1237,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   void _scheduleRenderedDetailWarmup(Iterable<PokemonCard> cards) {
-    if (!mounted) {
+    if (!mounted || _cardNotifier.isNavigationTransitionActive) {
       return;
     }
     final ids = <String>[];
@@ -1239,7 +1261,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     _lastRenderedWarmupIds = List.unmodifiable(ids);
     _detailWarmupRequestedIds.addAll(ids);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
+      if (!mounted || _cardNotifier.isNavigationTransitionActive) {
         return;
       }
       unawaited(
@@ -1374,7 +1396,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         'click',
                         source: 'search_preview',
                       );
-                  _goToCardDetail(context, card, heroTag: selection.heroTag);
+                  _goToCardDetail(ref, context, card,
+                      heroTag: selection.heroTag);
                   Future<void>.delayed(_searchPreviewHeroHoldDuration, () {
                     if (mounted) {
                       _resetTransientSearch();
@@ -1421,6 +1444,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       _CardCarouselSection(
                         title: 'Recently seen',
                         cards: sections.recentlySeen,
+                        seeMoreQuery: '',
                         isLoading: recentViewsState.isLoading &&
                             sections.recentlySeen.isEmpty,
                       ),
@@ -1429,11 +1453,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     _CardCarouselSection(
                       title: 'Best sellers',
                       cards: sections.bestSellers,
+                      seeMoreQuery: '',
                     ),
                     const SizedBox(height: 24),
                     _CardCarouselSection(
                       title: 'Featured',
                       cards: sections.featured,
+                      seeMoreQuery: '',
                     ),
                     const SizedBox(height: 24),
                     Center(
@@ -4279,12 +4305,14 @@ class _CardCarouselSection extends StatefulWidget {
   const _CardCarouselSection({
     required this.title,
     required this.cards,
+    this.seeMoreQuery,
     this.isLoading = false,
     this.isSkeleton = false,
   });
 
   final String title;
   final List<PokemonCard> cards;
+  final String? seeMoreQuery;
   final bool isLoading;
   final bool isSkeleton;
 
@@ -4357,6 +4385,7 @@ class _CardCarouselSectionState extends State<_CardCarouselSection> {
     }
     final screenWidth = MediaQuery.sizeOf(context).width;
     final isDesktop = screenWidth >= 900;
+    final isMobile = screenWidth < 760;
     final useDesktopControls = isDesktop && hasDesktopPointer();
     final cardWidth =
         screenWidth < 560 ? math.min(screenWidth - 44, 316).toDouble() : 360.0;
@@ -4366,6 +4395,49 @@ class _CardCarouselSectionState extends State<_CardCarouselSection> {
         : widget.cards.length;
     WidgetsBinding.instance.addPostFrameCallback((_) => _syncArrowVisibility());
     final contentInset = screenWidth >= 1264 ? (screenWidth - 1220) / 2 : 22.0;
+    if (isMobile) {
+      final mobileCards = widget.cards.take(3).toList(growable: false);
+      final mobileItemCount = showSkeletonCards ? 3 : mobileCards.length;
+      final mobileList = Padding(
+        padding: EdgeInsets.symmetric(horizontal: contentInset),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _SectionHeading(title: widget.title),
+            const SizedBox(height: 14),
+            for (var index = 0; index < mobileItemCount; index++) ...[
+              SizedBox(
+                height: screenWidth < 560 ? 184 : 210,
+                child: showSkeletonCards
+                    ? const _MarketplaceSkeletonFeatureCard()
+                    : _FeaturedCard(
+                        card: mobileCards[index],
+                        heroTag: widget.title == 'Recently seen'
+                            ? _recentlySeenHeroTag(mobileCards[index], index)
+                            : _cardHeroTag(
+                                mobileCards[index],
+                                'carousel-${widget.title}-$index',
+                              ),
+                      ),
+              ),
+              if (index != mobileItemCount - 1) const SizedBox(height: 14),
+            ],
+            if (!showSkeletonCards && mobileCards.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              _SectionSeeMoreButton(
+                title: widget.title,
+                query: widget.seeMoreQuery,
+              ),
+            ],
+          ],
+        ),
+      );
+      final hasSkeletonPulse =
+          _MarketplaceSkeletonPulseScope.maybeOf(context) != null;
+      return showSkeletonCards && !hasSkeletonPulse
+          ? _MarketplaceSkeletonPulse(child: mobileList)
+          : mobileList;
+    }
     final carousel = SizedBox(
       width: double.infinity,
       child: Column(
@@ -4509,6 +4581,41 @@ class _CarouselArrowButton extends StatelessWidget {
               size: 28,
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionSeeMoreButton extends ConsumerWidget {
+  const _SectionSeeMoreButton({
+    required this.title,
+    required this.query,
+  });
+
+  final String title;
+  final String? query;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: OutlinedButton.icon(
+        onPressed: () {
+          goToMarketplaceSearch(context, ref, query ?? title);
+        },
+        icon: const Icon(Icons.arrow_forward),
+        label: Text('See more $title'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: const Color(0xFFFACC15),
+          side: BorderSide(
+            color: const Color(0xFFFACC15).withValues(alpha: 0.6),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(999),
+          ),
+          textStyle: const TextStyle(fontWeight: FontWeight.w800),
         ),
       ),
     );
@@ -5616,7 +5723,7 @@ class _SpotlightMarketCard extends ConsumerWidget {
                 source: 'market_grid',
               );
           ref.read(cardProvider.notifier).clearFilters();
-          _goToCardDetail(context, card, heroTag: heroTag);
+          _goToCardDetail(ref, context, card, heroTag: heroTag);
         },
         child: Stack(
           children: [
@@ -5833,7 +5940,7 @@ class _MarketCard extends ConsumerWidget {
                   source: 'market_grid',
                 );
             ref.read(cardProvider.notifier).clearFilters();
-            _goToCardDetail(context, card, heroTag: heroTag);
+            _goToCardDetail(ref, context, card, heroTag: heroTag);
           },
           borderRadius: BorderRadius.circular(24),
           child: Stack(
@@ -6017,7 +6124,7 @@ class _FeaturedCard extends ConsumerWidget {
                 source: 'market_carousel',
               );
           ref.read(cardProvider.notifier).clearFilters();
-          _goToCardDetail(context, card, heroTag: heroTag);
+          _goToCardDetail(ref, context, card, heroTag: heroTag);
         },
         borderRadius: BorderRadius.circular(18),
         child: Stack(
@@ -6329,17 +6436,19 @@ String _cardHeroTag(PokemonCard card, String scope) {
   return 'market-card-image-${card.id}-$scope';
 }
 
-Future<void> _goToCardDetail(
+void _goToCardDetail(
+  WidgetRef ref,
   BuildContext context,
   PokemonCard card, {
   String? heroTag,
-}) async {
-  await navigateToCanonicalCardDetail(
+}) {
+  ref.read(cardProvider.notifier).beginNavigationTransition();
+  unawaited(navigateToCanonicalCardDetail(
     context,
     card,
     extra: heroTag,
     source: 'marketplace_home',
-  );
+  ));
 }
 
 String _homepageCardImageUrl(PokemonCard card) {

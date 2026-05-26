@@ -214,6 +214,48 @@ TCGdex structured card metadata is currently stored as DB-only enrichment in
 
 Auth: none.
 
+## Deck Card Version Lookup
+
+Returns ranked marketplace card versions for structured decklist rows, using
+card name, set code, and collector number instead of broad free-text search.
+
+```text
+GET /api/deck-card-version-lookup?name=Dreepy&setCode=TWM&collectorNumber=128&limit=8
+POST /api/deck-card-version-lookup
+```
+
+The endpoint is for `/shard-review` deck imports and should rank exact
+name + set code + collector number matches first, then same-name versions from
+other expansions.
+
+Auth: none.
+
+## Limitless Expansion Blueprints
+
+Returns the Limitless expansion-to-Pokoin blueprint mapping table populated from
+approved/public Limitless card references where available.
+
+```text
+GET /api/limitless-expansion-blueprints?setCode=TWM&includeBlueprints=1
+```
+
+Rollout requires the additive schema:
+
+```text
+oracle-postgres/schema/016_limitless_expansion_blueprint_mapping.sql
+```
+
+Then populate from already-synced public Limitless decklist card rows:
+
+```bash
+node scripts/sync-limitless-expansion-blueprints.js --dry-run
+node scripts/sync-limitless-expansion-blueprints.js --apply
+```
+
+This does not assume a full public Limitless card database API. If Limitless
+approves or documents a card database endpoint later, the same tables/API can be
+filled from that source.
+
 ## Marketplace Card Versions
 
 Returns ordered version/navigation rows for card detail pages and full version

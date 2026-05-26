@@ -20,6 +20,65 @@ const HOT_REFRESH_INTERVAL = '2 minutes';
 let cachedSnapshot = null;
 let cachedSnapshotAt = 0;
 
+function fallbackSectionsForCards(cards) {
+  const ids = cards.map((card) => String(card.id || '')).filter(Boolean);
+  const featuredIds = ids.slice(0, 12);
+  const bestSellerIds = ids.slice(12, 24);
+  return {
+    recentlySeenIds: ids.slice(24, 36),
+    bestSellerIds: bestSellerIds.length > 0 ? bestSellerIds : featuredIds,
+    featuredIds: featuredIds.length > 0 ? featuredIds : ids.slice(0, 12),
+  };
+}
+
+async function fetchRowsForHomeFallback() {
+  const result = await marketplaceQuery(
+    `
+      select
+        card_id,
+        name,
+        image_url,
+        cdn_image_url,
+        preview_image_url,
+        homepage_image_url,
+        set_name,
+        rarity,
+        card_type,
+        card_number,
+        product_variant,
+        item_kind,
+        product_type,
+        trainer_name,
+        card_palette,
+        emoji,
+        imported_at,
+        0 as listed_quantity,
+        null::numeric as lowest_price_pkn,
+        false as has_cardtrader_listing,
+        0 as cardtrader_eligible_listing_count,
+        0 as cardtrader_listed_quantity,
+        null::numeric as cardtrader_lowest_price_pkn,
+        0 as watchlist_count,
+        0 as cart_holder_count
+      from public.marketplace_search_candidates
+      where item_kind = 'single'
+        and product_type = 'card'
+        and coalesce(homepage_image_url, preview_image_url, cdn_image_url, image_url) is not null
+      order by search_weight desc, imported_at desc nulls last, card_id desc
+      limit $1
+    `,
+    [120],
+  );
+  const cards = result.rows
+    .map((row) => toCardJson(row))
+    .map(normalizeHomeCard)
+    .filter(hasCdnBackedImages);
+  return {
+    cards,
+    sections: fallbackSectionsForCards(cards),
+  };
+}
+
 function collectorNumberFromImageUrl(value) {
   const text = String(value || '');
   const match = text.match(/([0-9]{1,4}[A-Za-z]?)[-/]([0-9]{1,4})(?![0-9])/);
@@ -137,14 +196,18 @@ function normalizeImageUrl(value) {
 
 function cardTilePrice(row) {
   const cardTraderPrice = Number(row.cardtrader_lowest_price_pkn ?? row.cardtraderLowestPricePkn);
-  if (Number.isFinite(cardTraderPrice) && cardTraderPrice > 0) {
+  const listedPrice = Number(row.price ?? row.lowest_price_pkn);
+  if (
+    Number.isFinite(cardTraderPrice) &&
+    cardTraderPrice > 0 &&
+    (!Number.isFinite(listedPrice) || listedPrice <= 0 || cardTraderPrice <= listedPrice)
+  ) {
     return cardTraderPrice;
   }
-  const listedPrice = Number(row.price ?? row.lowest_price_pkn);
   if (Number.isFinite(listedPrice) && listedPrice > 0) {
     return listedPrice;
   }
-  return Number(1000n + (BigInt(row.card_id || 0) % 120000n));
+  return null;
 }
 
 function hasCardTraderAvailability(row = {}) {
@@ -205,11 +268,17 @@ function normalizeHomeCard(card = {}) {
   const cardTraderStock = Number.isFinite(cardTraderQuantity) && cardTraderQuantity > 0
     ? Math.trunc(cardTraderQuantity)
     : 1;
-  const price = Number(
+  const cardTraderPrice = Number(
     normalized.cardtraderLowestPricePkn ??
       normalized.cardtrader_lowest_price_pkn ??
-      normalized.price,
+      0,
   );
+  const listedPrice = Number(normalized.price ?? normalized.lowest_price_pkn);
+  const price = Number.isFinite(cardTraderPrice) &&
+    cardTraderPrice > 0 &&
+    (!Number.isFinite(listedPrice) || listedPrice <= 0 || cardTraderPrice <= listedPrice)
+    ? cardTraderPrice
+    : listedPrice;
   return {
     ...normalized,
     hasCardTraderListing: cardTraderAvailable,
@@ -237,6 +306,7 @@ async function hydrateCanonicalCardTraderCache(cards, cheapestCacheRelation) {
         candidate_id,
         blueprint_id,
         pokoin_card_id,
+        provider,
         eligible_listing_count,
         eligible_quantity,
         cheapest_price_pkn
@@ -245,13 +315,14 @@ async function hydrateCanonicalCardTraderCache(cards, cheapestCacheRelation) {
           candidate.card_id as candidate_id,
           cache.blueprint_id,
           cache.pokoin_card_id,
+          cache.provider,
           cache.eligible_listing_count,
           cache.eligible_quantity,
           cache.cheapest_price_pkn,
           case when cache.blueprint_id = candidate.card_id then 0 else 1 end as match_rank
         from unnest($1::bigint[]) as candidate(card_id)
         join ${cheapestCacheRelation} cache
-          on cache.provider = 'cardtrader'
+          on cache.provider in ('cardtrader', 'pokoin_native')
           and cache.eligible_listing_count > 0
           and cache.cheapest_price_pkn is not null
           and (
@@ -263,8 +334,10 @@ async function hydrateCanonicalCardTraderCache(cards, cheapestCacheRelation) {
         candidate_id,
         match_rank,
         cheapest_price_pkn asc,
+        case when provider = 'pokoin_native' then 0 else 1 end,
         eligible_listing_count desc,
-        blueprint_id asc
+        blueprint_id asc,
+        provider asc
     `,
     [ids],
   );
@@ -282,12 +355,15 @@ async function hydrateCanonicalCardTraderCache(cards, cheapestCacheRelation) {
     }
     return normalizeHomeCard({
       ...card,
-      hasCardTraderListing: true,
-      cardtraderEligibleListingCount: eligibleListingCount,
-      cardtraderListedQuantity: Number.isFinite(eligibleQuantity) && eligibleQuantity > 0
+      hasCardTraderListing: cache.provider === 'cardtrader',
+      cardtraderEligibleListingCount: cache.provider === 'cardtrader' ? eligibleListingCount : 0,
+      cardtraderListedQuantity: cache.provider === 'cardtrader' && Number.isFinite(eligibleQuantity) && eligibleQuantity > 0
         ? Math.trunc(eligibleQuantity)
         : 0,
-      cardtraderLowestPricePkn: cheapestPricePkn,
+      cardtraderLowestPricePkn: cache.provider === 'cardtrader' ? cheapestPricePkn : null,
+      stock: cache.provider === 'pokoin_native' && Number.isFinite(eligibleQuantity) && eligibleQuantity > 0
+        ? Math.trunc(eligibleQuantity)
+        : card.stock,
       price: cheapestPricePkn,
     });
   });
@@ -427,14 +503,23 @@ async function fetchMissingSectionCards(sectionIds, existingIds, cheapestCacheRe
         ${cartHolderCountColumn('cart_analytics')},
         (
           coalesce(price_summary.listed_quantity, 0) +
-          coalesce(cardtrader.eligible_quantity, 0)
+          case
+            when cardtrader.provider = 'cardtrader' then coalesce(cardtrader.eligible_quantity, 0)
+            when coalesce(price_summary.listed_quantity, 0) = 0 then coalesce(cardtrader.eligible_quantity, 0)
+            else 0
+          end
         ) as listed_quantity,
         case
-          when cardtrader.cheapest_price_pkn is not null then cardtrader.cheapest_price_pkn
+          when cardtrader.cheapest_price_pkn is not null
+            and (
+              price_summary.lowest_ask_pkn is null
+              or cardtrader.cheapest_price_pkn <= price_summary.lowest_ask_pkn
+            )
+            then cardtrader.cheapest_price_pkn
           else price_summary.lowest_ask_pkn
         end as lowest_price_pkn,
-        coalesce(cardtrader.eligible_quantity, 0) as cardtrader_listed_quantity,
-        cardtrader.cheapest_price_pkn as cardtrader_lowest_price_pkn
+        case when cardtrader.provider = 'cardtrader' then coalesce(cardtrader.eligible_quantity, 0) else 0 end as cardtrader_listed_quantity,
+        case when cardtrader.provider = 'cardtrader' then cardtrader.cheapest_price_pkn else null end as cardtrader_lowest_price_pkn
       from settings,
         public.marketplace_search_candidates
       left join public.cardtrader_pokemon_blueprints blueprints
@@ -479,12 +564,20 @@ async function fetchSnapshot() {
   if (cachedSnapshot && now - cachedSnapshotAt < MEMORY_CACHE_TTL_MS) {
     return cachedSnapshot;
   }
-  await refreshHotBlueprintsIfStale();
-  const result = await marketplaceQuery(
-    'select public.get_marketplace_home_snapshot($1) as snapshot',
-    [120],
-  );
-  const snapshot = result.rows[0]?.snapshot || { cards: [], sections: {} };
+  const useSqlSnapshot = process.env.MARKETPLACE_HOME_SQL_SNAPSHOT === '1';
+  let snapshot = await fetchRowsForHomeFallback();
+  if (useSqlSnapshot) {
+    try {
+      await refreshHotBlueprintsIfStale();
+      const result = await marketplaceQuery(
+        'select public.get_marketplace_home_snapshot($1) as snapshot',
+        [120],
+      );
+      snapshot = result.rows[0]?.snapshot || snapshot;
+    } catch (error) {
+      console.warn('marketplace-home snapshot fallback used', error);
+    }
+  }
 
   const cheapestCacheRelation = await cheapestHomepageCacheRelationName();
   const cards = Array.isArray(snapshot.cards)

@@ -28,6 +28,7 @@ class CompetitiveQuery {
     this.year,
     this.tournamentId = '',
     this.deckId = '',
+    this.decklistId = '',
   });
 
   final String game;
@@ -35,6 +36,7 @@ class CompetitiveQuery {
   final int? year;
   final String tournamentId;
   final String deckId;
+  final String decklistId;
 
   @override
   bool operator ==(Object other) {
@@ -43,15 +45,24 @@ class CompetitiveQuery {
         other.format == format &&
         other.year == year &&
         other.tournamentId == tournamentId &&
-        other.deckId == deckId;
+        other.deckId == deckId &&
+        other.decklistId == decklistId;
   }
 
   @override
-  int get hashCode => Object.hash(game, format, year, tournamentId, deckId);
+  int get hashCode =>
+      Object.hash(game, format, year, tournamentId, deckId, decklistId);
 }
 
 class MarketplaceCompetitiveScreen extends ConsumerStatefulWidget {
-  const MarketplaceCompetitiveScreen({super.key});
+  const MarketplaceCompetitiveScreen({
+    super.key,
+    this.initialDeckId = '',
+    this.initialDecklistId = '',
+  });
+
+  final String initialDeckId;
+  final String initialDecklistId;
 
   @override
   ConsumerState<MarketplaceCompetitiveScreen> createState() =>
@@ -65,6 +76,37 @@ class _MarketplaceCompetitiveScreenState
   int? _year;
   String _selectedTournamentId = '';
   String _selectedDeckId = '';
+  String _selectedDecklistId = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedDeckId = widget.initialDeckId.trim();
+    _selectedDecklistId = widget.initialDecklistId.trim();
+  }
+
+  @override
+  void didUpdateWidget(covariant MarketplaceCompetitiveScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final nextDeckId = widget.initialDeckId.trim();
+    final nextDecklistId = widget.initialDecklistId.trim();
+    if (oldWidget.initialDeckId.trim() != nextDeckId &&
+        nextDeckId != _selectedDeckId) {
+      setState(() {
+        _selectedDeckId = nextDeckId;
+        _selectedDecklistId = '';
+        _selectedTournamentId = '';
+      });
+    }
+    if (oldWidget.initialDecklistId.trim() != nextDecklistId &&
+        nextDecklistId != _selectedDecklistId) {
+      setState(() {
+        _selectedDecklistId = nextDecklistId;
+        _selectedDeckId = '';
+        _selectedTournamentId = '';
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -79,6 +121,7 @@ class _MarketplaceCompetitiveScreenState
       year: _year,
       tournamentId: _selectedTournamentId,
       deckId: _selectedDeckId,
+      decklistId: _selectedDecklistId,
     );
     final snapshot = ref.watch(competitiveSnapshotProvider(query));
 
@@ -129,6 +172,7 @@ class _MarketplaceCompetitiveScreenState
                     _year = null;
                     _selectedTournamentId = '';
                     _selectedDeckId = '';
+                    _selectedDecklistId = '';
                   });
                 },
                 onFormatChanged: (value) {
@@ -137,6 +181,7 @@ class _MarketplaceCompetitiveScreenState
                     _year = null;
                     _selectedTournamentId = '';
                     _selectedDeckId = '';
+                    _selectedDecklistId = '';
                   });
                 },
                 onYearChanged: (value) {
@@ -144,25 +189,35 @@ class _MarketplaceCompetitiveScreenState
                     _year = value;
                     _selectedTournamentId = '';
                     _selectedDeckId = '';
+                    _selectedDecklistId = '';
                   });
                 },
                 onDeckSelected: (id) {
-                  setState(() {
-                    _selectedDeckId = id;
-                    _selectedTournamentId = '';
-                  });
+                  if (id.trim().isEmpty) return;
+                  context.go('/marketplace/competitive/decks/${id.trim()}');
                 },
                 onTournamentSelected: (id) {
                   setState(() {
                     _selectedTournamentId = id;
                     _selectedDeckId = '';
+                    _selectedDecklistId = '';
                   });
                 },
+                onDecklistSelected: (id) {
+                  if (id.trim().isEmpty) return;
+                  context.go('/marketplace/competitive/decklists/${id.trim()}');
+                },
                 onBackToList: () {
-                  setState(() {
-                    _selectedTournamentId = '';
-                    _selectedDeckId = '';
-                  });
+                  if (widget.initialDeckId.trim().isNotEmpty ||
+                      widget.initialDecklistId.trim().isNotEmpty) {
+                    context.go('/marketplace/competitive');
+                  } else {
+                    setState(() {
+                      _selectedTournamentId = '';
+                      _selectedDeckId = '';
+                      _selectedDecklistId = '';
+                    });
+                  }
                 },
               ),
       ),
@@ -206,6 +261,7 @@ class _CompetitiveContent extends StatelessWidget {
     required this.onFormatChanged,
     required this.onYearChanged,
     required this.onTournamentSelected,
+    required this.onDecklistSelected,
     required this.onBackToList,
   });
 
@@ -219,12 +275,15 @@ class _CompetitiveContent extends StatelessWidget {
   final ValueChanged<String> onFormatChanged;
   final ValueChanged<int?> onYearChanged;
   final ValueChanged<String> onTournamentSelected;
+  final ValueChanged<String> onDecklistSelected;
   final VoidCallback onBackToList;
 
   @override
   Widget build(BuildContext context) {
     final deckDetailMode = snapshot.selectedDeck != null;
-    final detailMode = selectedTournamentId.isNotEmpty || deckDetailMode;
+    final decklistDetailMode = snapshot.selectedDecklist != null;
+    final detailMode =
+        selectedTournamentId.isNotEmpty || deckDetailMode || decklistDetailMode;
     final dashboard = snapshot.dashboard;
     return CustomScrollView(
       slivers: [
@@ -265,6 +324,14 @@ class _CompetitiveContent extends StatelessWidget {
                           results: snapshot.deckResults,
                           players: snapshot.deckPlayers,
                           decklists: snapshot.decklists,
+                          onTournamentSelected: onTournamentSelected,
+                          onDecklistSelected: onDecklistSelected,
+                          onBack: onBackToList,
+                        )
+                      else if (decklistDetailMode)
+                        _DecklistDetail(
+                          decklist: snapshot.selectedDecklist!,
+                          cards: snapshot.decklistCards,
                           onTournamentSelected: onTournamentSelected,
                           onBack: onBackToList,
                         )
@@ -548,7 +615,7 @@ class _TopDecksPanel extends StatelessWidget {
                 builder: (context, constraints) {
                   final columns = constraints.maxWidth >= 720 ? 2 : 1;
                   final cardWidth =
-                      (constraints.maxWidth - (columns - 1) * 12) / columns;
+                      (constraints.maxWidth - ((columns - 1) * 12)) / columns;
                   return Wrap(
                     spacing: 12,
                     runSpacing: 12,
@@ -1352,6 +1419,7 @@ class _DeckDetail extends StatelessWidget {
     required this.players,
     required this.decklists,
     required this.onTournamentSelected,
+    required this.onDecklistSelected,
     required this.onBack,
   });
 
@@ -1361,6 +1429,7 @@ class _DeckDetail extends StatelessWidget {
   final List<CompetitiveDeckPlayer> players;
   final List<CompetitiveDecklist> decklists;
   final ValueChanged<String> onTournamentSelected;
+  final ValueChanged<String> onDecklistSelected;
   final VoidCallback onBack;
 
   @override
@@ -1376,17 +1445,45 @@ class _DeckDetail extends StatelessWidget {
               TextButton.icon(
                 onPressed: onBack,
                 icon: const Icon(Icons.arrow_back),
-                label: const Text('Back to meta'),
+                label: const Text('Back to competitive'),
               ),
               const SizedBox(height: 8),
-              Text(
-                deck.name,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 26,
-                  height: 1.1,
-                  fontWeight: FontWeight.w900,
-                ),
+              Wrap(
+                spacing: 18,
+                runSpacing: 18,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                alignment: WrapAlignment.spaceBetween,
+                children: [
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 680),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const _Pill('Deck profile'),
+                        const SizedBox(height: 12),
+                        Text(
+                          deck.name,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 32,
+                            height: 1.05,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Competitive archetype snapshot with Pokoin marketplace artwork, core card usage, recent results, and representative public decklists.',
+                          style: TextStyle(
+                            color: Color(0xFFB8C4E6),
+                            fontSize: 14,
+                            height: 1.45,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  _DeckHeroCards(cards: coreCards),
+                ],
               ),
               const SizedBox(height: 12),
               Wrap(
@@ -1394,6 +1491,8 @@ class _DeckDetail extends StatelessWidget {
                 runSpacing: 8,
                 children: [
                   if (deck.rank != null) _MiniChip('#${deck.rank} meta deck'),
+                  if (deck.formatLabel.isNotEmpty) _MiniChip(deck.formatLabel),
+                  if (deck.format.isNotEmpty) _MiniChip(deck.format),
                   _MiniChip('${deck.share.toStringAsFixed(1)}% share'),
                   if (deck.points > 0) _MiniChip('${deck.points} points'),
                   if (deck.earningsText.isNotEmpty)
@@ -1426,15 +1525,55 @@ class _DeckDetail extends StatelessWidget {
         const SizedBox(height: 18),
         _DeckCoreCardsPanel(cards: coreCards),
         const SizedBox(height: 18),
+        _DecklistsPanel(
+          decklists: decklists,
+          onDecklistSelected: onDecklistSelected,
+        ),
+        const SizedBox(height: 18),
         _DeckResultsPanel(
           results: results,
           onTournamentSelected: onTournamentSelected,
         ),
         const SizedBox(height: 18),
-        _DecklistsPanel(decklists: decklists),
-        const SizedBox(height: 18),
         _DeckPlayersPanel(players: players),
       ],
+    );
+  }
+}
+
+class _DeckHeroCards extends StatelessWidget {
+  const _DeckHeroCards({required this.cards});
+
+  final List<CompetitiveDeckCard> cards;
+
+  @override
+  Widget build(BuildContext context) {
+    final picturedCards =
+        cards.where((card) => card.imageUrl.trim().isNotEmpty).take(4).toList();
+    if (picturedCards.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return SizedBox(
+      width: 260,
+      height: 158,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          for (final entry in picturedCards.indexed)
+            Positioned(
+              left: entry.$1 * 52,
+              top: entry.$1.isEven ? 8 : 0,
+              child: Transform.rotate(
+                angle: (entry.$1 - 1.5) * 0.055,
+                child: _DeckCardImage(
+                  card: entry.$2,
+                  width: 92,
+                  height: 128,
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -1461,12 +1600,29 @@ class _DeckCoreCardsPanel extends StatelessWidget {
           else
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-              child: Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  for (final card in cards.take(18)) _DeckCardChip(card: card),
-                ],
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final columns = constraints.maxWidth >= 980
+                      ? 6
+                      : constraints.maxWidth >= 760
+                          ? 5
+                          : constraints.maxWidth >= 540
+                              ? 4
+                              : 2;
+                  final cardWidth =
+                      (constraints.maxWidth - (columns - 1) * 12) / columns;
+                  return Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      for (final card in cards.take(24))
+                        SizedBox(
+                          width: cardWidth,
+                          child: _DeckCardTile(card: card),
+                        ),
+                    ],
+                  );
+                },
               ),
             ),
         ],
@@ -1475,30 +1631,357 @@ class _DeckCoreCardsPanel extends StatelessWidget {
   }
 }
 
-class _DeckCardChip extends StatelessWidget {
-  const _DeckCardChip({required this.card});
+class _DeckCardTile extends StatelessWidget {
+  const _DeckCardTile({required this.card});
 
   final CompetitiveDeckCard card;
 
   @override
   Widget build(BuildContext context) {
-    final count = card.count == null
-        ? ''
-        : card.count!.toStringAsFixed(
-            card.count!.truncateToDouble() == card.count ? 0 : 1);
+    final count = _formatDeckCardCount(card);
     final share = card.inclusionShare == null
         ? ''
         : '${card.inclusionShare!.toStringAsFixed(1)}%';
-    return _InlineActionChip(
-      icon: Icons.search_outlined,
-      label: [
-        if (count.isNotEmpty) '$count x',
-        card.name,
-        if (share.isNotEmpty) share,
-      ].join(' '),
-      onTap: () => card.marketplacePath.isNotEmpty
-          ? context.go(card.marketplacePath)
-          : _goToMarketplaceSearch(context, card.name),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _openDeckCard(context, card),
+        borderRadius: BorderRadius.circular(18),
+        child: Ink(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: const Color(0xFF111936),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0x18FFFFFF)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: _DeckCardImage(
+                  card: card,
+                  width: 104,
+                  height: 146,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                card.name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  height: 1.15,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                [
+                  if (count.isNotEmpty) '${count}x',
+                  if (share.isNotEmpty) share,
+                  _cardSetLabel(card),
+                ].where((value) => value.isNotEmpty).join(' · '),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFFB8C4E6),
+                  fontSize: 11,
+                  height: 1.25,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DeckCardImage extends StatelessWidget {
+  const _DeckCardImage({
+    required this.card,
+    required this.width,
+    required this.height,
+  });
+
+  final CompetitiveDeckCard card;
+  final double width;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    final image = card.imageUrl.trim();
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: _deckGradient(card.name),
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0x22FFFFFF)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x55000000),
+            blurRadius: 12,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(11),
+        child: image.isEmpty
+            ? _DeckCardImageFallback(card: card)
+            : Image.network(
+                image,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) =>
+                    _DeckCardImageFallback(card: card),
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return _DeckCardImageFallback(card: card);
+                },
+              ),
+      ),
+    );
+  }
+}
+
+class _DeckCardImageFallback extends StatelessWidget {
+  const _DeckCardImageFallback({required this.card});
+
+  final CompetitiveDeckCard card;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(10),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.style_outlined, color: Color(0xCCFFFFFF), size: 24),
+          const SizedBox(height: 8),
+          Text(
+            card.name,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 11,
+              height: 1.1,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DecklistDetail extends StatefulWidget {
+  const _DecklistDetail({
+    required this.decklist,
+    required this.cards,
+    required this.onTournamentSelected,
+    required this.onBack,
+  });
+
+  final CompetitiveDecklist decklist;
+  final List<CompetitiveDeckCard> cards;
+  final ValueChanged<String> onTournamentSelected;
+  final VoidCallback onBack;
+
+  @override
+  State<_DecklistDetail> createState() => _DecklistDetailState();
+}
+
+class _DecklistDetailState extends State<_DecklistDetail> {
+  CompetitiveDeckCard? _previewCard;
+
+  CompetitiveDeckCard? get _activePreviewCard {
+    if (_previewCard != null && widget.cards.contains(_previewCard)) {
+      return _previewCard;
+    }
+    return widget.cards.isEmpty ? null : widget.cards.first;
+  }
+
+  void _setPreviewCard(CompetitiveDeckCard card) {
+    if (_previewCard == card) return;
+    setState(() {
+      _previewCard = card;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final decklist = widget.decklist;
+    final cards = widget.cards;
+    final previewCard = _activePreviewCard;
+    final date = decklist.tournamentDate == null
+        ? ''
+        : DateFormat('MMM d, yyyy').format(decklist.tournamentDate!.toLocal());
+    final title = decklist.deckName.isEmpty
+        ? 'Decklist ${decklist.decklistId}'
+        : decklist.deckName;
+    final playerLine = [
+      if (decklist.playerName.isNotEmpty) decklist.playerName,
+      if (decklist.placingLabel.isNotEmpty)
+        decklist.placingLabel
+      else if (decklist.placing != null)
+        '#${decklist.placing}',
+      if (decklist.tournamentName.isNotEmpty) decklist.tournamentName,
+      if (date.isNotEmpty) date,
+    ].join(' · ');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _Panel(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextButton.icon(
+                onPressed: widget.onBack,
+                icon: const Icon(Icons.arrow_back),
+                label: const Text('Back to competitive'),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 18,
+                runSpacing: 18,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                alignment: WrapAlignment.spaceBetween,
+                children: [
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 720),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const _Pill('Limitless decklist'),
+                        const SizedBox(height: 12),
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 32,
+                            height: 1.05,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        if (playerLine.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            playerLine,
+                            style: const TextStyle(
+                              color: Color(0xFFB8C4E6),
+                              fontSize: 14,
+                              height: 1.45,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  _DeckHeroCards(cards: cards),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _MiniChip('List ${decklist.decklistId}'),
+                  if (decklist.formatLabel.isNotEmpty)
+                    _MiniChip(decklist.formatLabel),
+                  if (decklist.variant.isNotEmpty) _MiniChip(decklist.variant),
+                  _MiniChip('${_decklistTotalCards(cards)} cards'),
+                  if (decklist.deckId.isNotEmpty)
+                    _InlineActionChip(
+                      icon: Icons.analytics_outlined,
+                      label: 'Deck profile',
+                      onTap: () => context.go(
+                        '/marketplace/competitive/decks/${decklist.deckId}',
+                      ),
+                    ),
+                  if (decklist.tournamentId.isNotEmpty)
+                    _InlineActionChip(
+                      icon: Icons.emoji_events_outlined,
+                      label: 'Tournament',
+                      onTap: () =>
+                          widget.onTournamentSelected(decklist.tournamentId),
+                    ),
+                  if (decklist.sourceUrl.isNotEmpty)
+                    _InlineActionChip(
+                      icon: Icons.open_in_new,
+                      label: 'Open source',
+                      onTap: () => _openExternalUrl(decklist.sourceUrl),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+        _Panel(
+          padding: EdgeInsets.zero,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const _SectionTitle(
+                icon: Icons.style_outlined,
+                title: 'Deck Cards',
+                subtitle:
+                    'Pokemon, Trainer, and Energy sections with Pokoin marketplace images.',
+              ),
+              if (cards.isEmpty)
+                const _EmptyTableMessage(
+                  'This decklist has no imported card rows yet.',
+                )
+              else
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final wide = constraints.maxWidth >= 920;
+                      final preview = _DecklistPreviewPane(card: previewCard);
+                      final sections = _DecklistSections(
+                        cards: cards,
+                        previewCard: previewCard,
+                        onPreviewCardChanged: _setPreviewCard,
+                      );
+                      if (!wide) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            preview,
+                            const SizedBox(height: 14),
+                            sections,
+                          ],
+                        );
+                      }
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(child: sections),
+                          const SizedBox(width: 18),
+                          SizedBox(width: 300, child: preview),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1608,9 +2091,13 @@ class _DeckResultRow extends StatelessWidget {
 }
 
 class _DecklistsPanel extends StatelessWidget {
-  const _DecklistsPanel({required this.decklists});
+  const _DecklistsPanel({
+    required this.decklists,
+    required this.onDecklistSelected,
+  });
 
   final List<CompetitiveDecklist> decklists;
+  final ValueChanged<String> onDecklistSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -1633,29 +2120,342 @@ class _DecklistsPanel extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   for (final decklist in decklists.take(4)) ...[
-                    Text(
-                      'List ${decklist.decklistId}',
-                      style: const TextStyle(
-                        color: Color(0xFFFDE68A),
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
+                    Row(
                       children: [
-                        for (final card in decklist.cards.take(16))
-                          _DeckCardChip(card: card),
+                        Expanded(
+                          child: Text(
+                            _decklistTitle(decklist),
+                            style: const TextStyle(
+                              color: Color(0xFFFDE68A),
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        _InlineActionChip(
+                          icon: Icons.open_in_new,
+                          label: 'Open list',
+                          onTap: () => onDecklistSelected(decklist.decklistId),
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 14),
+                    if (_decklistSubtitle(decklist).isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        _decklistSubtitle(decklist),
+                        style: const TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                    _DecklistSections(cards: decklist.cards),
+                    const SizedBox(height: 16),
                   ],
                 ],
               ),
             ),
         ],
       ),
+    );
+  }
+}
+
+class _DecklistSections extends StatelessWidget {
+  const _DecklistSections({
+    required this.cards,
+    this.previewCard,
+    this.onPreviewCardChanged,
+  });
+
+  final List<CompetitiveDeckCard> cards;
+  final CompetitiveDeckCard? previewCard;
+  final ValueChanged<CompetitiveDeckCard>? onPreviewCardChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final groups = <String, List<CompetitiveDeckCard>>{};
+    for (final card in cards) {
+      final key = _deckSectionLabel(card.section);
+      groups.putIfAbsent(key, () => []).add(card);
+    }
+    final orderedKeys = [
+      'Pokemon',
+      'Trainer',
+      'Energy',
+      ...groups.keys.where(
+        (key) => key != 'Pokemon' && key != 'Trainer' && key != 'Energy',
+      ),
+    ].where(groups.containsKey).toList();
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= 760;
+        final sectionCount = orderedKeys.length.clamp(1, 3);
+        final sectionWidth = wide
+            ? (constraints.maxWidth - ((sectionCount - 1) * 12)) / sectionCount
+            : constraints.maxWidth;
+        return Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            for (final key in orderedKeys)
+              SizedBox(
+                width: sectionWidth,
+                child: _DecklistSection(
+                  title: key,
+                  cards: groups[key] ?? const [],
+                  previewCard: previewCard,
+                  onPreviewCardChanged: onPreviewCardChanged,
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _DecklistSection extends StatelessWidget {
+  const _DecklistSection({
+    required this.title,
+    required this.cards,
+    this.previewCard,
+    this.onPreviewCardChanged,
+  });
+
+  final String title;
+  final List<CompetitiveDeckCard> cards;
+  final CompetitiveDeckCard? previewCard;
+  final ValueChanged<CompetitiveDeckCard>? onPreviewCardChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final total = cards.fold<double>(
+      0,
+      (sum, card) => sum + (card.count ?? 0),
+    );
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111936),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0x18FFFFFF)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              _MiniChip(
+                '${total.toStringAsFixed(total.truncateToDouble() == total ? 0 : 1)} cards',
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          for (final card in cards.take(80)) ...[
+            _DecklistCardRow(
+              card: card,
+              selected: identical(card, previewCard),
+              onPreview: onPreviewCardChanged,
+            ),
+            if (card != cards.take(80).last)
+              const Divider(height: 10, color: Color(0x14FFFFFF)),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _DecklistCardRow extends StatelessWidget {
+  const _DecklistCardRow({
+    required this.card,
+    this.selected = false,
+    this.onPreview,
+  });
+
+  final CompetitiveDeckCard card;
+  final bool selected;
+  final ValueChanged<CompetitiveDeckCard>? onPreview;
+
+  @override
+  Widget build(BuildContext context) {
+    final count = _formatDeckCardCount(card);
+    return Material(
+      color: Colors.transparent,
+      child: FocusableActionDetector(
+        mouseCursor: SystemMouseCursors.click,
+        onShowFocusHighlight: (hasFocus) {
+          if (hasFocus) onPreview?.call(card);
+        },
+        onShowHoverHighlight: (hovering) {
+          if (hovering) onPreview?.call(card);
+        },
+        child: InkWell(
+          onTap: () => _openDeckCard(context, card),
+          onFocusChange: (hasFocus) {
+            if (hasFocus) onPreview?.call(card);
+          },
+          onHover: (hovering) {
+            if (hovering) onPreview?.call(card);
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 140),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            decoration: BoxDecoration(
+              color: selected ? const Color(0x2214B8A6) : Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: selected ? const Color(0x6614B8A6) : Colors.transparent,
+              ),
+            ),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 34,
+                  child: Text(
+                    count.isEmpty ? '-' : '$count x',
+                    style: const TextStyle(
+                      color: Color(0xFFFACC15),
+                      fontWeight: FontWeight.w900,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        card.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      Text(
+                        _cardSetLabel(card).isEmpty
+                            ? 'Pokoin marketplace search'
+                            : _cardSetLabel(card),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(
+                  card.marketplacePath.isEmpty
+                      ? Icons.search_outlined
+                      : Icons.shopping_bag_outlined,
+                  color: const Color(0xFF67E8F9),
+                  size: 16,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DecklistPreviewPane extends StatelessWidget {
+  const _DecklistPreviewPane({required this.card});
+
+  final CompetitiveDeckCard? card;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = card;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF172554), Color(0xFF0B1020)],
+        ),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0x22FFFFFF)),
+      ),
+      child: active == null
+          ? const Text(
+              'Hover a decklist card to preview it here.',
+              style: TextStyle(color: Color(0xFFB8C4E6), height: 1.4),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: _DeckCardImage(
+                    card: active,
+                    width: 210,
+                    height: 294,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  active.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    height: 1.15,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  alignment: WrapAlignment.center,
+                  children: [
+                    if (_formatDeckCardCount(active).isNotEmpty)
+                      _MiniChip('${_formatDeckCardCount(active)} copies'),
+                    if (_cardSetLabel(active).isNotEmpty)
+                      _MiniChip(_cardSetLabel(active)),
+                    if (active.marketplaceCardId.isNotEmpty)
+                      _MiniChip('Pokoin #${active.marketplaceCardId}'),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.center,
+                  child: _InlineActionChip(
+                    icon: active.marketplacePath.isEmpty
+                        ? Icons.search_outlined
+                        : Icons.shopping_bag_outlined,
+                    label: active.marketplacePath.isEmpty
+                        ? 'Search marketplace'
+                        : 'Open marketplace',
+                    onTap: () => _openDeckCard(context, active),
+                  ),
+                ),
+              ],
+            ),
     );
   }
 }
@@ -2267,6 +3067,62 @@ void _goToMarketplaceSearch(BuildContext context, String query) {
       },
     ).toString(),
   );
+}
+
+void _openDeckCard(BuildContext context, CompetitiveDeckCard card) {
+  if (card.marketplacePath.isNotEmpty) {
+    context.go(card.marketplacePath);
+    return;
+  }
+  _goToMarketplaceSearch(context, card.name);
+}
+
+String _formatDeckCardCount(CompetitiveDeckCard card) {
+  final count = card.count;
+  if (count == null) return '';
+  return count.toStringAsFixed(count.truncateToDouble() == count ? 0 : 1);
+}
+
+String _cardSetLabel(CompetitiveDeckCard card) {
+  return [
+    card.setCode,
+    if (card.collectorNumber.isNotEmpty) '#${card.collectorNumber}',
+  ].where((value) => value.trim().isNotEmpty).join(' ');
+}
+
+String _decklistTitle(CompetitiveDecklist decklist) {
+  final player = decklist.playerName.trim();
+  if (player.isEmpty) return 'Decklist ${decklist.decklistId}';
+  return '$player - decklist ${decklist.decklistId}';
+}
+
+String _decklistSubtitle(CompetitiveDecklist decklist) {
+  final date = decklist.tournamentDate == null
+      ? ''
+      : DateFormat('MMM d, yyyy').format(decklist.tournamentDate!.toLocal());
+  return [
+    if (decklist.placingLabel.isNotEmpty)
+      decklist.placingLabel
+    else if (decklist.placing != null)
+      '#${decklist.placing}',
+    if (decklist.tournamentName.isNotEmpty) decklist.tournamentName,
+    if (date.isNotEmpty) date,
+    if (decklist.variant.isNotEmpty) decklist.variant,
+  ].join(' · ');
+}
+
+String _decklistTotalCards(List<CompetitiveDeckCard> cards) {
+  final total = cards.fold<double>(0, (sum, card) => sum + (card.count ?? 0));
+  return total.toStringAsFixed(total.truncateToDouble() == total ? 0 : 1);
+}
+
+String _deckSectionLabel(String value) {
+  final normalized = value.trim().toLowerCase();
+  if (normalized.contains('pok')) return 'Pokemon';
+  if (normalized.contains('trainer')) return 'Trainer';
+  if (normalized.contains('energy')) return 'Energy';
+  if (normalized.isEmpty) return 'Other';
+  return normalized[0].toUpperCase() + normalized.substring(1);
 }
 
 Future<void> _openExternalUrl(String value) async {

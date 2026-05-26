@@ -794,6 +794,24 @@ final routerProvider = Provider<GoRouter>((ref) {
                 _appPage(state, const MarketplaceCompetitiveScreen()),
           ),
           GoRoute(
+            path: '/marketplace/competitive/decks/:deckId',
+            pageBuilder: (context, state) => _appPage(
+              state,
+              MarketplaceCompetitiveScreen(
+                initialDeckId: state.pathParameters['deckId'] ?? '',
+              ),
+            ),
+          ),
+          GoRoute(
+            path: '/marketplace/competitive/decklists/:decklistId',
+            pageBuilder: (context, state) => _appPage(
+              state,
+              MarketplaceCompetitiveScreen(
+                initialDecklistId: state.pathParameters['decklistId'] ?? '',
+              ),
+            ),
+          ),
+          GoRoute(
             path: '/marketplace/connect',
             pageBuilder: (context, state) =>
                 _appPage(state, const CardTraderConnectScreen()),

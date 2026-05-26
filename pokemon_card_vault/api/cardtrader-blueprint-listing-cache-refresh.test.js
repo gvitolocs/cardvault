@@ -152,6 +152,34 @@ test('CardTrader listing cache upsert writes cache only and clears scoped misses
   assert.deepEqual(calls[0].values[1], [316600]);
 });
 
+test('homepage cheapest cache SQL compares native and CardTrader prices', async () => {
+  const refresh = loadRefreshModuleWithStubs();
+  const calls = [];
+  await refresh.refreshOracleBlueprintListingCache({
+    rows: [],
+    scopeBlueprintIds: [316600],
+    env: { PKN_CHECKOUT_USDT_PRICE: '0.005' },
+    query: async (sql, values) => {
+      calls.push({ sql, values });
+      return { rows: [{ scoped_count: 1 }] };
+    },
+  });
+
+  const sql = calls[0].sql;
+  assert.match(sql, /eligible_cardtrader as/);
+  assert.match(sql, /eligible_native as/);
+  assert.match(sql, /from public\.marketplace_user_listings/);
+  assert.match(sql, /native_listing\.status = 'active'/);
+  assert.match(sql, /coalesce\(native_listing\.quantity_available, 0\) > 0/);
+  assert.match(sql, /native_listing\.price_pkn > 0/);
+  assert.match(sql, /coalesce\(native_listing\.shipping_available, true\) = true/);
+  assert.match(sql, /native_listing\.nft_available = true/);
+  assert.match(sql, /union all/);
+  assert.match(sql, /order by[\s\S]*eligible\.price_pkn asc/);
+  assert.match(sql, /case when eligible\.provider = 'pokoin_native' then 0 else 1 end/);
+  assert.match(sql, /cache\.provider in \(\$3::text, 'pokoin_native'\)/);
+});
+
 test('CardTrader listing cache script parses refresh flags', () => {
   const script = require('../scripts/refresh-cardtrader-blueprint-listing-cache');
   const options = script.parseArgs([

@@ -229,6 +229,21 @@ const routeDefinitions = [
     },
   },
   {
+    path: '/api/deck-card-version-lookup',
+    file: 'deck-card-version-lookup.js',
+    methods: ['GET', 'POST', 'OPTIONS'],
+    purpose: 'Return ranked marketplace card versions for structured decklist card fields.',
+    auth: 'Public.',
+    params: {
+      query: '`name`, `setCode`, `collectorNumber`, optional Limitless expansion fields, `language`, and `limit` are supported.',
+      body: 'Same fields as query parameters for POST.',
+    },
+    dependencies: {
+      env: ['MARKETPLACE_DATABASE_URL'],
+      services: ['Oracle/Postgres marketplace DB'],
+    },
+  },
+  {
     path: '/api/extension-card-search',
     file: 'extension-card-search.js',
     methods: ['POST', 'OPTIONS'],
@@ -325,6 +340,20 @@ const routeDefinitions = [
     dependencies: {
       env: ['FIREBASE_*', 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_FORUM_MEDIA_BUCKET', 'R2_FORUM_MEDIA_PUBLIC_URL'],
       services: ['Firebase Admin', 'Supabase REST', 'Cloudflare R2', 'sharp'],
+    },
+  },
+  {
+    path: '/api/limitless-expansion-blueprints',
+    file: 'limitless-expansion-blueprints.js',
+    methods: ['GET'],
+    purpose: 'Return Limitless expansion-to-Pokoin blueprint mapping rows.',
+    auth: 'Public.',
+    params: {
+      query: '`expansionKey`, `setCode`, `name`, `includeBlueprints=1`, and `limit` are supported.',
+    },
+    dependencies: {
+      env: ['MARKETPLACE_DATABASE_URL'],
+      services: ['Oracle/Postgres marketplace DB'],
     },
   },
   {
@@ -904,16 +933,15 @@ const routeDefinitions = [
     path: '/api/trainingai-card-classify',
     file: 'trainingai-card-classify.js',
     methods: ['POST', 'OPTIONS'],
-    purpose: 'Proxy card image classification requests to the Pokoin TrainingAI Hugging Face Space.',
-    auth: 'Public by default; protect upstream Space with TRAININGAI_HF_TOKEN when private.',
+    purpose: 'Proxy card image classification requests to the Pokoin TrainingAI Oracle classifier or Hugging Face Space fallback.',
+    auth: 'Public by default; protect upstream classifier with TRAININGAI_HF_TOKEN when private.',
     params: {
-      body: '`imageBase64` required; `topK` optional from 1 to 10.',
+      body: '`imageBase64` JSON or multipart image upload required; `topK`/`top_k` optional from 1 to 10.',
     },
     dependencies: {
-      env: ['TRAININGAI_HF_SPACE_URL', 'TRAININGAI_HF_TOKEN', 'TRAININGAI_CLASSIFIER_TIMEOUT_MS', 'TRAININGAI_CLASSIFIER_MAX_IMAGE_BYTES'],
-      services: ['Hugging Face Space classifier'],
+      env: ['TRAININGAI_CLASSIFIER_URL', 'TRAININGAI_HF_TOKEN', 'TRAININGAI_CLASSIFIER_TIMEOUT_MS', 'TRAININGAI_CLASSIFIER_MAX_IMAGE_BYTES'],
+      services: ['TrainingAI Oracle classifier or Hugging Face Space classifier'],
     },
-    rawBody: true,
   },
   {
     path: '/api/transfer-account-balance',

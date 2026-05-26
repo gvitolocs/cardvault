@@ -194,7 +194,7 @@ begin
     source_snapshot_at,
     updated_at
   )
-  with eligible as (
+  with eligible_cardtrader as (
     select
       snapshot.provider,
       coalesce(snapshot.blueprint_id, snapshot.cardtrader_blueprint_id) as blueprint_id,
@@ -234,15 +234,58 @@ begin
         or lower(coalesce(snapshot.raw_metadata->'user'->>'can_sell_sealed_with_ct_zero', snapshot.raw_metadata->>'can_sell_sealed_with_ct_zero', '')) in ('true', '1', 'yes', 'y')
       )
   ),
+  eligible_native as (
+    select
+      'pokoin_native'::text as provider,
+      native_listing.card_id::bigint as blueprint_id,
+      native_listing.card_id::text as pokoin_card_id,
+      native_listing.id::text as external_listing_id,
+      left(coalesce(nullif(native_listing.source_listing_id, ''), native_listing.id::text), 160) as external_product_id,
+      null::numeric as price_eur,
+      native_listing.price_pkn as price_pkn,
+      native_listing.quantity_available as quantity,
+      'pokoin_native'::text as shipping_mode,
+      native_listing.seller_country,
+      native_listing.updated_at as last_seen_at,
+      native_listing.updated_at
+    from (
+      select
+        listing.*,
+        case when listing.card_id ~ '^[0-9]+$' then listing.card_id::bigint else null end as card_id_bigint
+      from public.marketplace_user_listings
+      listing
+    ) native_listing
+    left join pg_temp.cardtrader_blueprint_listing_cache_scope scope
+      on scope.blueprint_id = native_listing.card_id_bigint
+    where native_listing.card_id_bigint is not null
+      and (not v_has_scope or scope.blueprint_id is not null)
+      and native_listing.status = 'active'
+      and coalesce(native_listing.quantity_available, 0) > 0
+      and native_listing.price_pkn > 0
+      and coalesce(native_listing.shipping_available, true) = true
+      and not (
+        native_listing.nft_available = true
+        and coalesce(native_listing.shipping_available, false) = false
+      )
+  ),
+  eligible as (
+    select * from eligible_cardtrader
+    union all
+    select * from eligible_native
+  ),
   ranked as (
     select
       eligible.*,
-      count(*) over (partition by eligible.blueprint_id)::integer as eligible_listing_count,
-      coalesce(sum(eligible.quantity) over (partition by eligible.blueprint_id), 0)::integer as eligible_quantity,
-      max(eligible.last_seen_at) over (partition by eligible.blueprint_id) as source_snapshot_at,
+      count(*) over (partition by eligible.blueprint_id, eligible.provider)::integer as eligible_listing_count,
+      coalesce(sum(eligible.quantity) over (partition by eligible.blueprint_id, eligible.provider), 0)::integer as eligible_quantity,
+      max(eligible.last_seen_at) over (partition by eligible.blueprint_id, eligible.provider) as source_snapshot_at,
       row_number() over (
         partition by eligible.blueprint_id
-        order by eligible.price_pkn asc, eligible.last_seen_at desc, eligible.external_listing_id asc
+        order by
+          eligible.price_pkn asc,
+          case when eligible.provider = 'pokoin_native' then 0 else 1 end,
+          eligible.last_seen_at desc,
+          eligible.external_listing_id asc
       ) as price_rank
     from eligible
   )
@@ -312,7 +355,7 @@ begin
     updated_at = excluded.updated_at;
 
   delete from public.cardtrader_blueprint_listing_cache cache
-  where cache.provider = v_provider
+  where cache.provider in (v_provider, 'pokoin_native')
     and (
       not v_has_scope
       or exists (

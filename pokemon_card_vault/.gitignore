@@ -48,3 +48,5 @@ node_modules/
 .env.*.local
 .env*.local
 keys/*
+deploy/env/
+data/trainingai/*.json

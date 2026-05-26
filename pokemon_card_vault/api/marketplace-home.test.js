@@ -65,8 +65,10 @@ test('marketplace home snapshot includes CardTrader analytics signals', () => {
   assert.match(sql, /left join lateral/);
   assert.match(sql, /cache\.blueprint_id = c\.card_id/);
   assert.match(sql, /cache\.pokoin_card_id = c\.card_id::text/);
-  assert.match(sql, /coalesce\(cardtrader_cache\.eligible_listing_count, 0\) as cardtrader_eligible_listing_count/);
-  assert.match(sql, /when cardtrader_cache\.cheapest_price_pkn is not null then cardtrader_cache\.cheapest_price_pkn/);
+  assert.match(sql, /as cardtrader_eligible_listing_count/);
+  assert.match(sql, /cache\.provider in \('cardtrader', 'pokoin_native'\)/);
+  assert.match(sql, /or cardtrader_cache\.cheapest_price_pkn <= price_summary\.lowest_ask_pkn/);
+  assert.match(sql, /'priceSource', homepage_cheapest_source/);
   assert.doesNotMatch(sql, /from public\.cardtrader_market_listing_snapshots/);
   assert.match(sql, /cardtraderSales24h'\)::integer, 0\) \* 3/);
 });
@@ -94,7 +96,7 @@ test('marketplace home section hydration qualifies joined card id columns', () =
   assert.match(apiSource, /marketplace_search_candidates\.card_id/);
   assert.match(apiSource, /marketplace_search_candidates\.name/);
   assert.match(apiSource, /cardTraderAvailabilityJoin\('marketplace_search_candidates', cheapestCacheRelation\)/);
-  assert.match(apiSource, /when cardtrader\.cheapest_price_pkn is not null then cardtrader\.cheapest_price_pkn/);
+  assert.match(apiSource, /or cardtrader\.cheapest_price_pkn <= price_summary\.lowest_ask_pkn/);
   assert.match(
     apiSource,
     /where marketplace_search_candidates\.card_id = any\(\$1::bigint\[\]\)/,
@@ -197,6 +199,27 @@ test('marketplace home card payload uses CardTrader stock and +200 PKN price', (
   assert.equal(cardTilePrice({ lowest_price_pkn: 800 }), 800);
 });
 
+test('marketplace home card payload does not synthesize placeholder prices', () => {
+  const card = toCardJson({
+    card_id: 391257,
+    name: 'Teal Mask Ogerpon ex',
+    set_name: 'CSVNC: Land of Kitakami Special Pack',
+    card_number: '043/040',
+    rarity: 'Card',
+    card_type: 'Trading card',
+    listed_quantity: 0,
+    lowest_price_pkn: null,
+    has_cardtrader_listing: false,
+    cardtrader_eligible_listing_count: 0,
+    cardtrader_listed_quantity: 0,
+    cardtrader_lowest_price_pkn: null,
+  });
+
+  assert.equal(card.stock, 0);
+  assert.equal(card.price, null);
+  assert.equal(cardTilePrice({ card_id: 391257 }), null);
+});
+
 test('marketplace home canonical CardTrader cache price wins tile display', () => {
   const card = toCardJson({
     card_id: 111409,
@@ -219,6 +242,28 @@ test('marketplace home canonical CardTrader cache price wins tile display', () =
   assert.equal(card.cardtraderEligibleListingCount, 56);
 });
 
+test('marketplace home native cheaper than CardTrader wins tile display', () => {
+  const card = toCardJson({
+    card_id: 111409,
+    name: 'Servine',
+    set_name: 'Black & White',
+    card_number: '4/114',
+    rarity: 'Uncommon',
+    card_type: 'Trading card',
+    listed_quantity: 2,
+    lowest_price_pkn: 500,
+    has_cardtrader_listing: true,
+    cardtrader_eligible_listing_count: 56,
+    cardtrader_listed_quantity: 70,
+    cardtrader_lowest_price_pkn: 800,
+  });
+
+  assert.equal(card.stock, 70);
+  assert.equal(card.price, 500);
+  assert.equal(card.hasCardTraderListing, true);
+  assert.equal(card.cardtraderLowestPricePkn, 800);
+});
+
 test('marketplace home cached cards are repaired with CardTrader availability', () => {
   const card = normalizeHomeCard({
     id: '316600',
@@ -236,6 +281,16 @@ test('marketplace home cached cards are repaired with CardTrader availability', 
   assert.equal(card.stock, 3);
   assert.equal(card.price, 780);
   assert.deepEqual(card.tags, ['Pokemon']);
+});
+
+test('marketplace home source includes lightweight cards fallback', () => {
+  assert.match(apiSource, /async function fetchRowsForHomeFallback\(\)/);
+  assert.match(apiSource, /from public\.marketplace_search_candidates/);
+  assert.match(apiSource, /0 as listed_quantity/);
+  assert.match(apiSource, /MARKETPLACE_HOME_SQL_SNAPSHOT/);
+  assert.doesNotMatch(apiSource, /return Number\(1000n \+ \(BigInt\(row\.card_id \|\| 0\) % 120000n\)\)/);
+  assert.match(apiSource, /marketplace-home snapshot fallback used/);
+  assert.match(apiSource, /hydrateCanonicalCardTraderCache\(cards, cheapestCacheRelation\)/);
 });
 
 test('marketplace home card payload uses cache listing availability as stock', () => {

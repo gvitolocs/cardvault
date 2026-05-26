@@ -97,6 +97,49 @@ void main() {
   });
 
   group('marketplace warmup', () {
+    test('home snapshot availability wins over stale spotlight card state',
+        () async {
+      final staleSpotlightCard = _searchCard(
+        id: '360108',
+        name: 'Mega Diancie ex',
+        set: 'Mega Evolution',
+      );
+      final cheapestSnapshotCard = staleSpotlightCard.copyWith(
+        price: 4244,
+        stock: 0,
+        hasCardTraderListing: true,
+        cardtraderEligibleListingCount: 56,
+      );
+      final service = _MarketplaceWarmupCardService(
+        snapshot: MarketplaceHomeSnapshot(
+          cards: [cheapestSnapshotCard],
+          sections: MarketplaceHomeSections(
+            recentlySeenIds: const [],
+            bestSellerIds: [cheapestSnapshotCard.id],
+            featuredIds: [cheapestSnapshotCard.id],
+          ),
+        ),
+      );
+      final notifier = CardNotifier(
+        cardService: service,
+        autoLoad: false,
+      );
+      addTearDown(notifier.dispose);
+
+      notifier.cacheCards([staleSpotlightCard]);
+      await notifier.warmMarketplaceAfterDetail();
+
+      final spotlightCard = notifier.state.spotlightCards.single;
+      final catalogCard = notifier.state.cards
+          .singleWhere((card) => card.id == cheapestSnapshotCard.id);
+      expect(spotlightCard.price, 4244);
+      expect(spotlightCard.hasCardTraderListing, isTrue);
+      expect(spotlightCard.cardtraderEligibleListingCount, 56);
+      expect(spotlightCard.isMarketAvailable, isTrue);
+      expect(catalogCard.price, 4244);
+      expect(catalogCard.isMarketAvailable, isTrue);
+    });
+
     test(
         'detail warmup loads marketplace snapshot when only detail card exists',
         () async {
@@ -166,6 +209,70 @@ void main() {
       expect(notifier.state.hasMarketplaceLoadCompleted, isTrue);
       expect(
           notifier.state.homeSections?.recentlySeenIds, [marketplaceCard.id]);
+    });
+
+    test('navigation transition defers marketplace warmup UI updates',
+        () async {
+      final marketplaceCard = _searchCard(id: '25', name: 'Pikachu');
+      final service = _MarketplaceWarmupCardService(
+        snapshot: MarketplaceHomeSnapshot(
+          cards: [marketplaceCard],
+          sections: MarketplaceHomeSections(
+            recentlySeenIds: const [],
+            bestSellerIds: [marketplaceCard.id],
+            featuredIds: const [],
+          ),
+        ),
+      );
+      final notifier = CardNotifier(
+        cardService: service,
+        autoLoad: false,
+      );
+      addTearDown(notifier.dispose);
+
+      notifier.beginNavigationTransition(
+        duration: const Duration(milliseconds: 60),
+      );
+      await notifier.warmMarketplaceAfterDetail();
+
+      expect(service.marketplaceSnapshotCalls, 0);
+      expect(notifier.state.homeSections, isNull);
+      expect(notifier.state.cards, isEmpty);
+
+      await Future<void>.delayed(const Duration(milliseconds: 90));
+      await Future<void>.delayed(Duration.zero);
+
+      expect(service.marketplaceSnapshotCalls, 1);
+      expect(notifier.state.homeSections?.bestSellerIds, [marketplaceCard.id]);
+      expect(notifier.state.cards.map((card) => card.id), [marketplaceCard.id]);
+    });
+
+    test(
+        'stale detail hydration result is ignored after navigation token changes',
+        () async {
+      final staleCard = _searchCard(
+        id: '25',
+        name: 'Pikachu',
+        number: '',
+      );
+      final hydratedCard = staleCard.copyWith(number: '025/165');
+      final service = _MarketplaceWarmupCardService()
+        ..cardsById[staleCard.id] = hydratedCard
+        ..cardByIdDelay = const Duration(milliseconds: 80);
+      final notifier = CardNotifier(
+        cardService: service,
+        autoLoad: false,
+      );
+      addTearDown(notifier.dispose);
+
+      notifier.cacheCards([staleCard]);
+      final warmup = notifier.warmDetailCards([staleCard]);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      notifier.beginNavigationTransition();
+      await warmup;
+
+      expect(service.cardByIdCalls, 1);
+      expect(notifier.state.cards.single.number, isEmpty);
     });
   });
 
@@ -347,9 +454,53 @@ void main() {
       'decklists': [
         {
           'decklistId': '27143',
+          'deckId': '284',
+          'deckName': 'Dragapult',
+          'tournamentName': 'Regional Campinas',
+          'playerName': 'Francisco Osorio',
           'cards': [
-            {'name': 'Dreepy', 'count': 4, 'section': 'pokémon'}
+            {
+              'name': 'Dreepy',
+              'count': 4,
+              'section': 'pokémon',
+              'setCode': 'TWM',
+              'collectorNumber': '128',
+              'marketplaceCardId': '287830',
+              'marketplacePath':
+                  '/marketplace/en/cards/575660/card-dreepy-128-167-twilight-masquerade',
+              'imageUrl':
+                  'https://cdn.pokoin.com/previews/287830_dreepy-128-167-twilight-masquerade.webp',
+            }
           ],
+        }
+      ],
+      'decklist': {
+        'decklistId': '27143',
+        'deckId': '284',
+        'deckName': 'Dragapult',
+        'formatLabel': 'Standard',
+        'tournamentId': '544',
+        'tournamentName': 'Regional Campinas',
+        'tournamentDate': '2026-05-10',
+        'placing': 2,
+        'placingLabel': '2nd',
+        'variant': 'Dragapult Dusknoir',
+        'playerId': '6816',
+        'playerName': 'Francisco Osorio',
+        'sourceUrl': 'https://limitlesstcg.com/decks/list/27143',
+      },
+      'cards': [
+        {
+          'name': 'Dreepy',
+          'count': 4,
+          'section': 'pokémon',
+          'setCode': 'TWM',
+          'collectorNumber': '128',
+          'marketplaceCardId': '287830',
+          'marketplacePath':
+              '/marketplace/en/cards/575660/card-dreepy-128-167-twilight-masquerade',
+          'imageUrl':
+              'https://cdn.pokoin.com/previews/287830_dreepy-128-167-twilight-masquerade.webp',
         }
       ],
       'years': [2026, 2025],
@@ -371,6 +522,14 @@ void main() {
     expect(snapshot.deckResults.single.decklistId, '27143');
     expect(snapshot.deckPlayers.single.playerName, 'Nathan O.');
     expect(snapshot.decklists.single.cards.single.name, 'Dreepy');
+    expect(snapshot.decklists.single.playerName, 'Francisco Osorio');
+    expect(snapshot.decklists.single.cards.single.marketplaceCardId, '287830');
+    expect(snapshot.decklists.single.cards.single.imageUrl,
+        contains('cdn.pokoin.com/previews'));
+    expect(snapshot.selectedDecklist?.decklistId, '27143');
+    expect(snapshot.selectedDecklist?.deckName, 'Dragapult');
+    expect(snapshot.selectedDecklist?.placingLabel, '2nd');
+    expect(snapshot.decklistCards.single.name, 'Dreepy');
   });
 
   test('marketplace row uses canonical CardTrader cache price', () {
@@ -393,6 +552,52 @@ void main() {
     expect(card.stock, 0);
     expect(card.price, 420);
     expect(card.isMarketAvailable, isTrue);
+  });
+
+  test('marketplace version row uses canonical homepage cheapest price', () {
+    final service = CardService();
+
+    final card = service.cardFromVersionRowForTest({
+      'card_id': 391030,
+      'name': 'Mega Venusaur ex',
+      'expansion_name': 'Play! Pokémon Prize Pack Series',
+      'expansion_number': '003/132',
+      'rarity': 'Promo',
+      'card_type': 'Trading card',
+      'cdn_image_url': 'https://cdn.pokoin.com/cards/mega-venusaur-ex.webp',
+      'listed_quantity': 7,
+      'lowest_price_pkn': 615,
+      'has_cardtrader_listing': true,
+      'cardtrader_eligible_listing_count': 3,
+    });
+
+    expect(card.stock, 7);
+    expect(card.price, 615);
+    expect(card.hasCardTraderListing, isTrue);
+    expect(card.cardtraderEligibleListingCount, 3);
+    expect(card.isMarketAvailable, isTrue);
+  });
+
+  test('marketplace result rows do not synthesize fallback prices', () {
+    final service = CardService();
+
+    final card = service.cardFromVersionRowForTest({
+      'card_id': 391034,
+      'name': 'Ledian',
+      'expansion_name': 'Play! Pokémon Prize Pack Series',
+      'expansion_number': '003/142',
+      'rarity': 'Promo',
+      'card_type': 'Trading card',
+      'cdn_image_url': 'https://cdn.pokoin.com/cards/ledian.webp',
+      'listed_quantity': 0,
+      'lowest_price_pkn': null,
+      'has_cardtrader_listing': false,
+      'cardtrader_eligible_listing_count': 0,
+    });
+
+    expect(card.price, 0);
+    expect(card.stock, 0);
+    expect(card.isMarketAvailable, isFalse);
   });
 
   test('PokemonCard JSON reads cached CardTrader price fields', () {
@@ -1153,6 +1358,44 @@ void main() {
       });
 
       expect(card.emoji, '🐍 🌿 🔷');
+    });
+
+    test(
+        'version row mapping replaces generic identity emoji for known species',
+        () {
+      final service = CardService();
+
+      final camerupt = service.cardFromVersionRowForTest({
+        'card_id': '391051',
+        'name': 'Mega Camerupt ex',
+        'expansion_name': 'Play! Pokémon Prize Pack Series',
+        'expansion_number': '022/132',
+        'rarity': 'Promo',
+        'card_type': 'Trading card',
+        'emoji': '🃏 ✨ 🎟️',
+      });
+      final sharpedo = service.cardFromVersionRowForTest({
+        'card_id': '356913',
+        'name': 'Mega Sharpedo ex',
+        'expansion_name': 'Phantasmal Flames',
+        'expansion_number': 'Special Illustration Rare | 127/094',
+        'rarity': 'Special Illustration Rare',
+        'card_type': 'Trading card',
+        'emoji': '🃏 ✨ 🎨',
+      });
+      final regirock = service.cardFromVersionRowForTest({
+        'card_id': '370745',
+        'name': 'Regirock ex',
+        'expansion_name': 'Ascended Heroes',
+        'expansion_number': 'Ultra Rare | 107/217',
+        'rarity': 'Ultra Rare',
+        'card_type': 'Trading card',
+        'emoji': '🃏 ✨ 💎',
+      });
+
+      expect(camerupt.emoji, '🐫 🌋 🎟️');
+      expect(sharpedo.emoji, '🦈 🌊 🎨');
+      expect(regirock.emoji, '🪨 🌟 💎');
     });
 
     test('provider remote result helper preserves backend rank, not names', () {
@@ -2100,7 +2343,7 @@ void main() {
       expect(service.autocompleteWithContextCalls, 0);
     });
 
-    test('typed query immediately clears unrelated empty hot previews', () {
+    test('typed query retains empty hot previews while backend is pending', () {
       final service = _CountingCardService();
       final notifier = CardNotifier(
         cardService: service,
@@ -2118,7 +2361,7 @@ void main() {
 
       expect(notifier.state.previewQuery, 'pika');
       expect(notifier.state.isSearchingPreviews, isTrue);
-      expect(notifier.state.searchPreviews, isEmpty);
+      expect(notifier.state.searchPreviews.map((card) => card.id), ['1', '2']);
     });
 
     test('typed query uses ranked context fallback while loading', () async {
@@ -3224,6 +3467,62 @@ void main() {
       ]);
     });
 
+    test('fresh rare candy query keeps cached hot previews while pending',
+        () async {
+      final hotCard = _searchCard(id: 'hot-1', name: 'Charizard ex');
+      final rareCandy = _searchCard(
+        id: '131642',
+        name: 'Rare Candy',
+        set: 'Unleashed',
+        number: '82/95',
+      );
+      final service = _MarketplaceWarmupCardService(
+        cachedSnapshot: MarketplaceHomeSnapshot(
+          cards: [hotCard],
+          sections: MarketplaceHomeSections(
+            recentlySeenIds: const [],
+            bestSellerIds: [hotCard.id],
+            featuredIds: const [],
+          ),
+        ),
+      )
+        ..autocompleteDelay = const Duration(milliseconds: 250)
+        ..autocompleteResponses = {
+          'rare candy': _AutocompleteFixture(
+            cards: [rareCandy],
+            context: _contextForLabels(
+              'rare candy',
+              const [
+                SearchCandidateLabel(
+                  id: '131642',
+                  name: 'Rare Candy',
+                  setName: 'Unleashed',
+                  number: '82/95',
+                ),
+              ],
+              latestDepth: 9,
+            ),
+          ),
+        };
+      final notifier = CardNotifier(
+        cardService: service,
+        autoLoad: true,
+      );
+      addTearDown(notifier.dispose);
+
+      await Future<void>.delayed(Duration.zero);
+
+      notifier.searchPreviewsOnly('rare candy');
+      expect(notifier.state.isSearchingPreviews, isTrue);
+      expect(notifier.state.searchPreviews.map((card) => card.id), ['hot-1']);
+
+      await Future<void>.delayed(const Duration(milliseconds: 420));
+
+      expect(service.autocompleteWithContextCalls, 1);
+      expect(notifier.state.isSearchingPreviews, isFalse);
+      expect(notifier.state.searchPreviews.map((card) => card.id), ['131642']);
+    });
+
     test('Flutter 2pikabench warms then renders ranked local fallback',
         () async {
       final service = _SequenceCardService(
@@ -3893,11 +4192,17 @@ class _MarketplaceWarmupCardService extends CardService {
 
   final MarketplaceHomeSnapshot? cachedSnapshot;
   final MarketplaceHomeSnapshot? snapshot;
+  final Map<String, PokemonCard> cardsById = {};
+  Map<String, _AutocompleteFixture> autocompleteResponses = const {};
+  Duration autocompleteDelay = Duration.zero;
+  Duration cardByIdDelay = Duration.zero;
   int cachedCardsCalls = 0;
   int cachedSnapshotCalls = 0;
   int cachedSpotlightCalls = 0;
   int marketplaceSnapshotCalls = 0;
   int allCardsCalls = 0;
+  int cardByIdCalls = 0;
+  int autocompleteWithContextCalls = 0;
 
   @override
   Future<List<PokemonCard>> getCachedCards() async {
@@ -3927,6 +4232,47 @@ class _MarketplaceWarmupCardService extends CardService {
   Future<List<PokemonCard>> getAllCards() async {
     allCardsCalls++;
     return const [];
+  }
+
+  @override
+  Future<PokemonCard?> getCardById(String id) async {
+    cardByIdCalls++;
+    if (cardByIdDelay > Duration.zero) {
+      await Future<void>.delayed(cardByIdDelay);
+    }
+    return cardsById[id];
+  }
+
+  @override
+  Future<SearchAutocompleteResult> searchAutocompleteCardsWithContext(
+    String query, {
+    int limit = 20,
+    int poolLimit = 15874,
+    String searchLanguage = 'en',
+    String previewMode = '',
+    SearchAutocompleteContext? previousSearchContext,
+    SearchTokenPredictionContext? predictionContext,
+    String? searchSessionId,
+  }) async {
+    autocompleteWithContextCalls++;
+    if (autocompleteDelay > Duration.zero) {
+      await Future<void>.delayed(autocompleteDelay);
+    }
+    final fixture = autocompleteResponses[query];
+    return SearchAutocompleteResult(
+      cards: fixture?.cards ?? const [],
+      context: fixture?.context,
+    );
+  }
+
+  @override
+  Future<SearchTokenPredictionResult> predictSearchNameTokensWithContext(
+    String query, {
+    int limit = 5,
+    String searchLanguage = 'en',
+    SearchTokenPredictionContext? previousPredictionContext,
+  }) async {
+    return const SearchTokenPredictionResult();
   }
 }
 

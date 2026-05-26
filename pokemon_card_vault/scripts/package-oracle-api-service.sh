@@ -8,6 +8,7 @@ cd "$ROOT_DIR"
 
 rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR/api" "$OUT_DIR/server" "$OUT_DIR/scripts" "$OUT_DIR/docs"
+mkdir -p "$OUT_DIR/deploy/systemd"
 
 cp package.json "$OUT_DIR/package.json"
 if [[ -f package-lock.json ]]; then
@@ -21,7 +22,11 @@ cp scripts/check-oracle-api-server.js "$OUT_DIR/scripts/check-oracle-api-server.
 cp scripts/refresh-cardtrader-blueprint-listing-cache.js "$OUT_DIR/scripts/refresh-cardtrader-blueprint-listing-cache.js"
 cp scripts/refresh-cardtrader-market-listings.js "$OUT_DIR/scripts/refresh-cardtrader-market-listings.js"
 cp scripts/run-cardtrader-daily-market-refresh.sh "$OUT_DIR/scripts/run-cardtrader-daily-market-refresh.sh"
+cp scripts/run-limitless-daily-competitive-sync.sh "$OUT_DIR/scripts/run-limitless-daily-competitive-sync.sh"
+cp scripts/sync-limitless-competitive.js "$OUT_DIR/scripts/sync-limitless-competitive.js"
 cp scripts/smoke-oracle-api-routes.js "$OUT_DIR/scripts/smoke-oracle-api-routes.js"
+cp deploy/systemd/pokoin-limitless-competitive-sync.service "$OUT_DIR/deploy/systemd/pokoin-limitless-competitive-sync.service"
+cp deploy/systemd/pokoin-limitless-competitive-sync.timer "$OUT_DIR/deploy/systemd/pokoin-limitless-competitive-sync.timer"
 cp docs/oracle-api-migration.md "$OUT_DIR/docs/oracle-api-migration.md"
 
 cat > "$OUT_DIR/README.md" <<'README'

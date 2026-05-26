@@ -405,6 +405,19 @@ Vercel compatibility rewrite are available.
 - Notable env vars: `CRYPTO_PKN_SELL_ENABLED`, `CRYPTO_PKN_AUTO_PAYOUT_ENABLED`, `FIREBASE_*`, `POKOIN_RPC_URL`, `POKOIN_BANK_ADDRESS`, `POKOIN_BANK_PRIVATE_KEY`
 - External dependencies: Firebase Admin, Pokoin RPC, configured crypto payout services
 
+### /api/deck-card-version-lookup
+
+- File: `api/deck-card-version-lookup.js`
+- Methods: `GET`, `POST`, `OPTIONS`
+- Purpose: Return ranked marketplace card versions for structured decklist card fields.
+- Auth: Public.
+- Migration status: Hosted by `server/oracle-api-server.js`; Vercel fallback remains available until the proxy rewrite is enabled.
+- Required query/body/path params:
+- query: `name`, `setCode`, `collectorNumber`, optional Limitless expansion fields, `language`, and `limit` are supported.
+- body: Same fields as query parameters for POST.
+- Notable env vars: `MARKETPLACE_DATABASE_URL`
+- External dependencies: Oracle/Postgres marketplace DB
+
 ### /api/extension-card-search
 
 - File: `api/extension-card-search.js`
@@ -489,6 +502,18 @@ Vercel compatibility rewrite are available.
 - body: `imageBase64` and either `topicId` or `postId`.
 - Notable env vars: `FIREBASE_*`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_FORUM_MEDIA_BUCKET`, `R2_FORUM_MEDIA_PUBLIC_URL`
 - External dependencies: Firebase Admin, Supabase REST, Cloudflare R2, sharp
+
+### /api/limitless-expansion-blueprints
+
+- File: `api/limitless-expansion-blueprints.js`
+- Methods: `GET`
+- Purpose: Return Limitless expansion-to-Pokoin blueprint mapping rows.
+- Auth: Public.
+- Migration status: Hosted by `server/oracle-api-server.js`; Vercel fallback remains available until the proxy rewrite is enabled.
+- Required query/body/path params:
+- query: `expansionKey`, `setCode`, `name`, `includeBlueprints=1`, and `limit` are supported.
+- Notable env vars: `MARKETPLACE_DATABASE_URL`
+- External dependencies: Oracle/Postgres marketplace DB
 
 ### /api/marketplace-artist-cards
 
@@ -987,14 +1012,13 @@ Vercel compatibility rewrite are available.
 
 - File: `api/trainingai-card-classify.js`
 - Methods: `POST`, `OPTIONS`
-- Purpose: Proxy card image classification requests to the Pokoin TrainingAI Hugging Face Space.
-- Auth: Public by default; protect upstream Space with TRAININGAI_HF_TOKEN when private.
+- Purpose: Proxy card image classification requests to the Pokoin TrainingAI Oracle classifier or Hugging Face Space fallback.
+- Auth: Public by default; protect upstream classifier with TRAININGAI_HF_TOKEN when private.
 - Migration status: Hosted by `server/oracle-api-server.js`; Vercel fallback remains available until the proxy rewrite is enabled.
 - Required query/body/path params:
-- body: `imageBase64` required; `topK` optional from 1 to 10.
-- Notable env vars: `TRAININGAI_HF_SPACE_URL`, `TRAININGAI_HF_TOKEN`, `TRAININGAI_CLASSIFIER_TIMEOUT_MS`, `TRAININGAI_CLASSIFIER_MAX_IMAGE_BYTES`
-- External dependencies: Hugging Face Space classifier
-- Raw body: required. The standalone server does not pre-parse this route so Stripe signature verification receives the original bytes.
+- body: `imageBase64` JSON or multipart image upload required; `topK`/`top_k` optional from 1 to 10.
+- Notable env vars: `TRAININGAI_CLASSIFIER_URL`, `TRAININGAI_HF_TOKEN`, `TRAININGAI_CLASSIFIER_TIMEOUT_MS`, `TRAININGAI_CLASSIFIER_MAX_IMAGE_BYTES`
+- External dependencies: TrainingAI Oracle classifier or Hugging Face Space classifier
 
 ### /api/transfer-account-balance
 

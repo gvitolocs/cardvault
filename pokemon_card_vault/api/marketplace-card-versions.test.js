@@ -2,6 +2,10 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 
 const {
+  _test: deckLookupTest,
+} = require('./deck-card-version-lookup');
+
+const {
   candidateRowsForCardId,
   cardDetailSlugParts,
   cardIdFromDoubledId,
@@ -16,17 +20,50 @@ const {
   rowsForVersions,
 } = require('./marketplace-card-versions');
 
-test('card versions payload SQL does not use CardTrader availability cache', async () => {
+test('card versions fallback row uses canonical homepage cheapest cache', async () => {
   const captured = [];
   await candidateRowsForCardId('316600', async (sql, values) => {
     captured.push({ sql, values });
+    if (sql.includes('to_regclass')) {
+      return { rows: [{ relation: 'public.cheapest_homepage_cache_blueprint' }] };
+    }
     return { rows: [] };
   });
 
-  assert.doesNotMatch(captured[0].sql, /cardtrader_blueprint_listing_cache/);
-  assert.doesNotMatch(captured[0].sql, /cardtrader_listed_quantity/);
-  assert.doesNotMatch(captured[0].sql, /cardtrader_lowest_price_pkn/);
-  assert.doesNotMatch(captured[0].sql, /cardtrader_market_listing_snapshots/);
+  assert.equal(captured.length, 2);
+  assert.match(captured[1].sql, /public\.cheapest_homepage_cache_blueprint/);
+  assert.match(captured[1].sql, /cardtrader\.cheapest_price_pkn as lowest_price_pkn/);
+  assert.match(captured[1].sql, /cardtrader_eligible_listing_count/);
+  assert.doesNotMatch(captured[1].sql, /price_summary\.lowest_ask_pkn as lowest_price_pkn/);
+  assert.doesNotMatch(captured[1].sql, /cardtrader_market_listing_snapshots/);
+});
+
+test('deck card lookup ranks Dreepy TWM 128 before Fusion Strike', () => {
+  const rows = deckLookupTest.rankDeckVersionRows(
+    [
+      {
+        card_id: 'fs',
+        name: 'Dreepy',
+        expansion_name: 'Fusion Strike',
+        expansion_number: '128/264',
+        expansion_code: 'FST',
+        product_type: 'card',
+      },
+      {
+        card_id: 'twm',
+        name: 'Dreepy',
+        expansion_name: 'Twilight Masquerade',
+        expansion_number: '128/167',
+        expansion_code: 'TWM',
+        product_type: 'card',
+      },
+    ],
+    { name: 'Dreepy', setCode: 'TWM', collectorNumber: '128' },
+  );
+
+  assert.equal(rows[0].card_id, 'twm');
+  assert.equal(rows[0].match.setCode, 'exact');
+  assert.equal(rows[0].match.collectorNumber, 'exact');
 });
 
 test('card detail slug parser ignores punctuation and numeric separators', () => {
@@ -184,6 +221,52 @@ test('card versions payload repairs Servine-style two-token emoji', async () => 
   assert.equal(rows[0].rarity, 'Uncommon');
   assert.equal(rows[0].rarityVariantEmoji, '🔷');
   assert.equal(rows[0].emoji, '🐍 🌿 🔷');
+});
+
+test('card versions rows use canonical homepage cheapest availability', async () => {
+  const captured = [];
+  await rowsForVersions({
+    expansionName: 'Play! Pokémon Prize Pack Series',
+    productType: 'card',
+    limit: 10,
+    dbQuery: async (sql, values) => {
+      captured.push({ sql, values });
+      if (sql.includes('to_regclass')) {
+        return { rows: [{ relation: 'public.cheapest_homepage_cache_blueprint' }] };
+      }
+      return {
+        rows: [
+          {
+            card_id: '391030',
+            name: 'Mega Venusaur ex',
+            expansion_name: 'Play! Pokémon Prize Pack Series',
+            expansion_number: '003/132',
+            product_variant: '',
+            blueprint_id: '391030',
+            image_url: 'https://cdn.pokoin.test/mega-venusaur-ex.webp',
+            product_type: 'card',
+            rarity: 'Promo',
+            card_type: 'Trading card',
+            listed_quantity: 4,
+            lowest_price_pkn: '615',
+            has_cardtrader_listing: true,
+            cardtrader_eligible_listing_count: 3,
+          },
+        ],
+      };
+    },
+  });
+
+  const versionQuery = captured.at(-1);
+  assert.match(versionQuery.sql, /public\.cheapest_homepage_cache_blueprint/);
+  assert.match(versionQuery.sql, /cardtrader\.cheapest_price_pkn as lowest_price_pkn/);
+  assert.match(versionQuery.sql, /cardtrader_eligible_listing_count/);
+  assert.doesNotMatch(versionQuery.sql, /price_summary\.lowest_ask_pkn as lowest_price_pkn/);
+  assert.deepEqual(versionQuery.values, [
+    'Play! Pokémon Prize Pack Series',
+    'card',
+    10,
+  ]);
 });
 
 test('slug match clause can use projected collector number', () => {

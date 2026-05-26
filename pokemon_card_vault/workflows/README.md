@@ -190,7 +190,9 @@ reconstructing commands from chat history.
    recognition training without exposing write credentials. It serves a styled
    Pokoin guide and import examples at `/`, a paginated JSON manifest at
    `/manifest.json` or `/images.json`, and card image objects at
-   `/images/<object-key>`. The
+   `/images/<object-key>`. It also serves the Oracle-derived classifier dataset
+   manifest at `/blueprints/best-images.json`, with one best non-homepage image
+   per CardTrader blueprint for incremental Colab embedding jobs. The
    `trainingai.pokoin.com` hostname should be configured as a Worker custom
    domain, not an R2 public bucket custom domain, so requests reach the Worker
    before any bucket access.
@@ -203,11 +205,38 @@ reconstructing commands from chat history.
    non-card/user-media prefixes; and can be made token-protected by setting the
    Worker secret `TRAININGAI_ACCESS_TOKEN`. If that secret is absent, the route
    is intentionally public read-only.
+   Regenerate and publish the best-blueprint manifest from Oracle/Postgres with:
+   ```bash
+   npm run trainingai:best-images -- --upload-r2
+   workflows/deploy-trainingai-cardvault-images.sh
+   curl -fsS https://trainingai.pokoin.com/blueprints/best-images.json \
+     | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).count))"
+   ```
+   The generator reads `MARKETPLACE_DATABASE_URL` from `.env.local` by default,
+   writes `data/trainingai/best-blueprint-images.json`, uploads it to
+   `cardvault-images/manifests/best-blueprint-images.json` when `--upload-r2` is
+   set, and never prints database or Cloudflare credentials.
    The same Worker also exposes `POST /api/classify` as the public TrainingAI
-   classifier entrypoint. Configure Worker secret `TRAININGAI_CLASSIFIER_URL`
-   (or `TRAININGAI_HF_SPACE_URL`) with the Hugging Face Space base URL, for
-   example `https://<user>-<space>.hf.space`. If the Space is private, also set
-   `TRAININGAI_HF_TOKEN`. The endpoint accepts either multipart upload:
+   classifier entrypoint. Prefer running the classifier on a lightweight Oracle
+   VM with Colab-generated `pokemon.index`, `metadata.json`, and
+   `card_paths.json` artifacts. Deploy the Oracle classifier with:
+   ```bash
+   TRAININGAI_ORACLE_SSH_TARGET=ubuntu@<oracle-vm-ip> \
+   TRAININGAI_ORACLE_SSH_KEY=/path/to/private.key \
+   workflows/deploy-trainingai-oracle-classifier.sh
+   ```
+   The service listens on the VM at `127.0.0.1:17860` by default and exposes
+   `/health`, `/classify`, and `/classify/base64`. Put a small reverse proxy in
+   front of it, for example `https://trainingai-api.pokoin.com`, then point the
+   Worker at that base URL:
+   ```bash
+   wrangler secret put TRAININGAI_CLASSIFIER_URL --config wrangler.trainingai-cardvault-images.jsonc
+   workflows/deploy-trainingai-cardvault-images.sh
+   ```
+   Hugging Face Spaces remains a fallback: `TRAININGAI_CLASSIFIER_URL` can also
+   be set to `https://<user>-<space>.hf.space`. If the classifier backend is
+   private, also set `TRAININGAI_HF_TOKEN`. The public endpoint accepts either
+   multipart upload:
    ```bash
    curl -X POST https://trainingai.pokoin.com/api/classify \
      -F "image=@card.jpg" \
@@ -219,6 +248,11 @@ reconstructing commands from chat history.
      -H "Content-Type: application/json" \
      -d '{"imageBase64":"<base64>","topK":3}'
    ```
+   Full Oracle classifier workflow: `workflows/trainingai-oracle-classifier-workflow.md`.
+   The Worker also has an hourly cron trigger (`0 * * * *`) that sends a light
+   `GET /health` keep-alive to `TRAININGAI_CLASSIFIER_URL` when configured. This
+   is intended for a Hugging Face free-tier Space fallback and is intentionally
+   hourly rather than aggressive.
 
    Cloudflare security for this hostname must keep the hostname-scoped legacy
    firewall bypass rule `Bypass legacy WAF for TrainingAI read-only image
@@ -227,7 +261,10 @@ reconstructing commands from chat history.
    WAF was blocking the originless Worker before Worker code executed. If
    Cloudflare returns `403` with body `Your request was blocked.` before the
    `x-cardvault-trainingai-worker` header appears, check that bypass rule and
-   the Worker custom domain before changing global security settings.
+   the Worker custom domain before changing global security settings. The
+   read-only skip rule must also allow `GET/HEAD/OPTIONS` for
+   `/blueprints/best-images.json`; the classifier API has a separate narrow
+   skip rule for `POST/OPTIONS /api/classify`.
 
    Fetch all manifest pages:
    ```bash
@@ -444,6 +481,8 @@ reconstructing commands from chat history.
   curl -I https://trainingai.pokoin.com/
   curl -sS https://trainingai.pokoin.com/ | sed -n '1,8p'
   curl -sS https://trainingai.pokoin.com/manifest.json?limit=5
+  curl -sS https://trainingai.pokoin.com/blueprints/best-images.json \
+    | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).count))"
   curl -sS "https://trainingai.pokoin.com/manifest.json?limit=1000&cursor=<nextCursor>"
   curl -I https://trainingai.pokoin.com/images/<object-key>
   ```

@@ -16,11 +16,7 @@ Future<bool> navigateToCanonicalCardDetail(
   CardService? cardService,
   bool replace = false,
 }) async {
-  final path = await canonicalCardDetailNavigationPath(
-    card,
-    language: language,
-    cardService: cardService,
-  );
+  final path = immediateCardDetailNavigationPath(card, language: language);
   if (!context.mounted) {
     return false;
   }
@@ -35,6 +31,10 @@ Future<bool> navigateToCanonicalCardDetail(
     context.go(path, extra: extra);
   }
   return true;
+}
+
+String immediateCardDetailNavigationPath(PokemonCard card, {String language = 'en'}) {
+  return safeCardDetailPath(card, language: language);
 }
 
 Future<String> canonicalCardDetailNavigationPath(

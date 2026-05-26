@@ -477,6 +477,35 @@ WorkingDirectory=/opt/pokemon_card_vault
 ExecStart=/usr/bin/env bash scripts/run-cardtrader-daily-market-refresh.sh
 ```
 
+### Limitless Competitive Daily Sync
+
+Competitive Limitless data follows the same rule: import it into Oracle on a
+schedule, then serve `/marketplace/competitive` and `/api/marketplace-competitive`
+from Oracle Postgres only. Do not put live Limitless fetches in the request path.
+
+The checked-in runner and units are:
+
+```text
+scripts/run-limitless-daily-competitive-sync.sh
+deploy/systemd/pokoin-limitless-competitive-sync.service
+deploy/systemd/pokoin-limitless-competitive-sync.timer
+```
+
+On peer3, install or update them from the deployed Oracle API directory:
+
+```bash
+cd /home/ubuntu/pokoin-oracle-api/current
+chmod +x scripts/run-limitless-daily-competitive-sync.sh
+sudo install -m 644 deploy/systemd/pokoin-limitless-competitive-sync.service /etc/systemd/system/pokoin-limitless-competitive-sync.service
+sudo install -m 644 deploy/systemd/pokoin-limitless-competitive-sync.timer /etc/systemd/system/pokoin-limitless-competitive-sync.timer
+sudo systemctl daemon-reload
+sudo systemctl enable --now pokoin-limitless-competitive-sync.timer
+```
+
+The timer runs daily at `04:20` with `Persistent=true` and invokes
+`scripts/sync-limitless-competitive.js --apply` through the wrapper with
+conservative public deck/tournament limits and request delay defaults.
+
 The apply path should call
 `public.refresh_cardtrader_market_listing_snapshots(...)` on peer4. Expected
 semantics:
@@ -2544,9 +2573,14 @@ Selection and crop rules:
   art.
 - Use full-size `cdn_image_url`/`image_url` sources, not `preview_image_url` or
   generated homepage crops.
-- Crop a square from top-center (`x` centered, `y` about 10% down, clamped to
-  image bounds), resize to 512x512 PNG, and upload to
+- Crop a smaller square from the upper artwork area (`x` centered, `y` about
+  18% down, with the bottom bounded to the upper half/art panel), resize to
+  512x512 PNG, and upload to
   `artist-profiles/generated/<artist-slug>.png`.
+- For regeneration of previously generated fallbacks, require
+  `--regenerate-generated-fallbacks` so real human portraits are not
+  overwritten. The current row must still point at
+  `artist-profiles/generated/...`.
 - Store provenance in `source_attribution.generatedProfileImage` and
   `raw_metadata.generatedProfileImage`: source card/blueprint ids, rarity,
   source image URL/object key, generation reason, crop strategy, and
@@ -2557,16 +2591,21 @@ Operator flow:
 ```bash
 node scripts/generate-artist-fallback-avatars.js \
   --artist="Aky CG Works" \
+  --regenerate-generated-fallbacks \
+  --sample-dir=workflows/reports/artist-fallback-avatar-samples-YYYYMMDD \
+  --sample-limit=3 \
   --write-report=workflows/reports/artist-fallback-avatar-dry-run-YYYYMMDD-sample.json
 
 node scripts/generate-artist-fallback-avatars.js \
   --apply \
   --artist="Aky CG Works" \
+  --regenerate-generated-fallbacks \
   --concurrency=1 \
   --write-report=workflows/reports/artist-fallback-avatar-apply-YYYYMMDD-sample.json
 
 node scripts/generate-artist-fallback-avatars.js \
   --apply \
+  --regenerate-generated-fallbacks \
   --limit=all \
   --concurrency=2 \
   --write-report=workflows/reports/artist-fallback-avatar-apply-YYYYMMDD-full.json

@@ -372,3 +372,23 @@ test('CardTrader refresh reports derived listing cache count', async () => {
   assert.equal(result.cacheRefreshedCount, 4);
   assert.match(calls[0].sql, /refresh_cardtrader_market_listing_snapshots/);
 });
+
+test('CardTrader market refresh SQL includes native listings in homepage cache', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const sql = fs.readFileSync(
+    path.join(__dirname, '..', 'oracle-postgres', 'schema', '012_cardtrader_market_listings.sql'),
+    'utf8',
+  );
+
+  assert.match(sql, /eligible_native as/);
+  assert.match(sql, /from public\.marketplace_user_listings/);
+  assert.match(sql, /native_listing\.status = 'active'/);
+  assert.match(sql, /coalesce\(native_listing\.quantity_available, 0\) > 0/);
+  assert.match(sql, /native_listing\.price_pkn > 0/);
+  assert.match(sql, /coalesce\(native_listing\.shipping_available, true\) = true/);
+  assert.match(sql, /native_listing\.nft_available = true/);
+  assert.match(sql, /union all/);
+  assert.match(sql, /case when eligible\.provider = 'pokoin_native' then 0 else 1 end/);
+  assert.match(sql, /cache\.provider in \(v_provider, 'pokoin_native'\)/);
+});

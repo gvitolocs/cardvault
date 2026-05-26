@@ -22,7 +22,8 @@ function cleanTopK(value) {
 
 function configuredSpaceUrl() {
   const raw = String(
-    process.env.TRAININGAI_HF_SPACE_URL ||
+    process.env.TRAININGAI_CLASSIFIER_URL ||
+      process.env.TRAININGAI_HF_SPACE_URL ||
       process.env.HF_SPACE_URL ||
       '',
   ).trim();
@@ -74,7 +75,7 @@ function decodeImageBase64(value) {
 function baseClassifierRequest() {
   const baseUrl = configuredSpaceUrl();
   if (!baseUrl) {
-    const error = new Error('TRAININGAI_HF_SPACE_URL is not configured.');
+    const error = new Error('TRAININGAI_CLASSIFIER_URL is not configured.');
     error.statusCode = 503;
     throw error;
   }

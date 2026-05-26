@@ -1,5 +1,18 @@
 const { marketplaceQuery } = require('./_marketplace_db');
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Max-Age': '86400',
+};
+
+function applyCorsHeaders(res) {
+  for (const [key, value] of Object.entries(CORS_HEADERS)) {
+    res.setHeader(key, value);
+  }
+}
+
 function cleanLimit(value, fallback = 40, max = 120) {
   if (value == null || value === '') return fallback;
   const limit = Number(value);
@@ -36,6 +49,28 @@ function wants(value) {
 
 function isMissingPublicLimitlessTable(error) {
   return error?.code === '42P01' && /limitless_public_/.test(String(error.message || ''));
+}
+
+let hasBlueprintMappingTableCache;
+
+async function hasBlueprintMappingTable({ query = marketplaceQuery } = {}) {
+  if (hasBlueprintMappingTableCache != null && query === marketplaceQuery) {
+    return hasBlueprintMappingTableCache;
+  }
+  try {
+    const result = await query(
+      "select to_regclass('public.limitless_marketplace_expansion_blueprints') is not null as exists",
+    );
+    const exists = result.rows[0]?.exists === true;
+    if (query === marketplaceQuery) hasBlueprintMappingTableCache = exists;
+    return exists;
+  } catch (error) {
+    if (error?.code === '42P01' || /unexpected query/i.test(String(error.message || ''))) {
+      if (query === marketplaceQuery) hasBlueprintMappingTableCache = false;
+      return false;
+    }
+    throw error;
+  }
 }
 
 function formatLabel(gameRow, formatId) {
@@ -210,6 +245,114 @@ function deckCardFromRow(row) {
   };
 }
 
+function deckCardImageJoinSql(
+  sourceAlias = 'core',
+  nameColumn = 'display_name',
+  { useBlueprintMapping = false, useFallbackScan = false } = {},
+) {
+  const sourceNameSql = `${sourceAlias}.${nameColumn}`;
+  return `
+      ${useBlueprintMapping ? `left join lateral (
+        select
+          c.card_id,
+          coalesce(urls.canonical_path, '') as marketplace_card_path,
+          coalesce(
+            nullif(c.preview_image_url, ''),
+            nullif(c.homepage_image_url, ''),
+            nullif(c.cdn_image_url, ''),
+            nullif(c.image_url, ''),
+            ''
+          ) as marketplace_image_url
+        from public.limitless_marketplace_expansion_blueprints mapping
+        join public.marketplace_search_candidates c
+          on c.card_id = mapping.blueprint_id
+        left join public.marketplace_card_urls urls
+          on urls.card_id = c.card_id and urls.language = 'en'
+        where c.item_kind = 'single'
+          and (
+            nullif(${sourceAlias}.set_code, '') is null
+            or lower(mapping.set_code) = lower(${sourceAlias}.set_code)
+          )
+          and (
+            nullif(${sourceAlias}.collector_number, '') is null
+            or mapping.normalized_collector_number = regexp_replace(
+              lower(coalesce(substring(${sourceAlias}.collector_number from '[A-Za-z]*0*([0-9]+[A-Za-z]?)'), ${sourceAlias}.collector_number)),
+              '[^a-z0-9]+',
+              '',
+              'g'
+            )
+          )
+          and (
+            regexp_replace(lower(mapping.card_name), '[^a-z0-9]+', '', 'g') =
+              regexp_replace(lower(coalesce(${sourceNameSql}, '')), '[^a-z0-9]+', '', 'g')
+            or regexp_replace(lower(mapping.limitless_card_name), '[^a-z0-9]+', '', 'g') =
+              regexp_replace(lower(coalesce(${sourceNameSql}, '')), '[^a-z0-9]+', '', 'g')
+          )
+        order by mapping.match_confidence desc, c.search_weight desc, c.imported_at desc nulls last, c.card_id asc
+        limit 1
+      ) mapped_card on true` : `
+      left join lateral (
+        select
+          null::bigint as card_id,
+          ''::text as marketplace_card_path,
+          ''::text as marketplace_image_url
+        where false
+      ) mapped_card on true`}
+      ${useFallbackScan ? `left join lateral (
+        select
+          c.card_id,
+          coalesce(urls.canonical_path, '') as marketplace_card_path,
+          coalesce(
+            nullif(c.preview_image_url, ''),
+            nullif(c.homepage_image_url, ''),
+            nullif(c.cdn_image_url, ''),
+            nullif(c.image_url, ''),
+            ''
+          ) as marketplace_image_url
+        from public.marketplace_search_candidates c
+        left join public.cardtrader_pokemon_blueprints b on b.id = c.card_id
+        cross join lateral (
+          select
+            regexp_replace(lower(coalesce(nullif(c.canonical_name, ''), c.name)), '[^a-z0-9]+', '', 'g') as candidate_name,
+            regexp_replace(lower(coalesce(${sourceNameSql}, '')), '[^a-z0-9]+', '', 'g') as source_name,
+            regexp_replace(lower(coalesce(nullif(c.card_number, ''), nullif(b.version, ''), nullif(b.blueprint->>'number', ''), nullif(b.blueprint->>'collector_number', ''), nullif(b.blueprint->>'card_number', ''))), '[^a-z0-9]+', '', 'g') as candidate_number,
+            regexp_replace(lower(coalesce(nullif(${sourceAlias}.collector_number, ''), ${sourceAlias}.card_key)), '[^a-z0-9]+', '', 'g') as source_number,
+            lower(coalesce(nullif(b.expansion->>'code', ''), nullif(b.blueprint->>'expansion_code', ''), nullif(b.blueprint->>'set_code', ''))) as candidate_set_code,
+            lower(coalesce(nullif(${sourceAlias}.set_code, ''), split_part(coalesce(${sourceNameSql}, ''), ' ', 1))) as source_set_code
+        ) normalized
+        left join public.marketplace_card_urls urls
+          on urls.card_id = c.card_id and urls.language = 'en'
+        where mapped_card.card_id is null
+          and c.item_kind = 'single'
+          and normalized.source_name <> ''
+          and (
+            normalized.candidate_name = normalized.source_name
+            or (
+              normalized.source_number <> ''
+              and (
+                normalized.candidate_number = normalized.source_number
+                or normalized.candidate_number like normalized.source_number || '%'
+              )
+              and (
+                normalized.source_set_code = ''
+                or normalized.candidate_set_code = normalized.source_set_code
+                or lower(c.set_name) = normalized.source_set_code
+              )
+            )
+          )
+        order by c.search_weight desc, c.imported_at desc nulls last, c.card_id asc
+        limit 1
+      ) fallback_card on true` : `
+      left join lateral (
+        select
+          null::bigint as card_id,
+          ''::text as marketplace_card_path,
+          ''::text as marketplace_image_url
+        where false
+      ) fallback_card on true`}
+  `;
+}
+
 function deckResultFromRow(row) {
   return {
     tournamentId: row.tournament_id || '',
@@ -223,6 +366,28 @@ function deckResultFromRow(row) {
     playerName: row.player_name || '',
     decklistId: cleanDecklistId(row.decklist_id),
     sourceUrl: row.source_url || '',
+  };
+}
+
+function decklistDetailFromRow(row) {
+  const decklistId = cleanDecklistId(row.decklist_id);
+  return {
+    decklistId,
+    deckId: row.deck_id ? String(row.deck_id) : '',
+    deckName: row.deck_name || row.name || '',
+    format: row.format || '',
+    formatLabel: row.format_label || row.format || '',
+    tournamentId: row.tournament_id || '',
+    tournamentName: row.tournament_name || '',
+    tournamentDate: row.tournament_date || null,
+    placing: row.placing,
+    placingLabel: row.placing_label || '',
+    variant: row.variant || '',
+    playerId: row.player_id || '',
+    playerName: row.player_name || '',
+    sourceUrl: row.source_url || (decklistId ? `https://limitlesstcg.com/decks/list/${encodeURIComponent(decklistId)}` : ''),
+    deckSourceUrl: row.deck_source_url || '',
+    tournamentSourceUrl: row.tournament_source_url || '',
   };
 }
 
@@ -817,6 +982,10 @@ async function fetchDeckDetail({
 } = {}) {
   const id = cleanDeckId(deckId);
   if (!id) return null;
+  const useBlueprintMapping = query === marketplaceQuery
+    ? await hasBlueprintMappingTable({ query })
+    : false;
+  const useFallbackScan = query !== marketplaceQuery;
   const deckResult = await query(
     `
       select *
@@ -833,55 +1002,11 @@ async function fetchDeckDetail({
     `
       select
         core.*,
-        c.card_id as marketplace_card_id,
-        coalesce(urls.canonical_path, '') as marketplace_card_path,
-        coalesce(
-          nullif(c.preview_image_url, ''),
-          nullif(c.homepage_image_url, ''),
-          nullif(c.cdn_image_url, ''),
-          nullif(c.image_url, ''),
-          ''
-        ) as marketplace_image_url
+        coalesce(mapped_card.card_id, fallback_card.card_id) as marketplace_card_id,
+        coalesce(mapped_card.marketplace_card_path, fallback_card.marketplace_card_path, '') as marketplace_card_path,
+        coalesce(mapped_card.marketplace_image_url, fallback_card.marketplace_image_url, '') as marketplace_image_url
       from public.limitless_public_deck_core_cards core
-      left join lateral (
-        select
-          c.card_id,
-          c.preview_image_url,
-          c.homepage_image_url,
-          c.cdn_image_url,
-          c.image_url
-        from public.marketplace_search_candidates c
-        left join public.cardtrader_pokemon_blueprints b on b.id = c.card_id
-        cross join lateral (
-          select
-            regexp_replace(lower(coalesce(nullif(c.canonical_name, ''), c.name)), '[^a-z0-9]+', '', 'g') as candidate_name,
-            regexp_replace(lower(core.display_name), '[^a-z0-9]+', '', 'g') as core_name,
-            regexp_replace(lower(coalesce(nullif(c.card_number, ''), nullif(b.version, ''), nullif(b.blueprint->>'number', ''), nullif(b.blueprint->>'collector_number', ''), nullif(b.blueprint->>'card_number', ''))), '[^a-z0-9]+', '', 'g') as candidate_number,
-            regexp_replace(lower(coalesce(nullif(core.collector_number, ''), core.card_key)), '[^a-z0-9]+', '', 'g') as core_number,
-            lower(coalesce(nullif(b.expansion->>'code', ''), nullif(b.blueprint->>'expansion_code', ''), nullif(b.blueprint->>'set_code', ''))) as candidate_set_code,
-            lower(coalesce(nullif(core.set_code, ''), split_part(core.display_name, ' ', 1))) as core_set_code
-        ) normalized
-        where c.item_kind = 'single'
-          and (
-            normalized.candidate_name = normalized.core_name
-            or (
-              normalized.core_number <> ''
-              and (
-                normalized.candidate_number = normalized.core_number
-                or normalized.candidate_number like normalized.core_number || '%'
-              )
-              and (
-                normalized.core_set_code = ''
-                or normalized.candidate_set_code = normalized.core_set_code
-                or lower(c.set_name) = normalized.core_set_code
-              )
-            )
-          )
-        order by c.search_weight desc, c.imported_at desc nulls last, c.card_id asc
-        limit 1
-      ) c on true
-      left join public.marketplace_card_urls urls
-        on urls.card_id = c.card_id and urls.language = 'en'
+      ${deckCardImageJoinSql('core', 'display_name', { useBlueprintMapping, useFallbackScan })}
       where core.deck_id = $1
       order by core.inclusion_share desc nulls last, core.count desc nulls last, core.display_name asc
       limit $2
@@ -916,10 +1041,15 @@ async function fetchDeckDetail({
   if (decklistIds.length > 0) {
     const decklistsResult = await query(
       `
-        select *
-        from public.limitless_public_decklist_cards
-        where decklist_id = any($1::text[])
-        order by decklist_id, section, count desc, card_name asc
+        select
+          deck_card.*,
+          coalesce(mapped_card.card_id, fallback_card.card_id) as marketplace_card_id,
+          coalesce(mapped_card.marketplace_card_path, fallback_card.marketplace_card_path, '') as marketplace_card_path,
+          coalesce(mapped_card.marketplace_image_url, fallback_card.marketplace_image_url, '') as marketplace_image_url
+        from public.limitless_public_decklist_cards deck_card
+        ${deckCardImageJoinSql('deck_card', 'card_name', { useBlueprintMapping, useFallbackScan })}
+        where deck_card.decklist_id = any($1::text[])
+        order by deck_card.decklist_id, deck_card.section, deck_card.count desc, deck_card.card_name asc
       `,
       [decklistIds],
     );
@@ -929,7 +1059,14 @@ async function fetchDeckDetail({
       grouped.get(card.decklist_id).push(deckCardFromRow(card));
     }
     decklists = decklistIds.map((decklistId) => ({
-      decklistId,
+      ...decklistDetailFromRow({
+        ...(resultsResult.rows.find((resultRow) => cleanDecklistId(resultRow.decklist_id) === decklistId) || {}),
+        decklist_id: decklistId,
+        deck_id: id,
+        deck_name: row.name || '',
+        format_label: row.format_label || row.format || '',
+        deck_source_url: row.source_url || '',
+      }),
       cards: grouped.get(decklistId) || [],
     }));
   }
@@ -940,6 +1077,99 @@ async function fetchDeckDetail({
     results: resultsResult.rows.map(deckResultFromRow),
     players: playersResult.rows.map(deckPlayerFromRow),
     decklists,
+  };
+}
+
+async function fetchDecklistDetail({
+  decklistId,
+  query = marketplaceQuery,
+} = {}) {
+  const id = cleanDecklistId(decklistId);
+  if (!id) return null;
+  const useBlueprintMapping = query === marketplaceQuery
+    ? await hasBlueprintMappingTable({ query })
+    : false;
+  const useFallbackScan = query !== marketplaceQuery;
+  const detailResult = await query(
+    `
+      select
+        r.decklist_id,
+        r.deck_id,
+        coalesce(d.name, r.variant, '') as deck_name,
+        coalesce(r.format, d.format, '') as format,
+        coalesce(d.format_label, r.format, '') as format_label,
+        r.tournament_id,
+        coalesce(t.name, r.tournament_name, '') as tournament_name,
+        coalesce(r.tournament_date, t.tournament_date) as tournament_date,
+        r."placing",
+        r.placing_label,
+        r.variant,
+        r.player_id,
+        r.player_name,
+        coalesce(r.source_url, '') as source_url,
+        coalesce(d.source_url, '') as deck_source_url,
+        coalesce(t.source_url, '') as tournament_source_url
+      from public.limitless_public_deck_results r
+      left join public.limitless_public_decks d on d.deck_id = r.deck_id
+      left join public.limitless_public_tournaments t on t.tournament_id = r.tournament_id
+      where r.decklist_id = $1
+      order by r.tournament_date desc nulls last, r."placing" asc nulls last, r.player_name asc
+      limit 1
+    `,
+    [id],
+  );
+  let detailRow = detailResult.rows[0] || null;
+  if (!detailRow) {
+    const standingResult = await query(
+      `
+        select
+          s.decklist_id,
+          s.deck_id,
+          coalesce(s.deck_name, d.name, s.variant, '') as deck_name,
+          coalesce(t.format, d.format, '') as format,
+          coalesce(t.format_label, d.format_label, t.format, d.format, '') as format_label,
+          s.tournament_id,
+          coalesce(t.name, '') as tournament_name,
+          t.tournament_date,
+          s."placing",
+          ''::text as placing_label,
+          s.variant,
+          s.player_id,
+          s.player_name,
+          coalesce(s.source_url, '') as source_url,
+          coalesce(d.source_url, '') as deck_source_url,
+          coalesce(t.source_url, '') as tournament_source_url
+        from public.limitless_public_tournament_standings s
+        left join public.limitless_public_decks d on d.deck_id = s.deck_id
+        left join public.limitless_public_tournaments t on t.tournament_id = s.tournament_id
+        where s.decklist_id = $1
+        order by t.tournament_date desc nulls last, s."placing" asc nulls last, s.player_name asc
+        limit 1
+      `,
+      [id],
+    );
+    detailRow = standingResult.rows[0] || null;
+  }
+
+  const cardsResult = await query(
+    `
+      select
+        deck_card.*,
+        coalesce(mapped_card.card_id, fallback_card.card_id) as marketplace_card_id,
+        coalesce(mapped_card.marketplace_card_path, fallback_card.marketplace_card_path, '') as marketplace_card_path,
+        coalesce(mapped_card.marketplace_image_url, fallback_card.marketplace_image_url, '') as marketplace_image_url
+      from public.limitless_public_decklist_cards deck_card
+      ${deckCardImageJoinSql('deck_card', 'card_name', { useBlueprintMapping, useFallbackScan })}
+      where deck_card.decklist_id = $1
+      order by deck_card.section, deck_card.count desc, deck_card.card_name asc
+    `,
+    [id],
+  );
+
+  if (!detailRow && cardsResult.rows.length === 0) return null;
+  return {
+    decklist: decklistDetailFromRow(detailRow || { decklist_id: id }),
+    cards: cardsResult.rows.map(deckCardFromRow),
   };
 }
 
@@ -981,13 +1211,28 @@ async function fetchSummary({ game, format, year, query = marketplaceQuery } = {
 }
 
 module.exports = async function handler(req, res) {
+  applyCorsHeaders(res);
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Allow', 'GET, OPTIONS');
+    return res.status(204).end();
+  }
   if (req.method !== 'GET') {
-    res.setHeader('Allow', 'GET');
+    res.setHeader('Allow', 'GET, OPTIONS');
     return res.status(405).json({ error: 'Method not allowed.' });
   }
 
   try {
     const url = new URL(req.url, `https://${req.headers.host || 'pokoin.com'}`);
+    const decklistId = cleanDecklistId(url.searchParams.get('decklistId'));
+    if (decklistId) {
+      const detail = await fetchDecklistDetail({ decklistId });
+      if (!detail) {
+        return res.status(404).json({ error: 'Decklist not found.' });
+      }
+      res.setHeader('Cache-Control', 'public, max-age=30, s-maxage=180, stale-while-revalidate=300');
+      return res.status(200).json(detail);
+    }
+
     const deckId = cleanDeckId(url.searchParams.get('deckId'));
     if (deckId) {
       const detail = await fetchDeckDetail({
@@ -1063,6 +1308,7 @@ module.exports.cleanTournamentId = cleanTournamentId;
 module.exports.fetchGames = fetchGames;
 module.exports.fetchDashboard = fetchDashboard;
 module.exports.fetchDeckDetail = fetchDeckDetail;
+module.exports.fetchDecklistDetail = fetchDecklistDetail;
 module.exports.fetchSummary = fetchSummary;
 module.exports.fetchTopDecks = fetchTopDecks;
 module.exports.fetchPublicTopDecks = fetchPublicTopDecks;

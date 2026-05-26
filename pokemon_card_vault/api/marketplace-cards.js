@@ -58,19 +58,34 @@ function cardTraderEligiblePredicate(alias = 'snapshot') {
 
 function availabilityColumns(prefix = 'price_summary', cardTraderPrefix = 'cardtrader') {
   return `
-    (
-      coalesce(${prefix}.listed_quantity, 0) +
-      coalesce(${cardTraderPrefix}.eligible_listing_count, 0)
-    ) as listed_quantity,
+    coalesce(${cardTraderPrefix}.eligible_quantity, ${cardTraderPrefix}.eligible_listing_count, 0) as listed_quantity,
+    ${cardTraderPrefix}.cheapest_price_pkn as lowest_price_pkn,
     case
-      when ${cardTraderPrefix}.cheapest_price_pkn is not null then ${cardTraderPrefix}.cheapest_price_pkn
-      else ${prefix}.lowest_ask_pkn
-    end as lowest_price_pkn,
-    coalesce(${cardTraderPrefix}.eligible_listing_count, 0) as cardtrader_eligible_listing_count,
-    coalesce(${cardTraderPrefix}.eligible_listing_count, 0) > 0 as has_cardtrader_listing,
-    coalesce(${cardTraderPrefix}.eligible_quantity, 0) as cardtrader_listed_quantity,
-    ${cardTraderPrefix}.cheapest_price_pkn as cardtrader_lowest_price_pkn,
-    coalesce(${cardTraderPrefix}.eligible_listing_count, 0) > 0 as cardtrader_available
+      when ${cardTraderPrefix}.cheapest_price_pkn is not null
+        then case
+          when ${cardTraderPrefix}.provider = 'pokoin_native' then 'pokoin_native_homepage_cache'
+          else 'cheapest_homepage_cache_blueprint'
+        end
+      else null
+    end as homepage_cheapest_source,
+    ${cardTraderPrefix}.provider as homepage_cheapest_provider,
+    ${cardTraderPrefix}.sample_listing_id as homepage_cheapest_listing_id,
+    case
+      when ${cardTraderPrefix}.provider = 'cardtrader'
+        then coalesce(${cardTraderPrefix}.eligible_listing_count, 0)
+      else 0
+    end as cardtrader_eligible_listing_count,
+    (${cardTraderPrefix}.provider = 'cardtrader' and coalesce(${cardTraderPrefix}.eligible_listing_count, 0) > 0) as has_cardtrader_listing,
+    case
+      when ${cardTraderPrefix}.provider = 'cardtrader'
+        then coalesce(${cardTraderPrefix}.eligible_quantity, 0)
+      else 0
+    end as cardtrader_listed_quantity,
+    case
+      when ${cardTraderPrefix}.provider = 'cardtrader' then ${cardTraderPrefix}.cheapest_price_pkn
+      else null
+    end as cardtrader_lowest_price_pkn,
+    (${cardTraderPrefix}.provider = 'cardtrader' and coalesce(${cardTraderPrefix}.eligible_listing_count, 0) > 0) as cardtrader_available
   `;
 }
 
@@ -116,7 +131,7 @@ function cardTraderAvailabilityJoin(
     left join lateral (
       select cardtrader_cache.*
       from ${cacheRelation} cardtrader_cache
-      where cardtrader_cache.provider = 'cardtrader'
+      where cardtrader_cache.provider in ('cardtrader', 'pokoin_native')
         and cardtrader_cache.eligible_listing_count > 0
         and cardtrader_cache.cheapest_price_pkn is not null
         and (
@@ -126,8 +141,10 @@ function cardTraderAvailabilityJoin(
       order by
         case when cardtrader_cache.blueprint_id = ${candidateIdColumn} then 0 else 1 end,
         cardtrader_cache.cheapest_price_pkn asc,
+        case when cardtrader_cache.provider = 'pokoin_native' then 0 else 1 end,
         cardtrader_cache.eligible_listing_count desc,
-        cardtrader_cache.blueprint_id asc
+        cardtrader_cache.blueprint_id asc,
+        cardtrader_cache.provider asc
       limit 1
     ) cardtrader on true
   `;

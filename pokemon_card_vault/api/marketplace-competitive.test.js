@@ -1,11 +1,14 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 
+const competitiveHandler = require('./marketplace-competitive');
+
 const {
   cleanLimit,
   cleanTournamentId,
   fetchDashboard,
   fetchDeckDetail,
+  fetchDecklistDetail,
   fetchPublicTournamentGroup,
   fetchSummary,
   fetchTopDecks,
@@ -13,12 +16,43 @@ const {
   fetchTournamentSnapshot,
   fetchPublicTournamentSnapshot,
   fetchYears,
-} = require('./marketplace-competitive');
+} = competitiveHandler;
 
 test('competitive limit sanitizer keeps defaults for absent values', () => {
   assert.equal(cleanLimit(null, 24, 80), 24);
   assert.equal(cleanLimit('', 24, 80), 24);
   assert.equal(cleanLimit('0', 24, 80), 1);
+});
+
+test('competitive handler supports browser CORS preflight', async () => {
+  const headers = {};
+  const res = {
+    statusCode: 200,
+    setHeader(name, value) {
+      headers[name.toLowerCase()] = value;
+    },
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    end() {
+      this.ended = true;
+    },
+  };
+
+  await competitiveHandler(
+    {
+      method: 'OPTIONS',
+      url: '/api/marketplace-competitive?game=PTCG',
+      headers: { host: 'api.pokoin.com' },
+    },
+    res,
+  );
+
+  assert.equal(res.statusCode, 204);
+  assert.equal(headers['access-control-allow-origin'], '*');
+  assert.equal(headers.allow, 'GET, OPTIONS');
+  assert.match(headers['access-control-allow-methods'], /GET/);
 });
 
 test('marketplace competitive list maps tournament rows', async () => {
@@ -365,6 +399,8 @@ test('competitive deck detail maps public cards, results, players, and decklists
         };
       }
       if (/from public\.limitless_public_decklist_cards/.test(sql)) {
+        assert.match(sql, /marketplace_search_candidates/);
+        assert.match(sql, /marketplace_card_urls/);
         return {
           rows: [
             {
@@ -374,6 +410,11 @@ test('competitive deck detail maps public cards, results, players, and decklists
               section: 'pokémon',
               set_code: 'TWM',
               collector_number: '128',
+              marketplace_card_id: '287830',
+              marketplace_card_path:
+                '/marketplace/en/cards/575660/card-dreepy-128-167-twilight-masquerade',
+              marketplace_image_url:
+                'https://cdn.pokoin.com/previews/287830_dreepy-128-167-twilight-masquerade.webp',
             },
           ],
         };
@@ -388,6 +429,77 @@ test('competitive deck detail maps public cards, results, players, and decklists
   assert.equal(detail.players[0].playerName, 'Nathan O.');
   assert.equal(detail.decklists[0].cards[0].cardName, undefined);
   assert.equal(detail.decklists[0].cards[0].name, 'Dreepy');
+  assert.equal(detail.decklists[0].cards[0].marketplaceCardId, '287830');
+  assert.equal(
+    detail.decklists[0].cards[0].marketplacePath,
+    '/marketplace/en/cards/575660/card-dreepy-128-167-twilight-masquerade',
+  );
+  assert.equal(
+    detail.decklists[0].cards[0].imageUrl,
+    'https://cdn.pokoin.com/previews/287830_dreepy-128-167-twilight-masquerade.webp',
+  );
+});
+
+test('competitive decklist detail maps source metadata and grouped cards', async () => {
+  const detail = await fetchDecklistDetail({
+    decklistId: '27143',
+    query: async (sql, values) => {
+      assert.deepEqual(values, ['27143']);
+      if (/from public\.limitless_public_deck_results r/.test(sql)) {
+        return {
+          rows: [
+            {
+              decklist_id: '27143',
+              deck_id: '284',
+              deck_name: 'Dragapult',
+              format: 'STANDARD',
+              format_label: 'Standard',
+              tournament_id: '544',
+              tournament_name: 'Regional Campinas',
+              tournament_date: '2026-05-10',
+              placing: 2,
+              placing_label: '2nd',
+              variant: 'Dragapult Dusknoir',
+              player_id: '6816',
+              player_name: 'Francisco Osorio',
+              source_url: 'https://limitlesstcg.com/decks/list/27143',
+              deck_source_url: 'https://limitlesstcg.com/decks/284',
+              tournament_source_url: 'https://limitlesstcg.com/tournaments/544',
+            },
+          ],
+        };
+      }
+      if (/from public\.limitless_public_decklist_cards/.test(sql)) {
+        assert.match(sql, /marketplace_search_candidates/);
+        return {
+          rows: [
+            {
+              decklist_id: '27143',
+              card_name: 'Dreepy',
+              count: '4',
+              section: 'pokemon',
+              set_code: 'TWM',
+              collector_number: '128',
+              marketplace_card_id: '287830',
+              marketplace_card_path:
+                '/marketplace/en/cards/575660/card-dreepy-128-167-twilight-masquerade',
+              marketplace_image_url:
+                'https://cdn.pokoin.com/previews/287830_dreepy-128-167-twilight-masquerade.webp',
+            },
+          ],
+        };
+      }
+      throw new Error(`unexpected query: ${sql}`);
+    },
+  });
+
+  assert.equal(detail.decklist.decklistId, '27143');
+  assert.equal(detail.decklist.deckId, '284');
+  assert.equal(detail.decklist.playerName, 'Francisco Osorio');
+  assert.equal(detail.decklist.tournamentName, 'Regional Campinas');
+  assert.equal(detail.cards[0].name, 'Dreepy');
+  assert.equal(detail.cards[0].marketplaceCardId, '287830');
+  assert.equal(detail.cards[0].imageUrl, 'https://cdn.pokoin.com/previews/287830_dreepy-128-167-twilight-masquerade.webp');
 });
 
 test('competitive top decks sanitizes limit and preserves featured record', async () => {

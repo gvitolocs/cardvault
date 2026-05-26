@@ -122,11 +122,12 @@ def image_url_for_path(path: str) -> str:
 
 def metadata_result(rank: int, score: float, entry: dict[str, Any]) -> dict[str, Any]:
     original_path = str(entry.get("original_path") or entry.get("path") or "")
+    image_url = str(entry.get("url") or entry.get("imageUrl") or image_url_for_path(original_path))
     return {
         "rank": rank,
         "score": float(score),
         "cardPath": original_path,
-        "imageUrl": image_url_for_path(original_path),
+        "imageUrl": image_url,
         "augmentation": entry.get("augmentation", ""),
         "ocrName": entry.get("ocr_name", entry.get("ocrName", [])),
         "ocrBottom": entry.get("ocr_bottom", entry.get("ocrBottom", [])),
@@ -201,6 +202,21 @@ def base64_to_image(value: str) -> Image.Image:
 
 @app.get("/health")
 def health() -> dict[str, Any]:
+    return {
+        "ok": True,
+        "service": "pokoin-trainingai-card-classifier",
+        "model": MODEL_NAME,
+        "pretrained": PRETRAINED,
+        "loaded": bool(_state),
+        "assets": {
+            filename: (DATA_DIR / filename).exists()
+            for filename in ASSETS
+        },
+    }
+
+
+@app.get("/ready")
+def ready() -> dict[str, Any]:
     state = model_state()
     return {
         "ok": True,

@@ -471,7 +471,7 @@ async function refreshOracleBlueprintListingCache({
           coalesce(row_data->'rawMetadata', row_data->'raw_metadata', row_data, '{}'::jsonb) as raw_metadata
         from jsonb_array_elements($1::jsonb) as payload(row_data)
       ),
-      eligible as (
+      eligible_cardtrader as (
         select
           incoming.provider,
           coalesce(incoming.blueprint_id, incoming.cardtrader_blueprint_id) as blueprint_id,
@@ -512,14 +512,53 @@ async function refreshOracleBlueprintListingCache({
             or incoming.shipping_mode = 'one_day_ready'
           )
       ),
+      eligible_native as (
+        select
+          'pokoin_native'::text as provider,
+          native_listing.card_id::bigint as blueprint_id,
+          native_listing.card_id::text as pokoin_card_id,
+          native_listing.id::text as external_listing_id,
+          left(coalesce(nullif(native_listing.source_listing_id, ''), native_listing.id::text), 160) as external_product_id,
+          null::numeric as price_eur,
+          native_listing.price_pkn as price_pkn,
+          native_listing.quantity_available as quantity,
+          native_listing.seller_country,
+          'pokoin_native'::text as shipping_mode,
+          native_listing.updated_at as source_snapshot_at
+        from (
+          select
+            listing.*,
+            case when listing.card_id ~ '^[0-9]+$' then listing.card_id::bigint else null end as card_id_bigint
+          from public.marketplace_user_listings
+          listing
+        ) native_listing
+        join scope on scope.blueprint_id = native_listing.card_id_bigint
+        where native_listing.card_id_bigint is not null
+          and native_listing.status = 'active'
+          and coalesce(native_listing.quantity_available, 0) > 0
+          and native_listing.price_pkn > 0
+          and coalesce(native_listing.shipping_available, true) = true
+          and not (
+            native_listing.nft_available = true
+            and coalesce(native_listing.shipping_available, false) = false
+          )
+      ),
+      eligible as (
+        select * from eligible_cardtrader
+        union all
+        select * from eligible_native
+      ),
       ranked as (
         select
           eligible.*,
-          count(*) over (partition by eligible.blueprint_id)::integer as eligible_listing_count,
-          coalesce(sum(eligible.quantity) over (partition by eligible.blueprint_id), 0)::integer as eligible_quantity,
+          count(*) over (partition by eligible.blueprint_id, eligible.provider)::integer as eligible_listing_count,
+          coalesce(sum(eligible.quantity) over (partition by eligible.blueprint_id, eligible.provider), 0)::integer as eligible_quantity,
           row_number() over (
             partition by eligible.blueprint_id
-            order by eligible.price_pkn asc, eligible.external_listing_id asc
+            order by
+              eligible.price_pkn asc,
+              case when eligible.provider = 'pokoin_native' then 0 else 1 end,
+              eligible.external_listing_id asc
           ) as price_rank
         from eligible
       ),
@@ -573,7 +612,7 @@ async function refreshOracleBlueprintListingCache({
       deleted as (
         delete from public.cardtrader_blueprint_listing_cache cache
         using scope
-        where cache.provider = $3::text
+        where cache.provider in ($3::text, 'pokoin_native')
           and cache.blueprint_id = scope.blueprint_id
           and not exists (
             select 1

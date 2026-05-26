@@ -13,6 +13,7 @@ import 'package:pokoin/providers/card_provider.dart';
 import 'package:pokoin/providers/recent_views_provider.dart';
 import 'package:pokoin/screens/home_screen.dart';
 import 'package:pokoin/services/card_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 PokemonCard _previewCard({
   required String id,
@@ -61,6 +62,10 @@ void main() {
     final hiveDir =
         Directory.systemTemp.createTempSync('pokoin_marketplace_test_');
     Hive.init(hiveDir.path);
+  });
+
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
   });
 
   test('exact one-result card query auto-open candidate is detected', () {
@@ -501,6 +506,101 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
   });
 
+  testWidgets('mobile marketplace sections stack three cards with see more',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(390, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final cards = [
+      for (var index = 1; index <= 4; index++)
+        _previewCard(
+          id: 'best-$index',
+          name: 'Best Seller Card $index',
+          rarity: 'Card',
+        ).copyWith(price: (1000 - index).toDouble(), stock: 3),
+      for (var index = 1; index <= 4; index++)
+        _previewCard(
+          id: 'featured-$index',
+          name: 'Featured Card $index',
+          rarity: 'Rare Holo',
+        ).copyWith(price: (100 - index).toDouble(), stock: 3),
+    ];
+
+    final router = GoRouter(
+      initialLocation: '/marketplace',
+      routes: [
+        GoRoute(
+          path: '/marketplace',
+          builder: (context, state) => const HomeScreen(),
+        ),
+        GoRoute(
+          path: '/marketplace/search',
+          builder: (context, state) => const SizedBox.shrink(),
+        ),
+        GoRoute(
+            path: '/', builder: (context, state) => const SizedBox.shrink()),
+        GoRoute(
+            path: '/scan',
+            builder: (context, state) => const SizedBox.shrink()),
+        GoRoute(
+            path: '/wallet',
+            builder: (context, state) => const SizedBox.shrink()),
+        GoRoute(
+            path: '/cart',
+            builder: (context, state) => const SizedBox.shrink()),
+        GoRoute(
+            path: '/marketplace/signal',
+            builder: (context, state) => const SizedBox.shrink()),
+      ],
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          cardProvider.overrideWith(
+            (ref) => CardNotifier(
+              cardService: _CachedHomeCardService(cards),
+            ),
+          ),
+          activeCardListingsProvider.overrideWith(
+            (ref) => Stream.value(const []),
+          ),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Best sellers'), findsOneWidget);
+    expect(find.textContaining('Best Seller Card 1'), findsOneWidget);
+    expect(find.textContaining('Best Seller Card 2'), findsOneWidget);
+    expect(find.textContaining('Best Seller Card 3'), findsOneWidget);
+    expect(find.textContaining('Best Seller Card 4'), findsNothing);
+    expect(find.text('See more Best sellers'), findsOneWidget);
+
+    final horizontalLists = tester
+        .widgetList<ListView>(find.byType(ListView))
+        .where((widget) => widget.scrollDirection == Axis.horizontal);
+    expect(horizontalLists, isEmpty);
+
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -780));
+    await tester.pump();
+
+    expect(find.text('Featured'), findsOneWidget);
+    expect(find.textContaining('Featured Card 1'), findsOneWidget);
+    expect(find.textContaining('Featured Card 2'), findsOneWidget);
+    expect(find.textContaining('Featured Card 3'), findsOneWidget);
+    expect(find.textContaining('Featured Card 4'), findsNothing);
+    expect(find.text('See more Featured'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 300));
+  });
+
   testWidgets('compact empty search tap opens hot preview loading overlay',
       (WidgetTester tester) async {
     final controller = TextEditingController();
@@ -933,4 +1033,33 @@ class _NeverLoadingCardService extends CardService {
 
   @override
   Future<List<PokemonCard>> getAllCards() async => const [];
+}
+
+class _CachedHomeCardService extends CardService {
+  _CachedHomeCardService(this.cards);
+
+  final List<PokemonCard> cards;
+
+  @override
+  Future<List<PokemonCard>> getCachedCards() async => cards;
+
+  @override
+  Future<MarketplaceHomeSnapshot?> getCachedMarketplaceHomeSnapshot() async =>
+      MarketplaceHomeSnapshot(
+        cards: cards,
+        sections: MarketplaceHomeSections(
+          recentlySeenIds: const [],
+          bestSellerIds: cards.take(4).map((card) => card.id).toList(),
+          featuredIds: cards.skip(4).take(4).map((card) => card.id).toList(),
+        ),
+      );
+
+  @override
+  Future<List<PokemonCard>> getCachedSpotlightCards() async => const [];
+
+  @override
+  Future<MarketplaceHomeSnapshot?> getMarketplaceHomeSnapshot() async => null;
+
+  @override
+  Future<List<PokemonCard>> getAllCards() async => cards;
 }

@@ -19,6 +19,7 @@ const VARIANT_EMOJIS = new Set([
   '🔷',
   '⚪',
 ]);
+const GENERIC_IDENTITY_EMOJIS = new Set(['🃏']);
 
 function textFromParts(...parts) {
   return parts.map((part) => String(part || '').toLowerCase()).join(' ');
@@ -69,6 +70,9 @@ function rarityVariantEmojiForCard(row = {}) {
 
 function fallbackIdentityForCard(row = {}) {
   const text = textFromParts(row.name, row.card_type || row.type);
+  if (/camerupt|numel/.test(text)) return ['🐫', '🌋'];
+  if (/sharpedo|carvanha/.test(text)) return ['🦈', '🌊'];
+  if (/regirock/.test(text)) return ['🪨', '🌟'];
   if (/leafeon|eevee|vaporeon|jolteon|flareon|espeon|umbreon|glaceon|sylveon/.test(text)) return ['🦊', '✨'];
   if (/drifloon|drifblim|gastly|haunter|gengar|mismagius|mimikyu|duskull|dusknoir/.test(text)) return ['👻', '🌫️'];
   if (/meltan|melmetal|magnemite|magneton|magnezone|beldum|metang|metagross|klink|klang|klinklang/.test(text)) return ['⚙️', '🔩'];
@@ -97,6 +101,7 @@ function cardIdentityEmojisForCard(row = {}) {
     : emojiTokens(row.emoji).filter((token) => !VARIANT_EMOJIS.has(token));
   const identity = [];
   for (const token of rawTokens) {
+    if (GENERIC_IDENTITY_EMOJIS.has(token)) continue;
     if (!identity.includes(token)) identity.push(token);
     if (identity.length === 2) break;
   }

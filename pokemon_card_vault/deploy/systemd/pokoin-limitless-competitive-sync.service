@@ -1,0 +1,12 @@
+[Unit]
+Description=Pokoin Limitless competitive daily sync
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/ubuntu/pokoin-oracle-api/current
+EnvironmentFile=/home/ubuntu/pokoin-oracle-api/.env
+ExecStart=/usr/bin/docker run --rm --name pokoin-limitless-competitive-sync --env-file /home/ubuntu/pokoin-oracle-api/.env -e LIMITLESS_DAILY_ENV_FILE=/app/.env -e LIMITLESS_DAILY_MAX_TOURNAMENTS=100 -e LIMITLESS_DAILY_PUBLIC_DECK_LIMIT=50 -e LIMITLESS_DAILY_PUBLIC_TOURNAMENT_LIMIT=50 -e LIMITLESS_DAILY_PUBLIC_DECK_RESULT_LIMIT=120 -e LIMITLESS_DAILY_PUBLIC_DECKLIST_LIMIT=24 -e LIMITLESS_DAILY_REQUEST_DELAY_MS=500 -v /home/ubuntu/pokoin-oracle-api/current:/app -v /home/ubuntu/pokoin-oracle-api/.env:/app/.env:ro -w /app node:20-bookworm bash scripts/run-limitless-daily-competitive-sync.sh
+NoNewPrivileges=true
+PrivateTmp=true

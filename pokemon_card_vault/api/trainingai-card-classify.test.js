@@ -61,7 +61,7 @@ test('trainingai classifier route rejects missing image data', async () => {
   });
 });
 
-test('trainingai classifier route reports missing space config', async () => {
+test('trainingai classifier route reports missing classifier config', async () => {
   await withEnv({ TRAININGAI_HF_SPACE_URL: '' }, async () => {
     const res = mockResponse();
     await handler({
@@ -78,7 +78,7 @@ test('trainingai classifier route reports missing space config', async () => {
 
 test('trainingai classifier route proxies base64 payload to space', async () => {
   await withEnv({
-    TRAININGAI_HF_SPACE_URL: 'https://classifier.example',
+    TRAININGAI_CLASSIFIER_URL: 'https://classifier.example',
     TRAININGAI_HF_TOKEN: 'secret',
   }, async () => {
     const previousFetch = global.fetch;
@@ -122,7 +122,7 @@ test('trainingai classifier route proxies base64 payload to space', async () => 
 
 test('trainingai classifier route proxies multipart payload to space', async () => {
   await withEnv({
-    TRAININGAI_HF_SPACE_URL: 'https://classifier.example',
+    TRAININGAI_CLASSIFIER_URL: 'https://classifier.example',
   }, async () => {
     const previousFetch = global.fetch;
     try {

@@ -229,6 +229,7 @@ List<DeckCardVersionSuggestion> rankDeckVersionSuggestionsForCard(
   final targetName = _normalizeDeckLookupText(parsedCard.name);
   final targetSetCode = _normalizeDeckLookupText(parsedCard.setCode);
   final targetNumber = _normalizeDeckLookupNumber(parsedCard.collectorNumber);
+  final targetSetNames = _deckSetCodeExpansionAliases(targetSetCode);
   final ranked = <({PokemonCard card, int score})>[];
   final seen = <String>{};
 
@@ -250,8 +251,13 @@ List<DeckCardVersionSuggestion> rankDeckVersionSuggestionsForCard(
     if (cardNumber == targetNumber) {
       score += 220;
     }
-    if (_deckSetLooksLikeCodeMatch(cardSet, targetSetCode)) {
-      score += 180;
+    if (_deckSetLooksLikeCodeMatch(cardSet, targetSetCode, targetSetNames)) {
+      score += 500;
+    }
+    if (cardName == targetName &&
+        cardNumber == targetNumber &&
+        _deckSetLooksLikeCodeMatch(cardSet, targetSetCode, targetSetNames)) {
+      score += 1000;
     }
     if (card.productType == 'card' && card.itemKind != 'product') {
       score += 20;
@@ -289,17 +295,44 @@ String _normalizeDeckLookupText(String value) {
 
 String _normalizeDeckLookupNumber(String value) {
   final text = value.trim().toLowerCase();
-  final match = RegExp(r'[a-z]*0*([0-9]+[a-z]?)').firstMatch(text);
+  final match = RegExp(r'[a-z]*0*([0-9]+[a-z]?)(?=\s*(?:/|$)|[^a-z0-9])')
+      .firstMatch(text);
   return match?.group(1) ?? text.replaceAll(RegExp(r'[^a-z0-9]+'), '');
 }
 
-bool _deckSetLooksLikeCodeMatch(String cardSet, String targetSetCode) {
+bool _deckSetLooksLikeCodeMatch(
+  String cardSet,
+  String targetSetCode, [
+  Set<String> targetSetNames = const {},
+]) {
   if (cardSet.isEmpty || targetSetCode.isEmpty) {
     return false;
   }
-  return cardSet == targetSetCode ||
+  return targetSetNames.contains(cardSet) ||
+      cardSet == targetSetCode ||
       cardSet.startsWith(targetSetCode) ||
       cardSet.contains(targetSetCode);
+}
+
+Set<String> _deckSetCodeExpansionAliases(String normalizedSetCode) {
+  const aliases = <String, String>{
+    'twm': 'Twilight Masquerade',
+    'tef': 'Temporal Forces',
+    'jtg': 'Journey Together',
+    'scr': 'Stellar Crown',
+    'sfa': 'Shrouded Fable',
+    'svp': 'Scarlet & Violet Black Star Promos',
+    'pal': 'Paldea Evolved',
+    'obf': 'Obsidian Flames',
+    'paf': 'Paldean Fates',
+    'par': 'Paradox Rift',
+    'sv1': 'Scarlet & Violet',
+  };
+  final expansionName = aliases[normalizedSetCode];
+  if (expansionName == null) {
+    return const {};
+  }
+  return {_normalizeDeckLookupText(expansionName)};
 }
 
 class ShardReviewScreen extends ConsumerStatefulWidget {
@@ -418,6 +451,16 @@ class _ShardReviewScreenState extends ConsumerState<ShardReviewScreen> {
   Future<List<DeckCardVersionSuggestion>> _loadVersionSuggestions(
     ParsedDeckCard card,
   ) async {
+    final structured = await _cardService.lookupDeckCardVersions(
+      name: card.name,
+      setCode: card.setCode,
+      collectorNumber: card.collectorNumber,
+      limit: 12,
+    );
+    if (structured.isNotEmpty) {
+      return rankDeckVersionSuggestionsForCard(card, structured);
+    }
+
     final queries = <String>[
       '${card.name} ${card.setCode} ${card.collectorNumber}',
       card.name,

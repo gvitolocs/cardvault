@@ -1,5 +1,6 @@
 const SERVICE_NAME = "trainingai-cardvault-images";
 const BUCKET_NAME = "cardvault-images";
+const BEST_BLUEPRINT_IMAGES_KEY = "manifests/best-blueprint-images.json";
 const MAX_MANIFEST_LIMIT = 1000;
 const DEFAULT_MANIFEST_LIMIT = 100;
 const CACHE_CONTROL = "public, max-age=31536000, immutable";
@@ -708,6 +709,11 @@ function renderIndex() {
             <p>Same manifest response for clients that were pointed at the older image index path.</p>
           </article>
           <article class="card endpoint">
+            <strong>Best blueprint images</strong>
+            <code>/blueprints/best-images.json</code>
+            <p>One DB-selected non-homepage image per CardTrader blueprint, generated from Oracle for incremental embedding jobs.</p>
+          </article>
+          <article class="card endpoint">
             <strong>Object download</strong>
             <code>/images/&lt;object-key&gt;</code>
             <p>Streams the R2 object with image metadata, ETag, byte-range support, and long-lived cache headers.</p>
@@ -740,6 +746,14 @@ function renderIndex() {
               <li><code>key</code>, <code>size</code>, <code>uploaded</code>, <code>etag</code>, and <code>contentType</code></li>
               <li><code>url</code> for this training endpoint and <code>sameOriginUrl</code> for the Pokoin CDN path</li>
               <li>Optional prefix filtering: <code>/manifest.json?prefix=previews/&amp;limit=100</code></li>
+            </ul>
+          </article>
+          <article class="card">
+            <h3>Best blueprint image fields</h3>
+            <ul>
+              <li><code>count</code>, <code>generated_at</code>, and <code>strategy</code> describe the Oracle snapshot.</li>
+              <li>Each object includes <code>blueprint_id</code>, <code>object_key</code>, <code>url</code>, <code>source</code>, <code>name</code>, <code>set_name</code>, and <code>collector_number</code>.</li>
+              <li>Use this endpoint for classifier embeddings; it avoids homepage derivatives and lets importers skip already-embedded blueprint IDs.</li>
             </ul>
           </article>
         </div>
@@ -812,6 +826,22 @@ while True:
     cursor = page.get("nextCursor") if page.get("hasMore") else None
     if not cursor:
         break</pre>
+          </article>
+
+          <article class="code-card">
+            <div class="code-head">
+              <span>Best blueprint manifest</span>
+              <button class="copy" data-copy="best-blueprint-example" type="button">Copy</button>
+            </div>
+            <pre id="best-blueprint-example">import requests
+
+manifest = requests.get(
+    "https://trainingai.pokoin.com/blueprints/best-images.json",
+    timeout=120,
+).json()
+
+for item in manifest["objects"]:
+    print(item["blueprint_id"], item["url"], item["source"])</pre>
           </article>
 
           <article class="code-card">
@@ -916,6 +946,28 @@ async function handleManifest(request, env) {
   });
 }
 
+async function handleBestBlueprintImages(request, env) {
+  const object = await env.CARD_IMAGES.get(BEST_BLUEPRINT_IMAGES_KEY);
+  if (!object) {
+    return jsonResponse({
+      ok: false,
+      error: "Best blueprint image manifest has not been generated yet.",
+    }, { status: 404 });
+  }
+
+  const headers = new Headers();
+  object.writeHttpMetadata(headers);
+  headers.set("Content-Type", "application/json; charset=utf-8");
+  headers.set("Cache-Control", "public, max-age=3600");
+  headers.set("ETag", object.httpEtag);
+  headers.set("Content-Length", String(object.size));
+
+  return withResponseHeaders(new Response(request.method === "HEAD" ? null : object.body, {
+    headers,
+    status: 200,
+  }));
+}
+
 async function handleImage(request, env, rawKey) {
   const key = normalizeObjectKey(rawKey);
   if (!isAllowedObjectKey(key)) {
@@ -963,6 +1015,43 @@ function cleanTopK(value) {
     return 3;
   }
   return Math.min(Math.max(parsed, 1), 10);
+}
+
+async function pingClassifier(env) {
+  const baseUrl = classifierBaseUrl(env);
+  if (!baseUrl) {
+    console.log(JSON.stringify({
+      event: "trainingai-classifier-keepalive-skipped",
+      reason: "missing-classifier-url",
+    }));
+    return;
+  }
+
+  const headers = new Headers();
+  const token = classifierToken(env);
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  const startedAt = Date.now();
+  try {
+    const response = await fetch(`${baseUrl}/health`, {
+      method: "GET",
+      headers,
+    });
+    console.log(JSON.stringify({
+      event: "trainingai-classifier-keepalive",
+      ok: response.ok,
+      status: response.status,
+      durationMs: Date.now() - startedAt,
+    }));
+  } catch (error) {
+    console.log(JSON.stringify({
+      event: "trainingai-classifier-keepalive-error",
+      error: error && error.message ? error.message : "unknown error",
+      durationMs: Date.now() - startedAt,
+    }));
+  }
 }
 
 async function handleClassify(request, env) {
@@ -1022,6 +1111,10 @@ async function handleClassify(request, env) {
 }
 
 export default {
+  async scheduled(_event, env, ctx) {
+    ctx.waitUntil(pingClassifier(env));
+  },
+
   async fetch(request, env) {
     if (request.method === "OPTIONS") {
       return withResponseHeaders(new Response(null, { status: 204 }));
@@ -1057,6 +1150,9 @@ export default {
     }
     if (url.pathname === "/manifest.json" || url.pathname === "/images.json") {
       return handleManifest(request, env);
+    }
+    if (url.pathname === "/blueprints/best-images.json") {
+      return handleBestBlueprintImages(request, env);
     }
     if (url.pathname.startsWith("/images/")) {
       return handleImage(request, env, url.pathname.slice("/images/".length));

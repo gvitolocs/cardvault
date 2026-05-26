@@ -67,16 +67,49 @@ as $$
       coalesce(cardtrader_cache.eligible_listing_count, 0) as cardtrader_listing_cache_count,
       (
         coalesce(price_summary.listed_quantity, 0) +
-        coalesce(cardtrader_cache.eligible_listing_count, 0)
+        case
+          when cardtrader_cache.provider = 'cardtrader' then coalesce(cardtrader_cache.eligible_quantity, 0)
+          when coalesce(price_summary.listed_quantity, 0) = 0 then coalesce(cardtrader_cache.eligible_quantity, 0)
+          else 0
+        end
       ) as available_quantity,
       case
-        when cardtrader_cache.cheapest_price_pkn is not null then cardtrader_cache.cheapest_price_pkn
+        when cardtrader_cache.cheapest_price_pkn is not null
+          and (
+            price_summary.lowest_ask_pkn is null
+            or cardtrader_cache.cheapest_price_pkn <= price_summary.lowest_ask_pkn
+          )
+          then cardtrader_cache.cheapest_price_pkn
         else price_summary.lowest_ask_pkn
       end as available_lowest_price_pkn,
-      coalesce(cardtrader_cache.eligible_listing_count, 0) as cardtrader_eligible_listing_count,
-      coalesce(cardtrader_cache.eligible_listing_count, 0) > 0 as has_cardtrader_listing,
-      coalesce(cardtrader_cache.eligible_quantity, 0) as cardtrader_eligible_quantity,
-      cardtrader_cache.cheapest_price_pkn as cardtrader_eligible_lowest_price_pkn,
+      case when cardtrader_cache.provider = 'cardtrader' then coalesce(cardtrader_cache.eligible_listing_count, 0) else 0 end as cardtrader_eligible_listing_count,
+      cardtrader_cache.provider = 'cardtrader' and coalesce(cardtrader_cache.eligible_listing_count, 0) > 0 as has_cardtrader_listing,
+      case when cardtrader_cache.provider = 'cardtrader' then coalesce(cardtrader_cache.eligible_quantity, 0) else 0 end as cardtrader_eligible_quantity,
+      case when cardtrader_cache.provider = 'cardtrader' then cardtrader_cache.cheapest_price_pkn else null end as cardtrader_eligible_lowest_price_pkn,
+      case
+        when cardtrader_cache.cheapest_price_pkn is not null
+          and (
+            price_summary.lowest_ask_pkn is null
+            or cardtrader_cache.cheapest_price_pkn <= price_summary.lowest_ask_pkn
+          )
+          then cardtrader_cache.provider
+        when price_summary.lowest_ask_pkn is not null then 'pokoin_native'
+        else null
+      end as homepage_cheapest_provider,
+      case
+        when cardtrader_cache.cheapest_price_pkn is not null
+          and (
+            price_summary.lowest_ask_pkn is null
+            or cardtrader_cache.cheapest_price_pkn <= price_summary.lowest_ask_pkn
+          )
+          then case
+            when cardtrader_cache.provider = 'pokoin_native' then 'pokoin_native_homepage_cache'
+            else 'cheapest_homepage_cache_blueprint'
+          end
+        when price_summary.lowest_ask_pkn is not null then 'marketplace_blueprint_price_summary'
+        else null
+      end as homepage_cheapest_source,
+      cardtrader_cache.sample_listing_id as homepage_cheapest_listing_id,
       (
         coalesce(h.hot_score_1h, 0) * 1.8 +
         coalesce(h.hot_score_24h, 0) +
@@ -98,7 +131,7 @@ as $$
     left join lateral (
       select cache.*
       from public.cheapest_homepage_cache_blueprint cache
-      where cache.provider = 'cardtrader'
+      where cache.provider in ('cardtrader', 'pokoin_native')
         and cache.eligible_listing_count > 0
         and cache.cheapest_price_pkn is not null
         and (
@@ -108,8 +141,10 @@ as $$
       order by
         case when cache.blueprint_id = c.card_id then 0 else 1 end,
         cache.cheapest_price_pkn asc,
+        case when cache.provider = 'pokoin_native' then 0 else 1 end,
         cache.eligible_listing_count desc,
-        cache.blueprint_id asc
+        cache.blueprint_id asc,
+        cache.provider asc
       limit 1
     ) cardtrader_cache on true
   ),
@@ -182,7 +217,10 @@ as $$
           'trainerName', trainer_name,
           'cardPalette', card_palette,
           'emoji', emoji,
-          'price', coalesce(available_lowest_price_pkn, (1000 + (card_id % 120000))::numeric),
+          'price', available_lowest_price_pkn,
+          'priceSource', homepage_cheapest_source,
+          'homepageCheapestProvider', homepage_cheapest_provider,
+          'homepageCheapestListingId', homepage_cheapest_listing_id,
           'stock', available_quantity,
           'rating', watchlist_count,
           'cartHolderCount', cart_holder_count,

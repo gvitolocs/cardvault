@@ -33,7 +33,7 @@ test('cheapest price lookup accepts card ids and canonical marketplace paths', (
   );
 });
 
-test('cheapest price row mirrors homepage CardTrader cache priority', () => {
+test('cheapest price row uses CardTrader when it is cheaper than native', () => {
   const row = cheapestPriceRow({
     card_id: 274416,
     canonical_path: '/marketplace/en/cards/548832/mew-ex',
@@ -52,6 +52,7 @@ test('cheapest price row mirrors homepage CardTrader cache priority', () => {
     cardtrader_listed_quantity: 2,
     cardtrader_sample_listing_id: 'ct-listing-1',
     cardtrader_sample_product_id: 'ct-product-1',
+    homepage_cache_provider: 'cardtrader',
     cardtrader_updated_at: '2026-05-21T09:00:00.000Z',
   });
 
@@ -59,7 +60,8 @@ test('cheapest price row mirrors homepage CardTrader cache priority', () => {
   assert.equal(row.price, 800);
   assert.equal(row.pricePkn, 800);
   assert.equal(row.priceUsdt, 4);
-  assert.equal(row.source, 'cardtrader_homepage_cache');
+  assert.equal(row.source, 'cheapest_homepage_cache_blueprint');
+  assert.equal(row.provider, 'cardtrader');
   assert.equal(row.listingId, 'ct-listing-1');
   assert.equal(row.listingCount, 1);
   assert.equal(row.listedQuantity, 2);
@@ -69,7 +71,31 @@ test('cheapest price row mirrors homepage CardTrader cache priority', () => {
   assert.equal(row.nativeListing.source, 'marketplace_blueprint_price_summary');
 });
 
-test('cheapest price row falls back to native summary when cache is empty', () => {
+test('cheapest price row does not bypass homepage cache for cheaper native summary', () => {
+  const row = cheapestPriceRow({
+    card_id: 274416,
+    native_lowest_ask_pkn: '700',
+    native_active_listing_count: 2,
+    native_listed_quantity: 3,
+    native_sample_listing_id: 'native-listing-1',
+    native_refreshed_at: '2026-05-21T08:00:00.000Z',
+    cardtrader_lowest_price_pkn: '800',
+    cardtrader_eligible_listing_count: 1,
+    cardtrader_listed_quantity: 2,
+    cardtrader_sample_listing_id: 'ct-listing-1',
+    homepage_cache_provider: 'cardtrader',
+  });
+
+  assert.equal(row.price, 800);
+  assert.equal(row.source, 'cheapest_homepage_cache_blueprint');
+  assert.equal(row.provider, 'cardtrader');
+  assert.equal(row.listingId, 'ct-listing-1');
+  assert.equal(row.listingCount, 1);
+  assert.equal(row.listedQuantity, 2);
+  assert.equal(row.nativeListing.pricePkn, 700);
+});
+
+test('cheapest price row returns no price when homepage cache is empty', () => {
   const row = cheapestPriceRow({
     card_id: 316600,
     native_lowest_ask_pkn: '950',
@@ -78,11 +104,30 @@ test('cheapest price row falls back to native summary when cache is empty', () =
     native_refreshed_at: '2026-05-21T08:00:00.000Z',
   });
 
-  assert.equal(row.price, 950);
-  assert.equal(row.source, 'marketplace_blueprint_price_summary');
-  assert.equal(row.listingCount, 3);
-  assert.equal(row.listedQuantity, 4);
+  assert.equal(row.price, null);
+  assert.equal(row.source, null);
+  assert.equal(row.provider, null);
+  assert.equal(row.listingCount, 0);
+  assert.equal(row.listedQuantity, 0);
+  assert.equal(row.available, false);
+  assert.equal(row.nativeListing.pricePkn, 950);
   assert.equal(row.cardtrader.available, false);
+});
+
+test('cheapest price row exposes native homepage cache winner metadata', () => {
+  const row = cheapestPriceRow({
+    card_id: 316600,
+    cardtrader_lowest_price_pkn: '650',
+    cardtrader_eligible_listing_count: 1,
+    cardtrader_listed_quantity: 1,
+    cardtrader_sample_listing_id: 'native-listing-1',
+    homepage_cache_provider: 'pokoin_native',
+  });
+
+  assert.equal(row.price, 650);
+  assert.equal(row.source, 'pokoin_native_homepage_cache');
+  assert.equal(row.provider, 'pokoin_native');
+  assert.equal(row.listingId, 'native-listing-1');
 });
 
 test('readCheapestPrices uses homepage cache relation and structured lookup fields', async () => {
@@ -128,7 +173,7 @@ test('readCheapestPrices uses homepage cache relation and structured lookup fiel
   assert.equal(calls.length, 2);
   assert.equal(prices.length, 1);
   assert.equal(prices[0].cardId, '274416');
-  assert.equal(prices[0].source, 'cardtrader_homepage_cache');
+  assert.equal(prices[0].source, 'cheapest_homepage_cache_blueprint');
 });
 
 test('cheapest price handler is CORS-enabled and extension-friendly', async () => {

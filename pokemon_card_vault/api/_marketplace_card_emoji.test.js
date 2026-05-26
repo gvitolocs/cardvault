@@ -46,6 +46,29 @@ test('card emoji fields backfill missing second identity emoji', () => {
   }).emoji, '⚙️ 🔩 🎟️');
 });
 
+test('card emoji fields replace generic identity for known species', () => {
+  assert.equal(cardEmojiFields({
+    name: 'Mega Camerupt ex',
+    rarity: 'Promo',
+    expansion_number: '022/132',
+    emoji: '🃏 ✨ 🎟️',
+  }).emoji, '🐫 🌋 🎟️');
+
+  assert.equal(cardEmojiFields({
+    name: 'Mega Sharpedo ex',
+    rarity: 'Special Illustration Rare',
+    expansion_number: '127/094',
+    emoji: '🃏 ✨ 🎨',
+  }).emoji, '🦈 🌊 🎨');
+
+  assert.equal(cardEmojiFields({
+    name: 'Regirock ex',
+    rarity: 'Ultra Rare',
+    expansion_number: '107/217',
+    emoji: '🃏 ✨ 💎',
+  }).emoji, '🪨 🌟 💎');
+});
+
 test('card emoji fields repair legacy two-token uncommon rows', () => {
   assert.deepEqual(cardEmojiFields({
     name: 'Servine',

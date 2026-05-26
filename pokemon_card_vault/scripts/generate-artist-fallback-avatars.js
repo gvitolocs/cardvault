@@ -23,7 +23,8 @@ const DEFAULT_AUDIT_REPORT = path.join(
   'artist-profile-grey-placeholder-audit-20260525.json',
 );
 const DEFAULT_AVATAR_SIZE = 512;
-const DEFAULT_CROP_Y_RATIO = 0.1;
+const DEFAULT_CROP_Y_RATIO = 0.18;
+const CROP_STRATEGY_NAME = 'upper_artwork_square_v2';
 
 function cleanText(value, maxLength = 1000) {
   return String(value || '').trim().replace(/\s+/g, ' ').slice(0, maxLength);
@@ -89,6 +90,9 @@ function parseArgs(argv) {
     cropYRatio: DEFAULT_CROP_Y_RATIO,
     includeMissing: true,
     includePlaceholders: true,
+    regenerateGeneratedFallbacks: false,
+    sampleDir: '',
+    sampleLimit: 0,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -121,6 +125,13 @@ function parseArgs(argv) {
       options.avatarSize = parsePositiveInt(value, DEFAULT_AVATAR_SIZE, 2048);
     } else if (rawKey === 'crop-y-ratio') {
       options.cropYRatio = parseNumber(value, DEFAULT_CROP_Y_RATIO, { min: 0, max: 0.5 });
+    } else if (rawKey === 'regenerate-generated-fallbacks') {
+      options.regenerateGeneratedFallbacks = true;
+    } else if (rawKey === 'sample-dir') {
+      options.sampleDir = path.resolve(ROOT_DIR, cleanText(value, 1000));
+      if (!options.sampleLimit) options.sampleLimit = 10;
+    } else if (rawKey === 'sample-limit') {
+      options.sampleLimit = parsePositiveInt(value, 10, 1000);
     } else if (rawKey === 'missing-only') {
       options.includeMissing = true;
       options.includePlaceholders = false;
@@ -134,8 +145,8 @@ function parseArgs(argv) {
     }
   }
 
-  if (!options.includeMissing && !options.includePlaceholders) {
-    throw new Error('At least one target class is required: missing or placeholder.');
+  if (!options.includeMissing && !options.includePlaceholders && !options.regenerateGeneratedFallbacks) {
+    throw new Error('At least one target class is required: missing, placeholder, or generated fallback regeneration.');
   }
   return options;
 }
@@ -187,6 +198,47 @@ function hasNoProfileImage(row) {
     !cleanText(row.profile_image_object_key);
 }
 
+function generatedFallbackFromRow(row) {
+  const sourceAttribution =
+    row.source_attribution && typeof row.source_attribution === 'object'
+      ? row.source_attribution
+      : {};
+  const rawMetadata =
+    row.raw_metadata && typeof row.raw_metadata === 'object'
+      ? row.raw_metadata
+      : {};
+  const generatedProfileImage =
+    sourceAttribution.generatedProfileImage && typeof sourceAttribution.generatedProfileImage === 'object'
+      ? sourceAttribution.generatedProfileImage
+      : rawMetadata.generatedProfileImage && typeof rawMetadata.generatedProfileImage === 'object'
+        ? rawMetadata.generatedProfileImage
+        : null;
+  if (!generatedProfileImage || generatedProfileImage.source !== 'card_art_fallback') {
+    return null;
+  }
+  return generatedProfileImage;
+}
+
+function isGeneratedFallbackObjectKey(value) {
+  return cleanText(value, 1000).startsWith('artist-profiles/generated/');
+}
+
+function isCurrentGeneratedFallbackImage(row) {
+  if (isGeneratedFallbackObjectKey(row.profile_image_object_key)) return true;
+  const candidates = [
+    row.profile_image_cdn_url,
+    row.profile_image_url,
+  ].map((value) => cleanText(value, 1000));
+  return candidates.some((value) => {
+    try {
+      const url = new URL(value);
+      return url.pathname.includes('/artist-profiles/generated/');
+    } catch {
+      return value.includes('/artist-profiles/generated/');
+    }
+  });
+}
+
 function auditedPlaceholderStillCurrent(row, audit) {
   if (!audit) return false;
   const currentSourceUrl = cleanText(row.profile_image_url, 1000);
@@ -198,7 +250,15 @@ function auditedPlaceholderStillCurrent(row, audit) {
   return false;
 }
 
-function targetReasonForRow(row, placeholderArtists, options) {
+function targetReasonForRow(row, placeholderArtists, options, generatedFallback = generatedFallbackFromRow(row)) {
+  if (
+    options.regenerateGeneratedFallbacks &&
+    generatedFallback &&
+    isCurrentGeneratedFallbackImage(row)
+  ) {
+    return cleanText(generatedFallback.reason, 120) || 'generated_card_art_fallback';
+  }
+
   const normalizedArtist = normalizeArtist(row.normalized_artist);
   const placeholderAudit = placeholderArtists.get(normalizedArtist);
   if (
@@ -251,17 +311,39 @@ async function fetchArtistTargets(pool, options, placeholderArtists) {
   );
 
   const targets = [];
+  const skippedRealProfileImages = [];
   for (const row of result.rows) {
-    const reason = targetReasonForRow(row, placeholderArtists, options);
+    const generatedFallback = generatedFallbackFromRow(row);
+    if (
+      options.regenerateGeneratedFallbacks &&
+      generatedFallback &&
+      !isCurrentGeneratedFallbackImage(row)
+    ) {
+      skippedRealProfileImages.push({
+        artist: displayNameForTarget(row),
+        normalizedArtist: normalizeArtist(row.normalized_artist),
+        status: 'skipped',
+        reason: 'current_profile_image_is_not_generated_fallback',
+        profileImageCdnUrl: cleanText(row.profile_image_cdn_url, 1000),
+        profileImageObjectKey: cleanText(row.profile_image_object_key, 1000),
+        previousGeneratedAt: cleanText(generatedFallback.generatedAt, 80),
+      });
+      continue;
+    }
+
+    const reason = targetReasonForRow(row, placeholderArtists, options, generatedFallback);
     if (!reason) continue;
     targets.push({
       ...row,
       normalized_artist: normalizeArtist(row.normalized_artist),
       generation_reason: reason,
       placeholder_audit: placeholderArtists.get(normalizeArtist(row.normalized_artist)) || null,
+      generated_profile_image: generatedFallback,
+      regenerate_generated_fallback: Boolean(options.regenerateGeneratedFallbacks && generatedFallback),
     });
     if (Number.isFinite(options.limit) && targets.length >= options.limit) break;
   }
+  targets.skippedRealProfileImages = skippedRealProfileImages;
   return targets;
 }
 
@@ -428,18 +510,55 @@ async function fetchCandidateCards(pool, normalizedArtists) {
   return byArtist;
 }
 
-function calculateTopCenterSquareCrop({ width, height, yRatio = DEFAULT_CROP_Y_RATIO }) {
+function cropSettingsForArtCategory(artCategory) {
+  if (artCategory === 'normal_art') {
+    return {
+      widthRatio: 0.52,
+      maxBottomRatio: 0.48,
+    };
+  }
+  return {
+    widthRatio: 0.55,
+    maxBottomRatio: 0.46,
+  };
+}
+
+function calculateUpperArtworkSquareCrop({
+  width,
+  height,
+  yRatio = DEFAULT_CROP_Y_RATIO,
+  artCategory = 'normal_art',
+}) {
   const imageWidth = Number(width || 0);
   const imageHeight = Number(height || 0);
   if (!Number.isFinite(imageWidth) || !Number.isFinite(imageHeight) || imageWidth < 1 || imageHeight < 1) {
     throw new Error('Valid image dimensions are required.');
   }
-  const size = Math.floor(Math.min(imageWidth, imageHeight));
+
+  if (imageWidth >= imageHeight) {
+    const size = Math.floor(Math.min(imageWidth, imageHeight));
+    return {
+      left: Math.round(Math.max(0, imageWidth - size) / 2),
+      top: Math.round(Math.max(0, imageHeight - size) / 2),
+      width: size,
+      height: size,
+    };
+  }
+
+  const settings = cropSettingsForArtCategory(artCategory);
+  const top = Math.max(0, Math.round(imageHeight * yRatio));
+  const maxBottom = Math.max(top + 1, Math.round(imageHeight * settings.maxBottomRatio));
+  const availableArtworkHeight = Math.max(1, maxBottom - top);
+  const preferredWidth = Math.floor(imageWidth * settings.widthRatio);
+  const size = Math.max(
+    1,
+    Math.floor(Math.min(preferredWidth, availableArtworkHeight, imageWidth, imageHeight)),
+  );
   const maxLeft = Math.max(0, Math.floor(imageWidth - size));
   const maxTop = Math.max(0, Math.floor(imageHeight - size));
   return {
     left: Math.round(maxLeft / 2),
-    top: Math.min(Math.max(0, Math.round(imageHeight * yRatio)), maxTop),
+    top: Math.min(top, maxTop),
     width: size,
     height: size,
   };
@@ -502,13 +621,14 @@ async function loadSourceImageBody({
   return downloadImage(card.sourceImageFetchUrl, fetchImpl);
 }
 
-async function generateAvatarPng(sourceBody, { avatarSize, cropYRatio }) {
+async function generateAvatarPng(sourceBody, { avatarSize, cropYRatio, artCategory }) {
   const image = sharp(sourceBody, { failOn: 'none' });
   const metadata = await image.metadata();
-  const crop = calculateTopCenterSquareCrop({
+  const crop = calculateUpperArtworkSquareCrop({
     width: metadata.width,
     height: metadata.height,
     yRatio: cropYRatio,
+    artCategory,
   });
   const output = await image
     .rotate()
@@ -574,6 +694,10 @@ function sourceUrlForInsert(target, card) {
 }
 
 function generatedMetadata({ target, card, publicUrl, objectKey, crop, sourceMetadata, options, generatedAt }) {
+  const previousGeneratedProfileImage =
+    target.generated_profile_image && typeof target.generated_profile_image === 'object'
+      ? target.generated_profile_image
+      : null;
   const sourceCard = {
     normalizedArtist: target.normalized_artist,
     artist: displayNameForTarget(target),
@@ -596,14 +720,22 @@ function generatedMetadata({ target, card, publicUrl, objectKey, crop, sourceMet
     profileImageCdnUrl: publicUrl,
     profileImageObjectKey: objectKey,
     cropStrategy: {
-      name: 'top_center_square',
+      name: CROP_STRATEGY_NAME,
       yRatio: options.cropYRatio,
       outputSize: options.avatarSize,
       sourceWidth: sourceMetadata.width,
       sourceHeight: sourceMetadata.height,
       sourceFormat: sourceMetadata.format,
+      artCategory: card.artCategory,
       crop,
     },
+    regeneratedFrom: previousGeneratedProfileImage
+      ? {
+          generatedAt: cleanText(previousGeneratedProfileImage.generatedAt, 80),
+          cropStrategy: previousGeneratedProfileImage.cropStrategy || null,
+          sourceCard: previousGeneratedProfileImage.sourceCard || null,
+        }
+      : undefined,
     sourceCard,
   };
 }
@@ -616,6 +748,7 @@ async function upsertGeneratedProfileImage(pool, target, card, generated) {
       generatedAt: generated.generatedAt,
       cropStrategy: generated.cropStrategy,
       sourceCard: generated.sourceCard,
+      regeneratedFrom: generated.regeneratedFrom,
     },
   };
   const rawMetadata = {
@@ -671,6 +804,11 @@ async function upsertGeneratedProfileImage(pool, target, card, generated) {
           and coalesce(public.marketplace_artist_profiles.profile_image_cdn_url, '') = $18
           and coalesce(public.marketplace_artist_profiles.profile_image_object_key, '') = $19
         )
+        or (
+          $20::boolean
+          and coalesce(public.marketplace_artist_profiles.profile_image_object_key, '') = $21
+          and coalesce(public.marketplace_artist_profiles.profile_image_object_key, '') like 'artist-profiles/generated/%'
+        )
       returning normalized_artist
     `,
     [
@@ -692,6 +830,8 @@ async function upsertGeneratedProfileImage(pool, target, card, generated) {
       target.generation_reason === 'placeholder_profile_image',
       cleanText(target.profile_image_url, 1000),
       cleanText(target.profile_image_cdn_url, 1000),
+      cleanText(target.profile_image_object_key, 1000),
+      Boolean(target.regenerate_generated_fallback),
       cleanText(target.profile_image_object_key, 1000),
     ],
   );
@@ -727,6 +867,9 @@ async function generateArtistFallbackAvatars({
 }) {
   const placeholderArtists = loadPlaceholderArtists(options.auditReport);
   const targets = await fetchArtistTargets(pool, options, placeholderArtists);
+  const skippedRealProfileImages = Array.isArray(targets.skippedRealProfileImages)
+    ? targets.skippedRealProfileImages
+    : [];
   const cardsByArtist = await fetchCandidateCards(
     pool,
     targets.map((row) => row.normalized_artist),
@@ -740,16 +883,21 @@ async function generateArtistFallbackAvatars({
     uploaded: 0,
     upserted: 0,
     skipped: 0,
+    skippedRealProfileImages: skippedRealProfileImages.length,
     failed: 0,
     reasons: {},
   };
-  const report = [];
+  const report = [...skippedRealProfileImages];
   const samples = [];
+  let writtenSampleCount = 0;
 
   if (options.apply && !r2Config) {
     throw new Error('R2 artist profile image configuration is required for --apply.');
   }
   const client = options.apply ? createS3Client(r2Config) : null;
+  if (options.sampleDir) {
+    fs.mkdirSync(options.sampleDir, { recursive: true });
+  }
 
   await mapWithConcurrency(targets, options.concurrency, async (target) => {
     const cards = cardsByArtist.get(target.normalized_artist) || [];
@@ -775,6 +923,15 @@ async function generateArtistFallbackAvatars({
     let generated = null;
     let status = options.apply ? 'generated' : 'matched_dry_run';
     let errorMessage = '';
+    let localSamplePath = '';
+    const shouldWriteSample = Boolean(
+      options.sampleDir &&
+        !options.apply &&
+        writtenSampleCount < options.sampleLimit,
+    );
+    if (shouldWriteSample) {
+      writtenSampleCount += 1;
+    }
 
     try {
       if (options.apply) {
@@ -784,7 +941,10 @@ async function generateArtistFallbackAvatars({
           r2Config,
           fetchImpl,
         });
-        const avatar = await generateAvatarPng(sourceBody, options);
+        const avatar = await generateAvatarPng(sourceBody, {
+          ...options,
+          artCategory: card.artCategory,
+        });
         const uploadedUrl = await uploadAvatar({
           client,
           r2Config,
@@ -808,6 +968,47 @@ async function generateArtistFallbackAvatars({
         counts.generated += 1;
         counts.uploaded += 1;
         counts.upserted += 1;
+      } else if (shouldWriteSample) {
+        const sourceBody = await loadSourceImageBody({
+          card,
+          client: null,
+          r2Config,
+          fetchImpl,
+        });
+        const avatar = await generateAvatarPng(sourceBody, {
+          ...options,
+          artCategory: card.artCategory,
+        });
+        const fileName = `${slugForKey(target.normalized_artist)}-${cleanText(card.card_id, 80) || 'card'}.png`;
+        localSamplePath = path.join(options.sampleDir, fileName);
+        fs.writeFileSync(localSamplePath, avatar.output);
+        status = 'sampled_dry_run';
+        generated = {
+          reason: target.generation_reason,
+          profileImageCdnUrl: publicUrl,
+          profileImageObjectKey: objectKey,
+          cropStrategy: {
+            name: CROP_STRATEGY_NAME,
+            yRatio: options.cropYRatio,
+            outputSize: options.avatarSize,
+            sourceWidth: avatar.metadata.width,
+            sourceHeight: avatar.metadata.height,
+            sourceFormat: avatar.metadata.format,
+            artCategory: card.artCategory,
+            crop: avatar.crop,
+          },
+          sourceCard: {
+            cardId: cleanText(card.card_id, 80),
+            blueprintId: cleanText(card.blueprint_id, 80),
+            name: cleanText(card.name, 240),
+            expansionName: cleanText(card.expansion_name, 240),
+            expansionNumber: cleanText(card.expansion_number, 120),
+            rarity: cleanText(card.rarity, 120),
+            artCategory: card.artCategory,
+            sourceImageUrl: card.sourceImageUrl,
+            canonicalUrl: cleanText(card.canonicalUrl, 1000),
+          },
+        };
       } else {
         generated = {
           reason: target.generation_reason,
@@ -851,10 +1052,12 @@ async function generateArtistFallbackAvatars({
       sourceCardUrl: card.canonicalUrl,
       profileImageCdnUrl: generated?.profileImageCdnUrl || publicUrl,
       profileImageObjectKey: objectKey,
+      samplePath: localSamplePath ? path.relative(ROOT_DIR, localSamplePath) : undefined,
       cropStrategy: generated?.cropStrategy || {
-        name: 'top_center_square',
+        name: CROP_STRATEGY_NAME,
         yRatio: options.cropYRatio,
         outputSize: options.avatarSize,
+        artCategory: card.artCategory,
       },
     };
     report.push(entry);
@@ -887,6 +1090,9 @@ async function main() {
         cropYRatio: options.cropYRatio,
         includeMissing: options.includeMissing,
         includePlaceholders: options.includePlaceholders,
+        regenerateGeneratedFallbacks: options.regenerateGeneratedFallbacks,
+        sampleDir: options.sampleDir ? path.relative(ROOT_DIR, options.sampleDir) : '',
+        sampleLimit: options.sampleLimit,
       },
       counts: result.counts,
       samples: result.samples,
@@ -914,7 +1120,7 @@ if (require.main === module) {
 }
 
 module.exports = {
-  calculateTopCenterSquareCrop,
+  calculateUpperArtworkSquareCrop,
   cardImageFetchUrl,
   classifyCardArt,
   fetchArtistTargets,

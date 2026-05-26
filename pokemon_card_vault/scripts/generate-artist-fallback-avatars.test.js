@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 
 const {
-  calculateTopCenterSquareCrop,
+  calculateUpperArtworkSquareCrop,
   cardImageFetchUrl,
   classifyCardArt,
   parseArgs,
@@ -15,9 +15,10 @@ test('fallback avatar generator is dry-run by default', () => {
   assert.equal(options.apply, false);
   assert.equal(options.limit, 100);
   assert.equal(options.avatarSize, 512);
-  assert.equal(options.cropYRatio, 0.1);
+  assert.equal(options.cropYRatio, 0.18);
   assert.equal(options.includeMissing, true);
   assert.equal(options.includePlaceholders, true);
+  assert.equal(options.regenerateGeneratedFallbacks, false);
 });
 
 test('fallback avatar generator parses target filters', () => {
@@ -27,7 +28,10 @@ test('fallback avatar generator parses target filters', () => {
     '--artist=Aky CG Works, No Image Artist',
     '--placeholders-only',
     '--avatar-size=768',
-    '--crop-y-ratio=0.15',
+    '--crop-y-ratio=0.22',
+    '--regenerate-generated-fallbacks',
+    '--sample-dir=workflows/reports/avatar-samples',
+    '--sample-limit=3',
   ]);
 
   assert.equal(options.apply, true);
@@ -36,7 +40,10 @@ test('fallback avatar generator parses target filters', () => {
   assert.equal(options.includeMissing, false);
   assert.equal(options.includePlaceholders, true);
   assert.equal(options.avatarSize, 768);
-  assert.equal(options.cropYRatio, 0.15);
+  assert.equal(options.cropYRatio, 0.22);
+  assert.equal(options.regenerateGeneratedFallbacks, true);
+  assert.match(options.sampleDir, /workflows\/reports\/avatar-samples$/);
+  assert.equal(options.sampleLimit, 3);
 });
 
 test('card art classification prioritizes illustration before full and normal art', () => {
@@ -69,23 +76,40 @@ test('card art classification prioritizes illustration before full and normal ar
   );
 });
 
-test('top-center square crop avoids the middle of a portrait card', () => {
-  const crop = calculateTopCenterSquareCrop({
+test('upper-artwork square crop avoids title and rules text on a portrait card', () => {
+  const crop = calculateUpperArtworkSquareCrop({
     width: 734,
     height: 1024,
-    yRatio: 0.1,
+    yRatio: 0.18,
+    artCategory: 'normal_art',
   });
 
   assert.deepEqual(crop, {
-    left: 0,
-    top: 102,
-    width: 734,
-    height: 734,
+    left: 213,
+    top: 184,
+    width: 308,
+    height: 308,
   });
 });
 
-test('top-center crop is centered for landscape images and clamped', () => {
-  const crop = calculateTopCenterSquareCrop({
+test('upper-artwork crop allows a larger square for illustration cards', () => {
+  const crop = calculateUpperArtworkSquareCrop({
+    width: 734,
+    height: 1024,
+    yRatio: 0.18,
+    artCategory: 'illustration',
+  });
+
+  assert.deepEqual(crop, {
+    left: 224,
+    top: 184,
+    width: 287,
+    height: 287,
+  });
+});
+
+test('upper-artwork crop is centered for landscape images', () => {
+  const crop = calculateUpperArtworkSquareCrop({
     width: 1200,
     height: 800,
     yRatio: 0.5,

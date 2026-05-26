@@ -13,6 +13,9 @@ import 'search_debug_trace.dart';
 const String _cardImageProxyOrigin = 'https://pokoin.com';
 const String _cardImageProxyPrefix = '/card-images';
 const String _cardImageCdnHost = 'cdn.pokoin.com';
+const String _competitiveApiBaseUrl = String.fromEnvironment(
+    'COMPETITIVE_API_BASE_URL',
+    defaultValue: 'https://api.pokoin.com');
 const int _marketplaceArtistSnapshotLimit = 300;
 
 Map<String, dynamic> _mapFromJson(Object? value) {
@@ -708,12 +711,42 @@ class CompetitiveDeckPlayer {
 class CompetitiveDecklist {
   const CompetitiveDecklist({
     required this.decklistId,
+    this.deckId = '',
+    this.deckName = '',
+    this.format = '',
+    this.formatLabel = '',
+    this.tournamentId = '',
+    this.tournamentName = '',
+    this.tournamentDate,
+    this.placing,
+    this.placingLabel = '',
+    this.variant = '',
+    this.playerId = '',
+    this.playerName = '',
+    this.sourceUrl = '',
+    this.deckSourceUrl = '',
+    this.tournamentSourceUrl = '',
     this.cards = const [],
   });
 
   factory CompetitiveDecklist.fromJson(Map<String, dynamic> json) {
     return CompetitiveDecklist(
       decklistId: '${json['decklistId'] ?? ''}'.trim(),
+      deckId: '${json['deckId'] ?? ''}'.trim(),
+      deckName: '${json['deckName'] ?? ''}'.trim(),
+      format: '${json['format'] ?? ''}'.trim(),
+      formatLabel: '${json['formatLabel'] ?? json['format'] ?? ''}'.trim(),
+      tournamentId: '${json['tournamentId'] ?? ''}'.trim(),
+      tournamentName: '${json['tournamentName'] ?? ''}'.trim(),
+      tournamentDate: DateTime.tryParse('${json['tournamentDate'] ?? ''}'),
+      placing: (json['placing'] as num?)?.toInt(),
+      placingLabel: '${json['placingLabel'] ?? ''}'.trim(),
+      variant: '${json['variant'] ?? ''}'.trim(),
+      playerId: '${json['playerId'] ?? ''}'.trim(),
+      playerName: '${json['playerName'] ?? ''}'.trim(),
+      sourceUrl: '${json['sourceUrl'] ?? ''}'.trim(),
+      deckSourceUrl: '${json['deckSourceUrl'] ?? ''}'.trim(),
+      tournamentSourceUrl: '${json['tournamentSourceUrl'] ?? ''}'.trim(),
       cards: (json['cards'] as List<dynamic>? ?? const [])
           .whereType<Map>()
           .map((row) =>
@@ -723,6 +756,21 @@ class CompetitiveDecklist {
   }
 
   final String decklistId;
+  final String deckId;
+  final String deckName;
+  final String format;
+  final String formatLabel;
+  final String tournamentId;
+  final String tournamentName;
+  final DateTime? tournamentDate;
+  final int? placing;
+  final String placingLabel;
+  final String variant;
+  final String playerId;
+  final String playerName;
+  final String sourceUrl;
+  final String deckSourceUrl;
+  final String tournamentSourceUrl;
   final List<CompetitiveDeckCard> cards;
 }
 
@@ -800,6 +848,8 @@ class CompetitiveSnapshot {
     this.deckResults = const [],
     this.deckPlayers = const [],
     this.decklists = const [],
+    this.selectedDecklist,
+    this.decklistCards = const [],
     this.selectedTournament,
     this.standings = const [],
     this.pairings = const [],
@@ -852,6 +902,16 @@ class CompetitiveSnapshot {
           .map((row) =>
               CompetitiveDecklist.fromJson(Map<String, dynamic>.from(row)))
           .toList(),
+      selectedDecklist: json['decklist'] is Map
+          ? CompetitiveDecklist.fromJson(
+              Map<String, dynamic>.from(json['decklist'] as Map),
+            )
+          : null,
+      decklistCards: (json['cards'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map((row) =>
+              CompetitiveDeckCard.fromJson(Map<String, dynamic>.from(row)))
+          .toList(),
       selectedTournament: json['tournament'] is Map
           ? CompetitiveTournament.fromJson(
               Map<String, dynamic>.from(json['tournament'] as Map),
@@ -880,6 +940,8 @@ class CompetitiveSnapshot {
   final List<CompetitiveDeckResult> deckResults;
   final List<CompetitiveDeckPlayer> deckPlayers;
   final List<CompetitiveDecklist> decklists;
+  final CompetitiveDecklist? selectedDecklist;
+  final List<CompetitiveDeckCard> decklistCards;
   final CompetitiveTournament? selectedTournament;
   final List<CompetitiveStanding> standings;
   final List<CompetitivePairing> pairings;
@@ -2019,8 +2081,7 @@ class CardService {
       type: type,
       hp: 0,
       attacks: const [],
-      price: listedPrice ??
-          (_pknPrices[id] ?? 1000 + (_stableSeed(id) % 120000)).toDouble(),
+      price: listedPrice ?? 0,
       description: itemKind == 'product'
           ? 'Imported from the Pokoin marketplace product projection.'
           : 'Imported from the Pokoin marketplace projection. Full blueprint data is loaded on card detail.',
@@ -2110,8 +2171,7 @@ class CardService {
       type: type,
       hp: 0,
       attacks: const [],
-      price: listedPrice ??
-          (_pknPrices[id] ?? 1000 + (_stableSeed(id) % 120000)).toDouble(),
+      price: listedPrice ?? 0,
       description: itemKind == 'product'
           ? 'Imported from the Pokoin marketplace product version index.'
           : 'Imported from the Pokoin marketplace version index. Full blueprint data is loaded on card detail.',
@@ -3114,11 +3174,14 @@ class CardService {
     int? year,
     String? tournamentId,
     String? deckId,
+    String? decklistId,
     int limit = 50,
   }) async {
     try {
       final queryParameters = <String, String>{
-        if (deckId?.trim().isNotEmpty == true)
+        if (decklistId?.trim().isNotEmpty == true)
+          'decklistId': decklistId!.trim()
+        else if (deckId?.trim().isNotEmpty == true)
           'deckId': deckId!.trim()
         else if (tournamentId?.trim().isNotEmpty == true)
           'tournamentId': tournamentId!.trim()
@@ -3130,10 +3193,15 @@ class CardService {
           if (year != null && year > 0) 'year': '$year',
         },
       };
-      final uri = Uri.base.resolve('/api/marketplace-competitive').replace(
-            queryParameters: queryParameters,
-          );
-      final response = await http.get(uri).timeout(const Duration(seconds: 8));
+      final directUri = Uri.parse(
+        '${_competitiveApiBaseUrl.replaceFirst(RegExp(r'/$'), '')}/api/marketplace-competitive',
+      ).replace(queryParameters: queryParameters);
+      final response = await _getCompetitiveSnapshotResponse(
+        directUri,
+        Uri.base.resolve('/api/marketplace-competitive').replace(
+              queryParameters: queryParameters,
+            ),
+      );
       if (response.statusCode >= 400) {
         debugPrint('Marketplace competitive failed: ${response.statusCode}');
         return null;
@@ -3144,6 +3212,18 @@ class CardService {
     } catch (error) {
       debugPrint('Marketplace competitive failed: $error');
       return null;
+    }
+  }
+
+  Future<http.Response> _getCompetitiveSnapshotResponse(
+    Uri directUri,
+    Uri fallbackUri,
+  ) async {
+    try {
+      return await http.get(directUri).timeout(const Duration(seconds: 15));
+    } catch (error) {
+      debugPrint('Marketplace competitive direct API failed: $error');
+      return http.get(fallbackUri).timeout(const Duration(seconds: 10));
     }
   }
 
@@ -3505,6 +3585,54 @@ class CardService {
       }
     }
     return _dedupeCards(results).take(limit).toList();
+  }
+
+  Future<List<PokemonCard>> lookupDeckCardVersions({
+    required String name,
+    required String setCode,
+    required String collectorNumber,
+    int limit = 12,
+    String searchLanguage = 'en',
+  }) async {
+    final normalizedName = name.trim();
+    final normalizedSetCode = setCode.trim();
+    final normalizedCollectorNumber = collectorNumber.trim();
+    if (normalizedName.isEmpty && normalizedCollectorNumber.isEmpty) {
+      return const [];
+    }
+
+    try {
+      final uri = Uri.base.resolve('/api/deck-card-version-lookup').replace(
+        queryParameters: {
+          if (normalizedName.isNotEmpty) 'name': normalizedName,
+          if (normalizedSetCode.isNotEmpty) 'setCode': normalizedSetCode,
+          if (normalizedCollectorNumber.isNotEmpty)
+            'collectorNumber': normalizedCollectorNumber,
+          'limit': '$limit',
+          if (_tcgdexLanguage(searchLanguage) != 'en')
+            'lang': _tcgdexLanguage(searchLanguage),
+        },
+      );
+      final response = await http.get(uri).timeout(const Duration(seconds: 6));
+      if (response.statusCode >= 400) {
+        return const [];
+      }
+
+      final payload = jsonDecode(response.body);
+      final rows = payload is Map
+          ? (payload['matches'] as List<dynamic>? ?? const [])
+          : payload is List
+              ? payload
+              : const [];
+      final cards = rows
+          .whereType<Map>()
+          .map((row) => _cardFromVersionRow(Map<String, dynamic>.from(row)))
+          .toList();
+      return _dedupeCards(cards).take(limit).toList();
+    } catch (error) {
+      debugPrint('Deck card version lookup failed: $error');
+      return const [];
+    }
   }
 
   Future<List<PokemonCard>> getMarketplaceCardsByProductType(
@@ -4163,6 +4291,9 @@ class CardService {
     final fallback = _splitEmojiText(row['emoji']);
     final tokens = <String>[];
     for (final token in identity) {
+      if (_genericIdentityEmojis.contains(token)) {
+        continue;
+      }
       if (!tokens.contains(token)) {
         tokens.add(token);
       }
@@ -4173,6 +4304,9 @@ class CardService {
     if (tokens.length < 2) {
       for (final token
           in fallback.where((token) => !_variantEmojis.contains(token))) {
+        if (_genericIdentityEmojis.contains(token)) {
+          continue;
+        }
         if (!tokens.contains(token)) {
           tokens.add(token);
         }
@@ -4235,6 +4369,15 @@ class CardService {
   List<String> _fallbackIdentityEmojis(Map<String, dynamic> row) {
     final text = '${row['name'] ?? ''} ${row['card_type'] ?? row['type'] ?? ''}'
         .toLowerCase();
+    if (RegExp(r'camerupt|numel').hasMatch(text)) {
+      return const ['🐫', '🌋'];
+    }
+    if (RegExp(r'sharpedo|carvanha').hasMatch(text)) {
+      return const ['🦈', '🌊'];
+    }
+    if (text.contains('regirock')) {
+      return const ['🪨', '🌟'];
+    }
     if (RegExp(
             r'leafeon|eevee|vaporeon|jolteon|flareon|espeon|umbreon|glaceon|sylveon')
         .hasMatch(text)) {
@@ -4324,6 +4467,8 @@ class CardService {
     '🔷',
     '⚪',
   };
+
+  static const Set<String> _genericIdentityEmojis = {'🃏'};
 
   String _cleanCanonicalPath(Map<String, dynamic> row) {
     final text =

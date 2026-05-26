@@ -25,6 +25,13 @@ oracle-postgres/schema/014_limitless_competitive.sql
   decklist access. Public standings store deck references and raw deck summary;
   full decklist fetching is intentionally disabled until Limitless approves the
   endpoint/API key.
+- `limitless_marketplace_expansions` and
+  `limitless_marketplace_expansion_blueprints` map Limitless set codes/card
+  references to Pokoin/CardTrader blueprint IDs for deck-card version lookup.
+  They are created by
+  `oracle-postgres/schema/016_limitless_expansion_blueprint_mapping.sql` and can
+  be populated from already-synced public Limitless decklist rows with
+  `scripts/sync-limitless-expansion-blueprints.js`.
 - `limitless_sync_runs` records apply runs and partial failures.
 
 ## Apply Schema
@@ -63,6 +70,40 @@ the API response, then run the full or otherwise sensible public import:
 node scripts/sync-limitless-competitive.js --apply --game=PTCG --max-tournaments=100
 ```
 
+Production competitive pages must not call Limitless during page load. Oracle
+runs the importer as a daily job and `/api/marketplace-competitive` reads only
+local Oracle Postgres tables (`limitless_*`, `limitless_public_*`, and local
+Pokoin card lookup tables). Live Limitless HTTP fetches belong in
+`scripts/sync-limitless-competitive.js` only.
+
+On peer3 the daily job is installed as:
+
+```text
+pokoin-limitless-competitive-sync.timer
+pokoin-limitless-competitive-sync.service
+```
+
+The service runs from `/home/ubuntu/pokoin-oracle-api/current` with
+`/home/ubuntu/pokoin-oracle-api/.env` and executes:
+
+```bash
+bash scripts/run-limitless-daily-competitive-sync.sh
+```
+
+Install or update the timer on the Oracle API host with:
+
+```bash
+cd /home/ubuntu/pokoin-oracle-api/current
+chmod +x scripts/run-limitless-daily-competitive-sync.sh
+sudo install -m 644 deploy/systemd/pokoin-limitless-competitive-sync.service /etc/systemd/system/pokoin-limitless-competitive-sync.service
+sudo install -m 644 deploy/systemd/pokoin-limitless-competitive-sync.timer /etc/systemd/system/pokoin-limitless-competitive-sync.timer
+sudo systemctl daemon-reload
+sudo systemctl enable --now pokoin-limitless-competitive-sync.timer
+```
+
+The timer is persistent and scheduled for `04:20` local host time with a small
+randomized delay, after the existing overnight market refresh window.
+
 Useful options:
 
 ```text
@@ -90,6 +131,18 @@ where the API allows. Restricted decklist endpoints may require Limitless
 approval and an API key; treat missing decklists as a documented blocker, not as
 data that should be silently assumed.
 
+Expansion-to-blueprint mapping:
+
+```bash
+node scripts/sync-limitless-expansion-blueprints.js --dry-run
+node scripts/sync-limitless-expansion-blueprints.js --apply
+```
+
+This importer uses `public.limitless_public_decklist_cards` rows already synced
+from public Limitless pages. Do not invent a full card-database feed or scrape a
+fragile card database HTML page; if Limitless exposes/approves an official card
+database API, point a future importer at the same mapping tables.
+
 ## API And UI
 
 The Flutter page reads:
@@ -97,6 +150,8 @@ The Flutter page reads:
 ```text
 GET /api/marketplace-competitive?includeGames=1&game=PTCG&limit=50
 GET /api/marketplace-competitive?tournamentId=<limitless-id>
+GET /api/limitless-expansion-blueprints?setCode=TWM&includeBlueprints=1
+GET /api/deck-card-version-lookup?name=Dreepy&setCode=TWM&collectorNumber=128
 ```
 
 The marketplace route is:

@@ -14,6 +14,12 @@ create table if not exists public.cardtrader_blueprint_listing_cache (
   updated_at timestamptz not null default now()
 );
 
+comment on column public.cardtrader_blueprint_listing_cache.provider is
+  'Winning homepage cheapest source for the blueprint: cardtrader import cache or pokoin_native marketplace listing.';
+
+comment on column public.cardtrader_blueprint_listing_cache.sample_listing_id is
+  'External CardTrader listing id or native marketplace_user_listings id for the winning homepage cheapest row.';
+
 create or replace view public.cheapest_homepage_cache_blueprint as
 select
   provider,
@@ -40,7 +46,7 @@ create index if not exists cardtrader_blueprint_listing_cache_available_idx
 
 create index if not exists cardtrader_blueprint_listing_cache_pokoin_available_idx
   on public.cardtrader_blueprint_listing_cache (pokoin_card_id)
-  where provider = 'cardtrader'
+  where provider in ('cardtrader', 'pokoin_native')
     and pokoin_card_id <> ''
     and eligible_listing_count > 0
     and cheapest_price_pkn is not null;

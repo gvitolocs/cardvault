@@ -1,3 +1,13 @@
+---
+title: Pokoin TrainingAI Card Classifier
+emoji: 🃏
+colorFrom: yellow
+colorTo: blue
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # Pokoin TrainingAI Hugging Face Space
 
 This Space runs the Pokemon Card Recognizer classifier behind the Pokoin API.
@@ -25,6 +35,9 @@ TRAININGAI_PRETRAINED=laion2b_s34b_b79k
 ```
 
 ## API
+
+`GET /health` is intentionally lightweight for keep-alive pings.
+Use `GET /ready` when you want to force-load OpenCLIP and the FAISS index.
 
 ```bash
 curl -X POST "https://<user>-<space>.hf.space/classify" \

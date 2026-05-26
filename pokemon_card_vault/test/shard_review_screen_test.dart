@@ -144,6 +144,38 @@ Energy: 15
     expect(ranked.first.imageUrl, contains('/1.webp'));
   });
 
+  test('deck version suggestions map Limitless set codes before fuzzy versions',
+      () {
+    const parsed = ParsedDeckCard(
+      quantity: 4,
+      name: 'Dreepy',
+      setCode: 'TWM',
+      collectorNumber: '128',
+      category: 'Pokemon',
+      rawLine: '4 Dreepy TWM 128',
+    );
+
+    final ranked = rankDeckVersionSuggestionsForCard(parsed, [
+      _card(
+        id: 'fs',
+        name: 'Dreepy',
+        set: 'Fusion Strike',
+        number: '128/264',
+        rarity: 'Common',
+      ),
+      _card(
+        id: 'twm',
+        name: 'Dreepy',
+        set: 'Twilight Masquerade',
+        number: '128/167',
+        rarity: 'Common',
+      ),
+    ]);
+
+    expect(ranked.first.card.id, 'twm');
+    expect(ranked.first.label, 'Dreepy (Twilight Masquerade 128/167)');
+  });
+
   testWidgets('Reserve tile opens standalone shard review route',
       (WidgetTester tester) async {
     await tester.pumpWidget(appForRoute('/earn'));

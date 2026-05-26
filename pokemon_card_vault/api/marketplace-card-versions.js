@@ -1,6 +1,11 @@
 const { marketplaceQuery } = require('./_marketplace_db');
 const { withCardEmojiFields } = require('./_marketplace_card_emoji');
 const { projectedRaritySql } = require('./_marketplace_card_rarity');
+const {
+  availabilityColumns,
+  cardTraderAvailabilityJoin,
+  cheapestHomepageCacheRelationName,
+} = require('./marketplace-cards');
 
 function cleanLimit(value, fallback = 240) {
   const limit = Number(value);
@@ -268,6 +273,7 @@ async function candidateRowsForCardId(cardId, query = marketplaceQuery) {
   if (!Number.isSafeInteger(normalizedCardId) || normalizedCardId <= 0) {
     return [];
   }
+  const cheapestCacheRelation = await cheapestHomepageCacheRelationName(query);
   const raritySql = projectedRaritySql({
     rarityColumn: 'candidates.rarity',
     collectorNumberSql: 'candidates.card_number',
@@ -298,15 +304,13 @@ async function candidateRowsForCardId(cardId, query = marketplaceQuery) {
         urls.canonical_path,
         candidates.imported_at as projected_at,
         expansions.symbol_image_url as expansion_symbol_url,
-        coalesce(price_summary.listed_quantity, 0) as listed_quantity,
-        price_summary.lowest_ask_pkn as lowest_price_pkn
+        ${availabilityColumns('price_summary', 'cardtrader')}
       from public.marketplace_search_candidates candidates
       left join public.cardtrader_pokemon_blueprints blueprints
         on blueprints.id = candidates.card_id
       left join public.marketplace_blueprint_tcg_metadata tcg_metadata
         on tcg_metadata.blueprint_id = candidates.card_id
-      left join public.marketplace_blueprint_price_summary price_summary
-        on price_summary.blueprint_id = candidates.card_id
+      ${cardTraderAvailabilityJoin('candidates', cheapestCacheRelation)}
       left join (
         select name, min(symbol_image_url) as symbol_image_url
         from public.cardtrader_pokemon_expansions
@@ -384,6 +388,7 @@ async function rowsForVersions({
 
   where += searchClause(query, normalizedProductType, searchLanguage, values);
   values.push(cleanLimit(limit));
+  const cheapestCacheRelation = await cheapestHomepageCacheRelationName(dbQuery);
 
   const result = await dbQuery(
     `
@@ -410,17 +415,15 @@ async function rowsForVersions({
         urls.canonical_path,
         versions.projected_at,
         expansions.symbol_image_url as expansion_symbol_url,
-        coalesce(price_summary.listed_quantity, 0) as listed_quantity,
-        price_summary.lowest_ask_pkn as lowest_price_pkn
+        ${availabilityColumns('price_summary', 'cardtrader')}
       from public.marketplace_card_versions versions
       left join public.marketplace_search_candidates candidates
         on candidates.card_id = versions.card_id
-      left join public.marketplace_blueprint_price_summary price_summary
-        on price_summary.blueprint_id = versions.card_id
       left join public.cardtrader_pokemon_blueprints blueprints
         on blueprints.id = versions.card_id
       left join public.marketplace_blueprint_tcg_metadata tcg_metadata
         on tcg_metadata.blueprint_id = versions.card_id
+      ${cardTraderAvailabilityJoin('versions', cheapestCacheRelation)}
       left join lateral (
         select collector_number
         from public.marketplace_cm_verified_links link

@@ -6,6 +6,7 @@
     "api:server": "node server/oracle-api-server.js",
     "api:check": "node scripts/check-oracle-api-server.js",
     "api:smoke": "node scripts/smoke-oracle-api-routes.js",
+    "trainingai:best-images": "node scripts/generate-trainingai-best-blueprint-images.js",
     "peer3:bundle": "bash scripts/package-oracle-api-service.sh",
     "peer3:deploy": "bash scripts/deploy-oracle-api-peer3.sh"
   },

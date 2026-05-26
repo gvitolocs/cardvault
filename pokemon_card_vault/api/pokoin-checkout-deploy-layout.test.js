@@ -242,6 +242,8 @@ test('deploy config exposes flutter debug logs as a Vercel function route', () =
 
 test('assistant and canonical card URL APIs are deploy-packaged manifest routes', () => {
   for (const route of [
+    ['/api/deck-card-version-lookup', 'deck-card-version-lookup.js'],
+    ['/api/limitless-expansion-blueprints', 'limitless-expansion-blueprints.js'],
     ['/api/pokoin-assistant', 'pokoin-assistant.js'],
     ['/api/marketplace-card-cheapest-price', 'marketplace-card-cheapest-price.js'],
     ['/api/marketplace-card-url', 'marketplace-card-url.js'],

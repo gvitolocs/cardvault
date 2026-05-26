@@ -26,12 +26,16 @@ test('marketplace cards CardTrader availability SQL exposes tile availability', 
   assert.match(joinSql, /left join lateral/);
   assert.match(joinSql, /cardtrader_cache\.blueprint_id = candidate\.card_id/);
   assert.match(joinSql, /cardtrader_cache\.pokoin_card_id = candidate\.card_id::text/);
+  assert.match(joinSql, /cardtrader_cache\.provider in \('cardtrader', 'pokoin_native'\)/);
   assert.match(joinSql, /cardtrader_cache\.eligible_listing_count > 0/);
   assert.match(joinSql, /cardtrader_cache\.cheapest_price_pkn is not null/);
   assert.match(joinSql, /order by[\s\S]*cardtrader_cache\.cheapest_price_pkn asc/);
   assert.match(columnsSql, /cardtrader_eligible_listing_count/);
   assert.match(columnsSql, /has_cardtrader_listing/);
-  assert.match(columnsSql, /when cardtrader\.cheapest_price_pkn is not null then cardtrader\.cheapest_price_pkn/);
+  assert.match(columnsSql, /cardtrader\.cheapest_price_pkn as lowest_price_pkn/);
+  assert.match(columnsSql, /homepage_cheapest_source/);
+  assert.match(columnsSql, /homepage_cheapest_provider/);
+  assert.doesNotMatch(columnsSql, /marketplace_blueprint_price_summary/);
   assert.doesNotMatch(joinSql, /cardtrader_market_listing_snapshots/);
 });
 

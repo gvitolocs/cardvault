@@ -635,8 +635,16 @@
       "destination": "/api/cardmarket-scrape-observation.js"
     },
     {
+      "source": "/api/deck-card-version-lookup",
+      "destination": "/api/deck-card-version-lookup.js"
+    },
+    {
       "source": "/api/unlock-silver",
       "destination": "/api/unlock-silver.js"
+    },
+    {
+      "source": "/api/limitless-expansion-blueprints",
+      "destination": "/api/limitless-expansion-blueprints.js"
     },
     {
       "source": "/api/marketplace-home",

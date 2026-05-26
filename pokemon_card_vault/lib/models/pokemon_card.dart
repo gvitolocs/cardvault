@@ -516,6 +516,9 @@ class PokemonCard extends HiveObject {
     final fallback = _splitEmojiText(json['emoji']);
     final tokens = <String>[];
     for (final token in identity) {
+      if (_genericIdentityEmojis.contains(token)) {
+        continue;
+      }
       if (!tokens.contains(token)) {
         tokens.add(token);
       }
@@ -525,6 +528,9 @@ class PokemonCard extends HiveObject {
     }
     if (tokens.length < 2) {
       for (final token in fallback.where((token) => !_isVariantEmoji(token))) {
+        if (_genericIdentityEmojis.contains(token)) {
+          continue;
+        }
         if (!tokens.contains(token)) {
           tokens.add(token);
         }
@@ -599,10 +605,21 @@ class PokemonCard extends HiveObject {
     }.contains(token);
   }
 
+  static const Set<String> _genericIdentityEmojis = {'🃏'};
+
   static List<String> _fallbackIdentityEmojis(Map<String, dynamic> json) {
     final text =
         '${json['name'] ?? ''} ${json['card_type'] ?? json['type'] ?? ''}'
             .toLowerCase();
+    if (RegExp(r'camerupt|numel').hasMatch(text)) {
+      return const ['🐫', '🌋'];
+    }
+    if (RegExp(r'sharpedo|carvanha').hasMatch(text)) {
+      return const ['🦈', '🌊'];
+    }
+    if (text.contains('regirock')) {
+      return const ['🪨', '🌟'];
+    }
     if (RegExp(
             r'leafeon|eevee|vaporeon|jolteon|flareon|espeon|umbreon|glaceon|sylveon')
         .hasMatch(text)) {
