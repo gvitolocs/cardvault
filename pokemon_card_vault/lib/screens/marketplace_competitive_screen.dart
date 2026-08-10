@@ -54,24 +54,76 @@ class CompetitiveQuery {
       Object.hash(game, format, year, tournamentId, deckId, decklistId);
 }
 
-class MarketplaceCompetitiveScreen extends ConsumerWidget {
+class MarketplaceCompetitiveScreen extends ConsumerStatefulWidget {
   const MarketplaceCompetitiveScreen({
     super.key,
     this.initialDeckId = '',
     this.initialDecklistId = '',
   });
 
-  // Kept for route compatibility while the competitive hub is in renovation.
   final String initialDeckId;
   final String initialDecklistId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MarketplaceCompetitiveScreen> createState() =>
+      _MarketplaceCompetitiveScreenState();
+}
+
+class _MarketplaceCompetitiveScreenState
+    extends ConsumerState<MarketplaceCompetitiveScreen> {
+  String _game = 'PTCG';
+  String _format = '';
+  int? _year;
+  String _selectedTournamentId = '';
+  String _selectedDeckId = '';
+  String _selectedDecklistId = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedDeckId = widget.initialDeckId.trim();
+    _selectedDecklistId = widget.initialDecklistId.trim();
+  }
+
+  @override
+  void didUpdateWidget(covariant MarketplaceCompetitiveScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final nextDeckId = widget.initialDeckId.trim();
+    final nextDecklistId = widget.initialDecklistId.trim();
+    if (oldWidget.initialDeckId.trim() != nextDeckId &&
+        nextDeckId != _selectedDeckId) {
+      setState(() {
+        _selectedDeckId = nextDeckId;
+        _selectedDecklistId = '';
+        _selectedTournamentId = '';
+      });
+    }
+    if (oldWidget.initialDecklistId.trim() != nextDecklistId &&
+        nextDecklistId != _selectedDecklistId) {
+      setState(() {
+        _selectedDecklistId = nextDecklistId;
+        _selectedDeckId = '';
+        _selectedTournamentId = '';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final compactTopBar = MediaQuery.sizeOf(context).width < 760;
     final cachedBalance = ref.watch(cachedPknBalanceProvider).valueOrNull;
     final balance =
         ref.watch(pknBalanceProvider).valueOrNull ?? cachedBalance ?? 0;
     final cartState = ref.watch(cartProvider);
+    final query = CompetitiveQuery(
+      game: _game,
+      format: _format,
+      year: _year,
+      tournamentId: _selectedTournamentId,
+      deckId: _selectedDeckId,
+      decklistId: _selectedDecklistId,
+    );
+    final snapshot = ref.watch(competitiveSnapshotProvider(query));
 
     return Scaffold(
       backgroundColor: const Color(0xFF050816),
@@ -99,79 +151,75 @@ class MarketplaceCompetitiveScreen extends ConsumerWidget {
           ),
         ),
       ),
-      body: const _CompetitiveRenovationPage(),
-    );
-  }
-}
-
-class _CompetitiveRenovationPage extends StatelessWidget {
-  const _CompetitiveRenovationPage();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF101B3E),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: const Color(0x33FACC15)),
-                ),
-                child: const Icon(
-                  Icons.construction_rounded,
-                  color: Color(0xFFFACC15),
-                  size: 36,
-                ),
+      body: snapshot.when(
+        loading: () => const _CompetitiveLoading(),
+        error: (error, _) => _CompetitiveError(message: '$error'),
+        data: (data) => data == null
+            ? const _CompetitiveError(
+                message:
+                    'Competitive data is not available yet. Run the Limitless sync after applying the Oracle schema.',
+              )
+            : _CompetitiveContent(
+                snapshot: data,
+                selectedGame: _game,
+                selectedFormat: _format,
+                selectedYear: _year,
+                selectedTournamentId: _selectedTournamentId,
+                onGameChanged: (value) {
+                  setState(() {
+                    _game = value;
+                    _format = '';
+                    _year = null;
+                    _selectedTournamentId = '';
+                    _selectedDeckId = '';
+                    _selectedDecklistId = '';
+                  });
+                },
+                onFormatChanged: (value) {
+                  setState(() {
+                    _format = value;
+                    _year = null;
+                    _selectedTournamentId = '';
+                    _selectedDeckId = '';
+                    _selectedDecklistId = '';
+                  });
+                },
+                onYearChanged: (value) {
+                  setState(() {
+                    _year = value;
+                    _selectedTournamentId = '';
+                    _selectedDeckId = '';
+                    _selectedDecklistId = '';
+                  });
+                },
+                onDeckSelected: (id) {
+                  if (id.trim().isEmpty) return;
+                  context.go('/marketplace/competitive-wip/decks/${id.trim()}');
+                },
+                onTournamentSelected: (id) {
+                  setState(() {
+                    _selectedTournamentId = id;
+                    _selectedDeckId = '';
+                    _selectedDecklistId = '';
+                  });
+                },
+                onDecklistSelected: (id) {
+                  if (id.trim().isEmpty) return;
+                  context.go('/marketplace/competitive-wip/decklists/${id.trim()}');
+                },
+                onBackToList: () {
+                  if (widget.initialDeckId.trim().isNotEmpty ||
+                      widget.initialDecklistId.trim().isNotEmpty) {
+                    context.go('/marketplace/competitive-wip');
+                  } else {
+                    setState(() {
+                      _selectedTournamentId = '';
+                      _selectedDeckId = '';
+                      _selectedDecklistId = '';
+                    });
+                  }
+                },
               ),
-              const SizedBox(height: 28),
-              const Text(
-                'Page in renovation',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 32,
-                  height: 1.1,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 14),
-              const Text(
-                'The competitive meta hub and top decks view are being rebuilt. Check back soon.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Color(0xFFB8C4E6),
-                  fontSize: 15,
-                  height: 1.55,
-                ),
-              ),
-              const SizedBox(height: 28),
-              FilledButton.icon(
-                onPressed: () => context.go('/marketplace'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFFFACC15),
-                  foregroundColor: const Color(0xFF111827),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 22,
-                    vertical: 14,
-                  ),
-                ),
-                icon: const Icon(Icons.storefront_outlined),
-                label: const Text(
-                  'Back to marketplace',
-                  style: TextStyle(fontWeight: FontWeight.w800),
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -925,7 +973,7 @@ class _CompetitiveNetworkPanel extends StatelessWidget {
                   icon: Icons.emoji_events_outlined,
                   title: 'Tournament platform',
                   body: 'Browse public events and open standings instantly.',
-                  onTap: () => context.go('/marketplace/competitive'),
+                  onTap: () => context.go('/marketplace/competitive-wip'),
                 ),
                 const SizedBox(height: 10),
                 _NetworkCard(
@@ -939,7 +987,7 @@ class _CompetitiveNetworkPanel extends StatelessWidget {
                   icon: Icons.leaderboard_outlined,
                   title: 'Rankings and results',
                   body: 'Use synced standings to spot emerging archetypes.',
-                  onTap: () => context.go('/marketplace/competitive'),
+                  onTap: () => context.go('/marketplace/competitive-wip'),
                 ),
                 const SizedBox(height: 10),
                 _NetworkCard(
@@ -1860,7 +1908,7 @@ class _DecklistDetailState extends State<_DecklistDetail> {
                       icon: Icons.analytics_outlined,
                       label: 'Deck profile',
                       onTap: () => context.go(
-                        '/marketplace/competitive/decks/${decklist.deckId}',
+                        '/marketplace/competitive-wip/decks/${decklist.deckId}',
                       ),
                     ),
                   if (decklist.tournamentId.isNotEmpty)
