@@ -449,6 +449,11 @@ reconstructing commands from chat history.
 
 ## Operational Notes
 
+- nespc Cursor update + reboot is local-only on `192.168.178.25`. Use
+  `workflows/nespc-cursor-reboot-workflow.md` and
+  `workflows/nespc-update-cursor-and-reboot.sh`. Cloud agents cannot reach the
+  LAN; do not treat Oracle peer reboots as substitutes for a nespc reboot
+  request.
 - Do not use plain `vercel deploy` from the project root. It can publish an
   incomplete output. Always use `deploy-pokoin-web.sh` or
   `workflows/deploy-web.sh`.
