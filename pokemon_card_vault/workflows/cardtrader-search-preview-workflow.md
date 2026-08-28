@@ -78,6 +78,12 @@ The marketplace search should behave like CardTrader:
 - Preview images live in the same R2 bucket as full card images under
   `previews/...`. Generated previews use `.webp`; CardTrader API preview imports
   currently preserve the downloaded preview bytes under `.jpg` keys.
+- CDN/R2 image URLs must use stable unique keys that start with the blueprint id
+  and a slug. Do not publish generic source basenames such as `preview.png`,
+  `image.png`, or CardTrader `/fallbacks/card_uploader/preview.png` as served
+  marketplace URLs. Copy/upload those sources to R2 first, update
+  `cdn_image_url`/`preview_image_url`/`homepage_image_url` and projection tables,
+  and keep the CardTrader URL only as source metadata.
 - Flutter receives `preview_image_url` when available and falls back to the full
   card image when preview generation is incomplete.
 - Home carousel rows use `homepage_image_url` when present, then fall back to

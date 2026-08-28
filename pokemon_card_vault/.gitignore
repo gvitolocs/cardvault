@@ -50,3 +50,5 @@ node_modules/
 keys/*
 deploy/env/
 data/trainingai/*.json
+
+/lib/generated/prisma

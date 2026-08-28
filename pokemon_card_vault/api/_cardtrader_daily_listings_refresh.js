@@ -2,8 +2,8 @@ const { cleanToken, fetchMarketplaceProducts } = require('./_cardtrader_client')
 const { marketplaceQuery } = require('./_marketplace_db');
 
 const PROVIDER = 'cardtrader';
-const DEFAULT_MAX_BLUEPRINTS = 250;
-const DEFAULT_MAX_PRODUCTS = 10_000;
+const DEFAULT_MAX_BLUEPRINTS = 100_000;
+const DEFAULT_MAX_PRODUCTS = 1_000_000;
 const MAX_BLUEPRINTS_PER_RUN = 100_000;
 const MAX_PRODUCTS_PER_RUN = 1_000_000;
 const DEFAULT_BLUEPRINT_REQUEST_DELAY_MS = 300;

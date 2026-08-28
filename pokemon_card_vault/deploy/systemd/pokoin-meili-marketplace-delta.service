@@ -1,0 +1,12 @@
+[Unit]
+Description=Pokoin Meilisearch marketplace delta sync
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/ubuntu/pokoin-oracle-api/current
+EnvironmentFile=/home/ubuntu/pokoin-oracle-api/.env
+ExecStart=/usr/bin/docker run --rm --name pokoin-meili-marketplace-delta --env-file /home/ubuntu/pokoin-oracle-api/.env -v /home/ubuntu/pokoin-oracle-api/current:/app -v /home/ubuntu/pokoin-oracle-api/.env:/app/.env:ro -w /app node:20-bookworm npm run meili:sync:delta
+NoNewPrivileges=true
+PrivateTmp=true

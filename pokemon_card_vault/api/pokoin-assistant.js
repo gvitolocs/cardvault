@@ -36,6 +36,19 @@ function loadMarketplaceDbHelper() {
   }
 }
 
+function loadSlugHelper() {
+  try {
+    return require('../server/_slug');
+  } catch (error) {
+    if (!isMissingHelper(error, '../server/_slug')) {
+      throw error;
+    }
+    return require('./_slug');
+  }
+}
+
+const { slugPart } = loadSlugHelper();
+
 let firebaseHelper;
 let emailHelper;
 let marketplaceDbHelper;
@@ -100,6 +113,8 @@ const POKO_SAFE_ASTRAL_EMOJI = new Set(['😊', '📚', '🛠', '💛']);
 const COMMUNITY_SENTIMENT_TTL_MS = 10 * 60 * 1000;
 const COMMUNITY_SENTIMENT_TIMEOUT_MS = 1800;
 const communitySentimentCache = new Map();
+const DECK_ADVISOR_CACHE_TTL_MS = 10 * 60 * 1000;
+const deckAdvisorCache = new Map();
 
 function cleanText(value, maxLength = 4000) {
   return String(value || '').trim().replace(/\s+\n/g, '\n').slice(0, maxLength);
@@ -164,6 +179,7 @@ function sanitizePokoEmoji(value) {
     sanitized = sanitized.split(emoji).join(replacement);
   }
   return sanitized
+    .replace(/\bCardTrader\b/gi, 'marketplace partner')
     .replace(/\uFFFD/g, '')
     .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, (emoji) => (
       POKO_SAFE_ASTRAL_EMOJI.has(emoji) ? emoji : ''
@@ -182,14 +198,6 @@ function normalizeIntentText(value) {
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[’']/g, '')
     .toLowerCase();
-}
-
-function slugPart(value) {
-  return String(value || '')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
 }
 
 function doubledCardId(value) {
@@ -408,6 +416,65 @@ function pageCardContext(page, pageContext = {}) {
 
 function cardSearchPath(query) {
   return `/marketplace/search?q=${encodeURIComponent(String(query || '').trim())}`;
+}
+
+const CARD_SUGGESTION_THEMES = [
+  {
+    id: 'ice_cream',
+    label: 'ice cream',
+    patterns: [
+      /\b(gelato|gelati|ice cream|icecream|vanillite|vanillish|vanilluxe)\b/,
+      /\b(ghiaccio|freddo|neve|snow|frozen|icy|ice)\b/,
+    ],
+    picks: [
+      {
+        name: 'Vanillite',
+        query: 'Vanillite',
+        detail: 'it is literally the tiny ice-cream-cone Pokemon, so it matches the vibe before we even talk rarity',
+      },
+      {
+        name: 'Vanillish',
+        query: 'Vanillish',
+        detail: 'same gelato family, a little more swirly and frosty',
+      },
+      {
+        name: 'Vanilluxe',
+        query: 'Vanilluxe',
+        detail: 'double-scoop ice cream chaos, perfect for a cold themed binder page',
+      },
+      {
+        name: 'Alolan Vulpix',
+        query: 'Alolan Vulpix',
+        detail: 'not ice cream, but it gives soft snow-and-vanilla energy',
+      },
+      {
+        name: 'Snom',
+        query: 'Snom',
+        detail: 'tiny snow bug energy, cute and cold without being generic',
+      },
+    ],
+  },
+];
+
+function cardSuggestionContextText(message = '', chatRecord = []) {
+  const recentUserText = Array.isArray(chatRecord)
+    ? chatRecord
+      .slice(-6)
+      .filter((entry) => entry?.role === 'user')
+      .map((entry) => entry.text)
+      .join('\n')
+    : '';
+  return normalizeIntentText(`${recentUserText}\n${message}`);
+}
+
+function detectCardSuggestionTheme(message = '', chatRecord = []) {
+  const text = cardSuggestionContextText(message, chatRecord);
+  return CARD_SUGGESTION_THEMES.find((theme) =>
+    theme.patterns.some((pattern) => pattern.test(text))) || null;
+}
+
+function isDirectMarketplaceCardPath(path) {
+  return /^\/marketplace\/[a-z]{2}\/cards\/[0-9]+\/[a-z0-9-]+$/i.test(cleanText(path, 500));
 }
 
 function parseCardQueryParts(card) {
@@ -801,6 +868,9 @@ function classifyIntent(message) {
   if (looksLikeDangerousCyberRequest(text)) {
     return 'unsafe-cyber';
   }
+  if (looksLikeCasualConversation(text)) {
+    return 'casual';
+  }
   if (looksLikeNavigationRequest(text)) {
     return 'navigation';
   }
@@ -810,7 +880,13 @@ function classifyIntent(message) {
   if (/\b(bug|broken|error|issue|problem|crash|stuck|failed|not working|doesn't work|doesnt work|can't|cannot|help me|support|inquiry|question for team|contact)\b/.test(text)) {
     return 'inquiry';
   }
+  if (looksLikeEarnOrShardQuestion(text)) {
+    return 'earn';
+  }
   if (looksLikeMarketplaceCardLookupRequest(text)) {
+    return 'marketplace';
+  }
+  if (explicitCardSubjectFromMessage(text)) {
     return 'marketplace';
   }
   if (looksLikeCardSuggestionRequest(text)) {
@@ -828,8 +904,46 @@ function classifyIntent(message) {
   return 'general';
 }
 
+function looksLikeEarnOrShardQuestion(text) {
+  const clean = String(text || '');
+  if (/\b(shard|shards|sharding|shard-review|disenchant|disenchanting|dust|recycle|recycling|turn cards into|turn card into|cards into pkn|cards into credits|cards into new cards|new cards from old cards|order new cards|earn pkn|earn|earning|reward|rewards|tipo videogame|videogame system)\b/.test(clean)) {
+    return true;
+  }
+  if (/\b(deck shard|card shard|pkn shard|shard review|reserve)\b/.test(clean)) {
+    return true;
+  }
+  if (/\b(come funziona|sistema|tipo videogame|videogame|gioco)\b/.test(clean) &&
+      /\b(carte|cards?|pkn|shard|guadagn|nuove|ordinare|order)\b/.test(clean)) {
+    return true;
+  }
+  if (/\b(posso|can i|how do i|come)\b/.test(clean) &&
+      /\b(turn|trasform|convert|scambiare|usare)\b/.test(clean) &&
+      /\b(cards?|carte)\b/.test(clean)) {
+    return true;
+  }
+  return false;
+}
+
+function looksLikeCasualConversation(text) {
+  const clean = String(text || '').trim();
+  if (!clean) {
+    return false;
+  }
+  if (/\b(wallet|metamask|pkn|wpkn|swap|blockchain|validator|node|nodo|staking|rpc|marketplace|listing|prezzo|price|cart|orders?|profile|docs|inventory|private key|seed phrase|password|token)\b/.test(clean)) {
+    return false;
+  }
+  const hasPersonalOrChatSignal = /\b(ti piace|ti piacciono|do you like|you like|come stai|come va|tutto ok|favorite|preferito|preferita|mi chiamo|my name is|sei simpatico|dimmi qualcosa|raccontami|joke|barzelletta|battuta)\b/.test(clean);
+  if (!hasPersonalOrChatSignal) {
+    return false;
+  }
+  return !looksLikeCardSuggestionRequest(clean) && !looksLikeMarketplaceCardLookupRequest(clean);
+}
+
 function looksLikeCardSuggestionRequest(text) {
   if (looksLikeMarketplaceCardLookupRequest(text)) {
+    return false;
+  }
+  if (explicitCardSubjectFromMessage(text)) {
     return false;
   }
   if (/\b(cart|orders?|profile|wallet|pokontact|chat page|forum|docs|inventory|collection|favorites)\b/.test(text)) {
@@ -931,8 +1045,15 @@ function cleanChatRecord(value) {
   })).filter((entry) => entry.text);
 }
 
-function shouldBypassPeerService(localIntent) {
-  return localIntent === 'greeting';
+function shouldBypassPeerService(localIntent, message = '', chatRecord = []) {
+  if (localIntent === 'greeting' || localIntent === 'casual') {
+    return true;
+  }
+  if (localIntent === 'card') {
+    const text = normalizeIntentText(message);
+    return looksLikeCardSuggestionRequest(text) || Boolean(detectCardSuggestionTheme(message, chatRecord));
+  }
+  return false;
 }
 
 function canonicalMarketplacePath(row, language = 'en') {
@@ -949,6 +1070,67 @@ function formatPkn(value) {
   return Number.isFinite(number)
     ? number.toLocaleString('en-US', { maximumFractionDigits: 2 })
     : '0';
+}
+
+function marketplaceAssistantQuery(text, values = []) {
+  const helper = getMarketplaceDbHelper();
+  const query = helper.marketplaceAssistantReadOnlyQuery ||
+    helper.marketplaceAnalyticsSearchQuery ||
+    helper.marketplaceQuery;
+  return query(text, values);
+}
+
+function sessionIdFromRequest(req) {
+  return cleanText(req.body?.sessionId || req.headers['x-pokoin-session-id'], 120);
+}
+
+function tokenizePreferenceText(value) {
+  return normalizeIntentText(value)
+    .replace(/\bpokémon\b/g, 'pokemon')
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+}
+
+function uniqueLimited(values, limit = 8) {
+  const seen = new Set();
+  const output = [];
+  for (const value of values) {
+    const clean = cleanText(value, 80);
+    const key = normalizeIntentText(clean);
+    if (!clean || seen.has(key)) continue;
+    seen.add(key);
+    output.push(clean);
+    if (output.length >= limit) break;
+  }
+  return output;
+}
+
+function inferUserPreferences({ message = '', chatRecord = [] } = {}) {
+  const text = normalizeIntentText([
+    ...(Array.isArray(chatRecord) ? chatRecord.slice(-12).filter((entry) => entry.role === 'user').map((entry) => entry.text) : []),
+    message,
+  ].join('\n'));
+  const pokemonMatches = text.match(/\b(rayquaza|pikachu|leafeon|charizard|gardevoir|mew|mewtwo|dragonite|magikarp|vanillite|vanillish|vanilluxe|lapras|snom|vulpix|eevee|umbreon|sylveon)\b/g) || [];
+  const themeMatches = text.match(/\b(cute|carina|carino|kawaii|ice|ghiaccio|gelato|fire|fuoco|dragon|drago|budget|economica|cheap|popular|hot|trending|illustration|artwork|cozy|beginner|facile|control|aggressive|aggro|turbo|competitive|competitivo)\b/g) || [];
+  const language = /\b(ciao|fammi|mostrami|consigliami|voglio|economica|carina|facile|forte|debolezze|come funziona)\b/.test(text)
+    ? 'it'
+    : /\b(show|suggest|recommend|best|beginner|budget|strengths|weaknesses|how does)\b/.test(text)
+      ? 'en'
+      : '';
+  return {
+    language,
+    favoritePokemon: uniqueLimited(pokemonMatches, 6),
+    themes: uniqueLimited(themeMatches, 10),
+    likesBudget: /\b(budget|cheap|economica|economico|low cost|spendere poco)\b/.test(text),
+    likesCute: /\b(cute|carina|carino|kawaii|cozy|dolce)\b/.test(text),
+    deckStyle: /\b(beginners?|facile|easy|principiante|principianti|iniziare|starter)\b/.test(text)
+      ? 'beginner'
+      : /\b(control|stall)\b/.test(text)
+      ? 'control'
+      : /\b(aggressive|aggro|turbo|fast|veloce)\b/.test(text)
+        ? 'aggressive'
+        : '',
+  };
 }
 
 function marketplaceIntentFromText(text) {
@@ -980,7 +1162,11 @@ function marketplaceIntentFromText(text) {
   if (/\b(hot|popular|trending|analytics|signals?|best sellers?|featured|views?|searches?|clicks?|popolari|tendenza)\b/.test(text)) {
     return { kind: 'analytics', mode: 'hot' };
   }
-  if (/\b(suggest|recommend|find|show|open|resolve|look up|search|consiglia|suggerisci|trova|cerca)\b/.test(text) &&
+  if (explicitCardSubjectFromMessage(text)) {
+    return { kind: 'card_lookup', mode: 'suggest' };
+  }
+  if (!detectCardSuggestionTheme(text, []) &&
+      /\b(suggest|recommend|find|show|open|resolve|look up|search|consiglia|suggerisci|trova|cerca|fammi|vedere|mostrami)\b/.test(text) &&
       /\b(card|cards|carta|carte|pokemon|pokémon)\b/.test(text)) {
     return { kind: 'card_lookup', mode: 'suggest' };
   }
@@ -1241,6 +1427,57 @@ function previousMarketplaceIntent(chatRecord) {
   return null;
 }
 
+function cleanExplicitCardSubject(value) {
+  const subject = String(value || '')
+    .replace(/\b(a|an|the|some|one|una|un|uno|la|il|lo|le|l)\b/g, ' ')
+    .replace(/\b(please|pls|per favore|grazie|thanks)\b/g, ' ')
+    .replace(/\b(card|cards|carta|carte|pokemon|pokémon)\b/g, ' ')
+    .replace(/\b(on|in|for|of|di|del|della|dello|dei|degli|delle|su|nel|nella)\b/g, ' ')
+    .replace(/\b(most expensive|highest price|highest priced|priciest|top price|costliest|floor price|floor|lowest price|lowest ask|cheapest|minimum price|best deal|good deal|underpriced|hot|popular|trending)\b/g, ' ')
+    .replace(/\b(piu costosa|piu caro|piu cara|prezzo piu alto|la piu costosa|prezzo minimo|meno cara|meno costosa|affare|miglior prezzo|popolari|tendenza)\b/g, ' ')
+    .replace(/\b(cute|kawaii|carina|carino|bella|bello|cozy|dolce|sweet|illustration|illustrator|art|artwork|artist|illustrazione|arte|disegno|popular|popolare|economica|economico|budget|cheap|premium|tipo|like|ma|but)\b/g, ' ')
+    .replace(/[^a-z0-9/\s-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const genericSubjectWords = new Set([
+    'cute', 'random', 'nice', 'cool', 'beautiful', 'pretty', 'cozy', 'sweet', 'fun',
+    'favorite', 'favourite', 'illustration', 'illustrator', 'art', 'artwork',
+    'carina', 'carino', 'bella', 'bello', 'casuale', 'preferita', 'preferito',
+    'ice', 'icy', 'snow', 'frozen', 'ghiaccio', 'freddo', 'neve', 'gelato',
+    'fire', 'fuoco', 'dragon', 'drago',
+  ]);
+  const words = subject.split(/\s+/).filter(Boolean);
+  if (words.length > 0 && words.every((word) => genericSubjectWords.has(word))) {
+    return '';
+  }
+  return cleanText(subject, 120);
+}
+
+function explicitCardSubjectFromMessage(message) {
+  const text = normalizeIntentText(message)
+    .replace(/\bpokémon\b/g, 'pokemon')
+    .replace(/[?!.,;:]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!text) {
+    return '';
+  }
+  const patterns = [
+    /\b(?:fammi vedere|mi fai vedere|mostrami|mostra mi|aprimi|apri|trovami|trova)\s+(?:una|un|la|il|lo|l|le|dei|delle|qualche)?\s*(?:carta|carte|card|cards)?\s*(?:di|del|della|dello|dei|degli|delle)?\s+([a-z0-9][a-z0-9\s/-]{1,80})$/,
+    /\b(?:show me|show|open|find me|find|look up|search for)\s+(?:a|an|the|some)?\s*(?:card|cards)?\s*(?:of|for)?\s+([a-z0-9][a-z0-9\s/-]{1,80})$/,
+    /\b(?:show me|show|open|find me|find|look up|search for)\s+([a-z0-9][a-z0-9\s/-]{1,80}?)\s+(?:card|cards)\b/,
+    /\b(?:carta|carte|card|cards)\s+(?:di|of|for)\s+([a-z0-9][a-z0-9\s/-]{1,80})$/,
+  ];
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    const subject = cleanExplicitCardSubject(match?.[1] || '');
+    if (subject) {
+      return subject;
+    }
+  }
+  return '';
+}
+
 function stripMarketplaceActionPhrases(text) {
   return String(text || '')
     .replace(/\b(fammi vedere|mi fai vedere|mostrami|mostra mi|show me|find me|open me|card of|cards of|card for|cards for|carta di|carte di|carta per|carte per)\b/g, ' ');
@@ -1257,6 +1494,10 @@ function extractMarketplaceSubject(message, intent, page, pageContext = {}) {
   }
   if (pageContext.searchQuery && /\b(this search|current search|questa ricerca|questi risultati|these results)\b/.test(text)) {
     return { query: cleanText(pageContext.searchQuery, 120), cardId: '' };
+  }
+  const explicitSubject = explicitCardSubjectFromMessage(text);
+  if (explicitSubject) {
+    return { query: explicitSubject, cardId: '' };
   }
   let query = stripMarketplaceActionPhrases(text)
     .replace(/\b(most expensive|expensive|highest price|highest priced|priciest|top price|costliest|floor price|floor|lowest price|lowest ask|cheapest|minimum price|best deal|good deal|underpriced|hot|popular|trending|analytics|signals?|best sellers?|featured|views?|searches?|clicks?)\b/g, ' ')
@@ -1322,6 +1563,219 @@ function marketplaceCardFromRow(row, language = 'en') {
     searches24h: Number(row.searches_24h || 0),
     clicks24h: Number(row.clicks_24h || 0),
   };
+}
+
+function recommendationIntentFromMessage(message = '', chatRecord = []) {
+  const text = normalizeIntentText(message).replace(/\bpokémon\b/g, 'pokemon');
+  const currentText = normalizeIntentText(message);
+  const contextText = cardSuggestionContextText(message, chatRecord);
+  const explicitSubject = explicitCardSubjectFromMessage(text);
+  const subject = cleanText(explicitSubject || extractRecommendationSubject(text), 120);
+  const theme = detectCardSuggestionTheme(message, []);
+  const styles = [];
+  const addStyle = (style) => {
+    if (!styles.includes(style)) styles.push(style);
+  };
+  if (/\b(cute|kawaii|carina|carino|bella|bello|cozy|dolce|sweet)\b/.test(currentText)) addStyle('cute');
+  if (/\b(illustration|illustrator|art|artwork|artist|illustrazione|arte|disegno)\b/.test(currentText)) addStyle('illustration');
+  if (/\b(popular|hot|trending|best sellers?|views?|searches?|clicks?|popolari|tendenza|forte)\b/.test(currentText)) addStyle('popular');
+  if (/\b(cheap|budget|economica|economico|meno cara|spendere poco|low cost)\b/.test(currentText)) addStyle('budget');
+  if (/\b(expensive|premium|costosa|costoso|chase)\b/.test(currentText)) addStyle('premium');
+  if (theme?.id === 'ice_cream') addStyle('ice');
+  const wantsRecommendation = (looksLikeCardSuggestionRequest(text) && /\b(card|cards|carta|carte)\b/.test(text)) ||
+    explicitSubject ||
+    /\b(show|find|open|recommend|suggest|pick|choose|consiglia|suggerisci|fammi|vedere|mostrami|trova|cerca)\b/.test(text) &&
+      /\b(card|cards|carta|carte|pokemon|cute|carina|deck)\b/.test(text);
+  if (!wantsRecommendation || /\bdeck\b/.test(text)) {
+    return null;
+  }
+  const hasOnlyGenericCuteStyle = !subject &&
+    !theme &&
+    styles.length > 0 &&
+    styles.every((style) => style === 'cute' || style === 'illustration');
+  if (hasOnlyGenericCuteStyle) {
+    const recentPreferences = inferUserPreferences({ message, chatRecord });
+    if (!recentPreferences.favoritePokemon.length && !recentPreferences.likesBudget && recentPreferences.deckStyle === '') {
+      return null;
+    }
+  }
+  return {
+    subject,
+    themeId: theme?.id || '',
+    themeLabel: theme?.label || '',
+    styles,
+    budget: styles.includes('budget') ? 'budget' : styles.includes('premium') ? 'premium' : '',
+    explicitSubject: Boolean(explicitSubject),
+  };
+}
+
+function extractRecommendationSubject(text) {
+  let query = stripMarketplaceActionPhrases(text)
+    .replace(/\b(cute|kawaii|carina|carino|bella|bello|cozy|dolce|sweet|illustration|illustrator|art|artwork|artist|illustrazione|arte|disegno|popular|hot|trending|best sellers?|views?|searches?|clicks?|popolari|tendenza|cheap|budget|economica|economico|meno cara|spendere poco|low cost|premium|expensive|costosa|costoso|chase|show|find|open|recommend|suggest|pick|choose|consiglia|consigliami|suggerisci|suggeriscimi|fammi|vedere|mostrami|trova|trovami|cerca|card|cards|carta|carte|pokemon|una|un|a|an|the|di|of|for|tipo|like|ma|but)\b/g, ' ')
+    .replace(/[^a-z0-9/\s-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const generic = new Set(['ice', 'ghiaccio', 'gelato', 'fire', 'fuoco', 'dragon', 'drago']);
+  const words = query.split(/\s+/).filter((word) => word && !generic.has(word));
+  return words.join(' ');
+}
+
+function themeSeedQueries(intent, preferences = {}) {
+  const seeds = [];
+  if (intent.subject) seeds.push(intent.subject);
+  if (intent.themeId === 'ice_cream' || intent.styles.includes('ice')) {
+    seeds.push('Vanillite', 'Vanillish', 'Vanilluxe', 'Alolan Vulpix', 'Snom', 'Lapras');
+  }
+  for (const pokemon of preferences.favoritePokemon || []) {
+    seeds.push(pokemon);
+  }
+  return uniqueLimited(seeds, 8);
+}
+
+function recommendationCardFromRow(row, language = 'en') {
+  const card = marketplaceCardFromRow(row, language);
+  return {
+    ...card,
+    score: Number(row.recommendation_score || 0),
+    artist: row.artist || row.illustrator || '',
+    types: Array.isArray(row.types) ? row.types : [],
+    flavorText: row.flavor_text || '',
+    cardtraderCheapestPkn: row.cardtrader_cheapest_pkn == null ? null : Number(row.cardtrader_cheapest_pkn),
+    cardtraderEligibleListings: Number(row.cardtrader_eligible_listing_count || 0),
+    sales24h: Number(row.sales_24h || 0),
+    cartAdds24h: Number(row.cart_adds_24h || 0),
+  };
+}
+
+async function queryCardRecommendations({
+  subject = '',
+  theme = '',
+  styles = [],
+  budget = '',
+  language = 'en',
+  userPreferences = {},
+  limit = 5,
+} = {}) {
+  const cleanSubject = cleanText(subject, 120);
+  const cleanTheme = cleanText(theme, 60);
+  const cleanStyles = uniqueLimited(styles, 8);
+  const seeds = themeSeedQueries({ subject: cleanSubject, themeId: cleanTheme, styles: cleanStyles }, userPreferences);
+  const values = [
+    cleanSubject,
+    cleanTheme,
+    cleanStyles,
+    budget,
+    seeds,
+    cleanText((userPreferences.favoritePokemon || [])[0] || '', 80),
+    Math.min(Math.max(Number(limit) || 5, 1), 10),
+  ];
+  const result = await marketplaceAssistantQuery(
+    `
+      with input as (
+        select
+          lower($1::text) as subject,
+          lower($2::text) as theme,
+          $3::text[] as styles,
+          lower($4::text) as budget,
+          $5::text[] as seeds,
+          lower($6::text) as favorite,
+          $7::integer as clean_limit
+      ),
+      seed_terms as (
+        select lower(unnest(input.seeds)) as value from input
+      ),
+      candidates as (
+        select
+          c.card_id,
+          coalesce(nullif(c.display_name, ''), nullif(c.canonical_name, ''), c.name) as card_name,
+          c.display_name,
+          c.canonical_name,
+          c.name,
+          c.set_name,
+          c.card_number,
+          c.rarity,
+          c.search_text,
+          c.search_weight,
+          c.card_type,
+          c.product_type,
+          c.item_kind,
+          urls.canonical_path,
+          summary.lowest_ask_pkn,
+          summary.active_listing_count,
+          summary.listed_quantity,
+          hot.views_24h,
+          hot.searches_24h,
+          hot.clicks_24h,
+          hot.cart_adds_24h,
+          hot.sales_24h,
+          hot.hot_score_24h,
+          cache.cheapest_price_pkn as cardtrader_cheapest_pkn,
+          cache.eligible_listing_count as cardtrader_eligible_listing_count,
+          artists.artist,
+          artists.illustrator,
+          metadata.types,
+          metadata.flavor_text,
+          (
+            case
+              when input.subject <> '' and lower(coalesce(nullif(c.display_name, ''), nullif(c.canonical_name, ''), c.name, '')) = input.subject then 800
+              when input.subject <> '' and lower(coalesce(c.name, '')) = input.subject then 760
+              when input.subject <> '' and lower(coalesce(c.search_text, c.name, '')) like '%' || input.subject || '%' then 560
+              else 0
+            end
+            + case when input.favorite <> '' and lower(coalesce(c.search_text, c.name, '')) like '%' || input.favorite || '%' then 180 else 0 end
+            + case when exists (select 1 from seed_terms where seed_terms.value <> '' and lower(coalesce(c.search_text, c.name, '')) like '%' || seed_terms.value || '%') then 420 else 0 end
+            + case when 'illustration' = any(input.styles) and lower(coalesce(c.rarity, '')) like '%illustration%' then 140 else 0 end
+            + case when 'cute' = any(input.styles) and (
+                lower(coalesce(c.rarity, '')) like '%illustration%'
+                or lower(coalesce(metadata.flavor_text, '')) ~ '(cute|tiny|sweet|play|friend|sleep|snow|dream|happy)'
+                or lower(coalesce(c.name, '')) ~ '(mew|eevee|pikachu|snom|vulpix|vanillite|leafeon)'
+              ) then 110 else 0 end
+            + case when input.theme = 'ice_cream' and (
+                lower(coalesce(c.search_text, c.name, '')) ~ '(vanillite|vanillish|vanilluxe|snom|lapras|vulpix|ice|snow|frost)'
+                or lower(coalesce(metadata.types::text, '')) like '%water%'
+              ) then 260 else 0 end
+            + case when 'popular' = any(input.styles) then least(coalesce(hot.hot_score_24h, 0), 250) else least(coalesce(hot.hot_score_24h, 0), 80) end
+            + case when input.budget = 'budget' and coalesce(summary.lowest_ask_pkn, cache.cheapest_price_pkn, 999999999) <= 500 then 120 else 0 end
+            + case when input.budget = 'premium' and coalesce(summary.lowest_ask_pkn, cache.cheapest_price_pkn, 0) >= 1000 then 80 else 0 end
+            + case when coalesce(summary.active_listing_count, 0) > 0 then 60 else 0 end
+            + case when coalesce(cache.eligible_listing_count, 0) > 0 then 35 else 0 end
+            + least(coalesce(c.search_weight, 0) / 100, 80)
+          )::numeric as recommendation_score
+        from public.marketplace_search_candidates c
+        cross join input
+        left join public.marketplace_card_urls urls on urls.card_id = c.card_id
+        left join public.marketplace_blueprint_price_summary summary on summary.blueprint_id = c.card_id
+        left join public.marketplace_hot_blueprints hot on hot.blueprint_id = c.card_id
+        left join public.cardtrader_blueprint_listing_cache cache on cache.blueprint_id = c.card_id
+        left join public.marketplace_blueprint_artists artists on artists.blueprint_id = c.card_id
+        left join public.marketplace_blueprint_tcg_metadata metadata on metadata.blueprint_id = c.card_id
+        where c.item_kind = 'single'
+          and (
+            input.subject <> ''
+            or input.theme <> ''
+            or array_length(input.styles, 1) is not null
+            or input.favorite <> ''
+          )
+          and (
+            input.subject = ''
+            or lower(coalesce(c.search_text, c.name, '')) like '%' || input.subject || '%'
+            or exists (select 1 from seed_terms where seed_terms.value <> '' and lower(coalesce(c.search_text, c.name, '')) like '%' || seed_terms.value || '%')
+          )
+      )
+      select *
+      from candidates
+      where recommendation_score > 0
+      order by
+        case when $1::text <> '' and lower(coalesce(card_name, name, '')) = lower($1::text) then 0 else 1 end,
+        recommendation_score desc,
+        active_listing_count desc nulls last,
+        hot_score_24h desc nulls last,
+        card_id desc
+      limit (select clean_limit from input)
+    `,
+    values,
+  );
+  return result.rows.map((row) => recommendationCardFromRow(row, language));
 }
 
 async function resolveMarketplaceCards({ query, cardId, language = 'en', limit = 5 }) {
@@ -1658,6 +2112,99 @@ function groundedMarketplaceReply(grounding, language = 'en') {
   };
 }
 
+function recommendationReply({ intent, cards, language = 'en', preferences = {} }) {
+  if (!cards.length) {
+    return {
+      reply: 'I checked the read-only Pokoin marketplace card, URL, hotness, listing, stock, price, artist, and partner availability tables, but I could not resolve a safe direct card recommendation for that request.',
+      actions: [],
+    };
+  }
+  const italian = language === 'it' || preferences.language === 'it' || isItalianMessage(intent.subject || '');
+  const card = cards[0];
+  const signals = [
+    card.hotScore24h ? `hot score ${formatPkn(card.hotScore24h)}` : '',
+    card.views24h ? `${card.views24h} views` : '',
+    card.searches24h ? `${card.searches24h} searches` : '',
+    card.clicks24h ? `${card.clicks24h} clicks` : '',
+    card.sales24h ? `${card.sales24h} sales/resolved sale signals` : '',
+    card.activeListingCount ? `${card.activeListingCount} active Pokoin listings` : '',
+    card.cardtraderEligibleListings ? `${card.cardtraderEligibleListings} partner availability listings` : '',
+  ].filter(Boolean).join(', ');
+  const price = card.floorPricePkn == null && card.cardtraderCheapestPkn == null
+    ? (italian ? 'Non vedo un floor affidabile ora.' : 'I do not see a reliable floor right now.')
+    : (italian
+      ? `Prezzo/floor indicativo: ${formatPkn(card.floorPricePkn ?? card.cardtraderCheapestPkn)} PKN.`
+      : `Indicative floor/price: ${formatPkn(card.floorPricePkn ?? card.cardtraderCheapestPkn)} PKN.`);
+  const why = intent.explicitSubject
+    ? (italian ? `Ho rispettato prima il soggetto esplicito: ${intent.subject}.` : `I prioritized your explicit subject first: ${intent.subject}.`)
+    : intent.themeLabel
+      ? (italian ? `Tema: ${intent.themeLabel}.` : `Theme match: ${intent.themeLabel}.`)
+      : preferences.favoritePokemon?.length
+        ? (italian ? `Lo sto anche tarando sui tuoi gusti recenti: ${preferences.favoritePokemon.join(', ')}.` : `I am also biasing this toward your recent taste: ${preferences.favoritePokemon.join(', ')}.`)
+        : (italian ? 'Ho scelto usando pertinenza, disponibilità e segnali marketplace.' : 'I picked this using relevance, availability, and marketplace signals.');
+  return {
+    reply: [
+      italian
+        ? `Ti apro ${card.name}${card.setName ? ` (${card.setName})` : ''}${card.collectorNumber ? ` ${card.collectorNumber}` : ''}.`
+        : `I am opening ${card.name}${card.setName ? ` (${card.setName})` : ''}${card.collectorNumber ? ` ${card.collectorNumber}` : ''}.`,
+      why,
+      price,
+      signals ? (italian ? `Segnali letti: ${signals}.` : `Signals used: ${signals}.`) : '',
+      card.artist ? (italian ? `Artista: ${card.artist}.` : `Artist: ${card.artist}.`) : '',
+      card.url ? `https://pokoin.com${card.path}` : '',
+      italian
+        ? 'Fonte: peer4/read-only marketplace site data (search candidates, canonical URLs, hotness, listing/stock/price summary, artists, partner availability). Non è consulenza finanziaria.'
+        : 'Source: peer4/read-only marketplace site data (search candidates, canonical URLs, hotness, listing/stock/price summary, artists, partner availability). Not financial advice.',
+    ].filter(Boolean).join('\n\n'),
+    actions: card.path ? [{
+      type: 'navigate',
+      path: card.path,
+      label: italian ? `Apri ${card.name || 'carta'}` : `Open ${card.name || 'card'}`,
+      reason: 'marketplace_recommendation',
+      data: {
+        cardId: card.cardId,
+        grounded: true,
+        direct: true,
+        recommendationScore: card.score,
+      },
+    }] : [],
+  };
+}
+
+async function recommendationGroundedDelivery({ message, chatRecord, page, pageContext, userPreferences = {} }) {
+  const intent = recommendationIntentFromMessage(message, chatRecord);
+  if (!intent) return null;
+  if (intent.explicitSubject && !intent.themeId && intent.styles.length === 0) {
+    return null;
+  }
+  const language = marketplaceLanguageFromPage(pageUrlFromContext(page, pageContext));
+  const cards = await queryCardRecommendations({
+    subject: intent.subject,
+    theme: intent.themeId,
+    styles: intent.styles,
+    budget: intent.budget,
+    language,
+    userPreferences,
+    limit: 5,
+  });
+  if (!cards.length && intent.subject) {
+    return null;
+  }
+  const response = recommendationReply({ intent, cards, language, preferences: userPreferences });
+  return {
+    reply: response.reply,
+    intent: 'card-recommendation',
+    source: 'peer4-readonly-recommendation',
+    actions: response.actions,
+    grounding: {
+      type: 'card_recommendation',
+      intent,
+      cards,
+      readOnly: true,
+    },
+  };
+}
+
 async function marketplaceGroundedDelivery({ message, chatRecord, page, pageContext }) {
   const request = marketplaceRequestFromMessage({ message, chatRecord, page, pageContext });
   if (!request) {
@@ -1702,6 +2249,297 @@ async function mostExpensiveCardTool({ message, page, chatRecord = [], pageConte
     return null;
   }
   return delivery;
+}
+
+function looksLikeDeckAdvisorRequest(message = '') {
+  const text = normalizeIntentText(message).replace(/\bpokémon\b/g, 'pokemon');
+  return /\b(deck|decklist|archetype|meta|competitive|competitivo|mazzo|mazzi|limitless|gardevoir|charizard)\b/.test(text) &&
+    /\b(best|choose|play|recommend|suggest|beginners?|budget|cheap|economico|economica|facile|forte|competitive|competitivo|works|funziona|strengths?|weaknesses?|debolezze|consiglia|scegliere|giocare|deck|mazzo)\b/.test(text);
+}
+
+function deckAdvisorIntentFromMessage(message = '', chatRecord = []) {
+  if (!looksLikeDeckAdvisorRequest(message)) return null;
+  const text = normalizeIntentText(message).replace(/\bpokémon\b/g, 'pokemon');
+  const prefs = inferUserPreferences({ message, chatRecord });
+  const deckMatch = text.match(/\b(gardevoir|charizard|dragapult|miraidon|chien pao|roaring moon|lost box|lugia|snorlax|ancient box|future box|raging bolt|gholdengo|greninja|zoroark|regidrago)(?:\s+ex)?\s+(?:deck|mazzo)?\b/) ||
+    text.match(/\b(?:deck|mazzo)\s+(?:di|of)?\s*(gardevoir|charizard|dragapult|miraidon|chien pao|roaring moon|lost box|lugia|snorlax|ancient box|future box|raging bolt|gholdengo|greninja|zoroark)(?:\s+ex)?\b/);
+  const deckName = cleanText(deckMatch?.[1] || '', 80);
+  return {
+    deckName,
+    wantsExplanation: /\b(works|funziona|how|come|strengths?|weaknesses?|debolezze|punti forti|punti deboli)\b/.test(text),
+    budget: /\b(budget|cheap|economico|economica|low cost|spendere poco)\b/.test(text),
+    beginner: /\b(beginners?|facile|easy|principiante|principianti|iniziare|starter)\b/.test(text),
+    playstyle: /\b(beginners?|facile|easy|principiante|principianti|iniziare|starter)\b/.test(text) ? 'beginner' : prefs.deckStyle,
+    language: isItalianMessage(message) ? 'it' : 'en',
+  };
+}
+
+function deckCacheKey(intent) {
+  return JSON.stringify({
+    deckName: intent.deckName,
+    budget: intent.budget,
+    beginner: intent.beginner,
+    playstyle: intent.playstyle,
+  });
+}
+
+function deckRowToAdvisorDeck(row) {
+  return {
+    deckId: String(row.deck_id || ''),
+    name: row.name || row.archetype || 'Unknown deck',
+    format: row.format || '',
+    formatLabel: row.format_label || row.format || '',
+    rank: row.rank == null ? null : Number(row.rank),
+    points: Number(row.points || row.deck_count || 0),
+    share: Number(row.share || 0),
+    sourceUrl: row.source_url || '',
+    featuredDecklistId: row.featured_decklist_id || '',
+    featuredTournamentName: row.featured_tournament_name || '',
+    featuredTournamentDate: row.featured_tournament_date || null,
+    coreCards: Array.isArray(row.core_cards) ? row.core_cards : [],
+    recentResults: Array.isArray(row.recent_results) ? row.recent_results : [],
+  };
+}
+
+function deckArchetypeNotes(deck, intent) {
+  const name = normalizeIntentText(deck.name);
+  const notes = {
+    plan: 'Use the core engine cards to build a stable board, trade prizes efficiently, and keep enough consistency cards to repeat the main attack plan.',
+    strengths: ['Established Limitless results give it a real competitive baseline.'],
+    weaknesses: ['Matchups and lists change by local meta, so do not treat this as a guaranteed best deck.'],
+    complexity: 'medium',
+    budgetTier: 'unknown',
+  };
+  if (/charizard/.test(name)) {
+    notes.plan = 'Charizard ex decks usually ramp Fire energy while building a high-HP attacker that gets stronger as the opponent takes prizes.';
+    notes.strengths.push('Strong comeback pressure and forgiving attacker durability.');
+    notes.weaknesses.push('Can be slower if the setup pieces are prized or disrupted early.');
+    notes.complexity = 'medium';
+  } else if (/gardevoir/.test(name)) {
+    notes.plan = 'Gardevoir ex decks usually trade with Psychic attackers while using the Gardevoir engine to attach energy from the discard pile.';
+    notes.strengths.push('Flexible attackers and strong late-game prize mapping.');
+    notes.weaknesses.push('More sequencing-heavy than simple beatdown decks.');
+    notes.complexity = 'high';
+  } else if (/miraidon|raging bolt|turbo|moon/.test(name)) {
+    notes.plan = 'This is closer to an aggressive/turbo deck: set up fast, pressure prizes early, and force the opponent to answer immediately.';
+    notes.strengths.push('Fast starts and clear proactive game plans.');
+    notes.weaknesses.push('Can run out of resources if the first wave is answered cleanly.');
+    notes.complexity = 'low-medium';
+  } else if (/snorlax|control|stall/.test(name)) {
+    notes.plan = 'Control decks try to deny the opponent clean attacks, trap awkward Pokémon, and win through resource management rather than raw damage.';
+    notes.strengths.push('Rewards matchup knowledge and can punish unprepared lists.');
+    notes.weaknesses.push('Harder for beginners and sometimes less fun for casual/local play.');
+    notes.complexity = 'high';
+  }
+  if (intent.beginner && notes.complexity === 'high') {
+    notes.weaknesses.push('Because you asked for beginner-friendly, I would only pick this if you enjoy careful sequencing.');
+  }
+  if (intent.budget) {
+    notes.budgetTier = 'check list price';
+    notes.weaknesses.push('Budget depends on exact staples and prints; verify the specific decklist before buying.');
+  }
+  return notes;
+}
+
+async function queryDeckAdvisorData(intent) {
+  const cached = deckAdvisorCache.get(deckCacheKey(intent));
+  if (cached && Date.now() - cached.createdAt < DECK_ADVISOR_CACHE_TTL_MS) {
+    return cached.value;
+  }
+  const values = [
+    cleanText(intent.deckName, 80),
+    intent.beginner,
+    intent.budget,
+    cleanText(intent.playstyle, 40),
+  ];
+  const result = await marketplaceAssistantQuery(
+    `
+      with input as (
+        select lower($1::text) as deck_name, $2::boolean as beginner, $3::boolean as budget, lower($4::text) as playstyle
+      ),
+      candidate_decks as (
+        select
+          d.deck_id,
+          d.name,
+          d.format,
+          d.format_label,
+          d.rank,
+          d.points,
+          d.share,
+          d.source_url,
+          case
+            when input.deck_name <> '' and lower(d.name) like '%' || input.deck_name || '%' then 500
+            else 0
+          end
+          + case when input.beginner and lower(d.name) ~ '(miraidon|charizard|raging bolt|turbo)' then 80 else 0 end
+          + case when input.playstyle = 'control' and lower(d.name) ~ '(control|snorlax|stall)' then 120 else 0 end
+          + case when input.playstyle = 'aggressive' and lower(d.name) ~ '(miraidon|turbo|raging bolt|roaring moon)' then 120 else 0 end
+          + coalesce(d.points, 0)
+          + coalesce(d.share, 0) * 10
+          - case when input.beginner and lower(d.name) ~ '(control|gardevoir|lost box)' then 30 else 0 end as advisor_score
+        from public.limitless_public_decks d
+        cross join input
+        where input.deck_name = '' or lower(d.name) like '%' || input.deck_name || '%'
+        order by advisor_score desc, d.rank asc nulls last, d.points desc, d.name asc
+        limit 6
+      )
+      select
+        d.*,
+        featured.decklist_id as featured_decklist_id,
+        featured.tournament_name as featured_tournament_name,
+        featured.tournament_date as featured_tournament_date,
+        coalesce(core.cards, '[]'::jsonb) as core_cards,
+        coalesce(results.results, '[]'::jsonb) as recent_results
+      from candidate_decks d
+      left join lateral (
+        select r.decklist_id, r.tournament_name, r.tournament_date
+        from public.limitless_public_deck_results r
+        where r.deck_id = d.deck_id
+        order by r.tournament_date desc nulls last, r."placing" asc nulls last, r.player_name asc
+        limit 1
+      ) featured on true
+      left join lateral (
+        select jsonb_agg(jsonb_build_object(
+          'name', c.display_name,
+          'count', c.count,
+          'inclusionShare', c.inclusion_share,
+          'setCode', c.set_code,
+          'collectorNumber', c.collector_number
+        ) order by c.inclusion_share desc nulls last, c.count desc nulls last, c.display_name asc) as cards
+        from (
+          select *
+          from public.limitless_public_deck_core_cards c
+          where c.deck_id = d.deck_id
+          order by c.inclusion_share desc nulls last, c.count desc nulls last, c.display_name asc
+          limit 8
+        ) c
+      ) core on true
+      left join lateral (
+        select jsonb_agg(jsonb_build_object(
+          'tournamentName', r.tournament_name,
+          'tournamentDate', r.tournament_date,
+          'placing', r."placing",
+          'playerName', r.player_name,
+          'decklistId', r.decklist_id
+        ) order by r.tournament_date desc nulls last, r."placing" asc nulls last) as results
+        from (
+          select *
+          from public.limitless_public_deck_results r
+          where r.deck_id = d.deck_id
+          order by r.tournament_date desc nulls last, r."placing" asc nulls last, r.player_name asc
+          limit 4
+        ) r
+      ) results on true
+      order by d.advisor_score desc, d.rank asc nulls last, d.points desc
+    `,
+    values,
+  );
+  const value = { decks: result.rows.map(deckRowToAdvisorDeck) };
+  deckAdvisorCache.set(deckCacheKey(intent), { createdAt: Date.now(), value });
+  if (deckAdvisorCache.size > 25) {
+    deckAdvisorCache.delete(deckAdvisorCache.keys().next().value);
+  }
+  return value;
+}
+
+function deckAdvisorFallbackDecks(intent) {
+  const names = intent.deckName
+    ? [intent.deckName]
+    : intent.beginner
+      ? ['Charizard ex', 'Miraidon ex', 'Raging Bolt']
+      : intent.budget
+        ? ['Miraidon ex', 'Ancient Box', 'Gardevoir ex']
+        : ['Charizard ex', 'Gardevoir ex', 'Miraidon ex'];
+  return names.map((name, index) => ({
+    deckId: '',
+    name,
+    rank: null,
+    points: 0,
+    share: 0,
+    sourceUrl: '',
+    coreCards: [],
+    recentResults: [],
+    fallback: true,
+    index,
+  }));
+}
+
+function deckAdvisorReply(intent, data, preferences = {}) {
+  const italian = intent.language === 'it' || preferences.language === 'it';
+  const decks = data.decks.length ? data.decks : deckAdvisorFallbackDecks(intent);
+  const lead = decks.length === 1 || intent.deckName
+    ? decks[0]
+    : null;
+  const renderDeck = (deck, index) => {
+    const notes = deckArchetypeNotes(deck, intent);
+    const core = deck.coreCards?.slice(0, 4).map((card) => card.name).filter(Boolean).join(', ');
+    const result = deck.recentResults?.[0];
+    const sourceLine = result?.tournamentName
+      ? `Recent Limitless result: ${result.tournamentName}${result.placing ? `, placing ${result.placing}` : ''}.`
+      : deck.sourceUrl
+        ? `Limitless source: ${deck.sourceUrl}`
+        : 'No fresh local Limitless result row was available in this response.';
+    return [
+      `${index + 1}. ${deck.name}${deck.rank ? ` (Limitless rank ${deck.rank})` : ''}`,
+      `How it works: ${notes.plan}`,
+      `Strengths: ${notes.strengths.join(' ')}`,
+      `Weaknesses: ${notes.weaknesses.join(' ')}`,
+      `Complexity: ${notes.complexity}. Budget tier: ${notes.budgetTier}.`,
+      core ? `Core cards seen in Limitless data: ${core}.` : '',
+      sourceLine,
+    ].filter(Boolean).join('\n');
+  };
+  if (!intent.deckName && !intent.beginner && !intent.budget && !intent.playstyle) {
+    return {
+      reply: [
+        italian
+          ? 'Posso aiutarti a scegliere, ma mi mancano i tuoi vincoli: budget, livello, stile (aggressivo/control), online o locale, e Pokémon preferiti.'
+          : 'I can help you choose, but I need your constraints: budget, skill level, playstyle (aggressive/control), online or local, and favorite Pokémon.',
+        italian
+          ? 'Intanto ti do 2-3 opzioni ragionevoli dai dati Limitless/site-data, con incertezza esplicita:'
+          : 'Meanwhile, here are 2-3 reasonable options from Limitless/site data, with clear uncertainty:',
+        decks.slice(0, 3).map(renderDeck).join('\n\n'),
+        italian
+          ? 'Non cito win rate esatti se non sono nel dato letto ora. La scelta finale va adattata al meta locale.'
+          : 'I will not claim exact live win rates unless they are in the data read now. Tune the final choice to your local meta.',
+      ].join('\n\n'),
+      actions: [],
+    };
+  }
+  return {
+    reply: [
+      lead
+        ? (italian ? `Per me il punto di partenza è ${lead.name}.` : `My starting pick is ${lead.name}.`)
+        : (italian ? 'Ecco le opzioni più sensate per quello che hai chiesto:' : 'Here are the strongest fits for what you asked:'),
+      decks.slice(0, lead ? 1 : 3).map(renderDeck).join('\n\n'),
+      italian
+        ? 'Fonte: peer4/read-only Limitless public deck tables e dati site-data locali. Se serve meta live oltre al cache, Poko deve dirti quando sta usando dati pubblici esterni e con quale incertezza.'
+        : 'Source: peer4/read-only Limitless public deck tables and local site data. If live meta beyond the cache is needed, Poko should say when public external data is used and how uncertain it is.',
+    ].join('\n\n'),
+    actions: [],
+  };
+}
+
+async function deckAdvisorDelivery({ message, chatRecord, userPreferences = {} }) {
+  const intent = deckAdvisorIntentFromMessage(message, chatRecord);
+  if (!intent) return null;
+  const data = await queryDeckAdvisorData(intent).catch((error) => {
+    console.error('pokoin-assistant deck advisor query failed', error);
+    return { decks: [] };
+  });
+  const response = deckAdvisorReply(intent, data, userPreferences);
+  return {
+    reply: response.reply,
+    intent: 'deck-advisor',
+    source: data.decks.length ? 'peer4-readonly-limitless' : 'deck-advisor-fallback',
+    actions: response.actions,
+    grounding: {
+      type: 'deck_advisor',
+      intent,
+      decks: data.decks,
+      readOnly: true,
+    },
+  };
 }
 
 async function legacyMostExpensiveCardTool({ message, page }) {
@@ -1854,12 +2692,12 @@ function projectReply() {
   return [
     'I am Poko, the little Pokoin helper friend ✨',
     '',
-    'Pokoin is a collector project with three cute-but-serious pieces:',
-    '• a Pokémon card marketplace for collectors ⭐',
-    '• the PokoinPoS chain with native PKN transfers 🛠️',
-    '• wallet tools like Scan, Swap, and MetaMask compatibility 🛠️',
+    'Pokoin is a collector project with a few connected pieces:',
+    '• a Pokemon card marketplace with search, card detail pages, seller listings, cart, checkout, orders, favorites, inventory, and collection views ⭐',
+    '• Earn PKN / shard review: users can send a card list or decklist for review; eligible extra cards can be sharded into PKN value that can be used toward cards they actually want ⭐',
+    '• the PokoinPoS chain with native PKN transfers, Scan, Swap, validators, native NFTs, and MetaMask compatibility 🛠️',
     '',
-    'Tiny explanation: think of PKN like arcade tokens for the Pokoin world. The blockchain is the shared notebook where everyone can check who sent what, and validators are the careful notebook keepers. 📚⭐',
+    'Tiny videogame-style explanation: extra cards are like duplicate items. Pokoin has a review flow to turn eligible cards into PKN value, then users can browse/order new cards through marketplace flows. It is a review/request flow, not an instant guaranteed disenchant button. Not financial advice. 📚⭐',
   ].join('\n');
 }
 
@@ -1869,13 +2707,49 @@ function cryptoReply() {
     '',
     'A wallet is like your keychain. Your address is like a public mailbox. Your private key is the house key, so never share it. 🛠️',
     '',
-    'PKN is native on PokoinPoS. wPKN is the wrapped version on BNB Chain. Swap lets you trade against live PokoinSwap pools, but only when a pool has liquidity. ✨',
+    'PKN is native on PokoinPoS and currently uses the app reference price of 0.005 USD. wPKN is the BNB Chain market token with reserve discipline, not a fixed 1:1 exchange rate. Swap follows live market/liquidity routes. ✨',
     '',
     'Simple example: if Alice sends Bob 5 PKN, the chain records “Alice -5, Bob +5” so everyone can verify it later. Cute accounting, but with math muscles ⭐✨',
   ].join('\n');
 }
 
-async function cardSuggestion({ page } = {}) {
+function earnReply(message) {
+  const italian = /\b(come|cosa|posso|carte|nuove|guadagn|funziona|videogame|gioco|tipo)\b/.test(normalizeIntentText(message));
+  if (italian) {
+    return [
+      'Sì: su Pokoin esiste il flusso Earn PKN / PKN Shard Review ✨',
+      '',
+      'Funziona in stile videogame, ma con review reale: mandi una lista di carte o un decklist dalla pagina /shard-review. Il team valuta identità, versione, lingua, condizione e valore stimato. Se le carte sono eleggibili, possono essere sharded into PKN, cioè trasformate in valore PKN da usare verso carte che vuoi davvero.',
+      '',
+      'Non è un pulsante automatico garantito: oggi è una richiesta di review via /api/earn-pkn. Puoi partire da https://pokoin.com/earn o https://pokoin.com/shard-review. Non è consulenza finanziaria.',
+    ].join('\n');
+  }
+  return [
+    'Yes: Pokoin has an Earn PKN / PKN Shard Review flow ✨',
+    '',
+    'Videogame-style idea, but with a real review step: submit a card list or full decklist on /shard-review. The team reviews card identity, version, language, condition, and estimated value. Eligible extra cards can be sharded into PKN value, then used toward cards you actually want through marketplace/order flows.',
+    '',
+    'Important: this is not an instant guaranteed disenchant button. The implemented flow is a review request sent through /api/earn-pkn. Start at https://pokoin.com/earn or https://pokoin.com/shard-review. Not financial advice.',
+  ].join('\n');
+}
+
+async function resolveThemedCardPick(theme, language) {
+  if (!theme) {
+    return { pick: null, directPath: '' };
+  }
+  for (const pick of theme.picks) {
+    const directPath = await resolveCardQueryPath(pick, language).catch((error) => {
+      console.error('pokoin-assistant themed card resolution failed', error);
+      return '';
+    });
+    if (directPath) {
+      return { pick, directPath };
+    }
+  }
+  return { pick: theme.picks[0] || null, directPath: '' };
+}
+
+async function cardSuggestion({ page, message = '', chatRecord = [] } = {}) {
   const picks = [
     {
       name: 'Magikarp',
@@ -1918,17 +2792,22 @@ async function cardSuggestion({ page } = {}) {
       detail: 'a quiet rainy-street mood, perfect if you like cozy illustration cards',
     },
   ];
-  const pick = picks[Math.floor(Math.random() * picks.length)];
   const language = marketplaceLanguageFromPage(page);
-  const directPath = await resolveCardQueryPath(pick, language).catch((error) => {
+  const theme = detectCardSuggestionTheme(message, chatRecord);
+  const themed = await resolveThemedCardPick(theme, language);
+  const pick = themed.pick || picks[Math.floor(Math.random() * picks.length)];
+  const directPath = themed.directPath || await resolveCardQueryPath(pick, language).catch((error) => {
     console.error('pokoin-assistant card suggestion resolution failed', error);
     return '';
   });
   const targetPath = directPath || cardSearchPath(pick.query);
   const targetLabel = directPath ? `Open ${pick.name}` : `Search ${pick.name}`;
+  const themeLine = theme
+    ? `Theme match: you asked for ${theme.label}, so I picked ${pick.name} instead of a random cute card.`
+    : 'Poko card taste mode activated ⭐💛';
   return {
     reply: [
-    'Poko card taste mode activated ⭐💛',
+    themeLine,
     '',
     'This is not financial advice. I only judge by cuteness, personality, and “would I put it in a cozy binder?” energy. 😊',
     '',
@@ -1943,8 +2822,8 @@ async function cardSuggestion({ page } = {}) {
       type: 'navigate',
       path: targetPath,
       label: targetLabel,
-      reason: 'cute_card_suggestion',
-      data: { query: pick.query, artist: pick.artist, direct: Boolean(directPath) },
+      reason: theme ? `themed_card_suggestion:${theme.id}` : 'cute_card_suggestion',
+      data: { query: pick.query, artist: pick.artist, theme: theme?.id || '', direct: Boolean(directPath) },
     }],
   };
 }
@@ -1971,6 +2850,25 @@ function greetingReply(message) {
   return 'Hi! I am Poko ✨ I can explain Pokoin, PKN, wallets, Scan, Swap, validators, suggest cute Pokémon cards without financial advice, or collect a bug report for the team.';
 }
 
+function casualReply(message) {
+  const text = normalizeIntentText(message);
+  if (/\b(ti piace|do you like|you like)\b/.test(text)) {
+    if (/\b(gelato|ice cream|icecream)\b/.test(text)) {
+      return 'Sì, in modalità Poko il gelato mi piace eccome: soprattutto quello alla vaniglia, perché mi fa pensare a Vanillite 😊 Se vuoi, posso anche consigliarti una carta a tema gelato.';
+    }
+    return 'Mi piace chiacchierare con te 😊 Non ho gusti veri come una persona, però posso stare al gioco e risponderti in modo naturale.';
+  }
+  if (/\b(come stai|come va|tutto ok)\b/.test(text)) {
+    return 'Tutto ok ✨ Sono qui, sveglio e pronto a chiacchierare o aiutarti con Pokoin quando vuoi.';
+  }
+  if (/\b(my name is|mi chiamo)\b/.test(text)) {
+    const match = cleanText(message, 120).match(/\b(?:my name is|mi chiamo)\s+([a-zA-ZÀ-ÿ0-9_-]{2,30})/i);
+    const name = match?.[1] || '';
+    return name ? `Piacere, ${name}! ✨` : 'Piacere! ✨ Dimmi pure come vuoi che ti chiami.';
+  }
+  return 'Ci sto, parliamo pure tranquillamente 😊 Quando vuoi posso anche tornare su Pokoin, carte o marketplace.';
+}
+
 function docsReply(message, intent) {
   const text = normalizeIntentText(message);
   const italian = /\b(come|cosa|dove|chi|spiega|documentazione|guida)\b/.test(text);
@@ -1984,6 +2882,32 @@ function docsReply(message, intent) {
     return `Per domande tecniche ti mando alla documentazione ufficiale, così non invento dettagli in chat 📚\n\nApri ${url} e guarda la sezione “${section}”.`;
   }
   return `For technical questions, I’ll point you to the official docs so I don’t invent details in chat 📚\n\nOpen ${url} and check the “${section}” section.`;
+}
+
+function safeAssistantActions(actions) {
+  if (!Array.isArray(actions)) {
+    return [];
+  }
+  return actions
+    .map((action) => {
+      if (!action || typeof action !== 'object') {
+        return null;
+      }
+      const type = cleanText(action.type || action.action, 40).toLowerCase();
+      if (type !== 'navigate') {
+        return null;
+      }
+      const path = cleanInternalPath(action.path || action.data?.canonicalPath || action.data?.path);
+      if (!path) {
+        return null;
+      }
+      return {
+        ...action,
+        type: 'navigate',
+        path,
+      };
+    })
+    .filter(Boolean);
 }
 
 async function callPokontactService({ message, chatRecord, user, page, pageContext, marketplaceContext }) {
@@ -2024,7 +2948,7 @@ async function callPokontactService({ message, chatRecord, user, page, pageConte
       provider: cleanText(payload.provider, 80),
       model: cleanText(payload.model, 120),
       source: cleanText(payload.source, 80) || 'peer2-service',
-      actions: Array.isArray(payload.actions) ? payload.actions : [],
+      actions: safeAssistantActions(payload.actions),
     };
   } finally {
     clearTimeout(timeout);
@@ -2042,6 +2966,7 @@ module.exports = async function handler(req, res) {
     const chatRecord = cleanChatRecord(req.body?.messages);
     const pageContext = cleanPageContext(req.body?.pageContext);
     const page = pageUrlFromContext(cleanText(req.body?.page, 500), pageContext);
+    const sessionId = sessionIdFromRequest(req);
     if (message.length < 2) {
       return res.status(400).json({ error: 'Write a message for Pokontact.' });
     }
@@ -2051,6 +2976,9 @@ module.exports = async function handler(req, res) {
       username: cleanText(req.body?.username, 80) || 'guest',
       email: '',
     }));
+    user.sessionId = sessionId;
+    user.identityKey = user.uid || sessionId || 'guest';
+    const userPreferences = inferUserPreferences({ message, chatRecord });
     const localIntent = classifyIntent(message);
     if (localIntent === 'unsafe-cyber') {
       return res.status(200).json({
@@ -2100,7 +3028,7 @@ module.exports = async function handler(req, res) {
         intent: cardOpinionDelivery.intent,
         forwarded: false,
         emailDelivery: null,
-        actions: cardOpinionDelivery.actions || [],
+        actions: safeAssistantActions(cardOpinionDelivery.actions),
         pageContext,
         serviceDelivery: {
           ok: true,
@@ -2112,7 +3040,63 @@ module.exports = async function handler(req, res) {
         assistant: 'Pokontact',
       });
     }
-    if (!['card', 'project', 'crypto', 'greeting'].includes(localIntent)) {
+    if (!['project', 'crypto', 'greeting', 'casual'].includes(localIntent)) {
+      const deckDelivery = await deckAdvisorDelivery({
+        message,
+        chatRecord,
+        userPreferences,
+      }).catch((error) => {
+        console.error('pokoin-assistant deck advisor failed', error);
+        return null;
+      });
+      if (deckDelivery) {
+        return res.status(200).json({
+          reply: sanitizePokoEmoji(deckDelivery.reply),
+          intent: deckDelivery.intent,
+          forwarded: false,
+          emailDelivery: null,
+          actions: safeAssistantActions(deckDelivery.actions),
+          pageContext,
+          serviceDelivery: {
+            ok: true,
+            source: deckDelivery.source,
+            provider: 'pokoin-deck-advisor',
+            model: 'deterministic',
+          },
+          marketplaceContext: deckDelivery.grounding,
+          userMemory: userPreferences,
+          assistant: 'Pokontact',
+        });
+      }
+      const recommendationDelivery = await recommendationGroundedDelivery({
+        message,
+        chatRecord,
+        page,
+        pageContext,
+        userPreferences,
+      }).catch((error) => {
+        console.error('pokoin-assistant card recommendation failed', error);
+        return null;
+      });
+      if (recommendationDelivery) {
+        return res.status(200).json({
+          reply: sanitizePokoEmoji(recommendationDelivery.reply),
+          intent: recommendationDelivery.intent,
+          forwarded: false,
+          emailDelivery: null,
+          actions: safeAssistantActions(recommendationDelivery.actions),
+          pageContext,
+          serviceDelivery: {
+            ok: true,
+            source: recommendationDelivery.source,
+            provider: 'pokoin-card-recommendation',
+            model: 'deterministic',
+          },
+          marketplaceContext: recommendationDelivery.grounding,
+          userMemory: userPreferences,
+          assistant: 'Pokontact',
+        });
+      }
       const marketplaceDelivery = await marketplaceGroundedDelivery({
         message,
         chatRecord,
@@ -2128,7 +3112,7 @@ module.exports = async function handler(req, res) {
           intent: marketplaceDelivery.intent,
           forwarded: false,
           emailDelivery: null,
-          actions: marketplaceDelivery.actions || [],
+          actions: safeAssistantActions(marketplaceDelivery.actions),
           pageContext,
           serviceDelivery: {
             ok: true,
@@ -2137,18 +3121,20 @@ module.exports = async function handler(req, res) {
             model: 'deterministic',
           },
           marketplaceContext: marketplaceDelivery.grounding,
+          userMemory: userPreferences,
           assistant: 'Pokontact',
         });
       }
     }
-    const serviceDelivery = shouldBypassPeerService(localIntent)
-      ? { ok: false, skipped: true, reason: 'local_greeting' }
+    const serviceDelivery = shouldBypassPeerService(localIntent, message, chatRecord)
+      ? { ok: false, skipped: true, reason: `local_${localIntent}` }
       : await callPokontactService({
         message,
         chatRecord,
         user,
         page,
         pageContext,
+        marketplaceContext: { userPreferences },
       }).catch((error) => ({
         ok: false,
         error: error.name === 'AbortError' ? 'Pokontact service timed out.' : error.message,
@@ -2170,15 +3156,19 @@ module.exports = async function handler(req, res) {
     } else if (serviceReply) {
       const rewrittenServiceReply = await rewriteCardSuggestionLinks(serviceReply, page);
       reply = rewrittenServiceReply.reply;
-      actions = rewrittenServiceReply.actions || [];
+      actions = safeAssistantActions(rewrittenServiceReply.actions);
     } else if (intent === 'greeting') {
       reply = greetingReply(message);
+    } else if (intent === 'casual') {
+      reply = casualReply(message);
     } else if (intent === 'card') {
-      const suggestion = await cardSuggestion({ page });
+      const suggestion = await cardSuggestion({ page, message, chatRecord });
       reply = suggestion.reply;
-      actions = suggestion.actions;
+      actions = safeAssistantActions(suggestion.actions);
     } else if (intent === 'project') {
       reply = projectReply();
+    } else if (intent === 'earn') {
+      reply = earnReply(message);
     } else if (intent === 'crypto') {
       reply = cryptoReply();
     } else {
@@ -2191,8 +3181,9 @@ module.exports = async function handler(req, res) {
       intent,
       forwarded,
       emailDelivery,
-      actions,
+      actions: safeAssistantActions(actions),
       pageContext,
+      userMemory: userPreferences,
       serviceDelivery: serviceReply ? {
         ok: true,
         source: serviceReply.source,
@@ -2221,15 +3212,29 @@ module.exports._test = {
   currentCardOpinionDelivery,
   looksLikeCurrentCardOpinionValueQuestion,
   fetchCommunitySentiment,
+  detectCardSuggestionTheme,
+  inferUserPreferences,
+  recommendationIntentFromMessage,
+  queryCardRecommendations,
+  recommendationGroundedDelivery,
+  deckAdvisorIntentFromMessage,
+  queryDeckAdvisorData,
+  deckAdvisorDelivery,
+  isDirectMarketplaceCardPath,
   parseCardQueryParts,
   resolveCardQueryPath,
   rewriteCardSuggestionLinks,
   cardSuggestion,
+  earnReply,
+  explicitCardSubjectFromMessage,
+  looksLikeEarnOrShardQuestion,
+  safeAssistantActions,
   cleanPageContext,
   sanitizePokoEmoji,
   pageContextForPrompt,
   slugPart,
   classifyIntent,
+  casualReply,
   greetingReply,
   shouldBypassPeerService,
   resolvePokontactServiceUrl,

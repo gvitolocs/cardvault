@@ -4,6 +4,7 @@
 # Local environment and secrets
 .env
 .env.local
+.env.honcho.local
 .env.*.local
 .env*.local
 pokemon_card_vault/.env.local
@@ -28,3 +29,24 @@ pokemon_card_vault/data/cardtrader/pokemon-blueprints.jsonl
 # Adjacent local support checkouts/assets
 pokemon-tcg-data/
 pokoin-brand/
+
+# Codevira cache (gitignored; rebuilt by `codevira sync`)
+.codevira-cache/
+
+# Honcho MCP lives in ~/Hermes/tools/honcho-mcp (global Cursor)
+.honcho-peer1-tunnel.pid
+.honcho-mcp-wrangler.pid
+.honcho-mcp-wrangler.log
+
+# Machine-local Cursor MCP paths
+.cursor/mcp.json
+
+# Local deploy/worktree copies (not source)
+pokemon_card_vault-home-availability-deploy/
+
+# Generated TrainingAI blueprint image maps
+pokemon_card_vault/integrations/trainingai-hf-space/best-blueprint-images.json
+pokemon_card_vault/integrations/trainingai-oracle-api/best-blueprint-images.json
+
+# Local operator accident backups
+*.bak-rebootloop-*

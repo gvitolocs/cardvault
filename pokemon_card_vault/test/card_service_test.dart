@@ -578,6 +578,32 @@ void main() {
     expect(card.isMarketAvailable, isTrue);
   });
 
+  test('marketplace version row marks graded listing cards', () {
+    final service = CardService();
+
+    final card = service.cardFromVersionRowForTest({
+      'card_id': 391030,
+      'name': 'Mega Venusaur ex',
+      'expansion_name': 'Play! Pokémon Prize Pack Series',
+      'expansion_number': '003/132',
+      'rarity': 'Promo',
+      'card_type': 'Trading card',
+      'cdn_image_url': 'https://cdn.pokoin.com/cards/mega-venusaur-ex.webp',
+      'listed_quantity': 1,
+      'lowest_price_pkn': 2500,
+      'is_graded': true,
+      'grading_company': 'PSA',
+      'grade': '10',
+    });
+
+    expect(card.isGraded, isTrue);
+    expect(card.gradingCompany, 'PSA');
+    expect(card.grade, '10');
+    expect(card.price, 2500);
+    expect(card.stock, 1);
+    expect(card.isMarketAvailable, isTrue);
+  });
+
   test('marketplace result rows do not synthesize fallback prices', () {
     final service = CardService();
 
@@ -1310,7 +1336,7 @@ void main() {
       );
     });
 
-    test('version row mapping prefers structured emoji slots', () {
+    test('version row mapping preserves database emoji', () {
       final service = CardService();
 
       final card = service.cardFromVersionRowForTest({
@@ -1325,10 +1351,10 @@ void main() {
         'rarity_variant_emoji': '🎨',
       });
 
-      expect(card.emoji, '🔮 ✨ 🎨');
+      expect(card.emoji, '🔮 💎 💎');
     });
 
-    test('version row mapping normalizes legacy emoji strings', () {
+    test('version row mapping keeps source emoji variants unchanged', () {
       final service = CardService();
 
       final card = service.cardFromVersionRowForTest({
@@ -1341,10 +1367,10 @@ void main() {
         'emoji': '🦊 ✨ 💎 💎',
       });
 
-      expect(card.emoji, '🦊 ✨ 🎨');
+      expect(card.emoji, '🦊 ✨ 💎 💎');
     });
 
-    test('version row mapping repairs legacy two-token rarity emoji', () {
+    test('version row mapping does not infer missing rarity emoji', () {
       final service = CardService();
 
       final card = service.cardFromVersionRowForTest({
@@ -1357,12 +1383,10 @@ void main() {
         'emoji': '🐍 🌿',
       });
 
-      expect(card.emoji, '🐍 🌿 🔷');
+      expect(card.emoji, '🐍 🌿');
     });
 
-    test(
-        'version row mapping replaces generic identity emoji for known species',
-        () {
+    test('version row mapping does not replace generic identity emoji', () {
       final service = CardService();
 
       final camerupt = service.cardFromVersionRowForTest({
@@ -1393,9 +1417,9 @@ void main() {
         'emoji': '🃏 ✨ 💎',
       });
 
-      expect(camerupt.emoji, '🐫 🌋 🎟️');
-      expect(sharpedo.emoji, '🦈 🌊 🎨');
-      expect(regirock.emoji, '🪨 🌟 💎');
+      expect(camerupt.emoji, '🃏 ✨ 🎟️');
+      expect(sharpedo.emoji, '🃏 ✨ 🎨');
+      expect(regirock.emoji, '🃏 ✨ 💎');
     });
 
     test('provider remote result helper preserves backend rank, not names', () {
@@ -1630,6 +1654,29 @@ void main() {
       expect(tokens.single.normalized, 'pikachu');
       expect(tokens.single.source, 'token_predict');
       expect(tokens.single.representativeCardIds, ['25', '26', '27']);
+    });
+
+    test('first-char warmup response parses suggestions by letter', () {
+      final result = CardService().firstCharWarmupResultFromJsonForTest({
+        'language': 'en',
+        'source_language': 'en',
+        'generated_at_ms': 42,
+        'suggestions': {
+          'p': {
+            'display_token': 'Pikachu',
+            'normalized_token': 'pikachu',
+            'confidence': 98,
+            'source_rank': 1,
+            'language': 'en',
+            'source': 'first_char_warmup',
+          },
+        },
+      });
+
+      expect(result.language, 'en');
+      expect(result.generatedAtMs, 42);
+      expect(result.suggestions['p']?.display, 'Pikachu');
+      expect(result.suggestions['p']?.source, 'first_char_warmup');
     });
 
     test('token prediction context parses candidates and validates refinement',
@@ -2215,6 +2262,65 @@ void main() {
       expect(backend.single.set, 'Base Set');
     });
 
+    test('backend preview row fills to twenty with compatible cached rows', () {
+      final backendRows = [
+        _searchCard(
+          id: 'exact',
+          name: 'Pokédex',
+          set: 'Black & White',
+          number: '98/114',
+        ),
+      ];
+      final fallbackRows = [
+        _searchCard(id: 'exact', name: 'Pokédex', set: 'Black & White'),
+        for (var index = 1; index <= 25; index += 1)
+          _searchCard(
+            id: 'fallback-$index',
+            name: 'Pokédex',
+            set: index.isEven ? 'Black & White' : 'Black & White Promos',
+            number: '$index/114',
+          ),
+      ];
+
+      final rows = mergeSearchPreviewRowsForTest(
+        backendRows: backendRows,
+        fallbackRows: fallbackRows,
+      );
+
+      expect(rows, hasLength(searchPreviewLimit));
+      expect(rows.first.id, 'exact');
+      expect(
+          rows.map((card) => card.id).toSet(), hasLength(searchPreviewLimit));
+      expect(rows[1].id, 'fallback-1');
+    });
+
+    test('accent-insensitive fallback matches pokedex and pokemon names', () {
+      final rows = searchPreviewFallbackRowsForTest(
+        query: 'pokedex black',
+        context: _contextForLabels(
+          'pokedex black',
+          const [
+            SearchCandidateLabel(
+              id: '1',
+              name: 'Pokédex',
+              setName: 'Black & White',
+              number: '98/114',
+            ),
+            SearchCandidateLabel(
+              id: '2',
+              name: 'Pokémon Communication',
+              setName: 'Black & White',
+              number: '99/114',
+            ),
+          ],
+          latestDepth: 12,
+        ),
+      );
+
+      expect(rows.map((card) => card.id), ['1']);
+      expect(rows.first.name, 'Pokédex');
+    });
+
     test('lightweight fallback renders only top twenty rows', () {
       final labels = [
         for (var index = 1; index <= 50; index += 1)
@@ -2611,6 +2717,52 @@ void main() {
       expect(notifier.state.searchPreviews.last.id, '$searchPreviewLimit');
     });
 
+    test('single backend result fills preview from compatible context labels',
+        () async {
+      final labels = [
+        const SearchCandidateLabel(
+          id: 'exact',
+          name: 'Pokédex',
+          setName: 'Black & White',
+          number: '98/114',
+        ),
+        for (var index = 1; index <= 25; index += 1)
+          SearchCandidateLabel(
+            id: 'fallback-$index',
+            name: 'Pokédex',
+            setName: 'Black & White',
+            number: '$index/114',
+          ),
+      ];
+      final service = _CountingCardService(
+        autocompleteCards: [
+          _searchCard(
+            id: 'exact',
+            name: 'Pokédex',
+            set: 'Black & White',
+            number: '98/114',
+          ),
+        ],
+        autocompleteContext:
+            _contextForLabels('pokedex black', labels, latestDepth: 12),
+      );
+      final notifier = CardNotifier(
+        cardService: service,
+        autoLoad: false,
+      );
+      addTearDown(notifier.dispose);
+
+      notifier.searchPreviewsOnly('pokedex black');
+      await Future<void>.delayed(const Duration(milliseconds: 180));
+
+      expect(notifier.state.searchPreviews, hasLength(searchPreviewLimit));
+      expect(notifier.state.searchPreviews.first.id, 'exact');
+      expect(
+        notifier.state.searchPreviews.map((card) => card.id).toSet(),
+        hasLength(searchPreviewLimit),
+      );
+    });
+
     test('one and two character typed previews warm silently', () async {
       final service = _CountingCardService(
         autocompleteCards: [_searchCard(id: '10', name: 'Remote Pikachu')],
@@ -2670,6 +2822,109 @@ void main() {
       expect(service.tokenPredictCalls, 1);
       expect(notifier.state.searchCompletion, 'Piplup');
       expect(notifier.state.searchCompletionSource, 'token_predict');
+    });
+
+    test('single m uses dynamic warmup before static fallback', () async {
+      final service = _CountingCardService(
+        firstCharWarmupResult: SearchFirstCharWarmupResult(
+          language: 'en',
+          generatedAtMs: DateTime.now().millisecondsSinceEpoch,
+          suggestions: const {
+            'm': SearchPredictedNameToken(
+              normalized: 'mimikyu',
+              display: 'Mimikyu',
+              confidence: 99,
+              sourceRank: 1,
+              source: 'first_char_warmup',
+              language: 'en',
+            ),
+          },
+        ),
+      );
+      final notifier = CardNotifier(
+        cardService: service,
+        autoLoad: false,
+      );
+      addTearDown(notifier.dispose);
+
+      notifier.showHotSearchPreviewsForEmptyFocus();
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      notifier.searchPreviewsOnly('m');
+
+      expect(service.firstCharWarmupCalls, 1);
+      expect(notifier.state.searchCompletion, 'Mimikyu');
+      expect(notifier.state.searchCompletionSource, 'first_char_warmup');
+    });
+
+    test('selected Italian language reaches warmup autocomplete and token prediction',
+        () async {
+      final service = _CountingCardService(
+        firstCharWarmupResult: const SearchFirstCharWarmupResult(
+          language: 'it',
+          generatedAtMs: 42,
+          suggestions: {
+            'c': SearchPredictedNameToken(
+              normalized: 'camilla',
+              display: 'Camilla',
+              confidence: 99,
+              sourceRank: 1,
+              source: 'first_char_warmup',
+              language: 'it',
+            ),
+          },
+        ),
+        predictedNameTokens: const [
+          SearchPredictedNameToken(
+            normalized: 'camilla',
+            display: 'Camilla',
+            confidence: 100,
+            source: 'token_predict',
+            language: 'it',
+          ),
+        ],
+        autocompleteCards: [_searchCard(id: 'it-camilla', name: 'Camilla')],
+      );
+      final notifier = CardNotifier(cardService: service, autoLoad: false);
+      addTearDown(notifier.dispose);
+
+      notifier.setSearchLanguage('it');
+      notifier.showHotSearchPreviewsForEmptyFocus();
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      notifier.searchPreviewsOnly('c');
+
+      expect(service.firstCharWarmupCalls, 1);
+      expect(service.lastFirstCharWarmupSearchLanguage, 'it');
+      expect(notifier.state.searchCompletion, 'Camilla');
+      expect(notifier.state.searchCompletionSource, 'first_char_warmup');
+
+      await Future<void>.delayed(const Duration(milliseconds: 180));
+
+      expect(service.lastAutocompleteSearchLanguage, 'it');
+      expect(service.lastTokenPredictSearchLanguage, 'it');
+      expect(notifier.state.searchCompletionSource, 'token_predict');
+    });
+
+    test('single m falls back to static suggestion when warmup missing',
+        () async {
+      final service = _CountingCardService(
+        firstCharWarmupResult: const SearchFirstCharWarmupResult(
+          language: 'en',
+          generatedAtMs: 0,
+        ),
+      );
+      final notifier = CardNotifier(
+        cardService: service,
+        autoLoad: false,
+      );
+      addTearDown(notifier.dispose);
+
+      notifier.showHotSearchPreviewsForEmptyFocus();
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      notifier.searchPreviewsOnly('m');
+
+      expect(service.firstCharWarmupCalls, 1);
+      expect(notifier.state.searchCompletion, 'Mew');
+      expect(notifier.state.searchCompletionSource, 'first_char_static');
     });
 
     test('empty token response keeps compatible ghost completion', () async {
@@ -3754,6 +4009,32 @@ void main() {
       expect(notifier.state.searchPreviews, isEmpty);
     });
 
+    test('language switch clears old cache and full search uses selected language',
+        () async {
+      final service = _CountingCardService(
+        autocompleteCards: [_searchCard(id: 'it-camilla', name: 'Camilla')],
+      );
+      final notifier = CardNotifier(cardService: service, autoLoad: false);
+      addTearDown(notifier.dispose);
+
+      notifier.searchPreviewsOnly('pik');
+      await Future<void>.delayed(const Duration(milliseconds: 180));
+
+      expect(service.lastAutocompleteSearchLanguage, 'en');
+      expect(service.autocompleteWithContextCalls, 1);
+
+      notifier.setSearchLanguage('it');
+      expect(notifier.state.searchPreviews, isEmpty);
+
+      notifier.searchCards('camilla');
+      await Future<void>.delayed(const Duration(milliseconds: 180));
+
+      expect(service.lastAutocompleteSearchLanguage, 'it');
+      expect(service.lastSearchMarketplaceLanguage, 'it');
+      expect(service.searchMarketplaceCalls, 1);
+      expect(notifier.state.remoteSearchQuery, 'camilla');
+    });
+
     test('historical prefix pool respects completed variation token', () async {
       final service = _SequenceCardService(
         responseDelay: const Duration(milliseconds: 80),
@@ -3791,6 +4072,51 @@ void main() {
       notifier.searchPreviewsOnly('mimikyu ex');
 
       expect(notifier.state.searchPreviews.map((card) => card.id), ['2']);
+    });
+
+    test('pending completed variation keeps compatible previews', () async {
+      final service = _SequenceCardService(
+        responseDelay: const Duration(milliseconds: 80),
+        responses: {
+          'mimikyu g': _AutocompleteFixture(
+            cards: [
+              _searchCard(id: 'gx-1', name: 'Mimikyu GX'),
+              _searchCard(id: 'ex-1', name: 'Mimikyu ex'),
+            ],
+            context: _contextForLabels(
+              'mimikyu g',
+              const [
+                SearchCandidateLabel(id: 'gx-1', name: 'Mimikyu GX'),
+                SearchCandidateLabel(id: 'ex-1', name: 'Mimikyu ex'),
+              ],
+              latestDepth: 8,
+            ),
+          ),
+          'mimikyu gx': _AutocompleteFixture(
+            cards: [_searchCard(id: 'gx-1', name: 'Mimikyu GX')],
+            context: _contextForLabels(
+              'mimikyu gx',
+              const [
+                SearchCandidateLabel(id: 'gx-1', name: 'Mimikyu GX'),
+              ],
+              latestDepth: 9,
+            ),
+          ),
+        },
+      );
+      final notifier = CardNotifier(cardService: service, autoLoad: false);
+      addTearDown(notifier.dispose);
+
+      notifier.searchPreviewsOnly('mimikyu g');
+      await Future<void>.delayed(const Duration(milliseconds: 220));
+      notifier.searchPreviewsOnly('mimikyu gx');
+
+      expect(notifier.state.isSearchingPreviews, isTrue);
+      expect(notifier.state.searchPreviews.map((card) => card.id), ['gx-1']);
+
+      await Future<void>.delayed(const Duration(milliseconds: 220));
+      expect(notifier.state.isSearchingPreviews, isFalse);
+      expect(notifier.state.searchPreviews.map((card) => card.id), ['gx-1']);
     });
 
     test('historical prefix pool stays visible for unmatched extension',
@@ -3970,6 +4296,10 @@ class _CountingCardService extends CardService {
     this.predictedNameTokens = const [],
     this.autocompletePredictedNameTokens,
     this.autocompleteDelay = Duration.zero,
+    this.firstCharWarmupResult = const SearchFirstCharWarmupResult(
+      language: 'en',
+      generatedAtMs: 0,
+    ),
   });
 
   final List<PokemonCard> autocompleteCards;
@@ -3977,22 +4307,29 @@ class _CountingCardService extends CardService {
   final List<SearchPredictedNameToken> predictedNameTokens;
   final List<SearchPredictedNameToken>? autocompletePredictedNameTokens;
   final Duration autocompleteDelay;
+  final SearchFirstCharWarmupResult firstCharWarmupResult;
   SearchTokenPredictionContext? tokenPredictionContext;
   int hotCalls = 0;
   int autocompleteCalls = 0;
   int autocompleteWithContextCalls = 0;
   int tokenPredictCalls = 0;
+  int firstCharWarmupCalls = 0;
   int tokenPredictDelayMs = 0;
   int cancelCalls = 0;
   String? lastAutocompleteQuery;
   int? lastAutocompletePoolLimit;
+  String? lastAutocompleteSearchLanguage;
   SearchTokenPredictionContext? lastAutocompletePredictionContext;
   String? lastAutocompleteSearchSessionId;
   String? lastTokenPredictQuery;
+  String? lastTokenPredictSearchLanguage;
+  String? lastFirstCharWarmupSearchLanguage;
+  String? lastSearchMarketplaceLanguage;
   SearchTokenPredictionContext? lastPreviousPredictionContext;
   String? lastCancelSessionId;
   String? lastCancelQuery;
   String? lastCancelReason;
+  int searchMarketplaceCalls = 0;
 
   @override
   Future<List<PokemonCard>> getHotMarketplaceCards({
@@ -4017,6 +4354,7 @@ class _CountingCardService extends CardService {
     autocompleteCalls++;
     lastAutocompleteQuery = query;
     lastAutocompletePoolLimit = poolLimit;
+    lastAutocompleteSearchLanguage = searchLanguage;
     lastAutocompletePredictionContext = predictionContext;
     lastAutocompleteSearchSessionId = searchSessionId;
     return autocompleteCards;
@@ -4036,6 +4374,7 @@ class _CountingCardService extends CardService {
     autocompleteWithContextCalls++;
     lastAutocompleteQuery = query;
     lastAutocompletePoolLimit = poolLimit;
+    lastAutocompleteSearchLanguage = searchLanguage;
     lastAutocompletePredictionContext = predictionContext;
     lastAutocompleteSearchSessionId = searchSessionId;
     if (autocompleteDelay > Duration.zero) {
@@ -4074,6 +4413,7 @@ class _CountingCardService extends CardService {
   }) async {
     tokenPredictCalls++;
     lastTokenPredictQuery = query;
+    lastTokenPredictSearchLanguage = searchLanguage;
     lastPreviousPredictionContext = previousPredictionContext;
     if (tokenPredictDelayMs > 0) {
       await Future<void>.delayed(Duration(milliseconds: tokenPredictDelayMs));
@@ -4082,6 +4422,29 @@ class _CountingCardService extends CardService {
       tokens: predictedNameTokens,
       context: tokenPredictionContext,
     );
+  }
+
+  @override
+  Future<SearchFirstCharWarmupResult> warmSearchFirstCharNameTokens({
+    int limit = 1,
+    String searchLanguage = 'en',
+  }) async {
+    firstCharWarmupCalls++;
+    lastFirstCharWarmupSearchLanguage = searchLanguage;
+    return firstCharWarmupResult;
+  }
+
+  @override
+  Future<List<PokemonCard>> searchMarketplaceCards(
+    String query, {
+    int limit = 120,
+    String? productType,
+    String searchLanguage = 'en',
+    String? searchSessionId,
+  }) async {
+    searchMarketplaceCalls++;
+    lastSearchMarketplaceLanguage = searchLanguage;
+    return autocompleteCards;
   }
 
   @override
@@ -4170,6 +4533,17 @@ class _SequenceCardService extends CardService {
     tokenPredictCalls++;
     return SearchTokenPredictionResult(
       tokens: tokenResponses[query] ?? const [],
+    );
+  }
+
+  @override
+  Future<SearchFirstCharWarmupResult> warmSearchFirstCharNameTokens({
+    int limit = 1,
+    String searchLanguage = 'en',
+  }) async {
+    return SearchFirstCharWarmupResult(
+      language: searchLanguage,
+      generatedAtMs: 0,
     );
   }
 
@@ -4273,6 +4647,17 @@ class _MarketplaceWarmupCardService extends CardService {
     SearchTokenPredictionContext? previousPredictionContext,
   }) async {
     return const SearchTokenPredictionResult();
+  }
+
+  @override
+  Future<SearchFirstCharWarmupResult> warmSearchFirstCharNameTokens({
+    int limit = 1,
+    String searchLanguage = 'en',
+  }) async {
+    return SearchFirstCharWarmupResult(
+      language: searchLanguage,
+      generatedAtMs: 0,
+    );
   }
 }
 

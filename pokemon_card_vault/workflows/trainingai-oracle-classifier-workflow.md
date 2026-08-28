@@ -184,6 +184,15 @@ one best non-homepage image per CardTrader blueprint. It prefers
 }
 ```
 
+Fallback CardTrader URLs can share generic basenames such as
+`/fallbacks/card_uploader/preview.png`. Do not use that basename as a lookup key.
+When a fallback/source URL has a generic basename, the generator must write a
+stable logical `object_key` and `original_path` in the
+`<blueprint_id>_<name-version-set-slug>.<source-ext>` format while keeping `url`
+and `cardtrader_image_url` pointed at the real remote source unless the image has
+actually been uploaded/copied to R2. Never publish a `trainingai.pokoin.com`
+image URL for a normalized key until that object exists.
+
 Regenerate it after blueprint image imports or CDN updates:
 
 ```bash
@@ -230,7 +239,18 @@ TRAININGAI_IMAGE_BASE_URL=https://raw.githubusercontent.com/SabatinoRaffaella/Po
 TRAININGAI_MAX_UPLOAD_BYTES=8388608
 TRAININGAI_MODEL_NAME=ViT-B-32
 TRAININGAI_PRETRAINED=laion2b_s34b_b79k
+# Optional Meilisearch OCR rerank (same marketplace index as api.pokoin.com).
+# On peer3 Docker, point at the Meili SSH tunnel on the Docker bridge:
+MEILI_HOST=http://172.17.0.1:27700
+MEILI_API_KEY=<redacted>
+MEILI_MARKETPLACE_INDEX=marketplace_cards
+TRAININGAI_ENABLE_MEILI_RERANK=1
 ```
+
+When OCR reads a name (for example `chien` + `pao`), the classifier queries
+Meili for blueprint `card_id`s and injects matching TrainingAI vectors even if
+CLIP ranked them outside the FAISS rerank pool. `GET /health` reports
+`meili.configured`.
 
 If Colab generated newer artifacts, upload them to:
 

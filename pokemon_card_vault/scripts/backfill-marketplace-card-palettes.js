@@ -447,6 +447,11 @@ async function seedSchemaMappings(pool) {
   return result.rows[0]?.seeded ?? 0;
 }
 
+async function refreshBlueprintEmojis(pool) {
+  const result = await pool.query('select public.refresh_marketplace_blueprint_emojis() as refreshed');
+  return result.rows[0]?.refreshed ?? 0;
+}
+
 async function refreshFullProjections(pool) {
   await pool.query('set statement_timeout = 0');
   const result = await pool.query(
@@ -470,12 +475,18 @@ async function refreshPaletteProjections(pool) {
         from public.marketplace_card_emoji_rules
       )
       update public.cardtrader_pokemon_blueprints b
-      set card_palette = public.marketplace_card_palette(
-        coalesce(nullif(b.blueprint->>'card_type', ''), nullif(b.blueprint->>'type', ''), nullif(b.blueprint->>'category_name', ''), 'Trading card'),
-        b.name,
-        coalesce(nullif(b.blueprint->>'rarity', ''), nullif(b.blueprint->>'collector_rarity', ''), 'Card'),
-        concat_ws(' ', coalesce(nullif(b.expansion->>'name', ''), nullif(b.blueprint->>'expansion_name', ''), 'Pokemon'), b.version)
-      )
+      set
+        card_palette = public.marketplace_card_palette(
+          coalesce(nullif(b.blueprint->>'card_type', ''), nullif(b.blueprint->>'type', ''), nullif(b.blueprint->>'category_name', ''), 'Trading card'),
+          b.name,
+          coalesce(nullif(b.blueprint->>'rarity', ''), nullif(b.blueprint->>'collector_rarity', ''), 'Card'),
+          concat_ws(' ', coalesce(nullif(b.expansion->>'name', ''), nullif(b.blueprint->>'expansion_name', ''), 'Pokemon'), b.version)
+        ),
+        emoji = coalesce((
+          select e.emoji
+          from public.marketplace_blueprint_emojis e
+          where e.blueprint_id = b.id
+        ), b.emoji, '')
       from mapped_names
       where mapped_names.name = b.name
     `);
@@ -483,13 +494,11 @@ async function refreshPaletteProjections(pool) {
       update public.marketplace_cards c
       set
         card_palette = b.card_palette,
-        emoji = concat_ws(
-          ' ',
-          nullif(public.marketplace_card_name_emoji(c.name), ''),
-          nullif(public.marketplace_card_variant_emoji(c.name, c.rarity, c.product_variant), '')
-        ),
+        emoji = coalesce(e.emoji, ''),
         projected_at = now()
       from public.cardtrader_pokemon_blueprints b
+      left join public.marketplace_blueprint_emojis e
+        on e.blueprint_id = c.card_id
       where b.id = c.card_id
         and b.name in (
           select distinct name
@@ -619,6 +628,8 @@ async function main() {
       console.log(`Seeded schema mappings: ${seeded}`);
       const inserted = await upsertMappings(pool, classified);
       console.log(`Upserted mappings: ${inserted}`);
+      const refreshedEmojis = await refreshBlueprintEmojis(pool);
+      console.log(`Refreshed blueprint emoji source rows: ${refreshedEmojis}`);
       if (refresh) {
         console.log(fullRefresh ? 'Refreshing all projections' : 'Refreshing palette projections');
         console.log(JSON.stringify(

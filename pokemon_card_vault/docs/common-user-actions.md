@@ -70,8 +70,8 @@ wPKN public facts:
 
 - BNB Chain contract: `0x91A17E2bddfF839078BD395482B38e4AC15276f4`
 - PancakeSwap pair: `0x86294c008542C2707B9f67e3E4BA2d03B7bF7451`
-- The reserve rule is that circulating wPKN must not exceed native PKN reserved
-  for backing.
+- The reserve rule is supply discipline, not a fixed swap rate: circulating wPKN
+  must not exceed the native PKN reserve allocation.
 
 ## Swap Tokens
 
@@ -83,7 +83,8 @@ Expected behavior:
 - Swap should only enable assets with a live pool and liquidity.
 - Unsupported assets should be discoverable/explainable but not swappable until
   a pool or supported route exists.
-- PKN and wPKN are different assets on different networks.
+- PKN and wPKN are different assets on different networks; they do not have a
+  fixed 1:1 market exchange rate.
 
 If a swap fails, ask for:
 
@@ -101,7 +102,7 @@ Do not ask for private keys or seed phrases.
 Users may ask how to sell, list, or create an offer for a card.
 
 Direct signed-in sellers to the profile/seller area for listing management.
-`Sell`, seller inventory, manage-listing, and CardTrader connection actions
+`Sell`, seller inventory, manage-listing, and seller sync/partner connection actions
 belong under `/profile`, `/inventory`, or contextual card/seller tools, not in
 the global marketplace top bar.
 
@@ -144,6 +145,33 @@ Common explanations:
 - Listing snapshots are preserved so checkout is tied to the selected offer.
 - If a cart item is unavailable, the listing may have sold out, been paused, or
   changed by the seller.
+
+## Earn PKN And Shard Cards
+
+Users may ask if they can shard, disenchant, recycle, or turn extra cards into
+new cards.
+
+Current implemented flow:
+
+- `https://pokoin.com/earn` explains Earn PKN.
+- `https://pokoin.com/shard-review` lets users request a PKN shard review.
+- Users can submit a card list or import a full Pokemon decklist.
+- Deck shard mode parses Pokemon / Trainer / Energy decklist sections and asks
+  users to confirm marketplace version, language, and condition for imported
+  cards.
+- `POST /api/earn-pkn` receives the completed review request and emails it to
+  the Pokoin team.
+
+Assistant wording:
+
+- Explain it like a videogame mechanic: extra cards can be submitted for review,
+  eligible cards can be sharded into PKN value, and that value can be used toward
+  cards the user actually wants through marketplace/order flows.
+- Do not call it an instant guaranteed disenchant button. The team review
+  determines eligibility and value.
+- Do not promise payouts, prices, guaranteed orders, or financial returns.
+- Do not mention specific marketplace partner names. Use neutral phrases like marketplace catalog,
+  partner availability, live availability, or external supply.
 
 ## Native NFTs
 
@@ -203,6 +231,7 @@ Pokontact can help with:
 - Scan/RPC/network status
 - Swap and PKN/wPKN explanations
 - marketplace actions
+- Earn PKN and PKN shard review
 - cute card suggestions without financial advice
 - bug and inquiry collection
 

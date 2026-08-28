@@ -1,0 +1,335 @@
+{
+  "generated_at": "2026-05-26T21:19:57.276Z",
+  "mode": "apply",
+  "source_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png",
+  "importer_cause": "CardTrader raw blueprint/delta import preserved blueprint.image_url fallback preview.png as image_url/cardtrader_image_url on 2026-05-17 before CDN normalization guards existed.",
+  "counts": {
+    "scanned": 1192,
+    "normalized": 1191,
+    "sourceMetadataOnly": 1192,
+    "skipped": 1,
+    "failed": 0
+  },
+  "samples": [
+    {
+      "id": "111077",
+      "name": "Champions Festival",
+      "before": {
+        "image_url": "",
+        "cdn_image_url": "",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "after": {
+        "image_url": "https://cdn.pokoin.com/111077_champions-festival-non-holo-promo-bw95-finalist-bw-black-star-promos.png",
+        "cdn_image_url": "https://cdn.pokoin.com/111077_champions-festival-non-holo-promo-bw95-finalist-bw-black-star-promos.png",
+        "cdn_object_key": "111077_champions-festival-non-holo-promo-bw95-finalist-bw-black-star-promos.png",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "action": "normalized-source-metadata"
+    },
+    {
+      "id": "111078",
+      "name": "Champions Festival",
+      "before": {
+        "image_url": "",
+        "cdn_image_url": "",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "after": {
+        "image_url": "https://cdn.pokoin.com/111078_champions-festival-non-holo-promo-bw95-champion-bw-black-star-promos.png",
+        "cdn_image_url": "https://cdn.pokoin.com/111078_champions-festival-non-holo-promo-bw95-champion-bw-black-star-promos.png",
+        "cdn_object_key": "111078_champions-festival-non-holo-promo-bw95-champion-bw-black-star-promos.png",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "action": "normalized-source-metadata"
+    },
+    {
+      "id": "113596",
+      "name": "Tropical Wind",
+      "before": {
+        "image_url": "",
+        "cdn_image_url": "",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "after": {
+        "image_url": "https://cdn.pokoin.com/113596_tropical-wind-non-holo-promo-dp05-semi-finalist-dp-black-star-promos.png",
+        "cdn_image_url": "https://cdn.pokoin.com/113596_tropical-wind-non-holo-promo-dp05-semi-finalist-dp-black-star-promos.png",
+        "cdn_object_key": "113596_tropical-wind-non-holo-promo-dp05-semi-finalist-dp-black-star-promos.png",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "action": "normalized-source-metadata"
+    },
+    {
+      "id": "113597",
+      "name": "Tropical Wind",
+      "before": {
+        "image_url": "",
+        "cdn_image_url": "",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "after": {
+        "image_url": "https://cdn.pokoin.com/113597_tropical-wind-non-holo-promo-dp05-finalist-dp-black-star-promos.png",
+        "cdn_image_url": "https://cdn.pokoin.com/113597_tropical-wind-non-holo-promo-dp05-finalist-dp-black-star-promos.png",
+        "cdn_object_key": "113597_tropical-wind-non-holo-promo-dp05-finalist-dp-black-star-promos.png",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "action": "normalized-source-metadata"
+    },
+    {
+      "id": "113623",
+      "name": "Tropical Wind",
+      "before": {
+        "image_url": "",
+        "cdn_image_url": "",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "after": {
+        "image_url": "https://cdn.pokoin.com/113623_tropical-wind-non-holo-promo-dp25-semi-finalist-dp-black-star-promos.png",
+        "cdn_image_url": "https://cdn.pokoin.com/113623_tropical-wind-non-holo-promo-dp25-semi-finalist-dp-black-star-promos.png",
+        "cdn_object_key": "113623_tropical-wind-non-holo-promo-dp25-semi-finalist-dp-black-star-promos.png",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "action": "normalized-source-metadata"
+    },
+    {
+      "id": "113624",
+      "name": "Tropical Wind",
+      "before": {
+        "image_url": "",
+        "cdn_image_url": "",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "after": {
+        "image_url": "https://cdn.pokoin.com/113624_tropical-wind-non-holo-promo-dp25-finalist-dp-black-star-promos.png",
+        "cdn_image_url": "https://cdn.pokoin.com/113624_tropical-wind-non-holo-promo-dp25-finalist-dp-black-star-promos.png",
+        "cdn_object_key": "113624_tropical-wind-non-holo-promo-dp25-finalist-dp-black-star-promos.png",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "action": "normalized-source-metadata"
+    },
+    {
+      "id": "113650",
+      "name": "Tropical Wind",
+      "before": {
+        "image_url": "",
+        "cdn_image_url": "",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "after": {
+        "image_url": "https://cdn.pokoin.com/113650_tropical-wind-non-holo-promo-dp48-top-sixteen-dp-black-star-promos.png",
+        "cdn_image_url": "https://cdn.pokoin.com/113650_tropical-wind-non-holo-promo-dp48-top-sixteen-dp-black-star-promos.png",
+        "cdn_object_key": "113650_tropical-wind-non-holo-promo-dp48-top-sixteen-dp-black-star-promos.png",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "action": "normalized-source-metadata"
+    },
+    {
+      "id": "113652",
+      "name": "Tropical Wind",
+      "before": {
+        "image_url": "",
+        "cdn_image_url": "",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "after": {
+        "image_url": "https://cdn.pokoin.com/113652_tropical-wind-non-holo-promo-dp48-semi-finalist-dp-black-star-promos.png",
+        "cdn_image_url": "https://cdn.pokoin.com/113652_tropical-wind-non-holo-promo-dp48-semi-finalist-dp-black-star-promos.png",
+        "cdn_object_key": "113652_tropical-wind-non-holo-promo-dp48-semi-finalist-dp-black-star-promos.png",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "action": "normalized-source-metadata"
+    },
+    {
+      "id": "113653",
+      "name": "Tropical Wind",
+      "before": {
+        "image_url": "",
+        "cdn_image_url": "",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "after": {
+        "image_url": "https://cdn.pokoin.com/113653_tropical-wind-non-holo-promo-dp48-finalist-dp-black-star-promos.png",
+        "cdn_image_url": "https://cdn.pokoin.com/113653_tropical-wind-non-holo-promo-dp48-finalist-dp-black-star-promos.png",
+        "cdn_object_key": "113653_tropical-wind-non-holo-promo-dp48-finalist-dp-black-star-promos.png",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "action": "normalized-source-metadata"
+    },
+    {
+      "id": "118533",
+      "name": "Double Colorless Energy",
+      "before": {
+        "image_url": "",
+        "cdn_image_url": "",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "after": {
+        "image_url": "https://cdn.pokoin.com/118533_double-colorless-energy-staff-international-championships-europe-90-108-evolutions-promos.png",
+        "cdn_image_url": "https://cdn.pokoin.com/118533_double-colorless-energy-staff-international-championships-europe-90-108-evolutions-promos.png",
+        "cdn_object_key": "118533_double-colorless-energy-staff-international-championships-europe-90-108-evolutions-promos.png",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "action": "normalized-source-metadata"
+    },
+    {
+      "id": "118535",
+      "name": "Double Colorless Energy",
+      "before": {
+        "image_url": "",
+        "cdn_image_url": "",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "after": {
+        "image_url": "https://cdn.pokoin.com/118535_double-colorless-energy-international-championships-europe-champion-90-108-evolutions-promos.png",
+        "cdn_image_url": "https://cdn.pokoin.com/118535_double-colorless-energy-international-championships-europe-champion-90-108-evolutions-promos.png",
+        "cdn_object_key": "118535_double-colorless-energy-international-championships-europe-champion-90-108-evolutions-promos.png",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "action": "normalized-source-metadata"
+    },
+    {
+      "id": "118539",
+      "name": "Double Colorless Energy",
+      "before": {
+        "image_url": "",
+        "cdn_image_url": "",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "after": {
+        "image_url": "https://cdn.pokoin.com/118539_double-colorless-energy-international-championships-oceania-champion-90-108-evolutions-promos.png",
+        "cdn_image_url": "https://cdn.pokoin.com/118539_double-colorless-energy-international-championships-oceania-champion-90-108-evolutions-promos.png",
+        "cdn_object_key": "118539_double-colorless-energy-international-championships-oceania-champion-90-108-evolutions-promos.png",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "action": "normalized-source-metadata"
+    },
+    {
+      "id": "118543",
+      "name": "Double Colorless Energy",
+      "before": {
+        "image_url": "",
+        "cdn_image_url": "",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "after": {
+        "image_url": "https://cdn.pokoin.com/118543_double-colorless-energy-international-championships-latin-america-champion-90-108-evolutions-promos.png",
+        "cdn_image_url": "https://cdn.pokoin.com/118543_double-colorless-energy-international-championships-latin-america-champion-90-108-evolutions-promos.png",
+        "cdn_object_key": "118543_double-colorless-energy-international-championships-latin-america-champion-90-108-evolutions-promos.png",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "action": "normalized-source-metadata"
+    },
+    {
+      "id": "118547",
+      "name": "Double Colorless Energy",
+      "before": {
+        "image_url": "",
+        "cdn_image_url": "",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "after": {
+        "image_url": "https://cdn.pokoin.com/118547_double-colorless-energy-international-championships-north-america-champion-90-108-evolutions-promos.png",
+        "cdn_image_url": "https://cdn.pokoin.com/118547_double-colorless-energy-international-championships-north-america-champion-90-108-evolutions-promos.png",
+        "cdn_object_key": "118547_double-colorless-energy-international-championships-north-america-champion-90-108-evolutions-promos.png",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "action": "normalized-source-metadata"
+    },
+    {
+      "id": "122705",
+      "name": "Typhlosion",
+      "before": {
+        "image_url": "",
+        "cdn_image_url": "",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "after": {
+        "image_url": "https://cdn.pokoin.com/122705_typhlosion-holo-promo-042-214-lost-thunder-promos.png",
+        "cdn_image_url": "https://cdn.pokoin.com/122705_typhlosion-holo-promo-042-214-lost-thunder-promos.png",
+        "cdn_object_key": "122705_typhlosion-holo-promo-042-214-lost-thunder-promos.png",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "action": "normalized-source-metadata"
+    },
+    {
+      "id": "124009",
+      "name": "Tropical Wind [Semi-Finalist]",
+      "before": {
+        "image_url": "",
+        "cdn_image_url": "",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "after": {
+        "image_url": "https://cdn.pokoin.com/124009_tropical-wind-semi-finalist-non-holo-promo-26-nintendo-black-star-promos.png",
+        "cdn_image_url": "https://cdn.pokoin.com/124009_tropical-wind-semi-finalist-non-holo-promo-26-nintendo-black-star-promos.png",
+        "cdn_object_key": "124009_tropical-wind-semi-finalist-non-holo-promo-26-nintendo-black-star-promos.png",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "action": "normalized-source-metadata"
+    },
+    {
+      "id": "124010",
+      "name": "Tropical Wind [Finalist]",
+      "before": {
+        "image_url": "",
+        "cdn_image_url": "",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "after": {
+        "image_url": "https://cdn.pokoin.com/124010_tropical-wind-finalist-non-holo-promo-26-nintendo-black-star-promos.png",
+        "cdn_image_url": "https://cdn.pokoin.com/124010_tropical-wind-finalist-non-holo-promo-26-nintendo-black-star-promos.png",
+        "cdn_object_key": "124010_tropical-wind-finalist-non-holo-promo-26-nintendo-black-star-promos.png",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "action": "normalized-source-metadata"
+    },
+    {
+      "id": "124014",
+      "name": "Tropical Tidal Wave",
+      "before": {
+        "image_url": "",
+        "cdn_image_url": "",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "after": {
+        "image_url": "https://cdn.pokoin.com/124014_tropical-tidal-wave-non-holo-promo-27-top-sixteen-nintendo-black-star-promos.png",
+        "cdn_image_url": "https://cdn.pokoin.com/124014_tropical-tidal-wave-non-holo-promo-27-top-sixteen-nintendo-black-star-promos.png",
+        "cdn_object_key": "124014_tropical-tidal-wave-non-holo-promo-27-top-sixteen-nintendo-black-star-promos.png",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "action": "normalized-source-metadata"
+    },
+    {
+      "id": "124015",
+      "name": "Tropical Tidal Wave",
+      "before": {
+        "image_url": "",
+        "cdn_image_url": "",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "after": {
+        "image_url": "https://cdn.pokoin.com/124015_tropical-tidal-wave-non-holo-promo-27-quarter-finalist-nintendo-black-star-promos.png",
+        "cdn_image_url": "https://cdn.pokoin.com/124015_tropical-tidal-wave-non-holo-promo-27-quarter-finalist-nintendo-black-star-promos.png",
+        "cdn_object_key": "124015_tropical-tidal-wave-non-holo-promo-27-quarter-finalist-nintendo-black-star-promos.png",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "action": "normalized-source-metadata"
+    },
+    {
+      "id": "124016",
+      "name": "Tropical Tidal Wave",
+      "before": {
+        "image_url": "",
+        "cdn_image_url": "",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "after": {
+        "image_url": "https://cdn.pokoin.com/124016_tropical-tidal-wave-non-holo-promo-27-semi-finalist-nintendo-black-star-promos.png",
+        "cdn_image_url": "https://cdn.pokoin.com/124016_tropical-tidal-wave-non-holo-promo-27-semi-finalist-nintendo-black-star-promos.png",
+        "cdn_object_key": "124016_tropical-tidal-wave-non-holo-promo-27-semi-finalist-nintendo-black-star-promos.png",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "action": "normalized-source-metadata"
+    }
+  ]
+}

@@ -2,7 +2,7 @@
   "asset": "wPKN",
   "assetName": "Wrapped PKN",
   "nativeAsset": "PKN",
-  "backingModel": "1 native PKN reserved for every 1 wPKN minted",
+  "backingModel": "Native PKN reserve allocation caps wPKN supply; this is not a fixed 1:1 market exchange rate",
   "reservedNativeAmount": "2000000",
   "reservedNativeDecimals": 18,
   "nativeChain": {
@@ -49,7 +49,7 @@
     }
   },
   "rules": [
-    "Circulating wPKN must never exceed reserved native PKN.",
+    "Circulating wPKN must never exceed the native PKN reserve allocation.",
     "wPKN ownership has been renounced, so no additional wPKN can be minted by an owner.",
     "The 2,000,000 wPKN supply is fixed at the contract max backed supply.",
     "If native PKN is released from reserve, the matching wPKN must be burned by holders or through market operations before reserve accounting is reduced."

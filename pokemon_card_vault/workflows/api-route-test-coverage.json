@@ -1,0 +1,210 @@
+{
+  "description": "Baseline for public manifest routes that do not yet have a direct api/<route>.test.js. New manifest routes must add a direct test or an explicit reviewed entry here.",
+  "coveredRouteExceptions": {
+    "cache-google-profile-picture.js": {
+      "path": "/api/cache-google-profile-picture",
+      "reason": "Legacy authenticated R2/avatar route; manifest loading, fallback packaging, and smoke safe-error paths are enforced until focused auth/R2 tests are added.",
+      "coveredBy": ["api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    },
+    "cardmarket-redirect.js": {
+      "path": "/api/cardmarket-redirect",
+      "reason": "Legacy redirect route with DB-backed behavior; manifest loading, fallback packaging, and smoke safe-error paths are enforced until redirect fixture tests are added.",
+      "coveredBy": ["api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    },
+    "cardmarket-scrape-observation.js": {
+      "path": "/api/cardmarket-scrape-observation",
+      "reason": "Legacy protected scrape review write route; manifest loading, fallback packaging, and smoke safe-error paths are enforced until auth/write tests are added.",
+      "coveredBy": ["api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    },
+    "cardtrader-clean-listings.js": {
+      "path": "/api/cardtrader-clean-listings",
+      "reason": "Legacy authenticated CardTrader cleanup route; manifest loading, fallback packaging, and smoke safe-error paths are enforced until seller auth tests are added.",
+      "coveredBy": ["api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    },
+    "cardtrader-disconnect.js": {
+      "path": "/api/cardtrader-disconnect",
+      "reason": "Legacy authenticated CardTrader disconnect route; manifest loading, fallback packaging, and smoke safe-error paths are enforced until Firebase auth tests are added.",
+      "coveredBy": ["api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    },
+    "cardtrader-import-dry-run.js": {
+      "path": "/api/cardtrader-import-dry-run",
+      "reason": "Legacy authenticated CardTrader import route; helper behavior is covered and manifest/package/smoke checks guard the route until handler fixture tests are added.",
+      "coveredBy": ["api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    },
+    "cardtrader-redirect.js": {
+      "path": "/api/cardtrader-redirect",
+      "reason": "Simple legacy redirect route; manifest loading, fallback packaging, and smoke safe-error paths are enforced until redirect tests are added.",
+      "coveredBy": ["api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    },
+    "cardtrader-status.js": {
+      "path": "/api/cardtrader-status",
+      "reason": "Legacy authenticated CardTrader status route; integration helper tests plus manifest/package/smoke checks cover the route until handler auth tests are added.",
+      "coveredBy": ["api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    },
+    "create-pkn-checkout-session.js": {
+      "path": "/api/create-pkn-checkout-session",
+      "reason": "Legacy Stripe checkout route; pricing helper and deploy-layout module-load tests exist, with manifest/package/smoke coverage until full Stripe handler tests are added.",
+      "coveredBy": ["auth-login.test.js", "api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    },
+    "crypto-pkn-purchase.js": {
+      "path": "/api/crypto-pkn-purchase/:action",
+      "reason": "Action route delegates quote logic to tested crypto helper; manifest/package/smoke coverage guards routing until handler action tests are added.",
+      "coveredBy": ["_crypto_pkn_purchase.test.js", "api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    },
+    "crypto-pkn-sale.js": {
+      "path": "/api/crypto-pkn-sale/:action",
+      "reason": "Action route shares tested crypto helper patterns; manifest/package/smoke coverage guards routing until sale handler action tests are added.",
+      "coveredBy": ["_crypto_pkn_purchase.test.js", "api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    },
+    "deck-card-version-lookup.js": {
+      "path": "/api/deck-card-version-lookup",
+      "reason": "Legacy deck lookup route is deploy-critical and smoke-covered; add direct query fixture tests before removing this baseline entry.",
+      "coveredBy": ["api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    },
+    "forum.js": {
+      "path": "/api/forum",
+      "reason": "Legacy Supabase forum read route; manifest loading, fallback packaging, and smoke safe-error paths are enforced until forum REST fixture tests are added.",
+      "coveredBy": ["api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    },
+    "forum-create-post.js": {
+      "path": "/api/forum-create-post",
+      "reason": "Legacy authenticated forum write route; manifest loading, fallback packaging, and smoke safe-error paths are enforced until auth/write tests are added.",
+      "coveredBy": ["api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    },
+    "forum-create-topic.js": {
+      "path": "/api/forum-create-topic",
+      "reason": "Legacy authenticated forum topic route; manifest loading, fallback packaging, and smoke safe-error paths are enforced until auth/write tests are added.",
+      "coveredBy": ["api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    },
+    "forum-upload-media.js": {
+      "path": "/api/forum-upload-media",
+      "reason": "Legacy authenticated R2 forum media route; manifest loading, fallback packaging, and smoke safe-error paths are enforced until media fixture tests are added.",
+      "coveredBy": ["api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    },
+    "marketplace-cardmarket-guess-review.js": {
+      "path": "/api/marketplace-cardmarket-guess-review",
+      "reason": "Protected Cardmarket review route; search debug auth helpers plus manifest/package/smoke checks guard it until direct review tests are added.",
+      "coveredBy": ["_search_debug_auth.test.js", "api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    },
+    "marketplace-debug-events.js": {
+      "path": "/api/marketplace-debug-events",
+      "reason": "Protected marketplace debug route; search debug auth helpers plus manifest/package/smoke checks guard it until direct debug tests are added.",
+      "coveredBy": ["_search_debug_auth.test.js", "api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    },
+    "marketplace-debug-refinement.js": {
+      "path": "/api/marketplace-debug-refinement",
+      "reason": "Protected refinement debug route; search debug auth helpers plus manifest/package/smoke checks guard it until direct refinement tests are added.",
+      "coveredBy": ["_search_debug_auth.test.js", "api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    },
+    "marketplace-hot-blueprints.js": {
+      "path": "/api/marketplace-hot-blueprints",
+      "reason": "Read-heavy analytics route; manifest/package/smoke checks and schema migration tracking guard it until query fixture tests are added.",
+      "coveredBy": ["api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    },
+    "social-autopost.js": {
+      "path": "/api/social-autopost",
+      "reason": "Protected social dispatcher with helper tests; manifest/package/smoke checks guard the route until provider-free handler tests are added.",
+      "coveredBy": ["_social_autoposter.test.js", "api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    },
+    "social-autopost-hot-card.js": {
+      "path": "/api/social-autopost/hot-card",
+      "reason": "Protected social hot-card route with helper coverage; manifest/package/smoke checks guard the route until handler fixture tests are added.",
+      "coveredBy": ["_social_autoposter.test.js", "api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    },
+    "social-post-agent.js": {
+      "path": "/api/social-post-agent",
+      "reason": "Protected social copy route with helper coverage; manifest/package/smoke checks guard the route until handler fixture tests are added.",
+      "coveredBy": ["_social_autoposter.test.js", "api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    },
+    "register-email.js": {
+      "path": "/api/register-email",
+      "reason": "Legacy email signup route; manifest loading, fallback packaging, and smoke safe-error paths are enforced until pending-signup tests are added.",
+      "coveredBy": ["api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    },
+    "remove-profile-picture.js": {
+      "path": "/api/remove-profile-picture",
+      "reason": "Legacy authenticated R2/avatar route; manifest loading, fallback packaging, and smoke safe-error paths are enforced until R2 auth tests are added.",
+      "coveredBy": ["api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    },
+    "request-pkn-withdraw.js": {
+      "path": "/api/request-pkn-withdraw",
+      "reason": "Legacy authenticated native PKN route; native helper coverage and manifest/package/smoke checks guard it until handler tests are added.",
+      "coveredBy": ["api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    },
+    "search-recipient-emails.js": {
+      "path": "/api/search-recipient-emails",
+      "reason": "Legacy Firebase username route; manifest loading, fallback packaging, and smoke safe-error paths are enforced until username fixture tests are added.",
+      "coveredBy": ["api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    },
+    "searchbar-cancel.js": {
+      "path": "/api/searchbar-cancel",
+      "reason": "Small search session control route; search session behavior is covered indirectly and manifest/package/smoke checks guard routing.",
+      "coveredBy": ["searchbar-cards.test.js", "api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    },
+    "signup-notification.js": {
+      "path": "/api/signup-notification",
+      "reason": "Legacy authenticated email notification route; manifest loading, fallback packaging, and smoke safe-error paths are enforced until email fixture tests are added.",
+      "coveredBy": ["api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    },
+    "stripe-webhook.js": {
+      "path": "/api/stripe-webhook",
+      "reason": "Raw-body webhook has Oracle adapter smoke and deploy-layout module-load coverage; add full Stripe fixture tests before removing this baseline entry.",
+      "coveredBy": ["api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    },
+    "top-up-account-balance.js": {
+      "path": "/api/top-up-account-balance",
+      "reason": "Legacy authenticated native PKN route; native helper coverage and manifest/package/smoke checks guard it until handler tests are added.",
+      "coveredBy": ["api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    },
+    "transfer-account-balance.js": {
+      "path": "/api/transfer-account-balance",
+      "reason": "Legacy authenticated Firebase balance route; manifest loading, fallback packaging, and smoke safe-error paths are enforced until transfer fixture tests are added.",
+      "coveredBy": ["api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    },
+    "unlock-silver.js": {
+      "path": "/api/unlock-silver",
+      "reason": "Legacy authenticated Firebase route; manifest loading, fallback packaging, and smoke safe-error paths are enforced until handler tests are added.",
+      "coveredBy": ["api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    },
+    "upload-profile-picture.js": {
+      "path": "/api/upload-profile-picture",
+      "reason": "Legacy authenticated R2/avatar upload route; manifest loading, fallback packaging, and smoke safe-error paths are enforced until media fixture tests are added.",
+      "coveredBy": ["api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    },
+    "verify-email-signup.js": {
+      "path": "/api/verify-email-signup",
+      "reason": "Legacy pending signup route; manifest loading, fallback packaging, and smoke safe-error paths are enforced until pending-signup tests are added.",
+      "coveredBy": ["api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    },
+    "wallet-auth-nonce.js": {
+      "path": "/api/wallet-auth/nonce",
+      "reason": "Legacy wallet auth route; deploy script explicitly guards compiled endpoint presence and manifest/smoke checks guard routing until wallet fixture tests are added.",
+      "coveredBy": ["api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    },
+    "wallet-auth-verify.js": {
+      "path": "/api/wallet-auth/verify",
+      "reason": "Legacy wallet auth route; deploy script explicitly guards compiled endpoint presence and manifest/smoke checks guard routing until wallet fixture tests are added.",
+      "coveredBy": ["api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    },
+    "wallet-link.js": {
+      "path": "/api/wallet-link",
+      "reason": "Legacy authenticated wallet link route; manifest loading, fallback packaging, and smoke safe-error paths are enforced until wallet fixture tests are added.",
+      "coveredBy": ["api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    },
+    "wallet-link-complete.js": {
+      "path": "/api/wallet-link/complete",
+      "reason": "Legacy wallet-link completion route; manifest loading, fallback packaging, and smoke safe-error paths are enforced until wallet fixture tests are added.",
+      "coveredBy": ["api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    },
+    "wallet-link-session.js": {
+      "path": "/api/wallet-link/session",
+      "reason": "Legacy wallet-link session route; manifest loading, fallback packaging, and smoke safe-error paths are enforced until wallet fixture tests are added.",
+      "coveredBy": ["api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    },
+    "wpkn-exchange.js": {
+      "path": "/api/wpkn-exchange/:action",
+      "reason": "Action route delegates exchange logic to shared helpers; manifest/package/smoke coverage guards routing until direct action tests are added.",
+      "coveredBy": ["api:check", "api:smoke", "api/pokoin-checkout-deploy-layout.test.js"]
+    }
+  }
+}

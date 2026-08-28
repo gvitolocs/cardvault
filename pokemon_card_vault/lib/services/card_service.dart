@@ -1333,6 +1333,49 @@ class SearchTokenPredictionResult {
   final SearchTokenPredictionContext? context;
 }
 
+class SearchFirstCharWarmupResult {
+  const SearchFirstCharWarmupResult({
+    required this.language,
+    required this.generatedAtMs,
+    this.sourceLanguage = '',
+    this.suggestions = const {},
+  });
+
+  factory SearchFirstCharWarmupResult.fromJson(Map<String, dynamic> json) {
+    final suggestionsJson = json['suggestions'];
+    final suggestions = <String, SearchPredictedNameToken>{};
+    if (suggestionsJson is Map) {
+      suggestionsJson.forEach((key, value) {
+        final letter = _compactTokenPredictionText('$key');
+        if (letter.length != 1 || value is! Map) {
+          return;
+        }
+        final token = SearchPredictedNameToken.fromJson(
+          Map<String, dynamic>.from(value),
+          source: 'first_char_warmup',
+        );
+        if (token.normalized.isNotEmpty && token.display.isNotEmpty) {
+          suggestions[letter] = token;
+        }
+      });
+    }
+    return SearchFirstCharWarmupResult(
+      language: '${json['language'] ?? ''}'.trim(),
+      sourceLanguage:
+          '${json['source_language'] ?? json['sourceLanguage'] ?? ''}'.trim(),
+      generatedAtMs: (json['generated_at_ms'] as num?)?.toInt() ??
+          (json['generatedAtMs'] as num?)?.toInt() ??
+          0,
+      suggestions: Map.unmodifiable(suggestions),
+    );
+  }
+
+  final String language;
+  final String sourceLanguage;
+  final int generatedAtMs;
+  final Map<String, SearchPredictedNameToken> suggestions;
+}
+
 List<String> _stringListFromJson(Object? value, {int limit = 8}) {
   if (value is! List) {
     return const [];
@@ -1976,6 +2019,13 @@ class CardService {
   }
 
   @visibleForTesting
+  SearchFirstCharWarmupResult firstCharWarmupResultFromJsonForTest(
+    Map<String, dynamic> json,
+  ) {
+    return SearchFirstCharWarmupResult.fromJson(json);
+  }
+
+  @visibleForTesting
   List<String> searchQueryVariantsForTest(String query) {
     return _searchQueryVariants([query]);
   }
@@ -2067,6 +2117,9 @@ class CardService {
     final listedPrice = _readMarketplaceTilePrice(row);
     final hasCardTraderListing = _readCardTraderAvailability(row);
     final cardTraderListingCount = _readCardTraderEligibleListingCount(row);
+    final isGraded = _readBoolish(
+      row['isGraded'] ?? row['is_graded'] ?? row['graded'],
+    );
     final artist = _cleanLabel(
       row['artist'] ?? row['illustrator'],
       fallback: '',
@@ -2103,7 +2156,12 @@ class CardService {
         if (trainerName.isNotEmpty) trainerName,
       ],
       condition: 'NM',
-      isGraded: false,
+      isGraded: isGraded,
+      grade: _cleanLabel(row['grade'], fallback: ''),
+      gradingCompany: _cleanLabel(
+        row['gradingCompany'] ?? row['grading_company'],
+        fallback: '',
+      ),
       itemKind: itemKind,
       productType: productType,
       trainerName: trainerName,
@@ -2157,6 +2215,9 @@ class CardService {
     final listedPrice = _readMarketplaceTilePrice(row);
     final hasCardTraderListing = _readCardTraderAvailability(row);
     final cardTraderListingCount = _readCardTraderEligibleListingCount(row);
+    final isGraded = _readBoolish(
+      row['isGraded'] ?? row['is_graded'] ?? row['graded'],
+    );
     final artist = _cleanLabel(
       row['artist'] ?? row['illustrator'],
       fallback: '',
@@ -2193,7 +2254,12 @@ class CardService {
         if (trainerName.isNotEmpty) trainerName,
       ],
       condition: 'NM',
-      isGraded: false,
+      isGraded: isGraded,
+      grade: _cleanLabel(row['grade'], fallback: ''),
+      gradingCompany: _cleanLabel(
+        row['gradingCompany'] ?? row['grading_company'],
+        fallback: '',
+      ),
       itemKind: itemKind,
       productType: productType,
       trainerName: trainerName,
@@ -3659,6 +3725,29 @@ class CardService {
     }
   }
 
+  Future<List<PokemonCard>> getMarketplaceGradedCards({
+    int limit = 240,
+  }) async {
+    final cacheKey = 'product:graded:$limit';
+    final cached = await _cachedCardList(cacheKey);
+    try {
+      final cards = await _searchMarketplaceCardVersions(
+        '',
+        limit: limit,
+        productType: 'card',
+        productCategory: 'graded',
+      );
+      if (cards.isNotEmpty) {
+        await _saveCardList(cacheKey, cards);
+        await _mergeCardsToLocal(cards);
+      }
+      return cards.isEmpty ? cached : cards;
+    } catch (error) {
+      debugPrint('Graded marketplace cards failed: $error');
+      return cached;
+    }
+  }
+
   Future<List<MarketplaceProductFacet>> getMarketplaceProductFacets({
     String query = '',
     String searchLanguage = 'en',
@@ -3670,7 +3759,7 @@ class CardService {
         queryParameters['query'] = normalizedQuery;
       }
       if (_tcgdexLanguage(searchLanguage) != 'en') {
-        queryParameters['lang'] = _tcgdexLanguage(searchLanguage);
+        queryParameters['search_language'] = _tcgdexLanguage(searchLanguage);
       }
       final uri = Uri.base.resolve('/api/marketplace-cards').replace(
             queryParameters: queryParameters,
@@ -4014,6 +4103,61 @@ class CardService {
     }
   }
 
+  Future<SearchFirstCharWarmupResult> warmSearchFirstCharNameTokens({
+    int limit = 1,
+    String searchLanguage = 'en',
+  }) async {
+    try {
+      final trace = SearchDebugTrace.instance;
+      final normalizedLanguage = _tcgdexLanguage(searchLanguage);
+      final cleanLimit = math.min(math.max(limit, 1), 5);
+      final started = DateTime.now();
+      trace.record('service.token_warmup.request', {
+        'limit': cleanLimit,
+        'language': normalizedLanguage,
+      });
+      final uri = Uri.base.resolve('/api/searchbar-token-predict').replace(
+        queryParameters: {
+          'warmup': '1',
+          'limit': '$cleanLimit',
+          'search_language': normalizedLanguage,
+        },
+      );
+      final response = await http.get(uri).timeout(const Duration(seconds: 2));
+      trace.record('service.token_warmup.response', {
+        'statusCode': response.statusCode,
+        'elapsedMs': DateTime.now().difference(started).inMilliseconds,
+        'payloadBytes': response.bodyBytes.length,
+        'serverTiming': response.headers['server-timing'],
+      });
+      if (response.statusCode >= 400) {
+        debugPrint('Search token warmup failed: ${response.statusCode}');
+        return SearchFirstCharWarmupResult(
+          language: normalizedLanguage,
+          generatedAtMs: 0,
+        );
+      }
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        return SearchFirstCharWarmupResult(
+          language: normalizedLanguage,
+          generatedAtMs: 0,
+        );
+      }
+      return SearchFirstCharWarmupResult.fromJson(decoded);
+    } catch (error) {
+      SearchDebugTrace.instance.record('service.token_warmup.error', {
+        'language': searchLanguage,
+        'error': '$error',
+      });
+      debugPrint('Search token warmup failed: $error');
+      return SearchFirstCharWarmupResult(
+        language: _tcgdexLanguage(searchLanguage),
+        generatedAtMs: 0,
+      );
+    }
+  }
+
   List<SearchPredictedNameToken> _predictedNameTokensFromResponse(
     Object? decoded,
     SearchAutocompleteContext? context,
@@ -4279,76 +4423,7 @@ class CardService {
   }
 
   String _readEmoji(Map<String, dynamic> row) {
-    final identity = _readEmojiList(
-      row['cardIdentityEmojis'] ?? row['card_identity_emojis'],
-    );
-    final identityText =
-        '${row['cardIdentityEmoji'] ?? row['card_identity_emoji'] ?? ''}';
-    if (identity.isEmpty && identityText.trim().isNotEmpty) {
-      identity.addAll(_splitEmojiText(identityText));
-    }
-
-    final fallback = _splitEmojiText(row['emoji']);
-    final tokens = <String>[];
-    for (final token in identity) {
-      if (_genericIdentityEmojis.contains(token)) {
-        continue;
-      }
-      if (!tokens.contains(token)) {
-        tokens.add(token);
-      }
-      if (tokens.length == 2) {
-        break;
-      }
-    }
-    if (tokens.length < 2) {
-      for (final token
-          in fallback.where((token) => !_variantEmojis.contains(token))) {
-        if (_genericIdentityEmojis.contains(token)) {
-          continue;
-        }
-        if (!tokens.contains(token)) {
-          tokens.add(token);
-        }
-        if (tokens.length == 2) {
-          break;
-        }
-      }
-    }
-    if (tokens.length < 2) {
-      for (final token in _fallbackIdentityEmojis(row)) {
-        if (!tokens.contains(token)) {
-          tokens.add(token);
-        }
-        if (tokens.length == 2) {
-          break;
-        }
-      }
-    }
-
-    final variantTokens = _splitEmojiText(
-      row['rarityVariantEmoji'] ??
-          row['rarity_variant_emoji'] ??
-          row['variantEmoji'] ??
-          row['variant_emoji'],
-    );
-    final variant = (variantTokens.isNotEmpty ? variantTokens.first : null) ??
-        _rarityVariantEmoji(row) ??
-        fallback.firstWhere(
-          (token) => _variantEmojis.contains(token),
-          orElse: () => '',
-        );
-    if (variant.isNotEmpty) {
-      tokens.add(variant);
-    }
-    return tokens.join(' ').trim();
-  }
-
-  List<String> _readEmojiList(Object? value) {
-    if (value is! List) {
-      return <String>[];
-    }
-    return value.expand(_splitEmojiText).toList(growable: true);
+    return _splitEmojiText(row['emoji']).join(' ').trim();
   }
 
   List<String> _splitEmojiText(Object? value) {
@@ -4365,110 +4440,6 @@ class CardService {
         .where((token) => token.isNotEmpty)
         .toList(growable: false);
   }
-
-  List<String> _fallbackIdentityEmojis(Map<String, dynamic> row) {
-    final text = '${row['name'] ?? ''} ${row['card_type'] ?? row['type'] ?? ''}'
-        .toLowerCase();
-    if (RegExp(r'camerupt|numel').hasMatch(text)) {
-      return const ['🐫', '🌋'];
-    }
-    if (RegExp(r'sharpedo|carvanha').hasMatch(text)) {
-      return const ['🦈', '🌊'];
-    }
-    if (text.contains('regirock')) {
-      return const ['🪨', '🌟'];
-    }
-    if (RegExp(
-            r'leafeon|eevee|vaporeon|jolteon|flareon|espeon|umbreon|glaceon|sylveon')
-        .hasMatch(text)) {
-      return const ['🦊', '✨'];
-    }
-    if (RegExp(
-            r'drifloon|drifblim|gastly|haunter|gengar|mismagius|mimikyu|duskull|dusknoir')
-        .hasMatch(text)) {
-      return const ['👻', '🌫️'];
-    }
-    if (RegExp(
-            r'meltan|melmetal|magnemite|magneton|magnezone|beldum|metang|metagross|klink|klang|klinklang')
-        .hasMatch(text)) {
-      return const ['⚙️', '🔩'];
-    }
-    if (text.contains('cresselia')) {
-      return const ['🌙', '🔮'];
-    }
-    if (RegExp(r'mewtwo|mew|lunala|solgaleo|jirachi|celebi').hasMatch(text)) {
-      return const ['🔮', '✨'];
-    }
-    if (RegExp(r'dragon|charizard|dragonite|rayquaza|salamence|garchomp|kyurem')
-        .hasMatch(text)) {
-      return const ['🐉', '🔥'];
-    }
-    return const ['🃏', '✨'];
-  }
-
-  String? _rarityVariantEmoji(Map<String, dynamic> row) {
-    final text = [
-      row['rarity'],
-      row['product_variant'],
-      row['productVariant'],
-      row['number'],
-      row['card_number'],
-      row['expansion_number'],
-      row['name'],
-    ].map((value) => '${value ?? ''}'.toLowerCase()).join(' ');
-    if (RegExp(r'promo|stamped|stamp').hasMatch(text)) return '🎟️';
-    if (RegExp(
-            r'special illustration rare|special art rare|illustration rare|art rare|alternate art|alt art|full[- ]?art')
-        .hasMatch(text)) {
-      return '🎨';
-    }
-    if (RegExp(r'gold secret|secret rare|hyper rare|gold').hasMatch(text)) {
-      return '🏆';
-    }
-    if (RegExp(r'shining|shiny|holo|foil|reverse').hasMatch(text)) return '✨';
-    if (RegExp(r'(^|[^a-z0-9])(vmax|v max)([^a-z0-9]|$)').hasMatch(text)) {
-      return '👑';
-    }
-    if (RegExp(r'(^|[^a-z0-9])(vstar|v star)([^a-z0-9]|$)').hasMatch(text)) {
-      return '🌟';
-    }
-    if (RegExp(r'(^|[^a-z0-9])(gx|g x)([^a-z0-9]|$)').hasMatch(text)) {
-      return '💥';
-    }
-    if (RegExp(r'(^|[^a-z0-9])(ex|e x)([^a-z0-9]|$)').hasMatch(text)) {
-      return '💎';
-    }
-    if (RegExp(r'(^|[^a-z0-9])rare([^a-z0-9]|$)').hasMatch(text)) return '⭐';
-    if (RegExp(r'(^|[^a-z0-9])uncommon([^a-z0-9]|$)').hasMatch(text)) {
-      return '🔷';
-    }
-    if (RegExp(r'(^|[^a-z0-9])common([^a-z0-9]|$)').hasMatch(text)) return '⚪';
-    return null;
-  }
-
-  static const Set<String> _variantEmojis = {
-    '👑',
-    '🌟',
-    '💥',
-    '💎',
-    '⬆️',
-    '🛡️',
-    '✨',
-    '🌈',
-    '🔺',
-    '🔻',
-    '🤝',
-    '🏅',
-    '⚡',
-    '🎨',
-    '🎟️',
-    '🏆',
-    '⭐',
-    '🔷',
-    '⚪',
-  };
-
-  static const Set<String> _genericIdentityEmojis = {'🃏'};
 
   String _cleanCanonicalPath(Map<String, dynamic> row) {
     final text =
@@ -4503,6 +4474,17 @@ class CardService {
       return value.toInt();
     }
     return int.tryParse('${value ?? ''}'.trim()) ?? 0;
+  }
+
+  bool _readBoolish(Object? value) {
+    if (value is bool) {
+      return value;
+    }
+    if (value is num) {
+      return value > 0;
+    }
+    final text = '${value ?? ''}'.trim().toLowerCase();
+    return const {'true', '1', 'yes', 'y'}.contains(text);
   }
 
   double? _readMarketplaceTilePrice(Map<String, dynamic> row) {
@@ -4582,7 +4564,7 @@ class CardService {
         queryParameters['query'] = normalizedQuery;
       }
       if (_tcgdexLanguage(searchLanguage) != 'en') {
-        queryParameters['lang'] = _tcgdexLanguage(searchLanguage);
+        queryParameters['search_language'] = _tcgdexLanguage(searchLanguage);
       }
       if (searchSessionId?.trim().isNotEmpty == true) {
         queryParameters['search_session_id'] = searchSessionId!.trim();
@@ -4612,6 +4594,7 @@ class CardService {
     String normalizedQuery, {
     required int limit,
     String? productType,
+    String? productCategory,
     String searchLanguage = 'en',
     String? searchSessionId,
   }) async {
@@ -4620,6 +4603,11 @@ class CardService {
       final normalizedProductType = productType?.trim();
       if (normalizedProductType != null && normalizedProductType.isNotEmpty) {
         queryParameters['productType'] = normalizedProductType;
+      }
+      final normalizedProductCategory = productCategory?.trim();
+      if (normalizedProductCategory != null &&
+          normalizedProductCategory.isNotEmpty) {
+        queryParameters['productCategory'] = normalizedProductCategory;
       }
       if (normalizedQuery.isNotEmpty) {
         queryParameters['query'] = normalizedQuery;

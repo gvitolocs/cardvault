@@ -1,0 +1,69 @@
+---
+description: Honcho + Codevira memory boundaries for Pokoin/Cursor coding
+alwaysApply: true
+---
+
+# Memory usage rules
+
+This project uses **Honcho** (cloud conversational memory), **Codevira** (structured project memory), and a **short Flareon handoff** (summary for Giuseppe's operator bot).
+
+## Memory layers (what goes where)
+
+| Layer | Where | What belongs |
+|-------|--------|----------------|
+| Pokoin Cursor (detail) | Honcho `pokoin-cursor` + Codevira + `memory/` | Conversations, decisions, architecture notes, coding context |
+| Flareon awareness (summary) | `memory/flareon-handoff.md` → peer1 `/opt/hermes-flareon/data/pokoin-handoff.md` | What you are working on, recent Cursor topics, blockers — **no code dumps** |
+| Hermes personal / operator | Honcho `hermes-peer1` (Hermes repo) | Personal goals, Flareon ops, non-Pokoin life — not full Pokoin codebase |
+
+**Not** “Flareon must never know about Pokoin.” Flareon **should** know what project and topics you care about — via the handoff file, not via copying entire Cursor threads or files into `hermes-peer1`.
+
+## Honcho workspaces (same account, different buckets)
+
+- `pokoin-cursor` — global Cursor MCP `honcho` + this repo’s `.env.honcho.local` override
+- `hermes-peer1` — Hermes/Flareon bots (do not paste Pokoin code here)
+
+## Use Honcho (pokoin-cursor) for
+
+- Recalling previous **Cursor** conversations about this codebase
+- Informal project context and preferences
+- Why certain choices were made (narrative memory)
+- Cross-session **coding** memory (summaries OK; avoid storing huge pasted files)
+
+## Use Codevira for
+
+- Structured project state and roadmap
+- Decision log (`codevira list-decisions`, `.codevira/decisions.jsonl`)
+- Implementation notes and locked conventions (`AGENTS.md`)
+- Current coding context that must stay precise
+
+## Use `memory/flareon-handoff.md` for
+
+- 5–20 bullets for Flareon: project, focus, recent Cursor themes, blockers
+- **Never** paste full files or long diffs
+- After updating, run: `./scripts/sync-flareon-handoff-peer1.sh`
+
+## Before meaningful coding changes
+
+1. Search/recall **Honcho** (`honcho-pokoin`) for relevant Cursor context.
+2. Check **Codevira** if available.
+3. Read relevant `memory/*.md` files.
+4. Inspect the actual code before editing.
+
+## After meaningful coding changes
+
+1. Save a concise update to **Honcho** (what changed and why — summary, not whole files).
+2. Update **Codevira** if roadmap/decisions/conventions changed.
+3. Update `memory/*.md` when architecture, security, bugs, or current state changed.
+4. Update **`memory/flareon-handoff.md`** when Flareon should know your current focus; sync to peer1.
+
+## Critical areas (extra care)
+
+- Stripe payments, user balance, PKN/wallet, authentication, DB migrations, blockchain, marketplace purchase flow
+- Never assume from memory alone; server-side source of truth; small diffs; explain risk first
+
+## Secrets
+
+- Do not commit API keys. Full **paths-only** map: `memory/secrets-workflow.md` and Codevira `AGENTS.md` (`D000001`–`D000004`).
+- Honcho Cursor: global `~/.cursor/mcp.json`; this repo sets workspace in `.env.honcho.local` (`pokoin-cursor`). Install: `~/Hermes/scripts/install-honcho-mcp.sh`.
+- Hermes/Flareon operator: `~/Hermes/private/flareon/` — see `~/Hermes/docs/flareon-secrets.md`.
+- Pokoin app runtime: `pokemon_card_vault/.env.local` — not in Flareon folder.

@@ -1,0 +1,17 @@
+[Unit]
+Description=Meilisearch service (Pokemon Card Vault)
+After=network.target
+
+[Service]
+Type=simple
+User=meili
+Group=meili
+WorkingDirectory=/opt/meilisearch
+EnvironmentFile=/etc/pokemon-card-vault/meili.env
+ExecStart=/usr/local/bin/meilisearch --config-file-path /etc/pokemon-card-vault/meili.toml
+Restart=on-failure
+RestartSec=3
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

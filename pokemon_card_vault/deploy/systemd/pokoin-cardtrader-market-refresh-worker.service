@@ -1,0 +1,37 @@
+[Unit]
+Description=Pokoin CardTrader durable market refresh worker
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+WorkingDirectory=/home/ubuntu/pokoin-oracle-api/current
+ExecStart=/usr/bin/docker run --rm --name pokoin-cardtrader-market-refresh-worker \
+  --env-file /home/ubuntu/pokoin-oracle-api/.env \
+  -e PROJECT_DIR=/app \
+  -e CARDTRADER_MARKET_REFRESH_ENV_FILE=/app/.env \
+  -e CARDTRADER_MARKET_STATE_DIR=/state \
+  -e CARDTRADER_MARKET_STATE_FILE=/state/state.json \
+  -e CARDTRADER_MARKET_LOG_DIR=/logs \
+  -e CARDTRADER_MARKET_LOG_FILE=/logs/worker.log \
+  -e CARDTRADER_MARKET_MAX_BLUEPRINTS=100000 \
+  -e CARDTRADER_MARKET_MAX_PRODUCTS=1000000 \
+  -e CARDTRADER_MARKET_REFRESH_BATCH_BLUEPRINTS=700 \
+  -e CARDTRADER_MARKET_BLUEPRINT_CONCURRENCY=1 \
+  -e CARDTRADER_MARKET_REQUEST_DELAY_MS=300 \
+  -e CARDTRADER_MARKET_RUN_ONCE=1 \
+  -v /home/ubuntu/pokoin-oracle-api/current:/app \
+  -v /home/ubuntu/pokoin-oracle-api/.env:/app/.env:ro \
+  -v /home/ubuntu/pokoin-oracle-api/deploy/cardtrader-market-refresh/state:/state \
+  -v /home/ubuntu/pokoin-oracle-api/deploy/cardtrader-market-refresh/logs:/logs \
+  -v /home/ubuntu/pokoin-oracle-api/deploy/cardtrader-market-refresh/cardtrader-market-refresh-worker.js:/runner/cardtrader-market-refresh-worker.js:ro \
+  -w /app \
+  node:20-bookworm node /runner/cardtrader-market-refresh-worker.js
+ExecStop=/usr/bin/docker stop -t 30 pokoin-cardtrader-market-refresh-worker
+Restart=on-failure
+RestartSec=60
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

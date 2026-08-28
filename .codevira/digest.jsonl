@@ -1,0 +1,5 @@
+{"id":"D000001","summary":"Cursor Honcho MCP uses peer1 self-hosted Docker via SSH tunnel (:18765) and…","tags":["cardvault","honcho","secrets"],"file":".env.honcho.local","do_not_revert":true,"weight":0.5}
+{"id":"D000002","summary":"Hermes/Flareon operator secrets live only in ~/Hermes/private/flareon/ (local)…","tags":["flareon","hermes","secrets"],"file":"docs/flareon-secrets.md","do_not_revert":true,"weight":0.5}
+{"id":"D000003","summary":"Flareon Pokoin awareness without code dumps: edit…","tags":["flareon","memory","pokoin"],"file":"memory/flareon-handoff.md","do_not_revert":true,"weight":0.5}
+{"id":"D000004","summary":"Pokoin app runtime secrets (Stripe, DB, Oracle API) belong in…","tags":["pokoin","secrets","security"],"file":"pokemon_card_vault/.env.local","do_not_revert":true,"weight":0.5}
+{"id":"D000005","summary":"Production English marketplace autocomplete/searchbar uses Meilisearch for…","tags":["meili","pokoin","production","search"],"file":"pokemon_card_vault/workflows/meilisearch-peer-workflow.md","do_not_revert":true,"weight":0.5}

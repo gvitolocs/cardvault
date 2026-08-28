@@ -4,15 +4,33 @@
   "scripts": {
     "api:docs": "node scripts/generate-api-docs.js",
     "api:server": "node server/oracle-api-server.js",
-    "api:check": "node scripts/check-oracle-api-server.js",
+    "api:check": "node scripts/check-oracle-api-server.js && npm run api:lint && npm run api:coverage && npm run api:migrations:check",
+    "api:lint": "node scripts/check-api-guardrails.js",
+    "api:coverage": "node scripts/check-api-route-tests.js",
+    "api:migrations:check": "node scripts/check-oracle-migrations.js",
     "api:smoke": "node scripts/smoke-oracle-api-routes.js",
+    "prisma:validate": "prisma validate",
+    "prisma:pull": "prisma db pull",
+    "prisma:generate": "prisma generate",
+    "prisma:sync": "npm run prisma:pull && npm run prisma:generate",
+    "prisma:smoke": "node scripts/check-prisma-oracle.js",
+    "prisma:studio": "prisma studio",
+    "meili:sync:full": "node scripts/meili-sync-marketplace-full.js && node scripts/meili-sync-name-tokens-full.js",
+    "meili:sync:delta": "node scripts/meili-sync-marketplace-delta.js",
+    "meili:peer:install": "bash deploy/meili/install-meili-peer.sh",
     "trainingai:best-images": "node scripts/generate-trainingai-best-blueprint-images.js",
     "peer3:bundle": "bash scripts/package-oracle-api-service.sh",
-    "peer3:deploy": "bash scripts/deploy-oracle-api-peer3.sh"
+    "peer3:deploy": "bash scripts/deploy-oracle-api-peer3.sh",
+    "codex:cursor-proxy": "bash scripts/start-codex-cursor-proxy.sh",
+    "codex:cursor-proxy:install-launchagent": "bash scripts/install-codex-cursor-proxy-launchagent.sh"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1048.0",
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "bignumber.js": "^11.1.1",
     "bitcoinjs-lib": "^7.0.1",
+    "dotenv": "^17.4.2",
     "ecpair": "^3.0.1",
     "ethers": "^6.16.0",
     "firebase-admin": "^13.6.0",
@@ -20,5 +38,8 @@
     "sharp": "^0.34.5",
     "stripe": "^20.1.0",
     "tiny-secp256k1": "^2.2.4"
+  },
+  "devDependencies": {
+    "prisma": "^7.8.0"
   }
 }

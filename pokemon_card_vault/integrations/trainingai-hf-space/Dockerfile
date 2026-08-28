@@ -7,13 +7,14 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends git libgomp1 \
+  && apt-get install -y --no-install-recommends git libgomp1 tesseract-ocr \
   && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
-COPY app.py .
+COPY app.py meili_rerank.py ./
+COPY best-blueprint-images.json .
 COPY data ./data
 
 EXPOSE 7860

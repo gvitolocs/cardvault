@@ -4,6 +4,11 @@ Use this workflow when changing marketplace/catalog/search storage, migrating
 data from Supabase, deploying Oracle-backed marketplace APIs, or cleaning up old
 Supabase marketplace objects.
 
+> English-only Meilisearch rollout note: when `MARKETPLACE_SEARCH_ENGINE=meili`,
+> only `search_language=en` requests can use Meili candidate retrieval. All
+> non-English requests remain on Oracle/Supabase legacy paths. See
+> `workflows/meilisearch-peer-workflow.md` for cutover and rollback.
+
 ## Current Architecture
 
 - Oracle Postgres is the source of truth for marketplace/catalog/search data.
@@ -121,6 +126,96 @@ store user data, listings, prices, events, full blueprint JSON, or marketplace
 write surfaces. Oracle peer4 remains the source of truth; peer3/peer2/peer1
 remain the Oracle read/fanout fallback architecture.
 
+## Multilingual Search Data
+
+Oracle keeps multilingual card-name search data in
+`marketplace_card_name_translations` plus the language-specific
+`marketplace_card_names_<language>` helper tables used by
+`marketplace_card_names_for_language(...)`. Expansion translations/aliases live
+in `marketplace_expansion_name_translations`; `marketplace_seed_expansion_aliases()`
+folds those localized expansion names into `marketplace_expansion_aliases` for
+the existing search RPCs. Supabase remains only the derived
+`marketplace_card_name_tokens` autocomplete cache and must keep one row per
+`language + search_name`.
+
+TCGdex is the preferred multilingual source for card and expansion/set names.
+Limitless is still useful for competitive/decklist set-code/card references and
+the existing `limitless_marketplace_expansion_blueprints` mapping, but the
+documented Limitless developer API is tournament/decklist oriented rather than a
+bulk multilingual card database. Use Limitless-derived mappings only as
+supporting evidence; do not scrape the card database UI as a production import.
+
+Dry-run multilingual card and expansion translation coverage first:
+
+```bash
+node scripts/import-tcgdex-card-name-translations.js \
+  --language=it,fr,de,es,pt,id,th,ja,zh-cn,zh-tw \
+  --limit=1000 \
+  --expansion-limit=all
+```
+
+After reviewing match counts and samples on the writable Oracle primary, apply:
+
+```bash
+node scripts/import-tcgdex-card-name-translations.js \
+  --apply \
+  --language=it,fr,de,es,pt,id,th,ja,zh-cn,zh-tw \
+  --limit=all \
+  --expansion-limit=all
+```
+
+Refresh expansion aliases after applying localized expansion names:
+
+```sql
+select public.marketplace_seed_expansion_aliases();
+```
+
+Then refresh the Supabase autocomplete name-token cache per language. The sync is
+dry-run by default and reads Oracle translations from both
+`marketplace_card_names_for_language(...)` and
+`marketplace_card_name_translations`, then writes separate rows per language:
+
+```bash
+node scripts/sync-card-name-index-to-supabase.js \
+  --full-refresh \
+  --languages=it,fr,de,es,pt,id,th,ja,zh-cn,zh-tw
+
+node scripts/sync-card-name-index-to-supabase.js \
+  --apply \
+  --full-refresh \
+  --languages=it,fr,de,es,pt,id,th,ja,zh-cn,zh-tw \
+  --transport=rest
+```
+
+Verification queries:
+
+```sql
+select language, count(*)::int as rows, max(updated_at) as updated_at
+from public.marketplace_card_name_translations
+group by language
+order by language;
+
+select language, count(*)::int as rows, max(updated_at) as updated_at
+from public.marketplace_expansion_name_translations
+group by language
+order by language;
+```
+
+For Supabase:
+
+```sql
+select language, count(*)::int as rows, max(synced_at) as synced_at
+from public.marketplace_card_name_tokens
+group by language
+order by language;
+```
+
+Flutter already stores `marketplace.search_language` and passes the selected
+language to autocomplete, token prediction, and full marketplace search. Verify
+the end-to-end flow by selecting a non-English language and searching a known
+localized card and expansion name, for example a French card name plus
+`Écarlate et Violet`.
+
 ## Card Detail URL Contract
 
 Canonical marketplace card URLs are generated in Flutter from the real
@@ -197,6 +292,36 @@ If an operator intentionally wants only the historical 400 chunks, pass
 CardTrader blueprint discovery, raw-row imports, CDN image generation, projection
 refresh, and Supabase name-token sync must run on Oracle Cloud, not inside Vercel
 serverless functions.
+
+### CDN Image Normalization Guardrail
+
+CardTrader fallback placeholders such as
+`https://cardtrader.com/fallbacks/card_uploader/preview.png` are source metadata,
+not stable marketplace images. Do not persist them into served marketplace fields
+(`image_url`, `cdn_image_url`, `preview_image_url`, or `homepage_image_url`).
+If a fallback placeholder must be exposed for traceability, first upload/copy it
+to R2 under a stable key:
+
+```text
+<blueprint_id>_<slug(name-version-set)>.<source-ext>
+```
+
+Then update Oracle `cardtrader_pokemon_blueprints` and projection tables to the
+Pokoin CDN URL. Keep the original CardTrader URL only in source metadata such as
+`cardtrader_image_url` or the raw `blueprint` JSON.
+
+Audit/repair command:
+
+```bash
+node scripts/normalize-oracle-cardtrader-fallback-cdn-images.js --limit=all
+node scripts/normalize-oracle-cardtrader-fallback-cdn-images.js --apply --ids=<blueprint_ids>
+```
+
+The root importer pattern that created the current fallback rows was the raw
+CardTrader blueprint/delta import preserving `blueprint.image_url` into
+`image_url` before the image pipeline had copied/uploaded an R2 object. Current
+delta and multi-game importers must strip `/fallbacks/card_uploader/preview.png`
+from `image_url`; image importers may retain it only as source metadata.
 
 Architecture:
 
@@ -428,7 +553,8 @@ removed-history rows, or daily analytics; those remain owned by the full
 market-data import/snapshot job. The conceptual pipeline is daily backend
 listings cache/import -> cheapest eligible Zero + 1-Day Ready listing per
 blueprint -> `cheapest_homepage_cache_blueprint` ->
-marketplace/homepage/catalog tile pricing. If production still writes
+marketplace/homepage/catalog tile pricing. This projection is a durable Oracle
+read model, not the live endpoint cache. If production still writes
 `public.cardtrader_blueprint_listing_cache`, that is the legacy/compatibility
 physical table name until a migration renames it. Do not make tiles call
 CardTrader live, and do not treat this projection as a fallback behind old stock
@@ -436,6 +562,14 @@ logic.
 Manual local runs of either script are emergency/backfill diagnostics only and
 should use explicit `--dry-run`, `--blueprint-id`, `--max-blueprints`, or
 `--max-products` limits before any broad apply.
+
+The normal peer-host wrapper must run broad coverage for CardTrader Pokémon card
+market data. Its defaults cover up to `100000` known blueprints and `1000000`
+products, with the market snapshot apply split by
+`--refresh-batch-blueprints=700` so removed-history archiving is scoped to each
+fetched batch. Do not install production cron/systemd with the older sample
+limits (`--max-blueprints=250 --max-products=10000`); those are only suitable for
+manual diagnostics and can miss most Pokémon CardTrader blueprints.
 
 Use the peer-host wrapper for the normal daily run:
 
@@ -541,13 +675,22 @@ GET /api/cardtrader-live-listings?cardId=248856
 
 This route answers which CardTrader listings currently have the card. It calls
 CardTrader `GET /api/v2/marketplace/products?blueprint_id=:id` with the trusted
-server global token (`CARDTRADER_AUTH_TOKEN` or legacy fallback `CARDTRADER_API_TOKEN`) and does
-not write Oracle or any database. `blueprintId` is a direct CardTrader blueprint
-ID. `cardId` is a Pokoin card ID; numeric values are resolved through Oracle card
-data when available and fall back to the same CardTrader blueprint ID. Keep only
-short in-process/HTTP caching for repeated page opens. Without `limit`, return
-every row CardTrader returns for the blueprint; explicit limits only cap the
-client response. Live rows include inferred
+server global token (`CARDTRADER_AUTH_TOKEN` or legacy fallback
+`CARDTRADER_API_TOKEN`) and does not write Oracle or any database. `blueprintId`
+is a direct CardTrader blueprint ID. `cardId` is a Pokoin card ID; numeric values
+are resolved through Oracle card data when available and fall back to the same
+CardTrader blueprint ID. Keep only short in-process/HTTP caching for repeated
+page opens. The current implementation uses a per-process `Map` cache with a
+45-second TTL, a 100-entry cap, and keys of
+`cardtrader:<resolvedBlueprintId>:<language-or-empty>:<limit-or-all>`. Expired
+entries are pruned opportunistically and overflow removes oldest insertion-order
+entries. There is no shared cache, database persistence, webhook invalidation, or
+admin invalidation endpoint; process restarts clear the cache. The route also
+sends `Cache-Control: public, max-age=30, s-maxage=60`, which is separate from
+the in-memory cache. Without `limit`, return every eligible row CardTrader
+returns for the blueprint; explicit `limit` values are clamped to `1..1000` and
+only cap the client response after the CardTrader fetch. Live rows include
+inferred
 `shippingMode`/`shippingLabel` metadata; CardTrader does not expose a direct
 shipping-type field, so the route derives `one_day_ready` only from explicit
 `1-Day Ready` or `One Day Ready` seller/listing text, then derives `zero` from
@@ -601,7 +744,9 @@ The relationship between tables is:
   the canonical cheapest eligible Zero + 1-Day Ready price projection used by
   marketplace/homepage/catalog tile payloads. It is one row per blueprint derived
   from the daily backend listings cache/import and must be read internally from
-  Oracle instead of calling CardTrader live for tiles. If production still exposes
+  Oracle instead of calling CardTrader live for tiles. It is distinct from both
+  `public.cardtrader_market_listing_snapshots` and the live endpoint's
+  45-second in-memory response cache. If production still exposes
   `public.cardtrader_blueprint_listing_cache`, treat it as a legacy/compatibility
   physical table name until a migration renames it. It is not a fallback behind
   old stock logic. Card detail seller listings must keep using the live parser
@@ -2087,12 +2232,14 @@ card name to one or more types with priority. Use this mapping for species that
 can legitimately have multiple types across printings, for example Chien-Pao as
 both `water` and `darkness`.
 
-Visible marketplace emojis are stored in the `emoji` column on
+Blueprint emojis are authoritative in `marketplace_blueprint_emojis`, keyed by
+`blueprint_id` and derived from card name plus rarity/variation. Visible
+marketplace emojis are copied from that source into the `emoji` column on
 `cardtrader_pokemon_blueprints`, `marketplace_cards`,
 `marketplace_search_candidates`, and `marketplace_card_versions`. Projection
-refreshes compute them with `marketplace_card_emoji(...)`. Name-specific emoji
-fixes belong in `marketplace_card_emoji_rules`, seeded by
-`marketplace_seed_card_emoji_rules()`, so Flutter and APIs read the same
+refreshes seed name-specific rules with `marketplace_seed_card_emoji_rules()`,
+populate the source with `refresh_marketplace_blueprint_emojis()`, then copy the
+source value through the read models so Flutter and APIs read the same
 database-backed symbols.
 
 Artist/illustrator credits live in the separate additive table
@@ -2107,12 +2254,13 @@ may query it by `normalized_artist` for grouping.
 
 Do not fix card palette or emoji exceptions only in Flutter. Persist name/type
 rules through `marketplace_seed_cards_name_type()` and name emoji rules through
-`marketplace_seed_card_emoji_rules()`, then run a targeted palette/emoji refresh
-so projected `card_palette` JSON and `emoji` strings are updated in all
-marketplace tables. Example: Cynthia cards intentionally map to the `lightning`
-palette, Team Rocket/Dark/Shadow card families should resolve to the dark
-palette from the database projection, and Air Balloon should use a balloon/wind
-emoji pair instead of the generic card/paw fallback.
+`marketplace_seed_card_emoji_rules()`, then refresh `marketplace_blueprint_emojis`
+and run a targeted palette/emoji refresh so projected `card_palette` JSON and
+`emoji` strings are updated in all marketplace tables. Example: Cynthia cards
+intentionally map to the `lightning` palette, Team Rocket/Dark/Shadow card
+families should resolve to the dark palette from the database projection, and
+Air Balloon should use a balloon/wind emoji pair instead of any generic card
+fallback.
 
 ### Blueprint Artist Metadata
 
@@ -2875,7 +3023,8 @@ Oracle rows have `card_palette->>'key' = 'fallback'`. Most misses come from
 CardTrader rows whose `card_type` is only `Trading card`.
 
 Use the repeatable classifier to enrich `cards_name_type`, seed emoji rules, and
-propagate palette JSON plus emoji strings into the projected marketplace tables:
+propagate palette JSON plus source-backed emoji strings into the projected
+marketplace tables:
 
 ```bash
 node scripts/backfill-marketplace-card-palettes.js
@@ -2888,8 +3037,16 @@ creates the `cards_name_type_lower_name_idx` lookup index if missing, because
 `marketplace_name_palette_key()` resolves names case-insensitively.
 In `--apply` mode it first runs `marketplace_seed_cards_name_type()` so schema
 seed rules are applied before palette JSON is refreshed. Schema apply also
-creates `marketplace_card_emoji_rules`; keep obvious item/supporter emoji
-exceptions there instead of adding client-side hardcoding.
+creates `marketplace_card_emoji_rules` and refreshes
+`marketplace_blueprint_emojis`; keep obvious item/supporter emoji exceptions in
+schema/database rules instead of adding client-side hardcoding.
+
+For an emoji-only refresh or validation pass, use:
+
+```bash
+node scripts/refresh-marketplace-blueprint-emojis.js
+node scripts/refresh-marketplace-blueprint-emojis.js --apply --refresh
+```
 
 The default `--refresh` path intentionally performs a targeted palette-only
 propagation into:
@@ -2900,7 +3057,8 @@ propagation into:
 - `marketplace_card_versions`
 
 The targeted refresh includes both `palette-backfill%` mappings, schema
-`seed-rule` mappings, and names in `marketplace_card_emoji_rules`, so it is
+`seed-rule` mappings, and names in `marketplace_card_emoji_rules`, then copies
+`marketplace_blueprint_emojis.emoji` through the projected tables. This is
 appropriate for small permanent palette/emoji exceptions such as Cynthia, Team
 Rocket/Dark/Shadow families, Air Balloon, and obvious item/supporter cards.
 
@@ -2921,17 +3079,40 @@ order by count desc, key;
 Emoji validation query:
 
 ```sql
-select card_id, name, card_palette->>'key' as palette_key, emoji
-from public.marketplace_search_candidates
-where lower(name) in (
-  'air balloon',
-  'rare candy',
-  'professor''s research',
-  'battle vip pass',
-  'volkner'
-)
-order by name, card_id
+select b.id, b.name, e.rarity, e.product_variant, e.emoji
+from public.cardtrader_pokemon_blueprints b
+left join public.marketplace_blueprint_emojis e on e.blueprint_id = b.id
+where public.classify_marketplace_product_type(
+    b.name,
+    coalesce(nullif(b.expansion->>'name', ''), nullif(b.blueprint->>'expansion_name', ''), 'Pokemon'),
+    b.blueprint->>'category_name',
+    b.blueprint->>'type',
+    coalesce(nullif(b.blueprint->>'number', ''), nullif(b.blueprint->>'collector_number', ''), nullif(b.blueprint->>'card_number', ''), b.version, b.id::text),
+    b.version,
+    b.id
+  ) = 'card'
+  and (e.blueprint_id is null or trim(e.emoji) = '' or position('🃏' in e.emoji) > 0)
+order by b.imported_at desc nulls last, b.id desc
 limit 50;
+```
+
+Projection drift query:
+
+```sql
+select 'marketplace_cards' as table_name, count(*)::int as mismatches
+from public.marketplace_cards c
+join public.marketplace_blueprint_emojis e on e.blueprint_id = c.card_id
+where coalesce(c.emoji, '') <> e.emoji
+union all
+select 'marketplace_search_candidates', count(*)::int
+from public.marketplace_search_candidates s
+join public.marketplace_blueprint_emojis e on e.blueprint_id = s.card_id
+where coalesce(s.emoji, '') <> e.emoji
+union all
+select 'marketplace_card_versions', count(*)::int
+from public.marketplace_card_versions v
+join public.marketplace_blueprint_emojis e on e.blueprint_id = v.card_id
+where coalesce(v.emoji, '') <> e.emoji;
 ```
 
 After the 2026-05-19 backfill, single-card fallback rows dropped from `42,859`

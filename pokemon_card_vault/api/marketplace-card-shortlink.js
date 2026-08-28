@@ -1,4 +1,5 @@
 const { marketplaceQuery } = require('./_marketplace_db');
+const { slugPart } = require('./_slug');
 const {
   canonicalCardUrlForLookup,
 } = require('./marketplace-card-url');
@@ -6,14 +7,6 @@ const {
 function cleanCardId(value) {
   const id = Number(String(value || '').trim());
   return Number.isSafeInteger(id) && id > 0 ? id : 0;
-}
-
-function slugPart(value) {
-  return String(value || '')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
 }
 
 function cleanCollectorNumber(value, cardId) {

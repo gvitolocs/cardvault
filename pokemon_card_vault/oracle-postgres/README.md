@@ -22,6 +22,7 @@ usually run without manual exports.
 ## Commands
 
 ```bash
+npm run api:migrations:check
 node scripts/oracle-marketplace-migrate.js schema
 node scripts/oracle-marketplace-migrate.js copy
 node scripts/oracle-marketplace-migrate.js refresh
@@ -35,6 +36,11 @@ node scripts/oracle-marketplace-migrate.js all
 ```
 
 Forum tables remain in Supabase and are intentionally not included here.
+
+`oracle-postgres/schema-manifest.json` is the tracked apply-order manifest for
+`oracle-postgres/schema/*.sql`. Add every new schema file there and run
+`npm run api:migrations:check`; the check fails on untracked files, stale entries,
+order drift, and undocumented duplicate numeric prefixes.
 
 ## Blueprint Pricing
 

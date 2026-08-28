@@ -1,0 +1,3 @@
+{"ts":"2026-05-28T09:28:30.865419+00:00","session_id":"membrdge","task":"Connect Codex to Honcho and Codevira for cardvault project memory","phase":"Phase 1: Initial Development","summary":null,"decision_ids":[],"outcome":null,"id":"S000001"}
+{"ts":"2026-05-28T09:36:37.728757+00:00","session_id":"prisma28","task":"Initialize Prisma against the main Oracle Postgres instance and update project workflows/memory","phase":"Phase 1: Initial Development","summary":null,"decision_ids":[],"outcome":null,"id":"S000002"}
+{"ts":"2026-05-28T09:58:13.684532+00:00","session_id":"meiliprod","task":"Full implement Meili to production for English queries and run 2pikabench.","phase":"Production Meilisearch rollout","summary":null,"decision_ids":[],"outcome":null,"id":"S000003"}

@@ -24,6 +24,19 @@ test('shortlink canonical slug keeps real collector number', () => {
   );
 });
 
+test('shortlink canonical slug folds Pokémon accents', () => {
+  assert.equal(
+    canonicalSlugForRow({
+      card_id: '251432',
+      name: 'Poliwhirl',
+      set_name: 'Pokémon Card 151',
+      card_number: '176/165',
+      rarity: 'Card',
+    }),
+    'card-poliwhirl-176-165-pokemon-card-151',
+  );
+});
+
 test('shortlink canonical path redirects to public-number marketplace URL', () => {
   assert.equal(
     canonicalPathForRow({

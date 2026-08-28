@@ -666,6 +666,15 @@ Request:
 `path` must be a safe internal path. Absolute `https://pokoin.com/...` URLs are
 normalized to paths; external URLs and protocol-relative URLs are rejected.
 
+Identity contract: if the browser has a signed-in Firebase user, the assistant
+client must send a fresh Firebase ID token for this request. Do not reuse a
+long-lived cached assistant `_bearerToken` for polling because Firebase ID tokens
+expire and rotate while tabs remain open. If there is no signed-in user, omit the
+Authorization header and use anonymous session scope. If an Authorization header
+is present but Firebase Admin rejects it, treat that as an authentication error
+and investigate/refresh the client token; do not silently downgrade the request
+to anonymous identity.
+
 Read the latest page:
 
 ```text
@@ -802,21 +811,23 @@ Authorization: Bearer <admin diagnostic secret>
 
 This endpoint is a guarded manual diagnostic path only. The scheduled daily
 CardTrader public listing ingestion runs on the Oracle/peer4 host with
-`scripts/refresh-cardtrader-market-listings.js`, not Vercel Cron. The host job
-uses the global CardTrader marketplace API token, calls
-`GET /api/v2/marketplace/products` by blueprint or expansion, refreshes Oracle
-`cardtrader_market_listing_snapshots`, archives missing rows in
-`cardtrader_market_listing_removed_history` with `removed_day = current_date - 1`
-by default, and projects global market rows into the existing card graph path via
-`marketplace_price_observations` sources `cardtrader_snapshot` and
-`cardtrader_removed_sale`. It also derives `cheapest_homepage_cache_blueprint`,
-the compact one-row-per-blueprint projection used by marketplace home/catalog
-tile payloads for the cheapest eligible Zero + 1-Day Ready price from the daily
-backend listings cache/import. If production still refreshes
-`cardtrader_blueprint_listing_cache`, that is the legacy physical table name for
-this projection until a migration renames it. Card detail seller rows and
-detailed CardTrader listing metadata keep using the live parser. No Pokoin user
-or connected seller is involved in this global market analytics refresh.
+`scripts/run-cardtrader-daily-market-refresh.sh`, not Vercel Cron. The wrapper
+first runs `scripts/refresh-cardtrader-market-listings.js`, which uses the global
+CardTrader marketplace API token, calls `GET /api/v2/marketplace/products` by
+blueprint or expansion, refreshes Oracle `cardtrader_market_listing_snapshots`,
+archives missing rows in `cardtrader_market_listing_removed_history` with
+`removed_day = current_date - 1` by default, and projects global market rows into
+the existing card graph path via `marketplace_price_observations` sources
+`cardtrader_snapshot` and `cardtrader_removed_sale`. After that succeeds, the
+wrapper runs `scripts/refresh-cardtrader-blueprint-listing-cache.js` to derive
+`cheapest_homepage_cache_blueprint`, the compact one-row-per-blueprint projection
+used by marketplace home/catalog tile payloads for the cheapest eligible Zero +
+1-Day Ready price from the daily backend listings cache/import. That projection
+is a durable Oracle read model, not the live endpoint cache. If production still
+refreshes `cardtrader_blueprint_listing_cache`, that is the legacy physical table
+name for this projection until a migration renames it. Card detail seller rows
+and detailed CardTrader listing metadata keep using the live parser. No Pokoin
+user or connected seller is involved in this global market analytics refresh.
 
 Useful test controls:
 
@@ -866,6 +877,17 @@ row CardTrader returns for the blueprint. Clients may pass `limit` to request a
 smaller result set; explicit limits are capped at a high safety ceiling, not the
 old production default of 25.
 
+The live in-process cache is a per-Node-process `Map`, not Oracle storage. Cache
+keys are `cardtrader:<resolvedBlueprintId>:<language-or-empty>:<limit-or-all>`,
+entries live for 45 seconds, and the map is capped at 100 entries. Expired
+entries are pruned on reads/writes, and overflow removes the oldest
+insertion-order keys. There is no shared cache across serverless instances,
+database persistence, webhook invalidation, or admin invalidation endpoint; a
+process restart clears it. The endpoint also sends
+`Cache-Control: public, max-age=30, s-maxage=60`, which is separate browser/CDN
+or proxy caching. Explicit `limit` values are clamped to `1..1000` and only cap
+the response after CardTrader is fetched.
+
 Live listing rows include inferred `shippingMode` and `shippingLabel` fields.
 `shippingMode` is one of `one_day_ready`, `zero`, or `normal`. CardTrader does
 not expose a direct shipping-type field in this payload, so the route uses this
@@ -905,10 +927,13 @@ endpoint only returns the latest safe metadata derived from those tables.
 Marketplace tiles/cards read `cheapest_homepage_cache_blueprint` for the
 cheapest eligible Zero + 1-Day Ready price derived from the daily backend
 listings cache/import and must not make live CardTrader API calls during tile
-rendering. If SQL still reads `cardtrader_blueprint_listing_cache`, that is the
-legacy physical table name for this projection until a migration renames it. Card
-detail seller listings continue to use the live CardTrader route so seller rows,
-comments, flags, and prices come from the detailed parser.
+rendering. This durable projection is separate from
+`cardtrader_market_listing_snapshots` and from the live route's 45-second
+in-memory response cache. If SQL still reads
+`cardtrader_blueprint_listing_cache`, that is the legacy physical table name for
+this projection until a migration renames it. Card detail seller listings
+continue to use the live CardTrader route so seller rows, comments, flags, and
+prices come from the detailed parser.
 
 Response fields include safe public listing metadata: external listing/product
 ids, CardTrader blueprint id, Pokoin card id when mapped, price/currency,

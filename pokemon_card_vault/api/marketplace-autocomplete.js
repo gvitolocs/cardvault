@@ -6,6 +6,7 @@ const {
   searchNameWithDatabase,
   searchNonNameWithDatabase,
 } = require('./marketplace-search-candidates');
+const { useMeiliSearchForLanguage } = require('./_marketplace_search_engine');
 const { withCardEmojiFields } = require('./_marketplace_card_emoji');
 const {
   getMarketplacePrefixSearchClients,
@@ -91,14 +92,18 @@ function setCorsHeaders(res) {
 }
 
 function compact(value) {
-  return String(value || '')
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
+  return foldDiacritics(value)
     .replace(/\bheart\s*gold\s*&\s*soul\s*silver\b/gi, 'heartgoldsoulsilver')
     .replace(/\bheartgold\s*&\s*soulsilver\b/gi, 'heartgoldsoulsilver')
     .replace(/&/g, ' tagteam ')
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '');
+}
+
+function foldDiacritics(value) {
+  return String(value || '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '');
 }
 
 function collectorNumberSql(candidateAlias = 'c', cardsAlias = 'mc', blueprintAlias = 'b') {
@@ -296,7 +301,7 @@ function withTimeout(promise, timeoutMs, label) {
 }
 
 function searchTerms(value) {
-  const rawTerms = normalizeVariationPhrases(value)
+  const rawTerms = foldDiacritics(normalizeVariationPhrases(value))
     .toLowerCase()
     .replace(/\b([a-z0-9]+)s\b/g, "$1's")
     .split(/[^a-z0-9]+/)
@@ -412,7 +417,9 @@ async function supabaseNameIndexCandidateRows(
             (
               case
                 when i.compact_name = input.compact_q then 240000
+                when public.marketplace_search_compact(i.search_name) = input.compact_q then 240000
                 when i.compact_name like input.compact_q || '%' then 120000
+                when public.marketplace_search_compact(i.search_name) like input.compact_q || '%' then 120000
                 when input.compact_q = any(i.name_tokens) then 60000
                 else 2500
               end +
@@ -427,7 +434,9 @@ async function supabaseNameIndexCandidateRows(
             on i.language = input.language
             and (
               i.compact_name = input.compact_q
+              or public.marketplace_search_compact(i.search_name) = input.compact_q
               or i.compact_name like input.compact_q || '%'
+              or public.marketplace_search_compact(i.search_name) like input.compact_q || '%'
               or input.compact_q = any(i.name_tokens)
             )
           where input.compact_q <> ''
@@ -977,7 +986,9 @@ async function supabaseOneCharNameTokenRows(
             (
               case
                 when i.compact_name = input.compact_q then 100
+                when public.marketplace_search_compact(i.search_name) = input.compact_q then 100
                 when i.compact_name like input.compact_q || '%' then greatest(72, 96 - greatest(length(i.compact_name) - length(input.compact_q), 0))
+                when public.marketplace_search_compact(i.search_name) like input.compact_q || '%' then greatest(72, 96 - greatest(length(public.marketplace_search_compact(i.search_name)) - length(input.compact_q), 0))
                 when i.normalized_name = input.normalized_q then 100
                 when i.normalized_name like input.normalized_q || '%' then 88
                 when exists (
@@ -991,7 +1002,9 @@ async function supabaseOneCharNameTokenRows(
             (
               case
                 when i.compact_name = input.compact_q then 240000
+                when public.marketplace_search_compact(i.search_name) = input.compact_q then 240000
                 when i.compact_name like input.compact_q || '%' then 120000
+                when public.marketplace_search_compact(i.search_name) like input.compact_q || '%' then 120000
                 when i.normalized_name = input.normalized_q then 90000
                 when i.normalized_name like input.normalized_q || '%' then 70000
                 when exists (
@@ -1019,7 +1032,9 @@ async function supabaseOneCharNameTokenRows(
             on i.language = input.language
             and (
               i.compact_name = input.compact_q
+              or public.marketplace_search_compact(i.search_name) = input.compact_q
               or i.compact_name like input.compact_q || '%'
+              or public.marketplace_search_compact(i.search_name) like input.compact_q || '%'
               or i.normalized_name = input.normalized_q
               or i.normalized_name like input.normalized_q || '%'
               or exists (
@@ -1280,7 +1295,9 @@ async function supabasePredictedNameTokens(
             (
               case
                 when i.compact_name = input.compact_q then 100
+                when public.marketplace_search_compact(i.search_name) = input.compact_q then 100
                 when i.compact_name like input.compact_q || '%' then greatest(72, 96 - greatest(length(i.compact_name) - length(input.compact_q), 0))
+                when public.marketplace_search_compact(i.search_name) like input.compact_q || '%' then greatest(72, 96 - greatest(length(public.marketplace_search_compact(i.search_name)) - length(input.compact_q), 0))
                 when input.compact_q = any(i.name_tokens) then 100
                 when exists (
                   select 1
@@ -1302,7 +1319,9 @@ async function supabasePredictedNameTokens(
             (
               case
                 when i.compact_name = input.compact_q then 240000
+                when public.marketplace_search_compact(i.search_name) = input.compact_q then 240000
                 when i.compact_name like input.compact_q || '%' then 120000
+                when public.marketplace_search_compact(i.search_name) like input.compact_q || '%' then 120000
                 when input.compact_q = any(i.name_tokens) then 60000
                 else 2500
               end +
@@ -1329,7 +1348,9 @@ async function supabasePredictedNameTokens(
             on i.language = input.language
             and (
               i.compact_name = input.compact_q
+              or public.marketplace_search_compact(i.search_name) = input.compact_q
               or i.compact_name like input.compact_q || '%'
+              or public.marketplace_search_compact(i.search_name) like input.compact_q || '%'
               or input.compact_q = any(i.name_tokens)
               or (
                 length(input.compact_q) >= 3
@@ -2831,6 +2852,7 @@ async function searchCombinedCardNameWithDatabase(
         '' as compact_variant,
         (c.search_weight + 2600)::real as search_rank
       from public.marketplace_search_candidates c
+      ${collectorNumberJoinSql('c', 'mc', 'b', 'candidate_number')}
       where c.item_kind <> 'product'
         and (
           select bool_and(
@@ -2839,7 +2861,7 @@ async function searchCombinedCardNameWithDatabase(
           )
           from input_terms
         )
-      order by c.search_weight desc, c.name asc, c.card_number asc
+      order by c.search_weight desc, c.name asc, candidate_number.card_number asc
       limit $2::integer
     `,
     [cleanTerms, Math.min(Math.max(poolLimit, 1), AUTOCOMPLETE_SQL_SAFE_POOL_CAP)],
@@ -2920,7 +2942,8 @@ async function searchNameOnlyRowsWithDatabase(
       from matched_names
       join public.marketplace_search_candidates c
         on coalesce(nullif(c.canonical_name, ''), c.name) = matched_names.name
-      order by search_rank desc, c.name asc, c.card_number asc
+      ${collectorNumberJoinSql('c', 'mc', 'b', 'candidate_number')}
+      order by search_rank desc, c.name asc, candidate_number.card_number asc
       limit $2::integer
     `,
     [cleanTerms, Math.min(Math.max(poolLimit, 1), AUTOCOMPLETE_SQL_SAFE_POOL_CAP), searchLanguage],
@@ -6436,6 +6459,48 @@ async function rowsForAutocompleteSearchTermWithQuery(
   nameIndexQuery = supabaseNameIndexQuery,
   predictionContext = null,
 ) {
+  if (useMeiliSearchForLanguage(searchLanguage)) {
+    const meiliPoolTerm = poolSearchTerm(searchTerm);
+    const rows = await rowsForSearchTerm(
+      meiliPoolTerm,
+      poolLimit,
+      0,
+      searchLanguage,
+      debug,
+      previousContext,
+      { meiliOnly: true },
+    );
+    if (rows?.length > 0) {
+      if (debug) {
+        debug.searchPath = debug.searchPath || 'meili_en_autocomplete_pool';
+        debug.tokenPlan = {
+          strategy: debug.tokenPlan?.strategy || 'meili_en_autocomplete_pool',
+          poolTerm: meiliPoolTerm,
+          candidateRowCount: rows.length,
+        };
+      }
+      return rows;
+    }
+    if (debug) {
+      const meiliSearchPath = debug.searchPath;
+      const meiliSearchEngine = debug.searchEngine ? { ...debug.searchEngine } : null;
+      const meiliTokenPlan = debug.tokenPlan ? { ...debug.tokenPlan } : null;
+      debug.meiliAutocompleteFallback = {
+        reason: meiliSearchEngine?.reason || 'empty_meili_pool',
+        poolTerm: meiliPoolTerm,
+        searchPath: meiliSearchPath,
+        candidateRowCount: rows?.length || 0,
+        searchEngine: meiliSearchEngine,
+        tokenPlan: meiliTokenPlan,
+      };
+      if (String(debug.searchPath || '').startsWith('meili_')) {
+        delete debug.searchPath;
+      }
+      if (String(debug.tokenPlan?.strategy || '').startsWith('meili_')) {
+        delete debug.tokenPlan;
+      }
+    }
+  }
   const readQuery = readQueryForAutocomplete(searchTerm, query);
   const canUseSupabaseNameTier = query === marketplaceQuery || nameIndexQuery !== supabaseNameIndexQuery;
   if (canUseSupabaseNameTier && shouldTrySupabaseNameIndex(searchTerm, previousContext)) {
@@ -6910,6 +6975,7 @@ module.exports = async function handler(req, res) {
     if (wantsDebug) {
       return res.status(200).json({
         rows: ranked,
+        search_language: searchLanguage,
         search_context: searchContext,
         debug: {
           sessionId: cleanSearchTerm(req.body?.debug_session_id),
@@ -6965,6 +7031,7 @@ module.exports = async function handler(req, res) {
     }
     return res.status(200).json({
       rows: ranked,
+      search_language: searchLanguage,
       pool,
       search_context: searchContext,
     });

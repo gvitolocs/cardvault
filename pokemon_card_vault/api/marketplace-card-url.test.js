@@ -3,10 +3,12 @@ const test = require('node:test');
 
 const {
   candidateCardIdsForLookup,
+  canonicalSlugFromPath,
   canonicalCardUrlForLookup,
   createHandler,
   parseMarketplaceCardPath,
   parseRootCardPath,
+  slugsEquivalent,
 } = require('./marketplace-card-url')._test;
 
 test('canonical URL lookup keeps direct root card id only', () => {
@@ -93,6 +95,20 @@ test('marketplace card path parser extracts language and public number field', (
   );
 });
 
+test('canonical URL slug matcher folds Pokémon accent legacy route', () => {
+  assert.equal(
+    canonicalSlugFromPath('/marketplace/en/cards/502864/card-poliwhirl-176-165-pok-mon-card-151'),
+    'card-poliwhirl-176-165-pok-mon-card-151',
+  );
+  assert.equal(
+    slugsEquivalent(
+      'card-poliwhirl-176-165-pok-mon-card-151',
+      'card-poliwhirl-176-165-pokemon-card-151',
+    ),
+    true,
+  );
+});
+
 test('canonical URL lookup returns stored database canonical path', async () => {
   const lookup = await canonicalCardUrlForLookup({
     path: '/marketplace/en/cards/497536/card-drifloon-6-17-pop-series-6',
@@ -113,6 +129,38 @@ test('canonical URL lookup returns stored database canonical path', async () => 
     language: 'en',
     canonicalPath: '/marketplace/en/cards/497536/db-backed-drifloon',
     publicNumber: '497536',
+  });
+});
+
+test('canonical URL lookup prefers decoded id when stale public number collides', async () => {
+  const lookup = await canonicalCardUrlForLookup({
+    path: '/marketplace/en/cards/502864/card-poliwhirl-176-165-pok-mon-card-151',
+  }, async (sql, values) => {
+    assert.match(sql, /marketplace_card_urls/);
+    assert.deepEqual(values, [[251432], 'en', '502864']);
+    return {
+      rows: [
+        {
+          card_id: '502864',
+          language: 'en',
+          canonical_path: '/marketplace/en/cards/1005728/card-some-other-card',
+        },
+        {
+          card_id: '251432',
+          language: 'en',
+          canonical_path:
+            '/marketplace/en/cards/502864/card-poliwhirl-176-165-pokemon-card-151',
+        },
+      ],
+    };
+  });
+
+  assert.deepEqual(lookup, {
+    cardId: '251432',
+    language: 'en',
+    canonicalPath:
+      '/marketplace/en/cards/502864/card-poliwhirl-176-165-pokemon-card-151',
+    publicNumber: '502864',
   });
 });
 

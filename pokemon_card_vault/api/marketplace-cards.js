@@ -395,7 +395,9 @@ module.exports = async function handler(req, res) {
     if (url.searchParams.get('facets') === 'products') {
       const products = await productFacetRows({
         query: url.searchParams.get('query'),
-        searchLanguage: url.searchParams.get('lang') || url.searchParams.get('language'),
+        searchLanguage: url.searchParams.get('search_language') ||
+          url.searchParams.get('lang') ||
+          url.searchParams.get('language'),
       });
       res.setHeader('Cache-Control', 'public, max-age=20, s-maxage=120');
       return res.status(200).json({ products });
@@ -405,7 +407,9 @@ module.exports = async function handler(req, res) {
       limit: url.searchParams.get('limit'),
       productType: url.searchParams.get('productType'),
       productSearchOnly: url.searchParams.get('productSearchOnly') === '1',
-      searchLanguage: url.searchParams.get('lang') || url.searchParams.get('language'),
+      searchLanguage: url.searchParams.get('search_language') ||
+        url.searchParams.get('lang') ||
+        url.searchParams.get('language'),
     });
     res.setHeader('Cache-Control', 'public, max-age=20, s-maxage=120');
     return res.status(200).json(rows);

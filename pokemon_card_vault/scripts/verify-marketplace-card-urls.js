@@ -3,6 +3,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { Pool } = require('pg');
+const { slugPart } = require('../api/_slug');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 const POKOINPOS_ROOT = process.env.POKOINPOS_ROOT || '/Users/giuseppe/pokoinpos';
@@ -209,13 +210,6 @@ function scopeWhere(scope) {
 
 function cleanText(value) {
   return String(value || '').trim();
-}
-
-function slugPart(value) {
-  return cleanText(value)
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
 }
 
 function cardDetailSlug(row) {

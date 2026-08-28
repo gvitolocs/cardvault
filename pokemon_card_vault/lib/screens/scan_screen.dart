@@ -151,18 +151,20 @@ class _ScanScreenState extends State<ScanScreen> {
                     const SizedBox(height: 18),
                     _StatsGrid(snapshot: data),
                     const SizedBox(height: 18),
-                    _ResponsiveColumns(
-                      left: _BlocksPanel(blocks: data?.blocks ?? const []),
-                      right: _TransactionsPanel(
-                          transactions: data?.transactions ?? const []),
-                    ),
+                    _TransactionsPanel(
+                        transactions: data?.transactions ?? const []),
                     const SizedBox(height: 18),
                     _ResponsiveColumns(
-                      left: _ValidatorsPanel(
-                        validators: data?.validators ?? const [],
-                        bootstrapRegistry: data?.bootstrapRegistry,
+                      left: _BlocksPanel(blocks: data?.blocks ?? const []),
+                      right: _ExplorerSideStack(
+                        children: [
+                          _ValidatorsPanel(
+                            validators: data?.validators ?? const [],
+                            bootstrapRegistry: data?.bootstrapRegistry,
+                          ),
+                          _LotteryPanel(status: data?.status),
+                        ],
                       ),
-                      right: _LotteryPanel(status: data?.status),
                     ),
                     const SizedBox(height: 18),
                     _WPKNPanel(reserve: data?.reserve),
@@ -988,7 +990,7 @@ class _BlocksPanel extends StatelessWidget {
             icon: Icons.layers_outlined,
           ),
           const SizedBox(height: 12),
-          for (final block in blocks)
+          for (final block in blocks.take(8))
             _ListRow(
               leading: '#${block.number}',
               title: 'Slot ${block.slot} · ${block.transactionCount} tx',
@@ -1024,7 +1026,7 @@ class _TransactionsPanel extends StatelessWidget {
           if (transactions.isEmpty)
             const _EmptyLine('No recent treasury transactions loaded.')
           else
-            _TransactionTable(transactions: transactions.take(12).toList()),
+            _TransactionList(transactions: transactions.take(12).toList()),
         ],
       ),
     );
@@ -1106,7 +1108,7 @@ class _LotteryPanel extends StatelessWidget {
               label: 'No ticket', value: _display(data['lotteryNoTicket'])),
           const SizedBox(height: 12),
           const Text(
-            'Positive-balance validators share 97% of mining weight. Zero-balance validators share the remaining 3%.',
+            'Only validators with a positive PKN balance receive mining weight. Zero-balance validators stay connected but receive no lottery tickets.',
             style: TextStyle(color: Color(0xFFCBD5E1), height: 1.4),
           ),
         ],
@@ -1237,7 +1239,7 @@ class _SearchPanel extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           if (transactions.isNotEmpty) ...[
-            _TransactionTable(transactions: transactions),
+            _TransactionList(transactions: transactions),
             if (rows.isNotEmpty) const SizedBox(height: 14),
           ],
           if (rows.isNotEmpty)
@@ -1266,6 +1268,24 @@ class _ResponsiveColumns extends StatelessWidget {
         Expanded(child: left),
         const SizedBox(width: 18),
         Expanded(child: right),
+      ],
+    );
+  }
+}
+
+class _ExplorerSideStack extends StatelessWidget {
+  final List<Widget> children;
+
+  const _ExplorerSideStack({required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        for (var i = 0; i < children.length; i++) ...[
+          if (i > 0) const SizedBox(height: 18),
+          children[i],
+        ],
       ],
     );
   }
@@ -1382,8 +1402,7 @@ class _ListRow extends StatelessWidget {
                   const SizedBox(height: 4),
                   SelectableText(
                     subtitle,
-                    style:
-                        const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                    style: const TextStyle(color: Colors.white, fontSize: 12),
                   ),
                 ],
               ),
@@ -1443,72 +1462,237 @@ class _InfoBox extends StatelessWidget {
   }
 }
 
-class _TransactionTable extends StatelessWidget {
+class _TransactionList extends StatelessWidget {
   final List<ExplorerTransaction> transactions;
 
-  const _TransactionTable({required this.transactions});
+  const _TransactionList({required this.transactions});
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: const Color(0xFF080D1A),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: DataTable(
-            headingRowColor: WidgetStateProperty.all(const Color(0xFF111827)),
-            dataRowMinHeight: 56,
-            dataRowMaxHeight: 64,
-            columnSpacing: 24,
-            headingTextStyle: const TextStyle(
-              color: Color(0xFFE2E8F0),
-              fontWeight: FontWeight.w800,
-              fontSize: 12,
-            ),
-            dataTextStyle: const TextStyle(
-              color: Color(0xFFE2E8F0),
-              fontSize: 12,
-            ),
-            columns: const [
-              DataColumn(label: Text('Transaction Hash')),
-              DataColumn(label: Text('Action')),
-              DataColumn(label: Text('Block')),
-              DataColumn(label: Text('From')),
-              DataColumn(label: Text('To')),
-              DataColumn(label: Text('Amount'), numeric: true),
-              DataColumn(label: Text('Status')),
-            ],
-            rows: [
-              for (final tx in transactions)
-                DataRow(
-                  cells: [
-                    DataCell(_ExplorerCellLink(
-                      label: _short(tx.hash, head: 10, tail: 6),
-                      url: '${ProjectLinks.rpcBase}/explorer/tx/${tx.hash}',
-                    )),
-                    DataCell(_ActionPill(label: tx.kind)),
-                    DataCell(Text('${tx.blockNumber}')),
-                    DataCell(_ExplorerCellLink(
-                      label: _short(tx.from, head: 8, tail: 6),
-                      url:
-                          '${ProjectLinks.rpcBase}/explorer/address/${tx.from}',
-                    )),
-                    DataCell(_ExplorerCellLink(
-                      label: _short(tx.to, head: 8, tail: 6),
-                      url: '${ProjectLinks.rpcBase}/explorer/address/${tx.to}',
-                    )),
-                    DataCell(Text('${_formatAmount(tx.amount)} PKN')),
-                    DataCell(Text(tx.finalized ? 'Final' : 'Pending')),
-                  ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 760;
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            color: const Color(0xFF121A2D),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            children: [
+              if (!compact) const _TransactionHeader(),
+              for (var i = 0; i < transactions.length; i++)
+                _TransactionRow(
+                  transaction: transactions[i],
+                  compact: compact,
+                  showDivider: i > 0 || !compact,
                 ),
             ],
           ),
-        ),
+        );
+      },
+    );
+  }
+}
+
+class _TransactionHeader extends StatelessWidget {
+  const _TransactionHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: const BoxDecoration(
+        color: Color(0xFF1A2438),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      child: const Row(
+        children: [
+          Expanded(flex: 5, child: _HeaderLabel('Transaction')),
+          Expanded(flex: 1, child: _HeaderLabel('Action', alignCenter: true)),
+          Expanded(child: _HeaderLabel('Block')),
+          Expanded(flex: 2, child: _HeaderLabel('From')),
+          Expanded(flex: 2, child: _HeaderLabel('To')),
+          Expanded(flex: 2, child: _HeaderLabel('Amount', alignEnd: true)),
+          Expanded(child: _HeaderLabel('Status', alignEnd: true)),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeaderLabel extends StatelessWidget {
+  final String text;
+  final bool alignEnd;
+  final bool alignCenter;
+
+  const _HeaderLabel(this.text,
+      {this.alignEnd = false, this.alignCenter = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      textAlign: alignCenter
+          ? TextAlign.center
+          : (alignEnd ? TextAlign.end : TextAlign.start),
+      style: const TextStyle(
+        color: Color(0xFFE2E8F0),
+        fontWeight: FontWeight.w800,
+        fontSize: 12,
+      ),
+    );
+  }
+}
+
+class _TransactionRow extends StatelessWidget {
+  final ExplorerTransaction transaction;
+  final bool compact;
+  final bool showDivider;
+
+  const _TransactionRow({
+    required this.transaction,
+    required this.compact,
+    required this.showDivider,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const rowTextStyle = TextStyle(
+      color: Color(0xFFE2E8F0),
+      fontWeight: FontWeight.w700,
+    );
+    final tx = transaction;
+    final hashLink = _ExplorerCellLink(
+      label: compact ? _short(tx.hash, head: 12, tail: 6) : tx.hash,
+      url: '${ProjectLinks.rpcBase}/explorer/tx/${tx.hash}',
+    );
+    final fromLink = _ExplorerCellLink(
+      label: compact ? _short(tx.from, head: 10, tail: 6) : tx.from,
+      url: '${ProjectLinks.rpcBase}/explorer/address/${tx.from}',
+    );
+    final toLink = _ExplorerCellLink(
+      label: compact ? _short(tx.to, head: 10, tail: 6) : tx.to,
+      url: '${ProjectLinks.rpcBase}/explorer/address/${tx.to}',
+    );
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: showDivider
+            ? Border(
+                top: BorderSide(color: Colors.white.withValues(alpha: 0.08)))
+            : null,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: compact
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(child: hashLink),
+                      const SizedBox(width: 10),
+                      _ActionPill(label: tx.kind),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 16,
+                    runSpacing: 8,
+                    children: [
+                      _TxMeta(
+                        label: 'Block',
+                        child: Text(
+                          '${tx.blockNumber}',
+                          style: rowTextStyle,
+                        ),
+                      ),
+                      _TxMeta(label: 'From', child: fromLink),
+                      _TxMeta(label: 'To', child: toLink),
+                      _TxMeta(
+                          label: 'Amount',
+                          child: Text(
+                            '${_formatAmount(tx.amount)} PKN',
+                            style: rowTextStyle,
+                          )),
+                      _TxMeta(
+                          label: 'Status',
+                          child: Text(
+                            tx.finalized ? 'Final' : 'Pending',
+                            style: rowTextStyle,
+                          )),
+                    ],
+                  ),
+                ],
+              )
+            : Row(
+                children: [
+                  Expanded(flex: 5, child: hashLink),
+                  Expanded(
+                    flex: 1,
+                    child: Align(
+                      alignment: Alignment.center,
+                      child: _ActionPill(label: tx.kind),
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      '${tx.blockNumber}',
+                      style: rowTextStyle,
+                    ),
+                  ),
+                  Expanded(flex: 2, child: fromLink),
+                  Expanded(flex: 2, child: toLink),
+                  Expanded(
+                    flex: 2,
+                    child: Text(
+                      '${_formatAmount(tx.amount)} PKN',
+                      textAlign: TextAlign.end,
+                      style: rowTextStyle,
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      tx.finalized ? 'Final' : 'Pending',
+                      textAlign: TextAlign.end,
+                      style: rowTextStyle,
+                    ),
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+}
+
+class _TxMeta extends StatelessWidget {
+  final String label;
+  final Widget child;
+
+  const _TxMeta({required this.label, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 120),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 3),
+          DefaultTextStyle(
+            style: const TextStyle(color: Colors.white, fontSize: 12),
+            child: child,
+          ),
+        ],
       ),
     );
   }
@@ -1526,9 +1710,13 @@ class _ExplorerCellLink extends StatelessWidget {
       onTap: () => _open(url),
       child: Text(
         label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        softWrap: false,
         style: const TextStyle(
           color: Color(0xFF38BDF8),
           fontWeight: FontWeight.w800,
+          fontSize: 12,
         ),
       ),
     );
@@ -1544,11 +1732,11 @@ class _ActionPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = label.trim().isEmpty ? 'Transfer' : label.trim();
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFF111827),
+        color: const Color(0xFF25324A),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.20)),
       ),
       child: Text(
         text[0].toUpperCase() + text.substring(1),

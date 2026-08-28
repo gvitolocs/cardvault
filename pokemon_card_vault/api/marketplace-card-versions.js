@@ -2,6 +2,10 @@ const { marketplaceQuery } = require('./_marketplace_db');
 const { withCardEmojiFields } = require('./_marketplace_card_emoji');
 const { projectedRaritySql } = require('./_marketplace_card_rarity');
 const {
+  slugPart,
+  slugParts: normalizedSlugParts,
+} = require('./_slug');
+const {
   availabilityColumns,
   cardTraderAvailabilityJoin,
   cheapestHomepageCacheRelationName,
@@ -17,6 +21,11 @@ function cleanLimit(value, fallback = 240) {
 
 function cleanText(value, maxLength = 120) {
   return String(value || '').trim().slice(0, maxLength);
+}
+
+function cleanProductCategory(value) {
+  const category = cleanText(value, 60).toLowerCase();
+  return category === 'graded' ? category : '';
 }
 
 function searchTerms(value) {
@@ -115,13 +124,7 @@ function projectedExpansionNumberIntSql(expansionNumberSql = projectedExpansionN
 }
 
 function cardDetailSlugParts(value) {
-  return String(value || '')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .split('-')
-    .filter(Boolean);
+  return normalizedSlugParts(value);
 }
 
 function normalizeCollectorNumberSlugToken(value) {
@@ -149,15 +152,7 @@ function stripLeadingClassifierTerms(terms) {
 }
 
 function slugSql(column) {
-  return `trim(both '-' from regexp_replace(lower(coalesce(${column}, '')), '[^a-z0-9]+', '-', 'g'))`;
-}
-
-function slugPart(value) {
-  return String(value || '')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+  return `trim(both '-' from regexp_replace(replace(lower(coalesce(${column}, '')), 'é', 'e'), '[^a-z0-9]+', '-', 'g'))`;
 }
 
 function canonicalSlugForRow(row = {}) {
@@ -190,7 +185,7 @@ function canonicalSlugMatches(left, right) {
 }
 
 function collectorSlugSql(column) {
-  return `trim(both '-' from regexp_replace(regexp_replace(lower(coalesce(${column}, '')), '\\y0+([0-9])', '\\1', 'g'), '[^a-z0-9]+', '-', 'g'))`;
+  return `trim(both '-' from regexp_replace(regexp_replace(replace(lower(coalesce(${column}, '')), 'é', 'e'), '\\y0+([0-9])', '\\1', 'g'), '[^a-z0-9]+', '-', 'g'))`;
 }
 
 function slugMatchClause(slug, values, options = {}) {
@@ -268,6 +263,70 @@ function searchClause(query, productType, searchLanguage, values) {
   return ` and ${clauses.join(' and ')}`;
 }
 
+function activeNativeListingPredicate(alias = 'listing') {
+  return `
+    ${alias}.status = 'active'
+    and coalesce(${alias}.quantity_available, 0) > 0
+    and ${alias}.price_pkn > 0
+    and coalesce(${alias}.shipping_available, true) = true
+    and not (
+      ${alias}.nft_available = true
+      and coalesce(${alias}.shipping_available, false) = false
+    )
+  `;
+}
+
+function gradedListingSummaryJoin(candidateAlias = 'versions') {
+  return `
+    left join lateral (
+      select
+        count(*)::integer as active_listing_count,
+        coalesce(sum(coalesce(listing.quantity_available, 0)), 0)::integer as listed_quantity,
+        min(listing.price_pkn) as lowest_price_pkn,
+        (array_agg(listing.id::text order by listing.price_pkn asc, listing.updated_at desc, listing.id asc))[1] as sample_listing_id,
+        (array_agg(nullif(listing.grading_company, '') order by listing.price_pkn asc, listing.updated_at desc, listing.id asc))[1] as grading_company,
+        (array_agg(nullif(listing.grade, '') order by listing.price_pkn asc, listing.updated_at desc, listing.id asc))[1] as grade
+      from (
+        select
+          native_listing.*,
+          case when native_listing.card_id ~ '^[0-9]+$' then native_listing.card_id::bigint else null end as card_id_bigint
+        from public.marketplace_user_listings native_listing
+      ) listing
+      where listing.card_id_bigint = ${candidateAlias}.card_id
+        and listing.graded = true
+        and ${activeNativeListingPredicate('listing')}
+    ) graded_listings on true
+  `;
+}
+
+function gradedAvailabilityColumns(alias = 'graded_listings') {
+  return `
+    coalesce(${alias}.listed_quantity, 0) as listed_quantity,
+    ${alias}.lowest_price_pkn as lowest_price_pkn,
+    case
+      when coalesce(${alias}.active_listing_count, 0) > 0
+        then 'marketplace_user_listings_graded'
+      else null
+    end as homepage_cheapest_source,
+    case
+      when coalesce(${alias}.active_listing_count, 0) > 0
+        then 'pokoin_native'
+      else null
+    end as homepage_cheapest_provider,
+    ${alias}.sample_listing_id as homepage_cheapest_listing_id,
+    0 as cardtrader_eligible_listing_count,
+    false as has_cardtrader_listing,
+    0 as cardtrader_listed_quantity,
+    null::numeric as cardtrader_lowest_price_pkn,
+    false as cardtrader_available,
+    true as is_graded,
+    ${alias}.active_listing_count as graded_listing_count,
+    ${alias}.lowest_price_pkn as graded_lowest_price_pkn,
+    ${alias}.grading_company,
+    ${alias}.grade
+  `;
+}
+
 async function candidateRowsForCardId(cardId, query = marketplaceQuery) {
   const normalizedCardId = Number(cardId);
   if (!Number.isSafeInteger(normalizedCardId) || normalizedCardId <= 0) {
@@ -339,6 +398,7 @@ async function rowsForVersions({
   sameAsCardId,
   limit,
   productType,
+  productCategory,
   searchLanguage,
 }) {
   const route = resolveCardRoute({ cardId, cardSlug });
@@ -381,14 +441,27 @@ async function rowsForVersions({
   }
 
   const normalizedProductType = cleanText(productType, 60);
+  const normalizedProductCategory = cleanProductCategory(productCategory);
+  const gradedOnly = normalizedProductCategory === 'graded';
   if (normalizedProductType) {
     values.push(normalizedProductType);
     where += ` and versions.product_type = $${values.length}`;
   }
 
   where += searchClause(query, normalizedProductType, searchLanguage, values);
+  if (gradedOnly) {
+    where += ' and coalesce(graded_listings.active_listing_count, 0) > 0';
+  }
   values.push(cleanLimit(limit));
-  const cheapestCacheRelation = await cheapestHomepageCacheRelationName(dbQuery);
+  const cheapestCacheRelation = gradedOnly
+    ? null
+    : await cheapestHomepageCacheRelationName(dbQuery);
+  const availabilitySql = gradedOnly
+    ? gradedAvailabilityColumns('graded_listings')
+    : availabilityColumns('price_summary', 'cardtrader');
+  const availabilityJoinSql = gradedOnly
+    ? gradedListingSummaryJoin('versions')
+    : cardTraderAvailabilityJoin('versions', cheapestCacheRelation);
 
   const result = await dbQuery(
     `
@@ -415,7 +488,7 @@ async function rowsForVersions({
         urls.canonical_path,
         versions.projected_at,
         expansions.symbol_image_url as expansion_symbol_url,
-        ${availabilityColumns('price_summary', 'cardtrader')}
+        ${availabilitySql}
       from public.marketplace_card_versions versions
       left join public.marketplace_search_candidates candidates
         on candidates.card_id = versions.card_id
@@ -423,7 +496,7 @@ async function rowsForVersions({
         on blueprints.id = versions.card_id
       left join public.marketplace_blueprint_tcg_metadata tcg_metadata
         on tcg_metadata.blueprint_id = versions.card_id
-      ${cardTraderAvailabilityJoin('versions', cheapestCacheRelation)}
+      ${availabilityJoinSql}
       left join lateral (
         select collector_number
         from public.marketplace_cm_verified_links link
@@ -471,7 +544,8 @@ async function rowsForVersions({
     query ||
     expansionName ||
     sameAsCardId ||
-    normalizedProductType
+    normalizedProductType ||
+    normalizedProductCategory
   ) {
     return result.rows.map(withCardEmojiFields);
   }
@@ -511,7 +585,10 @@ module.exports = async function handler(req, res) {
       sameAsCardId: url.searchParams.get('sameAsCardId'),
       limit: url.searchParams.get('limit'),
       productType: url.searchParams.get('productType'),
-      searchLanguage: url.searchParams.get('lang') || url.searchParams.get('language'),
+      productCategory: url.searchParams.get('productCategory') || url.searchParams.get('category'),
+      searchLanguage: url.searchParams.get('search_language') ||
+        url.searchParams.get('lang') ||
+        url.searchParams.get('language'),
     });
     res.setHeader('Cache-Control', 'public, max-age=20, s-maxage=120');
     return res.status(200).json(rows);
@@ -536,3 +613,6 @@ module.exports.canonicalSlugForRow = canonicalSlugForRow;
 module.exports.canonicalPathForRow = canonicalPathForRow;
 module.exports.canonicalSlugMatches = canonicalSlugMatches;
 module.exports.candidateRowsForCardId = candidateRowsForCardId;
+module.exports.activeNativeListingPredicate = activeNativeListingPredicate;
+module.exports.gradedAvailabilityColumns = gradedAvailabilityColumns;
+module.exports.gradedListingSummaryJoin = gradedListingSummaryJoin;

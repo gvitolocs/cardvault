@@ -647,6 +647,18 @@ Vercel compatibility rewrite are available.
 - Notable env vars: `MARKETPLACE_DATABASE_URL`, `MARKETPLACE_ADMIN_EMAILS`, `MARKETPLACE_DEBUG_EMAILS`, `FIREBASE_*`
 - External dependencies: Oracle/Postgres marketplace DB, Firebase Admin
 
+### /api/marketplace-cart
+
+- File: `api/marketplace-cart.js`
+- Methods: `POST`
+- Purpose: Record marketplace cart add/remove analytics with optional verified user context.
+- Auth: Public; optional Firebase bearer token attaches user UID when valid.
+- Migration status: Hosted by `server/oracle-api-server.js`; Vercel fallback remains available until the proxy rewrite is enabled.
+- Required query/body/path params:
+- body: `cardId` or `blueprintId`, `action`, and optional anonymous/session ID.
+- Notable env vars: `MARKETPLACE_DATABASE_URL`, `FIREBASE_*`
+- External dependencies: Oracle/Postgres marketplace DB, optional Firebase Admin
+
 ### /api/marketplace-cards
 
 - File: `api/marketplace-cards.js`
@@ -820,6 +832,18 @@ Vercel compatibility rewrite are available.
 - body: `search_term`/`searchTerm`, `result_limit`, `result_offset`, `search_language`, optional previous context/debug fields.
 - Notable env vars: `MARKETPLACE_DATABASE_URL`, `MARKETPLACE_*_DATABASE_URL`, `MARKETPLACE_ADMIN_EMAILS`, `MARKETPLACE_DEBUG_EMAILS`, `FIREBASE_*`
 - External dependencies: Oracle/Postgres marketplace DB, Firebase Admin for debug auth
+
+### /api/marketplace-watchlist
+
+- File: `api/marketplace-watchlist.js`
+- Methods: `POST`
+- Purpose: Record marketplace watchlist add/remove analytics with optional verified user context.
+- Auth: Public; optional Firebase bearer token attaches user UID when valid.
+- Migration status: Hosted by `server/oracle-api-server.js`; Vercel fallback remains available until the proxy rewrite is enabled.
+- Required query/body/path params:
+- body: `cardId` or `blueprintId`, `action`, and optional client context.
+- Notable env vars: `MARKETPLACE_DATABASE_URL`, `FIREBASE_*`
+- External dependencies: Oracle/Postgres marketplace DB, optional Firebase Admin
 
 ### /api/pokoin-assistant
 

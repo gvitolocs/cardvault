@@ -4,9 +4,41 @@ language sql
 stable
 set search_path = public
 as $$
-  with candidates as (
+  with available_homepage_cache as (
+    select distinct on (candidate.card_id)
+      candidate.card_id as candidate_id,
+      cache.blueprint_id,
+      cache.pokoin_card_id,
+      cache.provider,
+      cache.eligible_listing_count,
+      cache.eligible_quantity,
+      cache.cheapest_price_pkn,
+      cache.sample_listing_id
+    from public.cheapest_homepage_cache_blueprint cache
+    join public.marketplace_search_candidates candidate
+      on cache.blueprint_id = candidate.card_id
+      or cache.pokoin_card_id = candidate.card_id::text
+    where cache.provider in ('cardtrader', 'pokoin_native')
+      and cache.eligible_listing_count > 0
+      and cache.cheapest_price_pkn is not null
+      and cache.cheapest_price_pkn > 0
+    order by
+      candidate.card_id,
+      case when cache.blueprint_id = candidate.card_id then 0 else 1 end,
+      cache.cheapest_price_pkn asc,
+      case when cache.provider = 'pokoin_native' then 0 else 1 end,
+      cache.eligible_listing_count desc,
+      cache.blueprint_id asc,
+      cache.provider asc
+  ),
+  candidates as (
     select
       c.*,
+      cache.provider as homepage_cache_provider,
+      cache.eligible_listing_count as homepage_cache_eligible_listing_count,
+      cache.eligible_quantity as homepage_cache_eligible_quantity,
+      cache.cheapest_price_pkn as homepage_cache_cheapest_price_pkn,
+      cache.sample_listing_id as homepage_cache_sample_listing_id,
       coalesce(urls.canonical_path, '') as canonical_path,
       coalesce(
         case
@@ -39,6 +71,7 @@ as $$
         c.card_number
       ) as projected_card_number
     from public.marketplace_search_candidates c
+    join available_homepage_cache cache on cache.candidate_id = c.card_id
     left join public.cardtrader_pokemon_blueprints b on b.id = c.card_id
     left join public.marketplace_card_urls urls
       on urls.card_id = c.card_id
@@ -64,52 +97,20 @@ as $$
       coalesce((h.metadata->>'cardtraderListingCount')::integer, 0) as cardtrader_listing_count,
       coalesce((h.metadata->>'cardtraderListedQuantity')::integer, 0) as cardtrader_listed_quantity,
       coalesce((h.metadata->>'cardtraderSellThrough7d')::numeric, 0) as cardtrader_sell_through_7d,
-      coalesce(cardtrader_cache.eligible_listing_count, 0) as cardtrader_listing_cache_count,
-      (
-        coalesce(price_summary.listed_quantity, 0) +
-        case
-          when cardtrader_cache.provider = 'cardtrader' then coalesce(cardtrader_cache.eligible_quantity, 0)
-          when coalesce(price_summary.listed_quantity, 0) = 0 then coalesce(cardtrader_cache.eligible_quantity, 0)
-          else 0
-        end
-      ) as available_quantity,
+      coalesce(c.homepage_cache_eligible_listing_count, 0) as cardtrader_listing_cache_count,
+      coalesce(c.homepage_cache_eligible_quantity, c.homepage_cache_eligible_listing_count, 0) as available_quantity,
+      c.homepage_cache_cheapest_price_pkn as available_lowest_price_pkn,
+      case when c.homepage_cache_provider = 'cardtrader' then coalesce(c.homepage_cache_eligible_listing_count, 0) else 0 end as cardtrader_eligible_listing_count,
+      c.homepage_cache_provider = 'cardtrader' and coalesce(c.homepage_cache_eligible_listing_count, 0) > 0 as has_cardtrader_listing,
+      case when c.homepage_cache_provider = 'cardtrader' then coalesce(c.homepage_cache_eligible_quantity, 0) else 0 end as cardtrader_eligible_quantity,
+      case when c.homepage_cache_provider = 'cardtrader' then c.homepage_cache_cheapest_price_pkn else null end as cardtrader_eligible_lowest_price_pkn,
+      c.homepage_cache_provider as homepage_cheapest_provider,
       case
-        when cardtrader_cache.cheapest_price_pkn is not null
-          and (
-            price_summary.lowest_ask_pkn is null
-            or cardtrader_cache.cheapest_price_pkn <= price_summary.lowest_ask_pkn
-          )
-          then cardtrader_cache.cheapest_price_pkn
-        else price_summary.lowest_ask_pkn
-      end as available_lowest_price_pkn,
-      case when cardtrader_cache.provider = 'cardtrader' then coalesce(cardtrader_cache.eligible_listing_count, 0) else 0 end as cardtrader_eligible_listing_count,
-      cardtrader_cache.provider = 'cardtrader' and coalesce(cardtrader_cache.eligible_listing_count, 0) > 0 as has_cardtrader_listing,
-      case when cardtrader_cache.provider = 'cardtrader' then coalesce(cardtrader_cache.eligible_quantity, 0) else 0 end as cardtrader_eligible_quantity,
-      case when cardtrader_cache.provider = 'cardtrader' then cardtrader_cache.cheapest_price_pkn else null end as cardtrader_eligible_lowest_price_pkn,
-      case
-        when cardtrader_cache.cheapest_price_pkn is not null
-          and (
-            price_summary.lowest_ask_pkn is null
-            or cardtrader_cache.cheapest_price_pkn <= price_summary.lowest_ask_pkn
-          )
-          then cardtrader_cache.provider
-        when price_summary.lowest_ask_pkn is not null then 'pokoin_native'
-        else null
-      end as homepage_cheapest_provider,
-      case
-        when cardtrader_cache.cheapest_price_pkn is not null
-          and (
-            price_summary.lowest_ask_pkn is null
-            or cardtrader_cache.cheapest_price_pkn <= price_summary.lowest_ask_pkn
-          )
-          then case
-            when cardtrader_cache.provider = 'pokoin_native' then 'pokoin_native_homepage_cache'
-            else 'cheapest_homepage_cache_blueprint'
-          end
-        when price_summary.lowest_ask_pkn is not null then 'marketplace_blueprint_price_summary'
+        when c.homepage_cache_provider = 'pokoin_native' then 'pokoin_native_homepage_cache'
+        when c.homepage_cache_provider = 'cardtrader' then 'cheapest_homepage_cache_blueprint'
         else null
       end as homepage_cheapest_source,
-      cardtrader_cache.sample_listing_id as homepage_cheapest_listing_id,
+      c.homepage_cache_sample_listing_id as homepage_cheapest_listing_id,
       (
         coalesce(h.hot_score_1h, 0) * 1.8 +
         coalesce(h.hot_score_24h, 0) +
@@ -128,39 +129,39 @@ as $$
       on cart_analytics.blueprint_id = c.card_id
     left join public.marketplace_blueprint_price_summary price_summary
       on price_summary.blueprint_id = c.card_id
-    left join lateral (
-      select cache.*
-      from public.cheapest_homepage_cache_blueprint cache
-      where cache.provider in ('cardtrader', 'pokoin_native')
-        and cache.eligible_listing_count > 0
-        and cache.cheapest_price_pkn is not null
-        and (
-          cache.blueprint_id = c.card_id
-          or cache.pokoin_card_id = c.card_id::text
-        )
-      order by
-        case when cache.blueprint_id = c.card_id then 0 else 1 end,
-        cache.cheapest_price_pkn asc,
-        case when cache.provider = 'pokoin_native' then 0 else 1 end,
-        cache.eligible_listing_count desc,
-        cache.blueprint_id asc,
-        cache.provider asc
-      limit 1
-    ) cardtrader_cache on true
   ),
   cards as (
     select *
     from scored
+    where available_lowest_price_pkn is not null
+      and available_lowest_price_pkn > 0
+      and homepage_cheapest_provider in ('cardtrader', 'pokoin_native')
     order by spotlight_score desc, imported_at desc nulls last, card_id desc
     limit greatest(1, least(result_limit, 500))
   ),
   recent_ids as (
     select coalesce(jsonb_agg(card_id::text order by imported_at desc nulls last, card_id desc), '[]'::jsonb) ids
-    from (select * from scored order by imported_at desc nulls last, card_id desc limit 12) r
+    from (
+      select *
+      from scored
+      where available_lowest_price_pkn is not null
+        and available_lowest_price_pkn > 0
+        and homepage_cheapest_provider in ('cardtrader', 'pokoin_native')
+      order by imported_at desc nulls last, card_id desc
+      limit 12
+    ) r
   ),
   spotlight_ids as (
     select coalesce(jsonb_agg(card_id::text order by spotlight_score desc, imported_at desc nulls last), '[]'::jsonb) ids
-    from (select * from scored order by spotlight_score desc, imported_at desc nulls last limit 12) s
+    from (
+      select *
+      from scored
+      where available_lowest_price_pkn is not null
+        and available_lowest_price_pkn > 0
+        and homepage_cheapest_provider in ('cardtrader', 'pokoin_native')
+      order by spotlight_score desc, imported_at desc nulls last
+      limit 12
+    ) s
   ),
   featured_pool as (
     select *
@@ -171,9 +172,14 @@ as $$
           order by spotlight_score desc, imported_at desc nulls last, card_id desc
         )::integer as pool_rank
       from scored
-      where projected_rarity ilike '%rare%'
-         or projected_rarity ilike '%promo%'
-         or name ~* '(^|[^a-z0-9])(ex|vmax|vstar|gx|lv\.x)([^a-z0-9]|$)'
+      where available_lowest_price_pkn is not null
+        and available_lowest_price_pkn > 0
+        and homepage_cheapest_provider in ('cardtrader', 'pokoin_native')
+        and (
+          projected_rarity ilike '%rare%'
+          or projected_rarity ilike '%promo%'
+          or name ~* '(^|[^a-z0-9])(ex|vmax|vstar|gx|lv\.x)([^a-z0-9]|$)'
+        )
     ) ranked_featured
     where pool_rank <= 36
   ),

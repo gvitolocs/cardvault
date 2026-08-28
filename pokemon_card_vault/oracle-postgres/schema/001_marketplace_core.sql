@@ -200,6 +200,29 @@ create table if not exists public.marketplace_blueprint_classification_overrides
 create index if not exists marketplace_blueprint_classification_overrides_source_idx
   on public.marketplace_blueprint_classification_overrides (source, updated_at desc);
 
+create table if not exists public.marketplace_blueprint_emojis (
+  blueprint_id bigint primary key references public.cardtrader_pokemon_blueprints(id) on delete cascade,
+  card_id bigint generated always as (blueprint_id) stored,
+  name text not null,
+  rarity text not null default 'Card',
+  product_variant text not null default '',
+  emoji_identity_a text not null check (trim(emoji_identity_a) <> ''),
+  emoji_identity_b text not null default '',
+  rarity_variant_emoji text not null default '',
+  emoji text not null check (trim(emoji) <> '' and position('🃏' in emoji) = 0),
+  source text not null default 'manual',
+  reason text not null default '',
+  confidence numeric not null default 1 check (confidence >= 0 and confidence <= 1),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists marketplace_blueprint_emojis_name_idx
+  on public.marketplace_blueprint_emojis (lower(name), rarity, product_variant);
+
+create index if not exists marketplace_blueprint_emojis_source_idx
+  on public.marketplace_blueprint_emojis (source, updated_at desc);
+
 create table if not exists public.marketplace_artist_debug_skips (
   id bigserial primary key,
   blueprint_id bigint not null references public.cardtrader_pokemon_blueprints(id) on delete cascade,

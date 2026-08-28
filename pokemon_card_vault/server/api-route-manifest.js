@@ -511,6 +511,20 @@ const routeDefinitions = [
     },
   },
   {
+    path: '/api/marketplace-cart',
+    file: 'marketplace-cart.js',
+    methods: ['POST'],
+    purpose: 'Record marketplace cart add/remove analytics with optional verified user context.',
+    auth: 'Public; optional Firebase bearer token attaches user UID when valid.',
+    params: {
+      body: '`cardId` or `blueprintId`, `action`, and optional anonymous/session ID.',
+    },
+    dependencies: {
+      env: ['MARKETPLACE_DATABASE_URL', 'FIREBASE_*'],
+      services: ['Oracle/Postgres marketplace DB', 'optional Firebase Admin'],
+    },
+  },
+  {
     path: '/api/marketplace-cards',
     file: 'marketplace-cards.js',
     methods: ['GET'],
@@ -710,6 +724,20 @@ const routeDefinitions = [
     dependencies: {
       env: ['MARKETPLACE_DATABASE_URL', 'MARKETPLACE_*_DATABASE_URL', 'MARKETPLACE_ADMIN_EMAILS', 'MARKETPLACE_DEBUG_EMAILS', 'FIREBASE_*'],
       services: ['Oracle/Postgres marketplace DB', 'Firebase Admin for debug auth'],
+    },
+  },
+  {
+    path: '/api/marketplace-watchlist',
+    file: 'marketplace-watchlist.js',
+    methods: ['POST'],
+    purpose: 'Record marketplace watchlist add/remove analytics with optional verified user context.',
+    auth: 'Public; optional Firebase bearer token attaches user UID when valid.',
+    params: {
+      body: '`cardId` or `blueprintId`, `action`, and optional client context.',
+    },
+    dependencies: {
+      env: ['MARKETPLACE_DATABASE_URL', 'FIREBASE_*'],
+      services: ['Oracle/Postgres marketplace DB', 'optional Firebase Admin'],
     },
   },
   {

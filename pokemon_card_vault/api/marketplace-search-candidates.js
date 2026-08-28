@@ -5,6 +5,12 @@ const {
 } = require('./_marketplace_db');
 const { withCardEmojiFields } = require('./_marketplace_card_emoji');
 const { authorizeSearchDebugRequest } = require('./_search_debug_auth');
+const {
+  marketplaceSearchEngine,
+  marketplaceSearchShadowEnabled,
+  useMeiliSearchForLanguage,
+} = require('./_marketplace_search_engine');
+const { meiliMarketplaceCandidates } = require('./_meili_marketplace');
 
 const SEARCH_RPC_V2 = 'search_marketplace_blueprint_candidates_v2';
 const SEARCH_NAME_RPC = 'search_marketplace_blueprint_name_candidates';
@@ -41,12 +47,18 @@ function cleanLanguage(value) {
   return 'en';
 }
 
+function foldDiacritics(value) {
+  return String(value || '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
 function compact(value) {
-  return String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  return foldDiacritics(value).toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
 function searchTerms(value) {
-  const rawTerms = String(value || '')
+  const rawTerms = foldDiacritics(value)
     .replace(/&/g, ' tagteam ')
     .replace(/\blv\s*\.?\s*x\b/gi, 'lvx')
     .replace(/\blevel\s+x\b/gi, 'lvx')
@@ -1066,7 +1078,76 @@ async function rowsForSearchTerm(
   searchLanguage = 'en',
   debug = null,
   previousContext = null,
+  options = {},
 ) {
+  const meiliOnly = Boolean(options.meiliOnly);
+  if (useMeiliSearchForLanguage(searchLanguage)) {
+    if (debug) {
+      debug.searchPath = 'meili_en_candidates';
+    }
+    try {
+      const rows = await rowsForMeiliSearchTerm(
+        searchTerm,
+        resultLimit,
+        resultOffset,
+        searchLanguage,
+        debug,
+        previousContext,
+      );
+      if (marketplaceSearchShadowEnabled()) {
+        rowsForSplitSearchTerm(
+          searchTerm,
+          resultLimit,
+          resultOffset,
+          searchLanguage,
+          null,
+          previousContext,
+        ).catch((error) => {
+          console.error('legacy shadow search failed', error?.message || error);
+        });
+      }
+      return rows;
+    } catch (error) {
+      if (debug) {
+        debug.searchPath = meiliOnly ? 'meili_en_unavailable' : 'meili_en_fallback_legacy';
+        debug.searchEngine = {
+          mode: marketplaceSearchEngine(),
+          fallback: meiliOnly ? 'caller' : 'legacy',
+          reason: error.message || String(error),
+          code: error.code,
+        };
+      }
+      console.error(
+        meiliOnly
+          ? 'meili search failed; caller will choose fallback path'
+          : 'meili search failed, falling back to legacy search',
+        error,
+      );
+      if (meiliOnly) {
+        return [];
+      }
+    }
+  }
+  if (meiliOnly) {
+    if (debug) {
+      debug.searchEngine = {
+        mode: marketplaceSearchEngine(),
+        language: searchLanguage,
+        active: false,
+        fallback: 'caller',
+        reason: 'language_gate_or_flag',
+      };
+    }
+    return [];
+  }
+  if (debug) {
+    debug.searchEngine = {
+      mode: marketplaceSearchEngine(),
+      language: searchLanguage,
+      active: false,
+      reason: 'language_gate_or_flag',
+    };
+  }
   return rowsForSplitSearchTerm(
     searchTerm,
     resultLimit,
@@ -1075,6 +1156,59 @@ async function rowsForSearchTerm(
     debug,
     previousContext,
   );
+}
+
+async function rowsForMeiliSearchTerm(
+  searchTerm,
+  resultLimit,
+  resultOffset = 0,
+  searchLanguage = 'en',
+  debug = null,
+  previousContext = null,
+) {
+  const poolLimit = Math.min(Math.max(resultLimit * 3, 120), 500);
+  const meiliCandidates = await meiliMarketplaceCandidates(
+    searchTerm,
+    searchLanguage,
+    poolLimit,
+    resultOffset,
+  );
+  const ids = meiliCandidates.map((candidate) => candidate.card_id);
+  const hydratedRows = await searchRowsByCardIdsWithDatabase(ids);
+  const scoreById = new Map(meiliCandidates.map((candidate) => [String(candidate.card_id), candidate]));
+  const merged = hydratedRows
+    .map((row) => {
+      const meili = scoreById.get(String(row.card_id));
+      return {
+        ...row,
+        search_rank: Number(row.search_weight || 0) + Number(meili?.meili_rank || 0) * 10_000,
+      };
+    })
+    .sort((left, right) =>
+      Number(right.search_rank || 0) - Number(left.search_rank || 0) ||
+      String(left.name || '').localeCompare(String(right.name || '')) ||
+      String(left.card_number || '').localeCompare(String(right.card_number || '')))
+    .slice(0, resultLimit);
+  if (debug) {
+    debug.searchPath = 'meili_en_candidates';
+    debug.tokenPlan = {
+      strategy: 'meili_en_candidates',
+      poolLimit,
+      candidateCount: meiliCandidates.length,
+      hydratedCount: hydratedRows.length,
+    };
+    debug.searchEngine = {
+      mode: 'meili',
+      poolLimit,
+      candidateCount: meiliCandidates.length,
+      hydratedCount: hydratedRows.length,
+      shadow: marketplaceSearchShadowEnabled(),
+    };
+    if (previousContext?.non_name_context || previousContext?.nonNameContext) {
+      debug.searchEngine.contextIgnored = true;
+    }
+  }
+  return merged;
 }
 
 module.exports = async function handler(req, res) {
@@ -1147,9 +1281,12 @@ module.exports.searchNonNameTrainerVariantWithDatabase = searchNonNameTrainerVar
 module.exports.searchNonNameCategoryWithContext = searchNonNameCategoryWithContext;
 module.exports.buildNonNameContext = buildNonNameContext;
 module.exports.searchWithDatabase = searchWithDatabase;
+module.exports.rowsForMeiliSearchTerm = rowsForMeiliSearchTerm;
 module.exports.cleanSearchTerm = cleanSearchTerm;
 module.exports.cleanLimit = cleanLimit;
 module.exports.cleanLanguage = cleanLanguage;
 module.exports.searchTerms = searchTerms;
 module.exports.isVariationIntentTerm = isVariationIntentTerm;
 module.exports.rowSummary = rowSummary;
+module.exports.compact = compact;
+module.exports.foldDiacritics = foldDiacritics;

@@ -3,7 +3,7 @@ const { marketplaceQuery } = require('./_marketplace_db');
 
 const PROVIDER = 'cardtrader';
 const CARDTRADER_MARKUP_PKN = 200;
-const DEFAULT_MAX_BLUEPRINTS = 250;
+const DEFAULT_MAX_BLUEPRINTS = 100_000;
 const MAX_BLUEPRINTS_PER_RUN = 100_000;
 const DEFAULT_REFRESH_BATCH_BLUEPRINTS = 700;
 const MAX_REFRESH_BATCH_BLUEPRINTS = 10_000;

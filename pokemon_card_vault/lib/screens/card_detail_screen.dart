@@ -6071,49 +6071,7 @@ String _displaySellerNameForListing({
 }
 
 String _listingDisplaySellerComment(String comment) {
-  final cleanComment = comment.trim();
-  if (cleanComment.isEmpty) return '';
-  final normalized = cleanComment
-      .toLowerCase()
-      .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
-      .replaceAll(RegExp(r'\s+'), ' ')
-      .trim();
-  const hiddenPromoTerms = <String>[
-    'store',
-    'arcana',
-    'huge selection',
-    'strict grading',
-    'we buy cards',
-    'selection',
-    'grading',
-    'buy cards',
-  ];
-  if (hiddenPromoTerms.any(
-    (term) => RegExp(
-      r'(^| )' + RegExp.escape(term) + r'( |$)',
-    ).hasMatch(normalized),
-  )) {
-    return '';
-  }
-  const hiddenExactLabels = <String>{
-    'cardtrader zero',
-    'ct zero',
-    'zero',
-    '1 day ready',
-    'one day ready',
-    'cardtrader 1 day ready',
-  };
-  if (hiddenExactLabels.contains(normalized)) return '';
-  final hiddenPromos = <RegExp>[
-    RegExp(r'\bcheck (?:out )?my (?:store|shop|profile|page)\b'),
-    RegExp(r'\bvisit my (?:store|shop|profile|page)\b'),
-    RegExp(r'\bsee my (?:store|shop|profile|page|other cards|listings)\b'),
-    RegExp(r'\bmore (?:in|on) (?:the )?(?:store|shop|profile|page)\b'),
-    RegExp(r'\bmore (?:cards|items|listings|products) available\b'),
-  ];
-  return hiddenPromos.any((pattern) => pattern.hasMatch(normalized))
-      ? ''
-      : cleanComment;
+  return '';
 }
 
 void _addListingAsNft(WidgetRef ref, PokemonCard card, CardListing listing) {

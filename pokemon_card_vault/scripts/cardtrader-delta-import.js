@@ -313,6 +313,14 @@ function tcgPlayerIds(blueprint) {
   return [blueprint.tcg_player_id];
 }
 
+function cleanBlueprintImageUrl(value) {
+  const rawUrl = String(value || '').trim();
+  if (!rawUrl || rawUrl.includes('/fallbacks/card_uploader/')) {
+    return null;
+  }
+  return rawUrl;
+}
+
 function rowFromRecord(record) {
   const blueprint = record.blueprint || {};
   return {
@@ -322,7 +330,7 @@ function rowFromRecord(record) {
     game_id: blueprint.game_id,
     category_id: blueprint.category_id ?? null,
     expansion_id: blueprint.expansion_id ?? record.expansion?.id ?? null,
-    image_url: blueprint.image_url || null,
+    image_url: cleanBlueprintImageUrl(blueprint.image_url),
     card_market_ids: blueprint.card_market_ids ?? null,
     tcg_player_ids: tcgPlayerIds(blueprint),
     editable_properties: blueprint.editable_properties || [],

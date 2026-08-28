@@ -1,0 +1,9 @@
+db_path = "/var/lib/meilisearch/data.ms"
+dump_dir = "/var/lib/meilisearch/dumps"
+snapshot_dir = "/var/lib/meilisearch/snapshots"
+env = "production"
+http_addr = "0.0.0.0:7700"
+master_key = "replace_me"
+schedule_snapshot = true
+snapshot_interval_sec = 3600
+log_level = "INFO"

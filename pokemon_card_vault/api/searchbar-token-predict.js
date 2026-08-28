@@ -3,6 +3,8 @@ const {
   cleanLimit,
   cleanSearchTerm,
 } = require('./marketplace-search-candidates');
+const { useMeiliSearchForLanguage } = require('./_marketplace_search_engine');
+const { meiliPredictedNameTokens } = require('./_meili_marketplace');
 const {
   compact,
   supabasePredictedNameTokens,
@@ -23,6 +25,10 @@ const PREDICTION_CONTEXT_CANDIDATE_ID_LIMIT = 32;
 const CONTEXT_WEAK_MATCH_CONFIDENCE = 75;
 const PREDICTION_CONTEXT_TTL_MS = 60_000;
 const FIRST_CHAR_PREDICTION_CACHE_TTL_MS = 5 * 60_000;
+const FIRST_CHAR_WARMUP_CACHE_TTL_MS = 5 * 60_000;
+const DEFAULT_WARMUP_LIMIT = 1;
+const MAX_WARMUP_LIMIT = 5;
+const FIRST_CHAR_WARMUP_LETTERS = 'abcdefghijklmnopqrstuvwxyz'.split('');
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
@@ -30,6 +36,7 @@ const CORS_HEADERS = {
   'Access-Control-Max-Age': '86400',
 };
 const firstCharPredictionCachesByQuery = new WeakMap();
+const firstCharWarmupCachesByQuery = new WeakMap();
 const EXPANSION_ALIAS_COMPLETIONS = [
   {
     display_token: 'HeartGold & SoulSilver',
@@ -89,6 +96,13 @@ function cleanTokenPredictLimit(value) {
   return Math.min(Math.max(cleaned, 1), MAX_LIMIT);
 }
 
+function cleanWarmupLimit(value) {
+  const cleaned = value === undefined || value === null || value === ''
+    ? DEFAULT_WARMUP_LIMIT
+    : cleanLimit(value);
+  return Math.min(Math.max(cleaned, 1), MAX_WARMUP_LIMIT);
+}
+
 function inputFromRequest(req) {
   const source = req.method === 'GET' ? req.query || {} : req.body || {};
   const rawQuery = source.fragment ??
@@ -110,6 +124,31 @@ function inputFromRequest(req) {
       source.prediction_context ??
       source.predictionContext,
     ),
+    debug: source.debug === true || source.debug === 'true' || source.debug === '1' || source.debug === 1,
+  };
+}
+
+function requestWantsWarmup(req) {
+  const source = req.method === 'GET' ? req.query || {} : req.body || {};
+  const mode = String(source.mode || source.intent || '').trim().toLowerCase();
+  return mode === 'warmup' ||
+    mode === 'first_char_warmup' ||
+    source.warmup === true ||
+    source.warmup === 'true' ||
+    source.warmup === '1' ||
+    source.first_char_warmup === true ||
+    source.first_char_warmup === 'true' ||
+    source.first_char_warmup === '1' ||
+    source.firstCharWarmup === true ||
+    source.firstCharWarmup === 'true' ||
+    source.firstCharWarmup === '1';
+}
+
+function warmupInputFromRequest(req) {
+  const source = req.method === 'GET' ? req.query || {} : req.body || {};
+  return {
+    searchLanguage: cleanLanguage(source.search_language ?? source.language ?? source.lang),
+    limit: cleanWarmupLimit(source.limit ?? source.result_limit ?? source.resultLimit),
     debug: source.debug === true || source.debug === 'true' || source.debug === '1' || source.debug === 1,
   };
 }
@@ -151,6 +190,19 @@ function isModifierOnlyTrailingWords(words) {
   return Array.isArray(words) &&
     words.length > 0 &&
     words.every((word) => MODIFIER_ONLY_ANCHOR_WORDS.has(compact(word)));
+}
+
+function isVariationPrefixTrailingWords(words) {
+  return Array.isArray(words) &&
+    words.length > 0 &&
+    words.every((word) => {
+      const normalized = compact(word);
+      if (!normalized) return false;
+      if (normalized === 'g' || normalized === 'e') return true;
+      if (MODIFIER_ONLY_ANCHOR_WORDS.has(normalized)) return true;
+      return normalized.length >= 2 &&
+        [...MODIFIER_ONLY_ANCHOR_WORDS].some((modifier) => modifier.startsWith(normalized));
+    });
 }
 
 function predictionFragmentForQuery(value) {
@@ -590,6 +642,30 @@ function rememberFirstCharCacheEntry(query, key, result) {
   });
 }
 
+function firstCharWarmupCacheEntry(query, key) {
+  const cache = firstCharWarmupCachesByQuery.get(query);
+  if (!cache) return null;
+  const entry = cache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.createdAtMs > FIRST_CHAR_WARMUP_CACHE_TTL_MS) {
+    cache.delete(key);
+    return null;
+  }
+  return entry.payload;
+}
+
+function rememberFirstCharWarmupCacheEntry(query, key, payload) {
+  let cache = firstCharWarmupCachesByQuery.get(query);
+  if (!cache) {
+    cache = new Map();
+    firstCharWarmupCachesByQuery.set(query, cache);
+  }
+  cache.set(key, {
+    createdAtMs: Date.now(),
+    payload,
+  });
+}
+
 function firstCharCacheKey(input, normalizedFragment) {
   if (normalizedFragment.length !== 1) return '';
   if (input.previousPredictionContext) return '';
@@ -599,6 +675,231 @@ function firstCharCacheKey(input, normalizedFragment) {
 function clearFirstCharPredictionCacheForTest() {
   firstCharPredictionCachesByQuery.delete(supabaseNameIndexQuery);
   anchorCachesByQuery.delete(supabaseNameIndexQuery);
+  firstCharWarmupCachesByQuery.delete(supabaseNameIndexQuery);
+}
+
+function clearFirstCharWarmupCacheForTest(query = supabaseNameIndexQuery) {
+  firstCharWarmupCachesByQuery.delete(query);
+}
+
+async function firstCharWarmupRows(searchLanguage, perLetterLimit, query) {
+  const result = await query(
+    `
+      with input as (
+        select
+          $1::text as language,
+          least(greatest($2::integer, 1), 5) as per_letter_limit
+      ),
+      ranked as (
+        select
+          lower(substr(i.compact_name, 1, 1)) as letter,
+          i.display_name,
+          i.canonical_name,
+          i.compact_name,
+          i.language,
+          greatest(
+            coalesce(i.row_count, 0),
+            coalesce(array_length(i.card_ids, 1), 0)
+          )::integer as card_count,
+          coalesce(array_length(i.card_ids, 1), 0)::integer as ids_count,
+          least(
+            100,
+            greatest(72, 96 - greatest(length(i.compact_name) - 1, 0)) +
+              least(
+                8,
+                case
+                  when greatest(coalesce(i.row_count, 0), coalesce(array_length(i.card_ids, 1), 0)) > 1
+                    then ln(greatest(coalesce(i.row_count, 0), coalesce(array_length(i.card_ids, 1), 0)) + 1) / ln(2) * 1.2
+                  else 0
+                end
+              )
+          )::real as confidence,
+          (
+            120000 +
+            case when i.display_name = i.canonical_name then 800 else 0 end +
+            least(greatest(i.search_weight, 0), 5000) +
+            least(
+              greatest(
+                greatest(
+                  coalesce(i.row_count, 0),
+                  coalesce(array_length(i.card_ids, 1), 0)
+                ),
+                0
+              ),
+              1000
+            ) * 900
+          )::real as score,
+          row_number() over (
+            partition by lower(substr(i.compact_name, 1, 1))
+            order by
+              (
+                120000 +
+                case when i.display_name = i.canonical_name then 800 else 0 end +
+                least(greatest(i.search_weight, 0), 5000) +
+                least(
+                  greatest(
+                    greatest(
+                      coalesce(i.row_count, 0),
+                      coalesce(array_length(i.card_ids, 1), 0)
+                    ),
+                    0
+                  ),
+                  1000
+                ) * 900
+              ) desc,
+              length(i.compact_name),
+              i.display_name
+          )::integer as source_rank
+        from input
+        join public.marketplace_card_name_tokens i
+          on i.language = input.language
+        where i.compact_name ~ '^[a-z]'
+      )
+      select *
+      from ranked, input
+      where ranked.source_rank <= input.per_letter_limit
+      order by ranked.letter, ranked.source_rank
+    `,
+    [searchLanguage, perLetterLimit],
+  );
+  return result.rows || [];
+}
+
+async function firstCharWarmupRestRows(searchLanguage, perLetterLimit) {
+  const rows = [];
+  for (const letter of FIRST_CHAR_WARMUP_LETTERS) {
+    const predictions = await supabaseRestPredictedNameTokens(
+      letter,
+      searchLanguage,
+      perLetterLimit,
+    );
+    predictions.forEach((prediction, index) => {
+      rows.push({
+        ...prediction,
+        letter,
+        source_rank: index + 1,
+      });
+    });
+  }
+  return rows;
+}
+
+function firstCharWarmupSuggestionFromRow(row, requestedLanguage, sourceLanguage) {
+  const display = String(
+    row.canonical_name ||
+    row.display_name ||
+    row.display_token ||
+    row.display ||
+    '',
+  ).trim();
+  const normalized = compact(row.normalized_token || row.normalized || display) || compact(row.compact_name);
+  const letter = compact(row.letter || row.matched_prefix || normalized.slice(0, 1));
+  if (!display || !normalized || letter.length !== 1) return null;
+  return {
+    display_token: display,
+    normalized_token: normalized,
+    confidence: Number(row.confidence || 0),
+    score: Number(row.score || 0),
+    source_rank: Number(row.source_rank || 0),
+    language: requestedLanguage,
+    matched_prefix: letter,
+    card_count: Number(row.card_count || row.ids_count || 0),
+    ids_count: Number(row.ids_count || row.card_count || 0),
+    source: 'first_char_warmup',
+    ...(sourceLanguage !== requestedLanguage ? { source_language: sourceLanguage } : {}),
+  };
+}
+
+function firstCharWarmupPayload(rows, input, sourceLanguage, meta = {}) {
+  const byLetter = {};
+  for (const row of rows || []) {
+    const suggestion = firstCharWarmupSuggestionFromRow(row, input.searchLanguage, sourceLanguage);
+    if (!suggestion) continue;
+    const letter = suggestion.matched_prefix;
+    if (!FIRST_CHAR_WARMUP_LETTERS.includes(letter)) continue;
+    if (!byLetter[letter]) byLetter[letter] = [];
+    if (byLetter[letter].length < input.limit) {
+      byLetter[letter].push(suggestion);
+    }
+  }
+  const suggestions = {};
+  for (const letter of Object.keys(byLetter).sort()) {
+    if (byLetter[letter].length > 0) {
+      suggestions[letter] = byLetter[letter][0];
+    }
+  }
+  return {
+    ok: true,
+    endpoint: ENDPOINT,
+    mode: 'first_char_warmup',
+    language: input.searchLanguage,
+    source_language: sourceLanguage,
+    generated_at_ms: Date.now(),
+    limit: input.limit,
+    suggestions,
+    ...(input.limit > 1 ? { suggestion_lists: byLetter } : {}),
+    meta: {
+      source: 'supabase_postgres',
+      model: 'marketplace_card_name_tokens',
+      cache: { hit: false, ttl_ms: FIRST_CHAR_WARMUP_CACHE_TTL_MS },
+      ...meta,
+    },
+  };
+}
+
+async function firstCharWarmupSuggestions(input, query = supabaseNameIndexQuery) {
+  const normalizedLanguage = cleanLanguage(input.searchLanguage);
+  const cleanInput = {
+    searchLanguage: normalizedLanguage,
+    limit: cleanWarmupLimit(input.limit),
+  };
+  const cacheKey = `${cleanInput.searchLanguage}:${cleanInput.limit}`;
+  const cached = firstCharWarmupCacheEntry(query, cacheKey);
+  if (cached) {
+    return {
+      ...cached,
+      meta: {
+        ...cached.meta,
+        cache: { hit: true, ttl_ms: FIRST_CHAR_WARMUP_CACHE_TTL_MS },
+      },
+    };
+  }
+  const hasPostgresConfig = Boolean(supabaseNameIndexDatabaseUrl());
+  const hasRestConfig = Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+  if (query === supabaseNameIndexQuery && !hasPostgresConfig && !hasRestConfig) {
+    const error = new Error('Supabase name-token index is not configured for first-char warmup.');
+    error.statusCode = 503;
+    error.code = 'SUPABASE_NAME_INDEX_NOT_CONFIGURED';
+    throw error;
+  }
+  const loadRows = async (language) => {
+    try {
+      if (query !== supabaseNameIndexQuery || hasPostgresConfig) {
+        return {
+          source: 'supabase_postgres',
+          rows: await firstCharWarmupRows(language, cleanInput.limit, query),
+        };
+      }
+    } catch (error) {
+      if (!hasRestConfig) throw error;
+    }
+    return {
+      source: 'supabase_rest',
+      rows: await firstCharWarmupRestRows(language, cleanInput.limit),
+    };
+  };
+  const started = Date.now();
+  const sourceLanguage = cleanInput.searchLanguage;
+  const loaded = await loadRows(sourceLanguage);
+  const rows = loaded.rows;
+  const payload = firstCharWarmupPayload(rows, cleanInput, sourceLanguage, {
+    source: loaded.source,
+    duration_ms: Date.now() - started,
+    row_count: rows.length,
+    fallback_to_english: false,
+  });
+  rememberFirstCharWarmupCacheEntry(query, cacheKey, payload);
+  return payload;
 }
 
 function anchorFromPrediction(prediction, words, prefixWordCount, source) {
@@ -754,6 +1055,34 @@ async function fetchSupabasePredictionTokens(input, predictionFragment, query) {
     throw error;
   }
   try {
+    if (useMeiliSearchForLanguage(input.searchLanguage)) {
+      try {
+        const result = {
+          source: 'meili_name_tokens',
+          tokens: await meiliPredictedNameTokens(
+            predictionFragment,
+            input.searchLanguage,
+            PREDICTION_CONTEXT_MAX_CANDIDATES,
+          ),
+        };
+        if (cacheKey) rememberFirstCharCacheEntry(query, cacheKey, result);
+        return {
+          ...result,
+          firstCharCache: cacheKey
+            ? {
+                used: true,
+                hit: false,
+                ttl_ms: FIRST_CHAR_PREDICTION_CACHE_TTL_MS,
+              }
+            : { used: false },
+        };
+      } catch (error) {
+        console.error('meili token prediction failed, falling back to legacy token index', {
+          message: error.message,
+          code: error.code,
+        });
+      }
+    }
     const result = {
       source: 'supabase_postgres',
       tokens: await supabasePredictedNameTokens(
@@ -855,7 +1184,8 @@ async function predictNameTokens(input, query = supabaseNameIndexQuery) {
   const firstNameAnchor = await firstNameAnchorForQuery(input, query);
   const aliasPrediction = anchoredAliasPredictionForQuery(input.query, firstNameAnchor);
   const aliasToken = predictionFromExpansionAlias(aliasPrediction);
-  const suppressTrailingNamePrediction = Boolean(firstNameAnchor?.trailingWords?.length);
+  const suppressTrailingNamePrediction = Boolean(firstNameAnchor?.trailingWords?.length) &&
+    !isVariationPrefixTrailingWords(firstNameAnchor.trailingWords);
   const started = Date.now();
   let source = 'supabase_postgres';
   let tokens;
@@ -968,6 +1298,23 @@ async function handler(req, res) {
 
   const input = inputFromRequest(req);
   try {
+    if (requestWantsWarmup(req)) {
+      const warmupInput = warmupInputFromRequest(req);
+      const payload = await firstCharWarmupSuggestions(warmupInput);
+      res.setHeader('Cache-Control', req.method === 'POST'
+        ? 'no-store'
+        : 'public, max-age=30, s-maxage=300');
+      res.setHeader('Server-Timing', `first-char-warmup;dur=${payload.meta.duration_ms || 0}`);
+      return res.status(200).json(warmupInput.debug ? payload : {
+        ...payload,
+        meta: {
+          source: payload.meta.source,
+          model: payload.meta.model,
+          duration_ms: payload.meta.duration_ms,
+          cache: payload.meta.cache,
+        },
+      });
+    }
     const payload = await predictNameTokens(input);
     res.setHeader('Cache-Control', req.method === 'POST'
       ? 'no-store'
@@ -1005,8 +1352,12 @@ async function handler(req, res) {
 
 module.exports = handler;
 module.exports.cleanTokenPredictLimit = cleanTokenPredictLimit;
+module.exports.cleanWarmupLimit = cleanWarmupLimit;
 module.exports.inputFromRequest = inputFromRequest;
+module.exports.warmupInputFromRequest = warmupInputFromRequest;
+module.exports.requestWantsWarmup = requestWantsWarmup;
 module.exports.predictNameTokens = predictNameTokens;
+module.exports.firstCharWarmupSuggestions = firstCharWarmupSuggestions;
 module.exports.predictionFragmentForQuery = predictionFragmentForQuery;
 module.exports.predictionFragmentAlternates = predictionFragmentAlternates;
 module.exports.anchoredAliasPredictionForQuery = anchoredAliasPredictionForQuery;
@@ -1017,3 +1368,4 @@ module.exports.cleanPreviousPredictionContext = cleanPreviousPredictionContext;
 module.exports.trailingTokenFragment = trailingTokenFragment;
 module.exports.candidateCardIdsFromPrediction = candidateCardIdsFromPrediction;
 module.exports.clearFirstCharPredictionCacheForTest = clearFirstCharPredictionCacheForTest;
+module.exports.clearFirstCharWarmupCacheForTest = clearFirstCharWarmupCacheForTest;

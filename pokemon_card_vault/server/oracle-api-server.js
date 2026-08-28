@@ -3,6 +3,7 @@ const { Readable } = require('stream');
 const path = require('path');
 
 const { routeDefinitions } = require('./api-route-manifest');
+const { observeApiRequest } = require('../api/_api_observability');
 
 const API_DIR = path.join(__dirname, '..', 'api');
 const DEFAULT_HOST = process.env.ORACLE_API_HOST || '0.0.0.0';
@@ -303,7 +304,7 @@ function createOracleApiServer() {
         return;
       }
 
-      await callHandler(req, res, matched);
+      await observeApiRequest({ req, res, route: matched.route }, () => callHandler(req, res, matched));
     } catch (error) {
       if (error instanceof SyntaxError) {
         sendJson(res, 400, { error: 'Invalid JSON request body.' });

@@ -150,10 +150,11 @@ Oracle/peer4 scheduled job or script
 
 The global CardTrader market-data ingestion schedule is owned by the Oracle
 host connected to the peer4 marketplace primary. It is not a Vercel Cron. The
-scheduled Oracle job/script uses the global CardTrader app/API token, calls
-CardTrader `GET /marketplace/products` by blueprint or expansion, and refreshes
-Oracle global marketplace listing snapshots. No Firebase user, connected Pokoin
-seller, or encrypted seller token is involved.
+scheduled Oracle wrapper first uses the global CardTrader app/API token to call
+CardTrader `GET /marketplace/products` by blueprint or expansion and refresh
+Oracle global marketplace listing snapshots. After that import succeeds, it runs
+the separate homepage/catalog projection refresh. No Firebase user, connected
+Pokoin seller, or encrypted seller token is involved.
 
 Vercel functions may serve read APIs and explicit manual diagnostics only. They
 must not own the daily CardTrader schedule, retry loop, or production ingestion
@@ -173,8 +174,16 @@ Optional bounded test controls:
 
 Dry-run fetches and shapes rows but does not write Oracle. Keep all production
 and probe runs bounded with explicit blueprint/product limits until counts and
-duration are reviewed. Normal scheduled runs call
-`public.refresh_cardtrader_market_listing_snapshots(...)` on peer4, which:
+duration are reviewed. The normal peer-host run is
+`scripts/run-cardtrader-daily-market-refresh.sh`, which executes:
+
+1. `scripts/refresh-cardtrader-market-listings.js` for the full market listing
+   snapshot/removed-history import.
+2. `scripts/refresh-cardtrader-blueprint-listing-cache.js` for the compact
+   homepage/catalog cheapest-price projection only.
+
+The import step calls `public.refresh_cardtrader_market_listing_snapshots(...)`
+on peer4, which:
 
 - upserts current rows into `public.cardtrader_market_listing_snapshots`;
 - archives rows missing from the fresh export into
@@ -186,16 +195,27 @@ duration are reviewed. Normal scheduled runs call
 - projects current and removed facts into
   `public.marketplace_price_observations` as `cardtrader_snapshot` and
   `cardtrader_removed_sale`;
-- refreshes `cheapest_homepage_cache_blueprint` for the touched blueprints. This
-  projection is the one-row-per-blueprint marketplace tile/card price source
-  derived from the daily backend listings cache/import; it stores Zero + 1-Day
-  Ready eligible listing counts and may include the cheapest EUR price converted
-  to PKN plus the 200 PKN reserve markup when safely available. If production
-  still writes `public.cardtrader_blueprint_listing_cache`, that is the legacy
-  physical table name until a migration renames it;
 - refreshes the graph/price observation projections, blueprint price summaries,
   CardTrader daily analytics, and homepage ranking rollups used by the card page
   graph and marketplace home modules.
+
+The projection step writes `cheapest_homepage_cache_blueprint`, the
+one-row-per-blueprint marketplace tile/card price source derived from the daily
+backend listings cache/import. It stores eligible Zero + 1-Day Ready listing
+counts and may include the cheapest EUR price converted to PKN plus the 200 PKN
+reserve markup when safely available. It does not persist all CardTrader rows,
+removed-history rows, or daily analytics. If production still writes
+`public.cardtrader_blueprint_listing_cache`, that is the legacy physical table
+name until a migration renames it.
+
+The normal peer-host wrapper is intended to cover every known Pokémon CardTrader
+blueprint in `public.marketplace_search_candidates`, not only the highest-ranked
+sample. The script defaults are therefore broad (`100000` blueprints and
+`1000000` products) and the apply path uses `--refresh-batch-blueprints=700` so
+each batch archives only the blueprints it just fetched. Keep one-off diagnostics
+bounded with explicit lower `--max-blueprints`, `--max-products`, or
+`--blueprint-id` values, but do not install a production cron with the old sample
+limits such as `--max-blueprints=250 --max-products=10000`.
 
 Card page live listing API:
 
@@ -220,8 +240,18 @@ and fall back to the same numeric value as the CardTrader blueprint ID because
 Pokoin card identities are currently projected from CardTrader blueprints. The
 CardTrader response is never persisted. The route keeps only a short in-process
 cache and sends short HTTP cache headers to avoid repeated live calls on rapid
-page reloads. Without `limit`, it returns every row CardTrader returns for the
-blueprint; explicit limits only cap the client response.
+page reloads. The in-process cache is a per-Node-process `Map` with a 45-second
+TTL, at most 100 entries, and keys shaped as
+`cardtrader:<resolvedBlueprintId>:<language-or-empty>:<limit-or-all>`. Expired
+entries are pruned on reads/writes; if the map is still over 100 entries, the
+oldest insertion-order keys are removed. There is no distributed cache, DB write,
+webhook invalidation, or admin invalidation endpoint; a process restart or
+`clearLiveListingsCache()` in tests clears it. The response also sets
+`Cache-Control: public, max-age=30, s-maxage=60`, so browser/CDN/proxy caching is
+separate from the in-memory cache. Without `limit`, it returns every eligible row
+CardTrader returns for the blueprint. Clients may pass `limit` to request fewer
+rows; explicit limits are clamped to `1..1000` and only cap the response after
+CardTrader has been fetched.
 
 Responses contain safe current listing metadata: CardTrader product/listing id,
 CardTrader blueprint id, product name/expansion, price/currency, buyer/seller
@@ -317,7 +347,7 @@ node scripts/refresh-cardtrader-market-listings.js \
 Example peer4 crontab entry after the dry-run is reviewed:
 
 ```cron
-20 3 * * * cd /Users/giuseppe/cardvault/pokemon_card_vault && /usr/bin/env node scripts/refresh-cardtrader-market-listings.js --env-file=/Users/giuseppe/pokoinpos/deploy/env/peer4-postgres.env --max-blueprints=250 --max-products=10000 >> /var/log/pokoin-cardtrader-market-refresh.log 2>&1
+20 3 * * * cd /Users/giuseppe/cardvault/pokemon_card_vault && bash scripts/run-cardtrader-daily-market-refresh.sh >> /var/log/pokoin-cardtrader-market-refresh.log 2>&1
 ```
 
 Verification queries after a dry-run or scheduled apply:

@@ -753,7 +753,8 @@ Map<String, String> _assistantCardSummary(PokemonCard card) {
     add('pricePkn', card.price.toStringAsFixed(2));
   }
   if (card.isMarketAvailable) {
-    add('stock', card.stock > 0 ? card.stock.toString() : 'CardTrader available');
+    add('stock',
+        card.stock > 0 ? card.stock.toString() : 'CardTrader available');
   }
   add('canonicalPath', card.canonicalPath);
   return summary;
@@ -938,12 +939,7 @@ String _assistantNavigationPathFromAction(dynamic rawAction) {
   }
   final type =
       '${rawAction['type'] ?? rawAction['action'] ?? ''}'.trim().toLowerCase();
-  final allowedType = type == 'navigate' ||
-      type == 'navigation' ||
-      type == 'open' ||
-      type == 'open_url' ||
-      type == 'open-url';
-  if (!allowedType) {
+  if (type != 'navigate') {
     return '';
   }
   for (final candidate in [

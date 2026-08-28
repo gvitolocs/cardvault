@@ -9,12 +9,16 @@ const rootDir = path.join(__dirname, '..');
 const apiDir = path.join(rootDir, 'api');
 
 const deployHelpers = [
+  '_artist_display',
   '_email',
   '_firebase',
   '_firebase_roles',
   '_marketplace_card_emoji',
   '_marketplace_card_rarity',
   '_marketplace_db',
+  '_marketplace_search_engine',
+  '_meili_client',
+  '_meili_marketplace',
   '_native_pkn',
   '_pending_signup',
   '_pkn_checkout_pricing',
@@ -22,6 +26,7 @@ const deployHelpers = [
   '_r2',
   '_search_debug_auth',
   '_searchbar_session',
+  '_slug',
   '_supabase',
   '_username',
   '_wpkn_exchange',
@@ -129,6 +134,11 @@ test('Pokontact helper loaders resolve in deploy-pokoin-web output layout', () =
       copyApiFile(helper, deployServerDir);
     }
     copyApiFile('pokoin-assistant', deployApiDir);
+    let assistantSource = fs.readFileSync(path.join(deployApiDir, 'pokoin-assistant.js'), 'utf8');
+    assistantSource = assistantSource
+      .replaceAll("require('./_slug')", "require('../server/_slug')")
+      .replaceAll('require("./_slug")', 'require("../server/_slug")');
+    fs.writeFileSync(path.join(deployApiDir, 'pokoin-assistant.js'), assistantSource);
 
     const loaded = withStubbedExternalPackages(() => {
       const assistant = require(path.join(deployApiDir, 'pokoin-assistant.js'));
@@ -184,6 +194,12 @@ test('marketplace autocomplete resolves Supabase helper in deploy-pokoin-web out
         .replaceAll('require("./_marketplace_card_emoji")', 'require("../server/_marketplace_card_emoji")')
         .replaceAll("require('./_marketplace_card_rarity')", "require('../server/_marketplace_card_rarity')")
         .replaceAll('require("./_marketplace_card_rarity")', 'require("../server/_marketplace_card_rarity")')
+        .replaceAll("require('./_marketplace_search_engine')", "require('../server/_marketplace_search_engine')")
+        .replaceAll('require("./_marketplace_search_engine")', 'require("../server/_marketplace_search_engine")')
+        .replaceAll("require('./_meili_marketplace')", "require('../server/_meili_marketplace')")
+        .replaceAll('require("./_meili_marketplace")', 'require("../server/_meili_marketplace")')
+        .replaceAll("require('./_meili_client')", "require('../server/_meili_client')")
+        .replaceAll('require("./_meili_client")', 'require("../server/_meili_client")')
         .replaceAll("require('./_firebase')", "require('../server/_firebase')")
         .replaceAll('require("./_firebase")', 'require("../server/_firebase")')
         .replaceAll("require('./_supabase')", "require('../server/_supabase')")
@@ -218,6 +234,61 @@ test('marketplace autocomplete resolves Supabase helper in deploy-pokoin-web out
   }
 });
 
+test('marketplace artist APIs resolve display helper in deploy-pokoin-web output layout', () => {
+  const deployDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pokoin-web-deploy-'));
+  try {
+    const deployApiDir = path.join(deployDir, 'api');
+    const deployServerDir = path.join(deployDir, 'server');
+    fs.mkdirSync(deployApiDir);
+    fs.mkdirSync(deployServerDir);
+
+    for (const helper of deployHelpers) {
+      copyApiFile(helper, deployServerDir);
+    }
+    for (const endpoint of [
+      'marketplace-artist-cards',
+      'marketplace-artist-suggestions',
+    ]) {
+      copyApiFile(endpoint, deployApiDir);
+      const target = path.join(deployApiDir, `${endpoint}.js`);
+      let source = fs.readFileSync(target, 'utf8');
+      source = source
+        .replaceAll("require('./_marketplace_db')", "require('../server/_marketplace_db')")
+        .replaceAll('require("./_marketplace_db")', 'require("../server/_marketplace_db")')
+        .replaceAll("require('./_marketplace_card_emoji')", "require('../server/_marketplace_card_emoji')")
+        .replaceAll('require("./_marketplace_card_emoji")', 'require("../server/_marketplace_card_emoji")')
+        .replaceAll("require('./_marketplace_card_rarity')", "require('../server/_marketplace_card_rarity')")
+        .replaceAll('require("./_marketplace_card_rarity")', 'require("../server/_marketplace_card_rarity")')
+        .replaceAll("require('./_artist_display')", "require('../server/_artist_display')")
+        .replaceAll('require("./_artist_display")', 'require("../server/_artist_display")');
+      fs.writeFileSync(target, source);
+    }
+
+    const artistCardsSource = fs.readFileSync(
+      path.join(deployApiDir, 'marketplace-artist-cards.js'),
+      'utf8',
+    );
+    const artistSuggestionsSource = fs.readFileSync(
+      path.join(deployApiDir, 'marketplace-artist-suggestions.js'),
+      'utf8',
+    );
+    assert.match(artistCardsSource, /require\(['"]\.\.\/server\/_artist_display['"]\)/);
+    assert.match(artistSuggestionsSource, /require\(['"]\.\.\/server\/_artist_display['"]\)/);
+    assert.doesNotMatch(artistCardsSource, /require\(['"]\.\/_artist_display['"]\)/);
+    assert.doesNotMatch(artistSuggestionsSource, /require\(['"]\.\/_artist_display['"]\)/);
+
+    const loaded = withStubbedExternalPackages(() => ({
+      artistCards: require(path.join(deployApiDir, 'marketplace-artist-cards.js')),
+      artistSuggestions: require(path.join(deployApiDir, 'marketplace-artist-suggestions.js')),
+    }));
+
+    assert.equal(typeof loaded.artistCards, 'function');
+    assert.equal(typeof loaded.artistSuggestions, 'function');
+  } finally {
+    fs.rmSync(deployDir, { force: true, recursive: true });
+  }
+});
+
 test('deploy config exposes flutter debug logs as a Vercel function route', () => {
   const deployScript = fs.readFileSync(path.join(rootDir, 'deploy-pokoin-web.sh'), 'utf8');
   const vercelConfig = JSON.parse(fs.readFileSync(path.join(rootDir, 'vercel.json'), 'utf8'));
@@ -240,16 +311,56 @@ test('deploy config exposes flutter debug logs as a Vercel function route', () =
   );
 });
 
-test('assistant and canonical card URL APIs are deploy-packaged manifest routes', () => {
+test('critical marketplace and assistant APIs are deploy-packaged manifest routes', () => {
   for (const route of [
+    ['/api/cardtrader-blueprint-listings', 'cardtrader-blueprint-listings.js'],
+    ['/api/cardtrader-live-listings', 'cardtrader-live-listings.js'],
     ['/api/deck-card-version-lookup', 'deck-card-version-lookup.js'],
+    ['/api/flutter-debug-logs', 'flutter-debug-logs.js'],
     ['/api/limitless-expansion-blueprints', 'limitless-expansion-blueprints.js'],
-    ['/api/pokoin-assistant', 'pokoin-assistant.js'],
+    ['/api/marketplace-autocomplete', 'marketplace-autocomplete.js'],
+    ['/api/marketplace-blueprint-price', 'marketplace-blueprint-price.js'],
     ['/api/marketplace-card-cheapest-price', 'marketplace-card-cheapest-price.js'],
     ['/api/marketplace-card-url', 'marketplace-card-url.js'],
+    ['/api/marketplace-cart', 'marketplace-cart.js'],
+    ['/api/marketplace-home', 'marketplace-home.js'],
+    ['/api/marketplace-listings', 'marketplace-listings.js'],
+    ['/api/marketplace-orders', 'marketplace-orders.js'],
+    ['/api/marketplace-search-candidates', 'marketplace-search-candidates.js'],
+    ['/api/marketplace-watchlist', 'marketplace-watchlist.js'],
+    ['/api/pokoin-assistant', 'pokoin-assistant.js'],
     ['/api/user-current-page', 'user-current-page.js'],
   ]) {
     assertApiRoutePackaged(route[0], route[1]);
+  }
+});
+
+test('fallback Vercel packaging includes seller comment helper', () => {
+  const deployScript = fs.readFileSync(path.join(rootDir, 'deploy-pokoin-web.sh'), 'utf8');
+
+  assert.match(deployScript, /\b_seller_comment_filter\b/);
+  assert.match(deployScript, /require\('\.\.\/server\/_seller_comment_filter'\)/);
+  assert.match(deployScript, /server\/_seller_comment_filter\.js/);
+});
+
+test('fallback serverless route sources cover manifest endpoints', () => {
+  const deployScript = fs.readFileSync(path.join(rootDir, 'deploy-pokoin-web.sh'), 'utf8');
+  const vercelConfig = JSON.parse(fs.readFileSync(path.join(rootDir, 'vercel.json'), 'utf8'));
+  const { routeDefinitions } = require('../server/api-route-manifest');
+  const copiedEndpoints = copiedEndpointNames();
+  const rewriteSources = new Set(
+    vercelConfig.rewrites
+      .filter((rewrite) => String(rewrite.destination || '').startsWith('/api/'))
+      .map((rewrite) => rewrite.source),
+  );
+
+  for (const route of routeDefinitions) {
+    const endpointName = route.file.replace(/\.js$/, '');
+    if (!route.path.includes('/:')) {
+      assert.equal(copiedEndpoints.has(endpointName), true, `${endpointName} is copied by deploy`);
+    }
+    assert.equal(rewriteSources.has(route.path), true, `${route.path} has a Vercel fallback rewrite`);
+    assert.match(deployScript, new RegExp(`\\b${endpointName}\\b`), `${endpointName} is referenced by deploy`);
   }
 });
 

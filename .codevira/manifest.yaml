@@ -1,0 +1,49 @@
+schema_version: 1
+generated_at: '2026-05-28T09:58:13.672063+00:00'
+total_decisions: 5
+active_decisions: 5
+tags:
+  cardvault:
+  - D000001
+  flareon:
+  - D000002
+  - D000003
+  hermes:
+  - D000002
+  honcho:
+  - D000001
+  memory:
+  - D000003
+  pokoin:
+  - D000003
+  - D000004
+  - D000005
+  secrets:
+  - D000001
+  - D000002
+  - D000004
+  security:
+  - D000004
+  meili:
+  - D000005
+  production:
+  - D000005
+  search:
+  - D000005
+files:
+  .env.honcho.local:
+  - D000001
+  docs/flareon-secrets.md:
+  - D000002
+  memory/flareon-handoff.md:
+  - D000003
+  pokemon_card_vault/.env.local:
+  - D000004
+  pokemon_card_vault/workflows/meilisearch-peer-workflow.md:
+  - D000005
+do_not_revert_ids:
+- D000001
+- D000002
+- D000003
+- D000004
+- D000005

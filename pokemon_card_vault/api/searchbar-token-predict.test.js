@@ -67,6 +67,8 @@ test('token predict normalization covers punctuation and diacritics', () => {
   assert.equal(compact("_____'s Pikachu"), 'spikachu');
   assert.equal(compact('Unown [N]'), 'unownn');
   assert.equal(compact('Flabébé'), 'flabebe');
+  assert.equal(compact('Pokédex'), 'pokedex');
+  assert.equal(compact('Pokémon'), 'pokemon');
 });
 
 test('token predict ranks broad p by popularity and par by prefix quality', async () => {
@@ -109,6 +111,36 @@ test('token predict ranks broad p by popularity and par by prefix quality', asyn
   assert.equal(predictP.predictions[0].card_count, 120);
   assert.equal(predictPar.predictions[0].display_token, 'Paras');
 });
+
+test('token predict uses accent-folded compact query for Pokédex', async () => {
+  const payload = await tokenPredict.predictNameTokens(
+    {
+      query: 'pokédex',
+      fragment: 'pokédex',
+      searchLanguage: 'en',
+      limit: 5,
+    },
+    async (_sql, values) => {
+      assert.equal(values[0], 'pokedex');
+      return {
+        rows: [
+          tokenRow({
+            name: 'Pokédex',
+            compactName: 'pokedex',
+            tokens: ['pokedex'],
+            count: 24,
+            confidence: 100,
+            score: 240000,
+          }),
+        ],
+      };
+    },
+  );
+
+  assert.equal(payload.normalized_fragment, 'pokedex');
+  assert.equal(payload.predictions[0].display_token, 'Pokédex');
+});
+
 
 test('token predict narrows p to pi to pik from previous context top half', async () => {
   const predictP = await tokenPredict.predictNameTokens(
@@ -198,6 +230,189 @@ test('token predict caches repeated first-character Supabase lookup', async () =
   assert.equal(second.predictions[0].display_token, 'Pikachu');
   assert.equal(first.meta.first_char_cache.hit, false);
   assert.equal(second.meta.first_char_cache.hit, true);
+});
+
+test('token predict uses Meili only for english language', async () => {
+  const originalEngine = process.env.MARKETPLACE_SEARCH_ENGINE;
+  const originalHost = process.env.MEILI_HOST;
+  const originalIndex = process.env.MEILI_NAME_TOKEN_INDEX;
+  const originalFetch = global.fetch;
+  process.env.MARKETPLACE_SEARCH_ENGINE = 'meili';
+  process.env.MEILI_HOST = 'http://127.0.0.1:7700';
+  process.env.MEILI_NAME_TOKEN_INDEX = 'marketplace_name_tokens';
+  let fetchCalls = 0;
+  global.fetch = async () => {
+    fetchCalls += 1;
+    return {
+      ok: true,
+      status: 200,
+      async text() {
+        return JSON.stringify({
+          hits: [{
+            display_token: 'Pikachu',
+            normalized_token: 'pikachu',
+            card_count: 100,
+            candidate_card_ids: ['25'],
+            _rankingScore: 0.98,
+          }],
+        });
+      },
+    };
+  };
+  try {
+    const englishPayload = await tokenPredict.predictNameTokens(
+      {
+        query: 'pik',
+        fragment: 'pik',
+        searchLanguage: 'en',
+        limit: 5,
+      },
+      async () => {
+        throw new Error('legacy token query must not run for english meili mode');
+      },
+    );
+    assert.equal(englishPayload.predictions[0].display_token, 'Pikachu');
+    assert.equal(fetchCalls > 0, true);
+
+    let legacyCalls = 0;
+    fetchCalls = 0;
+    const frenchPayload = await tokenPredict.predictNameTokens(
+      {
+        query: 'pik',
+        fragment: 'pik',
+        searchLanguage: 'fr',
+        limit: 5,
+      },
+      async () => {
+        legacyCalls += 1;
+        return {
+          rows: [
+            tokenRow({ name: 'Pikachu', compactName: 'pikachu', count: 100, confidence: 90, score: 100000 }),
+          ],
+        };
+      },
+    );
+    assert.equal(frenchPayload.predictions[0].display_token, 'Pikachu');
+    assert.equal(legacyCalls > 0, true);
+    assert.equal(fetchCalls, 0);
+  } finally {
+    global.fetch = originalFetch;
+    if (originalEngine === undefined) delete process.env.MARKETPLACE_SEARCH_ENGINE;
+    else process.env.MARKETPLACE_SEARCH_ENGINE = originalEngine;
+    if (originalHost === undefined) delete process.env.MEILI_HOST;
+    else process.env.MEILI_HOST = originalHost;
+    if (originalIndex === undefined) delete process.env.MEILI_NAME_TOKEN_INDEX;
+    else process.env.MEILI_NAME_TOKEN_INDEX = originalIndex;
+  }
+});
+
+test('token predict warmup returns top first-character suggestions and caches them', async () => {
+  tokenPredict.clearFirstCharWarmupCacheForTest();
+  let dbCalls = 0;
+  const query = async (sql, values) => {
+    dbCalls += 1;
+    assert.match(sql, /public\.marketplace_card_name_tokens/);
+    assert.equal(values[0], 'en');
+    assert.equal(values[1], 1);
+    return {
+      rows: [
+        {
+          letter: 'm',
+          canonical_name: 'Mew',
+          display_name: 'Mew',
+          compact_name: 'mew',
+          language: 'en',
+          confidence: 100,
+          score: 260000,
+          source_rank: 1,
+          card_count: 155,
+          ids_count: 155,
+        },
+        {
+          letter: 'p',
+          canonical_name: 'Pikachu',
+          display_name: 'Pikachu',
+          compact_name: 'pikachu',
+          language: 'en',
+          confidence: 98,
+          score: 620000,
+          source_rank: 1,
+          card_count: 550,
+          ids_count: 550,
+        },
+      ],
+    };
+  };
+
+  const first = await tokenPredict.firstCharWarmupSuggestions(
+    { searchLanguage: 'en', limit: 1 },
+    query,
+  );
+  const second = await tokenPredict.firstCharWarmupSuggestions(
+    { searchLanguage: 'en', limit: 1 },
+    query,
+  );
+
+  assert.equal(dbCalls, 1);
+  assert.equal(first.language, 'en');
+  assert.equal(first.suggestions.p.display_token, 'Pikachu');
+  assert.equal(first.suggestions.m.display_token, 'Mew');
+  assert.equal(first.suggestions.p.source, 'first_char_warmup');
+  assert.equal(first.meta.cache.hit, false);
+  assert.equal(second.meta.cache.hit, true);
+  assert.equal(second.suggestions.p.display_token, 'Pikachu');
+});
+
+test('token predict warmup does not fall back to English for selected language', async () => {
+  tokenPredict.clearFirstCharWarmupCacheForTest();
+  const languages = [];
+  const payload = await tokenPredict.firstCharWarmupSuggestions(
+    { searchLanguage: 'it', limit: 1 },
+    async (_sql, values) => {
+      languages.push(values[0]);
+      return {
+        rows: [],
+      };
+    },
+  );
+
+  assert.deepEqual(languages, ['it']);
+  assert.equal(payload.language, 'it');
+  assert.equal(payload.source_language, 'it');
+  assert.deepEqual(payload.suggestions, {});
+  assert.equal(payload.meta.fallback_to_english, false);
+});
+
+test('token predict debug exposes selected Italian language and token language', async () => {
+  const payload = await tokenPredict.predictNameTokens(
+    {
+      query: 'camilla',
+      fragment: 'camilla',
+      searchLanguage: 'it',
+      limit: 5,
+    },
+    async (_sql, values) => {
+      assert.equal(values[1], 'it');
+      return {
+        rows: [
+          tokenRow({
+            name: 'Camilla',
+            compactName: 'camilla',
+            tokens: ['camilla'],
+            language: 'it',
+            count: 4,
+            confidence: 100,
+            score: 240000,
+          }),
+        ],
+      };
+    },
+  );
+
+  assert.equal(payload.search_language, 'it');
+  assert.equal(payload.predictions[0].display_token, 'Camilla');
+  assert.equal(payload.predictions[0].language, 'it');
+  assert.equal(payload.prediction_context.language, 'it');
 });
 
 test('token predict fuzzy mode after three chars keeps girati on Giratina', async () => {
@@ -490,6 +705,55 @@ test('token predict tries trailing phrase before generic suffix token', async ()
 
   assert.deepEqual(calls, ['megadarkraiex', 'darkraiex']);
   assert.equal(payload.predictions[0].display_token, 'Darkrai EX');
+});
+
+test('token predict keeps variation prefix completion after first-name anchor', async () => {
+  const calls = [];
+  const payload = await tokenPredict.predictNameTokens(
+    {
+      query: 'mimikyu g',
+      fragment: 'g',
+      predictionFragment: 'mimikyu g',
+      searchLanguage: 'en',
+      limit: 5,
+    },
+    async (_sql, values) => {
+      calls.push(values[0]);
+      if (values[0] === 'mimikyu') {
+        return {
+          rows: [
+            tokenRow({
+              name: 'Mimikyu',
+              compactName: 'mimikyu',
+              tokens: ['mimikyu'],
+              count: 60,
+              confidence: 100,
+              score: 140000,
+            }),
+          ],
+        };
+      }
+      if (values[0] === 'mimikyug') {
+        return {
+          rows: [
+            tokenRow({
+              name: 'Mimikyu GX',
+              compactName: 'mimikyugx',
+              tokens: ['mimikyu', 'gx'],
+              count: 7,
+              confidence: 100,
+              score: 180000,
+            }),
+          ],
+        };
+      }
+      return { rows: [] };
+    },
+  );
+
+  assert.deepEqual(calls, ['mimikyu', 'mimikyug']);
+  assert.equal(payload.predictions[0].display_token, 'Mimikyu GX');
+  assert.equal(payload.meta.source, 'supabase_postgres');
 });
 
 test('token predict suppresses unrelated Hearthflame card after Rare Candy anchor', async () => {

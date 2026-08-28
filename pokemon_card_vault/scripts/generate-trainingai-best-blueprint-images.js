@@ -76,12 +76,91 @@ function readEnv(path) {
   return { ...values, ...process.env };
 }
 
+function required(env, key) {
+  if (!env[key]) {
+    throw new Error(`Missing ${key}.`);
+  }
+  return env[key];
+}
+
+function marketplaceDatabaseUrl(env) {
+  if (env.MARKETPLACE_DATABASE_URL) {
+    return env.MARKETPLACE_DATABASE_URL;
+  }
+  const user = encodeURIComponent(required(env, 'MARKETPLACE_DB_USER'));
+  const password = encodeURIComponent(required(env, 'MARKETPLACE_DB_PASSWORD'));
+  const host = required(env, 'MARKETPLACE_DB_PUBLIC_HOST');
+  const port = env.MARKETPLACE_DB_PORT || '5432';
+  const database = encodeURIComponent(required(env, 'MARKETPLACE_DB_NAME'));
+  return `postgresql://${user}:${password}@${host}:${port}/${database}`;
+}
+
 function normalizeCardTraderUrl(value) {
   const raw = String(value || '').trim();
   if (!raw) return '';
   if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
   if (raw.startsWith('/')) return `https://cardtrader.com${raw}`;
   return raw;
+}
+
+function slugify(value) {
+  return String(value || '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 120);
+}
+
+function basenameFromUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  try {
+    return decodeURIComponent(new URL(raw).pathname.split('/').pop() || '');
+  } catch {
+    return raw.split('/').pop() || '';
+  }
+}
+
+function extensionFromPath(value) {
+  const match = basenameFromUrl(value).match(/\.([a-zA-Z0-9]+)$/);
+  const ext = match ? match[1].toLowerCase() : 'jpg';
+  return ext === 'jpeg' ? 'jpg' : ext;
+}
+
+function isGenericSourceBasename(value) {
+  const basename = basenameFromUrl(value).toLowerCase();
+  return new Set([
+    'preview.png',
+    'preview.jpg',
+    'preview.jpeg',
+    'preview.webp',
+    'image.png',
+    'image.jpg',
+    'image.jpeg',
+    'image.webp',
+    'card.png',
+    'card.jpg',
+    'card.jpeg',
+    'card.webp',
+    'default.png',
+    'default.jpg',
+    'default.jpeg',
+    'default.webp',
+    'fallback.png',
+    'fallback.jpg',
+    'fallback.jpeg',
+    'fallback.webp',
+  ]).has(basename);
+}
+
+function logicalObjectKeyForSource(row, sourceUrl) {
+  if (!isGenericSourceBasename(sourceUrl)) return '';
+  const fields = [row.name, row.version, row.set_name].filter(Boolean).join(' ');
+  const slug = slugify(fields) || `blueprint-${row.blueprint_id}`;
+  const ext = extensionFromPath(sourceUrl);
+  return `${row.blueprint_id}_${slug}.${ext}`;
 }
 
 function encodeObjectKey(key) {
@@ -103,8 +182,10 @@ function isUsableCdnKey(key) {
     lower &&
     !lower.includes('_homepage') &&
     !lower.includes('-homepage') &&
+    !lower.startsWith('previews/') &&
     !lower.includes('/previews/') &&
-    !lower.includes('preview_')
+    !lower.includes('preview_') &&
+    !isGenericSourceBasename(lower)
   );
 }
 
@@ -122,6 +203,7 @@ function mapBlueprintRow(row, publicBaseUrl) {
   } else if (sourceUrl && !sourceUrl.toLowerCase().includes('/preview_')) {
     url = sourceUrl;
     source = 'cardtrader_source';
+    selectedObjectKey = logicalObjectKeyForSource(row, sourceUrl);
   } else {
     return null;
   }
@@ -147,12 +229,8 @@ function mapBlueprintRow(row, publicBaseUrl) {
 }
 
 async function queryBlueprintRows(env) {
-  if (!env.MARKETPLACE_DATABASE_URL) {
-    throw new Error('Missing MARKETPLACE_DATABASE_URL.');
-  }
-
   const client = new Client({
-    connectionString: env.MARKETPLACE_DATABASE_URL,
+    connectionString: marketplaceDatabaseUrl(env),
     ssl: env.MARKETPLACE_DATABASE_SSL_VERIFY === '1' ? { rejectUnauthorized: true } : false,
     statement_timeout: 120000,
   });

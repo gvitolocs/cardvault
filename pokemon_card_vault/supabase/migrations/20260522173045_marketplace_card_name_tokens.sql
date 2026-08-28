@@ -4,6 +4,23 @@
 -- that should be hydrated from Oracle when the name is predicted.
 
 create extension if not exists pg_trgm with schema extensions;
+create extension if not exists unaccent with schema extensions;
+
+create or replace function public.marketplace_search_normalize(value text)
+returns text
+language sql
+immutable
+as $$
+  select trim(regexp_replace(lower(extensions.unaccent(coalesce(value, ''))), '[^a-z0-9]+', ' ', 'g'));
+$$;
+
+create or replace function public.marketplace_search_compact(value text)
+returns text
+language sql
+immutable
+as $$
+  select regexp_replace(lower(extensions.unaccent(coalesce(value, ''))), '[^a-z0-9]', '', 'g');
+$$;
 
 create or replace function public.marketplace_edit_distance(left_text text, right_text text)
 returns integer

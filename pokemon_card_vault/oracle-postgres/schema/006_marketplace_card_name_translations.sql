@@ -11,6 +11,15 @@ create table if not exists public.marketplace_card_name_translations (
   primary key (language, name)
 );
 
+alter table public.marketplace_card_name_translations
+  add column if not exists match_confidence numeric not null default 1 check (match_confidence >= 0 and match_confidence <= 1);
+
+alter table public.marketplace_card_name_translations
+  add column if not exists match_reason text not null default '';
+
+alter table public.marketplace_card_name_translations
+  add column if not exists raw_metadata jsonb not null default '{}'::jsonb;
+
 create index if not exists marketplace_card_name_translations_language_normalized_trgm_idx
   on public.marketplace_card_name_translations using gin (normalized_localized_name gin_trgm_ops);
 
@@ -19,6 +28,31 @@ create index if not exists marketplace_card_name_translations_language_compact_i
 
 create index if not exists marketplace_card_name_translations_name_idx
   on public.marketplace_card_name_translations (name);
+
+create table if not exists public.marketplace_expansion_name_translations (
+  language text not null,
+  expansion_name text not null,
+  localized_name text not null,
+  normalized_localized_name text not null,
+  compact_localized_name text not null,
+  localized_name_tokens text[] not null default '{}'::text[],
+  source text not null default 'tcgdex',
+  source_set_id text not null default '',
+  match_confidence numeric not null default 1 check (match_confidence >= 0 and match_confidence <= 1),
+  match_reason text not null default '',
+  raw_metadata jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now(),
+  primary key (language, expansion_name, localized_name)
+);
+
+create index if not exists marketplace_expansion_name_translations_language_compact_idx
+  on public.marketplace_expansion_name_translations (language, compact_localized_name);
+
+create index if not exists marketplace_expansion_name_translations_expansion_idx
+  on public.marketplace_expansion_name_translations (
+    public.marketplace_search_normalize(expansion_name),
+    language
+  );
 
 create table if not exists public.marketplace_card_names_en (
   language text not null default 'en',
@@ -37,6 +71,8 @@ create table if not exists public.marketplace_card_names_fr (like public.marketp
 create table if not exists public.marketplace_card_names_de (like public.marketplace_card_names_en including all);
 create table if not exists public.marketplace_card_names_es (like public.marketplace_card_names_en including all);
 create table if not exists public.marketplace_card_names_pt (like public.marketplace_card_names_en including all);
+create table if not exists public.marketplace_card_names_id (like public.marketplace_card_names_en including all);
+create table if not exists public.marketplace_card_names_th (like public.marketplace_card_names_en including all);
 create table if not exists public.marketplace_card_names_ja (like public.marketplace_card_names_en including all);
 create table if not exists public.marketplace_card_names_zh_cn (like public.marketplace_card_names_en including all);
 create table if not exists public.marketplace_card_names_zh_tw (like public.marketplace_card_names_en including all);
@@ -70,6 +106,16 @@ create index if not exists marketplace_card_names_pt_normalized_trgm_idx
   on public.marketplace_card_names_pt using gin (normalized_name gin_trgm_ops);
 create index if not exists marketplace_card_names_pt_compact_idx
   on public.marketplace_card_names_pt (compact_name);
+
+create index if not exists marketplace_card_names_id_normalized_trgm_idx
+  on public.marketplace_card_names_id using gin (normalized_name gin_trgm_ops);
+create index if not exists marketplace_card_names_id_compact_idx
+  on public.marketplace_card_names_id (compact_name);
+
+create index if not exists marketplace_card_names_th_normalized_trgm_idx
+  on public.marketplace_card_names_th using gin (normalized_name gin_trgm_ops);
+create index if not exists marketplace_card_names_th_compact_idx
+  on public.marketplace_card_names_th (compact_name);
 
 create index if not exists marketplace_card_names_ja_normalized_trgm_idx
   on public.marketplace_card_names_ja using gin (normalized_name gin_trgm_ops);
@@ -105,7 +151,7 @@ set search_path = public
 as $$
   with normalized as (
     select case
-      when lower(coalesce(nullif(search_language, ''), 'en')) in ('it', 'fr', 'de', 'es', 'pt', 'ja', 'zh-cn', 'zh-tw')
+      when lower(coalesce(nullif(search_language, ''), 'en')) in ('it', 'fr', 'de', 'es', 'pt', 'id', 'th', 'ja', 'zh-cn', 'zh-tw')
         then lower(coalesce(nullif(search_language, ''), 'en'))
       else 'en'
     end as language
@@ -123,6 +169,10 @@ as $$
     union all
     select n.* from normalized l join public.marketplace_card_names_pt n on l.language = 'pt'
     union all
+    select n.* from normalized l join public.marketplace_card_names_id n on l.language = 'id'
+    union all
+    select n.* from normalized l join public.marketplace_card_names_th n on l.language = 'th'
+    union all
     select n.* from normalized l join public.marketplace_card_names_ja n on l.language = 'ja'
     union all
     select n.* from normalized l join public.marketplace_card_names_zh_cn n on l.language = 'zh-cn'
@@ -130,13 +180,5 @@ as $$
     select n.* from normalized l join public.marketplace_card_names_zh_tw n on l.language = 'zh-tw'
   )
   select * from selected
-  union all
-  select en.*
-  from normalized l
-  join public.marketplace_card_names_en en on l.language <> 'en'
-  where not exists (
-    select 1
-    from selected s
-    where s.name = en.name
-  );
+  order by name;
 $$;

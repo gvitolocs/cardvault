@@ -6,7 +6,7 @@ const {
   maybeSendWpkn,
   normalizeAddress,
   normalizeDirection,
-  pancakeSpotPrice,
+  marketSpotPrice,
   publicQuote,
   reserveSnapshot,
   settlementMode,
@@ -40,7 +40,7 @@ async function handleQuote(req, res, decoded, admin, firestore) {
 
   const [reserves, marketPrice] = await Promise.all([
     reserveSnapshot(firestore),
-    pancakeSpotPrice(),
+    marketSpotPrice(),
   ]);
   const quote = calculateQuote({
     direction: req.body?.direction,
@@ -138,14 +138,6 @@ async function handleRequest(req, res, decoded, admin, firestore) {
         statusCode: 400,
       });
     }
-    if (
-      direction === 'wpkn_to_pkn' &&
-      Number(verifiedDeposit.amountWpkn || 0) < Number(quote.amountIn || 0)
-    ) {
-      throw Object.assign(new Error('Deposit amount is lower than the quoted wPKN amount.'), {
-        statusCode: 400,
-      });
-    }
     if (Date.now() > Number(quote.quoteExpiresAtMs || 0)) {
       transaction.update(quoteRef, {
         status: 'expired',
@@ -174,6 +166,11 @@ async function handleRequest(req, res, decoded, admin, firestore) {
         expectedAmountWpkn: Number(quote.amountIn || 0),
         usedTxHashes: usedDeposits.docs.map((doc) => doc.id),
       });
+      if (Number(verifiedDeposit.amountWpkn || 0) < Number(quote.amountIn || 0)) {
+        throw Object.assign(new Error('Deposit amount is lower than the quoted wPKN amount.'), {
+          statusCode: 400,
+        });
+      }
       depositRef = firestore.collection('wpkn_exchange_deposits').doc(verifiedDeposit.txHash);
     }
     const now = admin.firestore.FieldValue.serverTimestamp();

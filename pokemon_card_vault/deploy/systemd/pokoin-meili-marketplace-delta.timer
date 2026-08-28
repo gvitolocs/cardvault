@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Pokoin Meilisearch marketplace delta sync
+
+[Timer]
+OnBootSec=2m
+OnUnitActiveSec=2m
+RandomizedDelaySec=20s
+Unit=pokoin-meili-marketplace-delta.service
+
+[Install]
+WantedBy=timers.target

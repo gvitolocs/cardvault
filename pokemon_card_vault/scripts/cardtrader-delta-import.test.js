@@ -58,6 +58,24 @@ test('rowFromRecord maps CardTrader single tcg_player_id to json array', () => {
   assert.equal(row.expansion.name, 'Abyss Eye');
 });
 
+test('rowFromRecord does not persist CardTrader fallback preview as image_url', () => {
+  const row = rowFromRecord({
+    blueprint: {
+      id: 390877,
+      name: 'Chien-Pao',
+      game_id: 5,
+      category_id: 73,
+      expansion_id: 4639,
+      image_url: 'https://cardtrader.com/fallbacks/card_uploader/preview.png',
+      editable_properties: [],
+    },
+    expansion: { id: 4639, name: 'Stellar Crystal' },
+  });
+
+  assert.equal(row.image_url, null);
+  assert.match(row.blueprint.image_url, /fallbacks\/card_uploader\/preview\.png/);
+});
+
 test('tcgPlayerIds preserves array and omits empty scalar', () => {
   assert.deepEqual(tcgPlayerIds({ tcg_player_ids: [1, 2] }), [1, 2]);
   assert.equal(tcgPlayerIds({ tcg_player_id: '' }), null);

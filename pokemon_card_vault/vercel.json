@@ -503,6 +503,10 @@
       "destination": "https://pokoin-status.vercel.app/api/circulating-supply"
     },
     {
+      "source": "/api/auth-login",
+      "destination": "/api/auth-login.js"
+    },
+    {
       "source": "/api/transfer-account-balance",
       "destination": "/api/transfer-account-balance.js"
     },
@@ -517,6 +521,10 @@
     {
       "source": "/api/wpkn-exchange/:action",
       "destination": "/api/wpkn-exchange.js?action=:action"
+    },
+    {
+      "source": "/api/wpkn-pkn-quote",
+      "destination": "/api/wpkn-pkn-quote.js"
     },
     {
       "source": "/api/crypto-pkn-purchase/:action",
@@ -565,6 +573,10 @@
     {
       "source": "/api/social-post-agent",
       "destination": "/api/social-post-agent.js"
+    },
+    {
+      "source": "/api/trainingai-card-classify",
+      "destination": "/api/trainingai-card-classify.js"
     },
     {
       "source": "/api/wallet-auth/nonce",
@@ -639,6 +651,10 @@
       "destination": "/api/deck-card-version-lookup.js"
     },
     {
+      "source": "/api/earn-pkn",
+      "destination": "/api/earn-pkn.js"
+    },
+    {
       "source": "/api/unlock-silver",
       "destination": "/api/unlock-silver.js"
     },
@@ -651,6 +667,10 @@
       "destination": "/api/marketplace-home.js"
     },
     {
+      "source": "/api/marketplace-cards",
+      "destination": "/api/marketplace-cards.js"
+    },
+    {
       "source": "/api/marketplace-competitive",
       "destination": "/api/marketplace-competitive.js"
     },
@@ -661,6 +681,10 @@
     {
       "source": "/api/marketplace-card-cheapest-price",
       "destination": "/api/marketplace-card-cheapest-price.js"
+    },
+    {
+      "source": "/api/marketplace-hot-blueprints",
+      "destination": "/api/marketplace-hot-blueprints.js"
     },
     {
       "source": "/api/marketplace-artist-cards",
@@ -691,6 +715,14 @@
       "destination": "/api/marketplace-debug-cardtrader-blueprints.js"
     },
     {
+      "source": "/api/marketplace-card-seo",
+      "destination": "/api/marketplace-card-seo.js"
+    },
+    {
+      "source": "/api/marketplace-card-shortlink",
+      "destination": "/api/marketplace-card-shortlink.js"
+    },
+    {
       "source": "/api/marketplace-card-versions",
       "destination": "/api/marketplace-card-versions.js"
     },
@@ -701,6 +733,10 @@
     {
       "source": "/api/marketplace-card-url",
       "destination": "/api/marketplace-card-url.js"
+    },
+    {
+      "source": "/api/marketplace-cart",
+      "destination": "/api/marketplace-cart.js"
     },
     {
       "source": "/api/marketplace-event",
@@ -735,12 +771,20 @@
       "destination": "/api/marketplace-search-candidates.js"
     },
     {
+      "source": "/api/marketplace-watchlist",
+      "destination": "/api/marketplace-watchlist.js"
+    },
+    {
       "source": "/api/marketplace-expansion-symbols",
       "destination": "/api/marketplace-expansion-symbols.js"
     },
     {
       "source": "/api/marketplace-expansions",
       "destination": "/api/marketplace-expansions.js"
+    },
+    {
+      "source": "/api/extension-card-search",
+      "destination": "/api/extension-card-search.js"
     },
     {
       "source": "/api/flutter-debug-logs",
@@ -765,6 +809,10 @@
     {
       "source": "/api/stripe-webhook",
       "destination": "/api/stripe-webhook.js"
+    },
+    {
+      "source": "/api/cache-google-profile-picture",
+      "destination": "/api/cache-google-profile-picture.js"
     },
     {
       "source": "/api/upload-profile-picture",

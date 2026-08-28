@@ -189,6 +189,7 @@ test('searchbar response wrapper exposes rows, context, counts, path, and timing
 
   assert.equal(body.ok, true);
   assert.equal(body.endpoint, '/api/searchbar-cards');
+  assert.equal(body.search_language, 'en');
   assert.equal(body.rows.length, 2);
   assert.equal(body.search_context.card_ids.length, 3);
   assert.equal(body.search_context.candidate_labels.length, 3);
@@ -198,6 +199,43 @@ test('searchbar response wrapper exposes rows, context, counts, path, and timing
   assert.equal(body.meta.search_path, 'name_table_direct');
   assert.equal(body.meta.timings.duration_ms, 42);
   assert.equal(body.debug.searchPath, 'name_table_direct');
+});
+
+test('searchbar response wrapper exposes selected Italian language', () => {
+  const body = searchbar.wrapAutocompleteBody({
+    rows: [row(1, 'Camilla')],
+    search_language: 'it',
+    pool: {
+      source: 'search_pipeline',
+      size: 1,
+      strategy: 'supabase_name_index',
+    },
+    search_context: autocomplete.buildSearchContext(
+      'camilla',
+      'it',
+      [row(1, 'Camilla')],
+      'supabase_name_index',
+      null,
+      500,
+    ),
+    debug: {
+      searchPath: 'supabase_name_index',
+      searchLanguage: 'it',
+    },
+  }, {
+    query: 'camilla',
+    searchLanguage: 'it',
+    limit: 20,
+    poolLimit: 500,
+    mode: 'autocomplete',
+    debug: true,
+  }, {
+    headers: {},
+  });
+
+  assert.equal(body.search_language, 'it');
+  assert.equal(body.search_context.language, 'it');
+  assert.equal(body.debug.searchLanguage, 'it');
 });
 
 test('searchbar response wrapper exposes predictive debug metadata', () => {

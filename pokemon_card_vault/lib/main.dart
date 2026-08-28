@@ -485,6 +485,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           state.uri.queryParameters['signupToken']?.isNotEmpty == true;
       final isProtectedRoute = {
         '/wallet',
+        '/swap',
         '/profile',
         '/inventory',
         '/collection',
@@ -585,28 +586,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/wallet',
+        pageBuilder: (context, state) => _appPage(state, _walletRoute()),
+      ),
+      GoRoute(
+        path: '/swap',
         pageBuilder: (context, state) => _appPage(
           state,
-          Theme(
-            data: ThemeData(
-              brightness: Brightness.dark,
-              scaffoldBackgroundColor: const Color(0xFF050816),
-              colorScheme: const ColorScheme.dark(
-                primary: Color(0xFFFACC15),
-                secondary: Color(0xFF38BDF8),
-                surface: Color(0xFF0B1020),
-              ),
-              inputDecorationTheme: InputDecorationTheme(
-                filled: true,
-                fillColor: const Color(0xFF111936),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-              useMaterial3: true,
-            ),
-            child: const WalletScreen(),
-          ),
+          _walletRoute(initialSwapOpen: true),
         ),
       ),
       ShellRoute(
@@ -1068,6 +1054,7 @@ bool _keepsPageChromeFixed(String path) {
       path.startsWith('/card/') ||
       _isRootCardRoutePath(path) ||
       path.startsWith('/wallet') ||
+      path.startsWith('/swap') ||
       path.startsWith('/orders') ||
       path.startsWith('/auth') ||
       path.startsWith('/buy') ||
@@ -1151,7 +1138,33 @@ int _routeOrder(String path) {
   if (path.startsWith('/wallet')) {
     return 60;
   }
+  if (path.startsWith('/swap')) {
+    return 60;
+  }
   return 100;
+}
+
+Widget _walletRoute({bool initialSwapOpen = false}) {
+  return Theme(
+    data: ThemeData(
+      brightness: Brightness.dark,
+      scaffoldBackgroundColor: const Color(0xFF050816),
+      colorScheme: const ColorScheme.dark(
+        primary: Color(0xFFFACC15),
+        secondary: Color(0xFF38BDF8),
+        surface: Color(0xFF0B1020),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: const Color(0xFF111936),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+      ),
+      useMaterial3: true,
+    ),
+    child: WalletScreen(initialSwapOpen: initialSwapOpen),
+  );
 }
 
 bool _isRootCardRoutePath(String path) {

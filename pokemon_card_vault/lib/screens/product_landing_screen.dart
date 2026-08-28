@@ -113,17 +113,14 @@ class _ProductLandingConfig {
         );
       case 'graded':
         return _ProductLandingConfig(
-          title: 'Graded candidates',
-          subtitle: 'Cards worth inspecting',
+          title: 'Graded',
+          subtitle: 'Active graded listings',
           description:
-              'High-signal singles that collectors often consider for grading.',
-          ctaLabel: 'Search candidates',
-          ctaPath:
-              '/marketplace/search?q=special%20illustration%20rare&productType=card',
-          loadCards: () => service.searchMarketplaceCards(
-            'special illustration rare',
+              'Browse cards with active marketplace listings already marked as graded.',
+          ctaLabel: 'Search graded cards',
+          ctaPath: '/product/graded',
+          loadCards: () => service.getMarketplaceGradedCards(
             limit: 80,
-            productType: 'card',
           ),
         );
       case 'nft':

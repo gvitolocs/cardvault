@@ -15,8 +15,10 @@ const {
 test('artist endpoint normalizes URL slug and raw artist lookup keys', () => {
   assert.equal(normalizeArtistSlug('Raita Kazama'), 'raita-kazama');
   assert.equal(normalizeArtistSlug(' raita_kazama!! '), 'raita-kazama');
+  assert.equal(normalizeArtistSlug('Narumi Sato'), 'narumi-sato');
   assert.equal(normalizeArtistLookupName('Raita-Kazama'), 'raita kazama');
   assert.equal(normalizeArtistLookupName('  Raita   Kazama  '), 'raita kazama');
+  assert.equal(normalizeArtistLookupName('Narumi-Sato'), 'narumi sato');
 });
 
 test('artist endpoint keeps Pikachu Project slug aliases compatible', async () => {
@@ -223,6 +225,49 @@ test('artist card lookup filters by normalized artist slug and preserves card ro
   );
 });
 
+test('artist card lookup resolves Narumi Sato canonical slug', async () => {
+  const queries = [];
+  const payload = await artistCardsForSlug({
+    artistSlug: 'narumi-sato',
+    limit: 10,
+    query: async (sql, values) => {
+      queries.push({ sql, values });
+      return {
+        rows: [
+          {
+            card_id: '409489',
+            name: 'Pikachu',
+            expansion_name: 'Test Expansion',
+            expansion_number: '025/100',
+            blueprint_id: '409489',
+            preview_image_url: 'https://cdn.pokoin.test/narumi-pikachu.webp',
+            artist: 'Narumi Sato',
+            illustrator: 'Narumi Sato',
+            normalized_artist: 'narumi sato',
+            artist_slug: 'narumi-sato',
+            artist_card_count: 3,
+            total_artist_card_count: 3,
+            profile_display_name: 'Narumi Sato',
+          },
+        ],
+      };
+    },
+  });
+
+  assert.equal(queries.length, 1);
+  assert.deepEqual(queries[0].values, [['narumi-sato'], 10]);
+  assert.deepEqual(payload.artist, {
+    name: 'Narumi Sato',
+    illustrator: 'Narumi Sato',
+    normalizedArtist: 'narumi sato',
+    slug: 'narumi-sato',
+    cardCount: 3,
+  });
+  assert.equal(payload.profile.displayName, 'Narumi Sato');
+  assert.equal(payload.cards[0].artist, 'Narumi Sato');
+  assert.equal(payload.cards[0].normalized_artist, 'narumi sato');
+});
+
 test('artist card lookup projects illustration rarity from collector labels', async () => {
   const payload = await artistCardsForSlug({
     artistSlug: 'Mitsuhiro Arita',
@@ -323,6 +368,7 @@ test('artist profile row mapping exposes generated card art attribution', () => 
       generatedProfileImage: {
         source: 'card_art_fallback',
         reason: 'placeholder_profile_image',
+        generatedAt: '2026-05-25T20:07:53.194Z',
         sourceCard: {
           cardId: '123',
           name: 'Pikachu ex',
@@ -332,11 +378,15 @@ test('artist profile row mapping exposes generated card art attribution', () => 
     },
   });
 
+  assert.equal(
+    profile.imageUrl,
+    'https://pokoin.com/card-images/artist-profiles/aky-cg-works.png?v=2026-05-25T20%3A07%3A53.194Z',
+  );
   assert.equal(profile.generatedProfileImage.reason, 'placeholder_profile_image');
   assert.equal(profile.generatedProfileImage.sourceCard.name, 'Pikachu ex');
 });
 
-test('artist summaries expose persisted artist card counts', async () => {
+test('artist summaries expose visible artist card counts', async () => {
   const queries = [];
   const payload = await artistSummaries({
     limit: 10,
@@ -349,7 +399,8 @@ test('artist summaries expose persisted artist card counts', async () => {
             illustrator: 'Raita Kazama',
             normalized_artist: 'raita kazama',
             artist_slug: 'raita-kazama',
-            artist_card_count: 213,
+            artist_card_count: 0,
+            visible_card_count: 213,
             image_url: 'https://cdn.pokoin.test/raita.webp',
           },
         ],
@@ -358,7 +409,8 @@ test('artist summaries expose persisted artist card counts', async () => {
   });
 
   assert.equal(queries.length, 1);
-  assert.match(queries[0].sql, /artist\.artist_card_count/);
+  assert.match(queries[0].sql, /visible_card_count/);
+  assert.match(queries[0].sql, /greatest\(/);
   assert.match(queries[0].sql, /marketplace_card_versions/);
   assert.deepEqual(queries[0].values, [10]);
   assert.deepEqual(payload, [

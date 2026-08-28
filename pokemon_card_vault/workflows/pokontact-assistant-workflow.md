@@ -74,7 +74,8 @@ Pokontact should be a serious AI service with this flow:
 5. Peer2 service generates the assistant reply with the Poko persona when the
    request is not fully answered by deterministic site grounding.
 6. Assistant navigation/open-page actions are returned as structured client
-   actions with sanitized internal paths only.
+   actions with sanitized internal paths only, and only when navigation is useful
+   for the user's intent.
 7. Vercel API returns the reply to the browser and forwards bug/inquiry chat
    records to `POKOIN_ASSISTANT_EMAIL`.
 
@@ -109,6 +110,18 @@ non-empty messages plus route/card context derived from `GoRouterState` and
 
 Gateway data sources:
 
+- Poko can read peer4 marketplace/site data only through controlled server-side
+  helper functions and fixed SQL templates. Do not expose raw SQL generation or
+  arbitrary database query execution to chat users. Prefer the
+  `POKO_ASSISTANT_READONLY_DATABASE_URL` read-only credential in production; if it
+  is missing, create a least-privilege role with `CONNECT`, `USAGE` on `public`,
+  and `SELECT` on readable site-data tables/views, then set that env without
+  printing the credential.
+- Keep the Poko-visible peer4 schema guide in
+  `docs/poko-peer4-site-data-schema.md`. It documents card/search candidates,
+  canonical URLs, analytics/hotness, listing/stock/price, partner availability,
+  artists, TCG metadata, Limitless deck tables, join keys (`card_id`,
+  `blueprint_id`, doubled card page ids), and privacy boundaries.
 - `marketplace_user_listings`: active seller listings for highest price, floor
   price, and best-deal style queries. Filter to `status = 'active'`,
   `quantity_available > 0`, and positive `price_pkn`.
@@ -122,6 +135,14 @@ Gateway data sources:
   synthesize slugs from card names in assistant/client code.
 - `marketplace_hot_blueprints`: popularity/analytics context such as views,
   searches, clicks, cart/reserve/sale counts, and hot scores.
+- Partner availability/cache tables: public market stock, cheapest listing,
+  and sell-through style signals. Do not expose raw seller/user identifiers and
+  do not mention the provider name in user-facing Poko replies.
+- `marketplace_blueprint_artists` and `marketplace_blueprint_tcg_metadata`:
+  artist, type, flavor, legality, and card metadata for themed recommendations.
+- `limitless_public_*` and imported `limitless_*` tables: public competitive
+  deck/archetype, tournament, result, decklist, and core-card data for Poko deck
+  advisor answers.
 
 For grounded intents the gateway may return a deterministic answer immediately.
 It should also pass `marketplaceContext` to peer2 when a model-backed wording path
@@ -140,6 +161,19 @@ financial advice" for price/popularity contexts.
 
 Card recommendation/navigation rules:
 
+- Poko may chat naturally for harmless casual conversation. Do not route casual
+  messages like `ti piace il gelato?` to docs/marketplace or force navigation.
+  Keep safety rules: no private keys/secrets, no financial advice, and no
+  invented prices/live data.
+- Card suggestions must respect explicit user/chat themes. For ice cream /
+  `gelato` / `ghiaccio` / `freddo` / `neve`, prefer Vanillite, Vanillish,
+  Vanilluxe, or another clearly ice-themed Pokemon rather than generic cute picks
+  such as Mew or Dragonite.
+- Explicit subject show-card prompts outrank generic cute-card suggestions. For
+  example, `fammi vedere una carta di rayquaza`, `mostrami una carta di
+  rayquaza`, `show me a Rayquaza card`, and `show me a card of Rayquaza` must
+  resolve `Rayquaza` through marketplace card lookup and navigate to a direct
+  Rayquaza card page, not enter random/cute-card mode.
 - When Poko chooses a concrete card, return a direct card-page `navigate` action.
   Do not send the user to `/marketplace/search?...` unless exact card-page
   resolution fails.
@@ -152,6 +186,38 @@ Card recommendation/navigation rules:
   resolves `Leafeon`, not `show me Leafeon`.
 - Treat `fammi vedere`, `mostrami`, `show me`, `find me`, `carta di`, and
   `card of` as action scaffolding, not search terms.
+- Sophisticated recommendation prompts such as `fammi vedere una cute card di
+  rayquaza`, `show me a cute ice card`, `show me a popular cute Leafeon card`,
+  and `fammi vedere una carta economica ma carina di pikachu` should use the
+  controlled read-only recommendation planner. Extract subject, theme, style, and
+  constraints; rank contextual relevance first; then use hotness, views/searches/
+  clicks/sales, active listing counts, stock, floor/price summaries, partner
+  availability, artists, and TCG metadata. Explicit subjects outrank
+  generic cute-card mode.
+- Personalization is bounded and low risk. Use Firebase `uid`/safe display name
+  when present and anonymous `sessionId` otherwise, but infer only lightweight
+  preferences from bounded chat history: language, liked Pokémon/themes, budget,
+  cute/illustration taste, and deck style. Do not store or expose secrets,
+  passwords, tokens, raw Firebase data, raw `user_uid`, or holder keys.
+
+Deck advisor rules:
+
+- Competitive deck questions stay on `/api/pokoin-assistant`; do not add a new
+  function. Supported examples include `what competitive deck should I play?`,
+  `best deck for beginners`, `voglio un deck competitivo facile`, `deck forte ma
+  economico`, `come funziona gardevoir ex deck?`, and `strengths and weaknesses
+  of charizard ex deck`.
+- Prefer peer4/read-only Limitless data (`limitless_public_decks`,
+  `limitless_public_deck_core_cards`, `limitless_public_deck_results`, public
+  tournaments/standings, and decklist cards). Use bounded public internet/Limitless
+  fetches only when a controlled adapter is available and always cache/fallback so
+  chat is not hard-dependent on live web.
+- If the user does not give needs, ask for budget, skill level, playstyle
+  (aggressive/control), online/local context, and favorite Pokémon, while still
+  offering 2-3 caveated options when useful.
+- Explain how the deck works, strengths, weaknesses, complexity, rough budget
+  tier if data supports it, and who it suits. Do not claim exact live win rates
+  unless the data read in that response contains them.
 
 Current-card contextual answers:
 
@@ -181,12 +247,31 @@ Navigation rules:
 
 - Accept internal paths only. Strip origin, reject external URLs, block protocol
   tricks such as `javascript:`, and keep query strings bounded.
+- Use `navigate` conditionally. Appropriate cases are direct card pages, explicit
+  "show/open/take me to" intents, and resolved recommendations where opening the
+  card is helpful. Do not navigate for casual chat, vague questions, or when only
+  an unsafe/external/non-direct target is available; reply normally or ask a
+  clarifying question instead.
 - Marketplace card paths must come from `marketplace_card_urls` or
   `/api/marketplace-card-url`, including card suggestions and grounded
   marketplace/card-price answers.
 - Tile/card taps in the Flutter UI must also use the DB canonical URL. Generated
   fallback slugs are only for legacy direct URL repair/redirect paths such as
   short links, never for user-facing tile taps or assistant actions.
+- Pokontact must always know who is talking when Firebase has an authenticated
+  user. Do not keep a long-lived `_bearerToken` in the assistant widget and reuse
+  it for background current-page polling; Firebase ID tokens expire and can
+  rotate while the browser tab stays open. Before each authenticated assistant,
+  current-page, or navigation-state request, read the current `FirebaseAuth`
+  user and obtain a fresh token through `PokoinApiAuthService.bearerToken()` or
+  an `idTokenChanges()`-backed identity provider. If there is no current user,
+  send no Authorization header and treat the session as anonymous.
+- Do not fix invalid Firebase bearer tokens by silently falling back to anonymous
+  identity when the request included an Authorization header. That hides the root
+  cause and makes the assistant lose user identity. Invalid/expired/revoked
+  bearer tokens should be surfaced as authentication failures, with enough
+  redacted diagnostics to identify the Firebase error code, and the client should
+  refresh or clear its token before retrying.
 - If a user-current-page/current-session-page API is added, update
   `server/api-route-manifest.js`, `vercel.json`, `deploy-pokoin-web.sh`,
   `docs/pokoin-api.md` or regenerated API docs, and
@@ -362,6 +447,7 @@ German, and Portuguese phrases around:
 - nodes, validators, peers, and bootstrap
 - wallet, MetaMask, PKN, wPKN, Swap, and bridge basics
 - project/marketplace explanation
+- Earn PKN / PKN Shard Review and card/deck sharding
 - live status / online / health questions
 - earning/rewards questions
 
@@ -369,13 +455,18 @@ For these common paths, prefer curated replies or tightly grounded knowledge
 sections over open-ended local LLM generation. The local model is a fallback for
 true free-form conversation, not the source of truth.
 
-For earning questions such as `how do I earn`, `come si guadagna`, `rewards`,
-`ricompense`, `ganar`, `gagner`, `verdienen`, or `ganhar`, never invent
-achievements, reward programs, price opportunities, or fake guide URLs. State
-that there is no public automatic rewards/achievements program unless explicitly
-launched. Mention only realistic current paths: marketplace selling/listing,
-available PKN app features, or node/peer participation if opened by the team.
-Always avoid financial advice.
+For earning/sharding questions such as `how do I earn`, `how do shards work`,
+`can I turn cards into new cards`, `come funziona il sistema tipo videogame`,
+`come si guadagna`, `rewards`, `ricompense`, `ganar`, `gagner`, `verdienen`, or
+`ganhar`, never invent achievements, reward programs, price opportunities, or
+fake guide URLs. Explain the implemented Earn PKN / PKN Shard Review flow:
+users submit a card list or decklist on `/shard-review`; the team reviews card
+identity/version/language/condition/value; eligible cards can be sharded into PKN
+value and used toward marketplace/order flows. Clarify that this is a review
+request, not an instant guaranteed automatic disenchant button. Mention other
+realistic paths only when relevant: marketplace selling/listing, available PKN
+app features, or node/peer participation if opened by the team. Always avoid
+financial advice.
 
 Earning detection must tolerate common typos such as `cosa gudagno`,
 `gudagno`, and similar near-misses.
@@ -642,6 +733,10 @@ printf '%s' '12000' |
 - Card suggestions must be by Pokontact's cute/personal collector taste only.
   Never present card suggestions as financial advice, price predictions, or
   investment recommendations.
+- Card suggestions must stay coherent with the chat context. If the user asks for
+  `pokemon gelato`, ice cream, snow, cold, or ice themes, choose
+  Vanillite/Vanillish/Vanilluxe or another fitting ice-themed Pokemon rather than
+  an unrelated favorite.
 - Card suggestion links should resolve to direct card detail routes when Oracle
   marketplace candidates can match the suggested name/collector number. Use the
   stored canonical path from `marketplace_card_urls` or
@@ -678,6 +773,8 @@ Update `knowledge.md` when any of these change:
 - PokoinPoS network metadata, RPC URLs, chain ID, validators, or bootstrap rules.
 - Marketplace architecture, Oracle-backed APIs, search behavior, listings, carts,
   or analytics.
+- Earn PKN, PKN Shard Review, `/earn`, `/shard-review`, `/api/earn-pkn`, card
+  list sharding, or deck shard review behavior.
 - PokoinSwap, PKN, wPKN, BNB Chain contract/pair/reserve details.
 - Native NFT APIs, minting workflow, metadata model, or card NFT direction.
 - Assistant role, support/bug escalation language, privacy rules, or forbidden

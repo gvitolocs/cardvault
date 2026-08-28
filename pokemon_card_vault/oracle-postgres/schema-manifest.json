@@ -1,0 +1,27 @@
+{
+  "description": "Ordered Oracle/Postgres schema files applied by scripts/oracle-marketplace-migrate.js. Duplicate numeric prefixes are allowed only when explicitly listed here with a reason.",
+  "files": [
+    "001_marketplace_core.sql",
+    "002_marketplace_functions.sql",
+    "003_cardtrader_listing_cache.sql",
+    "003_marketplace_search_rpc.sql",
+    "004_marketplace_home.sql",
+    "005_refresh_all.sql",
+    "006_marketplace_card_name_translations.sql",
+    "007_cardmarket_parsing_seeds.sql",
+    "008_marketplace_firebase_users.sql",
+    "009_cardtrader_import_jobs.sql",
+    "010_flutter_debug_logs.sql",
+    "011_cardtrader_user_listings.sql",
+    "012_cardtrader_market_listings.sql",
+    "013_assistant_user_current_pages.sql",
+    "013_cheapest_homepage_cache_compat_view.sql",
+    "014_limitless_competitive.sql",
+    "015_homepage_cheapest_native_source.sql",
+    "016_limitless_expansion_blueprint_mapping.sql"
+  ],
+  "allowedDuplicatePrefixes": {
+    "003": "Historical split between CardTrader listing cache and marketplace search RPC work; preserve apply order until renumbered in a planned migration cleanup.",
+    "013": "Historical split between assistant current-page storage and cheapest homepage cache compatibility view; preserve apply order until renumbered in a planned migration cleanup."
+  }
+}

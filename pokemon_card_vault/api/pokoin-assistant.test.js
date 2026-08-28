@@ -82,7 +82,7 @@ test('Pokontact helpers module-load in deploy-pokoin-web output layout', () => {
     fs.mkdirSync(deployServerDir);
 
     copyApiFile('pokoin-assistant', deployApiDir);
-    for (const helper of ['_firebase', '_email', '_marketplace_db']) {
+    for (const helper of ['_firebase', '_email', '_marketplace_db', '_slug']) {
       copyApiFile(helper, deployServerDir);
     }
 
@@ -650,6 +650,531 @@ test('curated Dragonite suggestion opens direct card page instead of search', as
   }
 });
 
+test('Italian explicit Rayquaza card prompt opens Rayquaza direct card page', async () => {
+  const assistant = loadAssistantWithStubs({
+    marketplaceQuery: async (sql, values) => {
+      assert.match(String(sql), /marketplace_search_candidates/);
+      assert.match(String(sql), /marketplace_card_urls/);
+      assert.deepEqual(values, ['rayquaza', '', 5]);
+      return {
+        rows: [{
+          card_id: '123456',
+          card_name: 'Rayquaza VMAX',
+          name: 'Rayquaza VMAX',
+          collector_number: '111/203',
+          set_name: 'Evolving Skies',
+          rarity: 'Ultra Rare',
+          canonical_path: '/marketplace/en/cards/246912/ultra-rare-rayquaza-vmax-111-203-evolving-skies',
+          lowest_ask_pkn: 125,
+          active_listing_count: 2,
+        }],
+      };
+    },
+  });
+  const res = createResponse();
+
+  assert.equal(assistant._test.classifyIntent('fammi vedere una carta di rayquaza'), 'marketplace');
+  assert.equal(assistant._test.explicitCardSubjectFromMessage('fammi vedere una carta di rayquaza'), 'rayquaza');
+  await assistant({
+    method: 'POST',
+    headers: {},
+    body: {
+      message: 'fammi vedere una carta di rayquaza',
+      messages: [],
+      page: 'https://pokoin.com/marketplace/en',
+      username: 'guest',
+    },
+  }, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.intent, 'marketplace');
+  assert.equal(res.body.serviceDelivery.provider, 'pokoin-marketplace-tool');
+  assert.equal(res.body.actions[0].type, 'navigate');
+  assert.equal(
+    res.body.actions[0].path,
+    '/marketplace/en/cards/246912/ultra-rare-rayquaza-vmax-111-203-evolving-skies',
+  );
+  assert.match(res.body.reply, /Rayquaza VMAX/i);
+  assert.match(res.body.reply, /Direct card page/i);
+  assert.doesNotMatch(res.body.reply, /Mew ex|Poko card taste mode|My illustration pick/i);
+});
+
+test('English explicit Rayquaza card prompt opens Rayquaza direct card page', async () => {
+  const assistant = loadAssistantWithStubs({
+    marketplaceQuery: async (sql, values) => {
+      assert.match(String(sql), /marketplace_search_candidates/);
+      assert.match(String(sql), /marketplace_card_urls/);
+      assert.deepEqual(values, ['rayquaza', '', 5]);
+      return {
+        rows: [{
+          card_id: '98765',
+          card_name: 'Rayquaza ex',
+          name: 'Rayquaza ex',
+          collector_number: '102/107',
+          set_name: 'Deoxys',
+          rarity: 'Ultra Rare',
+          canonical_path: '/marketplace/en/cards/197530/ultra-rare-rayquaza-ex-102-107-deoxys',
+        }],
+      };
+    },
+  });
+  const res = createResponse();
+
+  assert.equal(assistant._test.classifyIntent('show me a Rayquaza card'), 'marketplace');
+  assert.equal(assistant._test.explicitCardSubjectFromMessage('show me a Rayquaza card'), 'rayquaza');
+  await assistant({
+    method: 'POST',
+    headers: {},
+    body: {
+      message: 'show me a Rayquaza card',
+      messages: [],
+      page: 'https://pokoin.com/marketplace/en',
+      username: 'guest',
+    },
+  }, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.intent, 'marketplace');
+  assert.equal(res.body.actions[0].type, 'navigate');
+  assert.equal(
+    res.body.actions[0].path,
+    '/marketplace/en/cards/197530/ultra-rare-rayquaza-ex-102-107-deoxys',
+  );
+  assert.match(res.body.reply, /Rayquaza ex/i);
+  assert.doesNotMatch(res.body.reply, /Mew ex|Poko card taste mode|My illustration pick/i);
+});
+
+test('casual gelato chat is not forced to docs, marketplace, or navigation', async () => {
+  const originalFetch = global.fetch;
+  let peerServiceCalled = false;
+  global.fetch = async () => {
+    peerServiceCalled = true;
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        reply: 'Per domande tecniche ti mando alla documentazione ufficiale.',
+        intent: 'project',
+        actions: [{ type: 'navigate', path: '/docs' }],
+      }),
+    };
+  };
+  try {
+    const assistant = loadAssistantWithStubs({
+      env: {
+        POKONTACT_SERVICE_TOKEN: 'secret',
+      },
+      marketplaceQuery: async () => {
+        throw new Error('marketplace should not be queried for casual chat');
+      },
+    });
+    const res = createResponse();
+
+    await assistant({
+      method: 'POST',
+      headers: {},
+      body: {
+        message: 'ti piace il gelato?',
+        messages: [],
+        page: 'https://pokoin.com/marketplace/en',
+        username: 'guest',
+      },
+    }, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(peerServiceCalled, false);
+    assert.equal(res.body.intent, 'casual');
+    assert.match(res.body.reply, /gelato/i);
+    assert.match(res.body.reply, /Vanillite/i);
+    assert.doesNotMatch(res.body.reply, /docs|documentazione ufficiale|marketplace_search_candidates/i);
+    assert.deepEqual(res.body.actions, []);
+    assert.equal(res.body.serviceDelivery.reason, 'local_casual');
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('pokemon gelato suggestion resolves to coherent Vanillite card navigation', async () => {
+  const assistant = loadAssistantWithStubs({
+    marketplaceQuery: async (sql, values) => {
+      assert.match(String(sql), /marketplace_search_candidates/);
+      assert.match(String(sql), /marketplace_card_urls/);
+      assert.equal(values[0], 'Vanillite');
+      assert.equal(values[1], '');
+      return {
+        rows: [{
+          card_id: '555',
+          card_name: 'Vanillite',
+          name: 'Vanillite',
+          collector_number: '043/198',
+          set_name: 'Scarlet & Violet',
+          rarity: 'Illustration Rare',
+          canonical_path: '/marketplace/en/cards/1110/illustration-rare-vanillite-043-198-scarlet-violet',
+        }],
+      };
+    },
+  });
+  const res = createResponse();
+
+  await assistant({
+    method: 'POST',
+    headers: {},
+    body: {
+      message: 'consigliami un pokemon gelato',
+      messages: [],
+      page: 'https://pokoin.com/marketplace/en',
+      username: 'guest',
+    },
+  }, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.intent, 'card');
+  assert.match(res.body.reply, /ice cream|gelato/i);
+  assert.match(res.body.reply, /Vanillite/);
+  assert.doesNotMatch(res.body.reply, /Dragonite|Mew ex|Magikarp/);
+    assert.equal(res.body.serviceDelivery.reason, 'local_card');
+  assert.equal(res.body.actions[0].type, 'navigate');
+  assert.equal(
+    res.body.actions[0].path,
+    '/marketplace/en/cards/1110/illustration-rare-vanillite-043-198-scarlet-violet',
+  );
+  assert.match(res.body.actions[0].path, /^\/marketplace\/en\/cards\/\d+\//);
+});
+
+test('cute Rayquaza recommendation uses analytics-backed direct card navigation', async () => {
+  const queries = [];
+  const assistant = loadAssistantWithStubs({
+    marketplaceQuery: async (sql, values) => {
+      queries.push(String(sql));
+      assert.match(String(sql), /marketplace_search_candidates/);
+      assert.match(String(sql), /marketplace_hot_blueprints/);
+      assert.match(String(sql), /marketplace_blueprint_price_summary/);
+      assert.match(String(sql), /cardtrader_blueprint_listing_cache/);
+      assert.match(String(sql), /marketplace_blueprint_artists/);
+      assert.deepEqual(values.slice(0, 5), [
+        'rayquaza',
+        '',
+        ['cute'],
+        '',
+        ['rayquaza'],
+      ]);
+      return {
+        rows: [{
+          card_id: '123456',
+          card_name: 'Rayquaza VMAX',
+          name: 'Rayquaza VMAX',
+          set_name: 'Evolving Skies',
+          card_number: '111/203',
+          rarity: 'Illustration Rare',
+          canonical_path: '/marketplace/en/cards/246912/illustration-rare-rayquaza-vmax-111-203-evolving-skies',
+          lowest_ask_pkn: 300,
+          active_listing_count: 3,
+          listed_quantity: 4,
+          views_24h: 42,
+          searches_24h: 12,
+          clicks_24h: 5,
+          sales_24h: 1,
+          hot_score_24h: 88,
+          recommendation_score: 1450,
+          artist: 'Atsushi Furusawa',
+        }],
+      };
+    },
+  });
+  const res = createResponse();
+
+  await assistant({
+    method: 'POST',
+    headers: {},
+    body: {
+      message: 'fammi vedere una cute card di rayquaza',
+      messages: [],
+      page: 'https://pokoin.com/marketplace/en',
+      sessionId: 'session-1',
+      username: 'guest',
+    },
+  }, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.intent, 'card-recommendation');
+  assert.equal(res.body.serviceDelivery.provider, 'pokoin-card-recommendation');
+  assert.equal(res.body.actions[0].type, 'navigate');
+  assert.equal(
+    res.body.actions[0].path,
+    '/marketplace/en/cards/246912/illustration-rare-rayquaza-vmax-111-203-evolving-skies',
+  );
+  assert.match(res.body.reply, /Rayquaza VMAX/);
+  assert.match(res.body.reply, /Signals used|Segnali letti/i);
+  assert.match(res.body.reply, /peer4\/read-only/i);
+  assert.ok(queries.every((sql) => !/\b(insert|update|delete|drop|alter|truncate)\b/i.test(sql)));
+});
+
+test('personalized cute recommendation biases toward prior Rayquaza preference', async () => {
+  const assistant = loadAssistantWithStubs({
+    marketplaceQuery: async (sql, values) => {
+      if (!String(sql).includes('input.favorite')) {
+        return { rows: [] };
+      }
+      assert.equal(values[0], '');
+      assert.deepEqual(values[2], ['cute']);
+      assert.equal(values[5], 'rayquaza');
+      return {
+        rows: [{
+          card_id: '123456',
+          card_name: 'Rayquaza VMAX',
+          name: 'Rayquaza VMAX',
+          set_name: 'Evolving Skies',
+          card_number: '111/203',
+          rarity: 'Illustration Rare',
+          canonical_path: '/marketplace/en/cards/246912/illustration-rare-rayquaza-vmax-111-203-evolving-skies',
+          active_listing_count: 1,
+          hot_score_24h: 10,
+          recommendation_score: 700,
+        }],
+      };
+    },
+  });
+  const res = createResponse();
+
+  await assistant({
+    method: 'POST',
+    headers: {},
+    body: {
+      message: 'suggest a cute card',
+      messages: [
+        { role: 'user', text: 'I love Rayquaza and ice cards' },
+        { role: 'assistant', text: 'Nice taste.' },
+      ],
+      page: 'https://pokoin.com/marketplace/en',
+      sessionId: 'session-rayquaza',
+      username: 'guest',
+    },
+  }, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.intent, 'card-recommendation');
+  assert.match(res.body.reply, /Rayquaza VMAX/);
+  assert.match(res.body.reply, /recent taste/i);
+  assert.equal(res.body.userMemory.favoritePokemon[0], 'rayquaza');
+  assert.equal(
+    res.body.actions[0].path,
+    '/marketplace/en/cards/246912/illustration-rare-rayquaza-vmax-111-203-evolving-skies',
+  );
+});
+
+test('ice theme recommendation resolves Vanillite through read-only planner', async () => {
+  const assistant = loadAssistantWithStubs({
+    marketplaceQuery: async (sql, values) => {
+      assert.match(String(sql), /seed_terms/);
+      assert.equal(values[1], 'ice_cream');
+      assert.deepEqual(values[4].slice(0, 3), ['Vanillite', 'Vanillish', 'Vanilluxe']);
+      return {
+        rows: [{
+          card_id: '555',
+          card_name: 'Vanillite',
+          name: 'Vanillite',
+          set_name: 'Scarlet & Violet',
+          card_number: '043/198',
+          rarity: 'Illustration Rare',
+          canonical_path: '/marketplace/en/cards/1110/illustration-rare-vanillite-043-198-scarlet-violet',
+          lowest_ask_pkn: 80,
+          active_listing_count: 2,
+          hot_score_24h: 12,
+          recommendation_score: 900,
+        }],
+      };
+    },
+  });
+  const res = createResponse();
+
+  await assistant({
+    method: 'POST',
+    headers: {},
+    body: {
+      message: 'show me a cute ice card',
+      messages: [],
+      page: 'https://pokoin.com/marketplace/en',
+      username: 'guest',
+    },
+  }, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.intent, 'card-recommendation');
+  assert.match(res.body.reply, /Vanillite/);
+  assert.equal(
+    res.body.actions[0].path,
+    '/marketplace/en/cards/1110/illustration-rare-vanillite-043-198-scarlet-violet',
+  );
+});
+
+test('pokemon gelato suggestion avoids generic fallback when first ice match resolves', async () => {
+  const assistant = loadAssistantWithStubs({
+    marketplaceQuery: async (sql, values) => {
+      assert.match(String(sql), /marketplace_search_candidates/);
+      assert.equal(values[0], 'Vanillite');
+      return {
+        rows: [{
+          card_id: '777',
+          card_name: 'Vanillite',
+          name: 'Vanillite',
+          collector_number: '044/162',
+          set_name: 'Temporal Forces',
+          rarity: 'Common',
+          canonical_path: '/marketplace/en/cards/1554/common-vanillite-044-162-temporal-forces',
+        }],
+      };
+    },
+  });
+
+  const suggestion = await assistant._test.cardSuggestion({
+    page: 'https://pokoin.com/marketplace/en',
+    message: 'pokemon gelato',
+    chatRecord: [],
+  });
+
+  assert.match(suggestion.reply, /Vanillite/);
+  assert.doesNotMatch(suggestion.reply, /\b(Dragonite|Mew ex)\b/);
+  assert.equal(suggestion.actions[0].type, 'navigate');
+  assert.equal(
+    suggestion.actions[0].path,
+    '/marketplace/en/cards/1554/common-vanillite-044-162-temporal-forces',
+  );
+});
+
+test('navigate actions are sanitized to safe internal direct card paths', () => {
+  const assistant = loadAssistantWithStubs({});
+
+  const actions = assistant._test.safeAssistantActions([
+    { type: 'navigate', path: 'https://evil.example/cards/1' },
+    { type: 'open_url', path: '/marketplace/en/cards/1110/vanillite' },
+    { type: 'navigate', path: '//pokoin.com/marketplace/en/cards/1110/vanillite' },
+    {
+      type: 'navigate',
+      data: {
+        canonicalPath:
+          '/marketplace/en/cards/1110/illustration-rare-vanillite-043-198-scarlet-violet',
+      },
+    },
+  ]);
+
+  assert.deepEqual(actions, [{
+    type: 'navigate',
+    data: {
+      canonicalPath:
+        '/marketplace/en/cards/1110/illustration-rare-vanillite-043-198-scarlet-violet',
+    },
+    path: '/marketplace/en/cards/1110/illustration-rare-vanillite-043-198-scarlet-violet',
+  }]);
+  assert.equal(assistant._test.isDirectMarketplaceCardPath(actions[0].path), true);
+});
+
+test('deck advisor gives beginner deck options from Limitless read-only data', async () => {
+  const assistant = loadAssistantWithStubs({
+    marketplaceQuery: async (sql, values) => {
+      assert.match(String(sql), /limitless_public_decks/);
+      assert.match(String(sql), /limitless_public_deck_core_cards/);
+      assert.match(String(sql), /limitless_public_deck_results/);
+      assert.deepEqual(values, ['', true, false, 'beginner']);
+      return {
+        rows: [{
+          deck_id: 'charizard-ex',
+          name: 'Charizard ex',
+          format: 'STANDARD',
+          format_label: 'Standard',
+          rank: 1,
+          points: 1200,
+          share: 12.5,
+          source_url: 'https://limitlesstcg.com/decks/charizard-ex',
+          featured_decklist_id: '123',
+          featured_tournament_name: 'Regional Championship',
+          featured_tournament_date: '2026-05-01',
+          core_cards: [
+            { name: 'Charizard ex', count: 3, inclusionShare: 0.98 },
+            { name: 'Pidgeot ex', count: 2, inclusionShare: 0.9 },
+          ],
+          recent_results: [
+            {
+              tournamentName: 'Regional Championship',
+              tournamentDate: '2026-05-01',
+              placing: 2,
+              playerName: 'Test Player',
+              decklistId: '123',
+            },
+          ],
+        }],
+      };
+    },
+  });
+  const res = createResponse();
+
+  await assistant({
+    method: 'POST',
+    headers: {},
+    body: {
+      message: 'best deck for beginners',
+      messages: [],
+      page: 'https://pokoin.com/marketplace/en',
+      username: 'guest',
+    },
+  }, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.intent, 'deck-advisor');
+  assert.equal(res.body.serviceDelivery.provider, 'pokoin-deck-advisor');
+  assert.match(res.body.reply, /Charizard ex/);
+  assert.match(res.body.reply, /How it works/);
+  assert.match(res.body.reply, /Strengths/);
+  assert.match(res.body.reply, /Weaknesses/);
+  assert.match(res.body.reply, /Limitless/);
+  assert.deepEqual(res.body.actions, []);
+  assert.equal(res.body.marketplaceContext.readOnly, true);
+});
+
+test('deck advisor explains a named deck without claiming exact live win rates', async () => {
+  const assistant = loadAssistantWithStubs({
+    marketplaceQuery: async (sql, values) => {
+      assert.match(String(sql), /limitless_public_decks/);
+      assert.equal(values[0], 'gardevoir');
+      return {
+        rows: [{
+          deck_id: 'gardevoir-ex',
+          name: 'Gardevoir ex',
+          format: 'STANDARD',
+          format_label: 'Standard',
+          rank: 4,
+          points: 700,
+          share: 6.2,
+          source_url: 'https://limitlesstcg.com/decks/gardevoir-ex',
+          core_cards: [
+            { name: 'Gardevoir ex', count: 2, inclusionShare: 0.96 },
+            { name: 'Kirlia', count: 4, inclusionShare: 0.94 },
+          ],
+          recent_results: [],
+        }],
+      };
+    },
+  });
+  const res = createResponse();
+
+  await assistant({
+    method: 'POST',
+    headers: {},
+    body: {
+      message: 'come funziona gardevoir ex deck?',
+      messages: [],
+      page: 'https://pokoin.com/marketplace/en',
+      username: 'guest',
+    },
+  }, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.intent, 'deck-advisor');
+  assert.match(res.body.reply, /Gardevoir ex/);
+  assert.match(res.body.reply, /energy from the discard pile/i);
+  assert.match(res.body.reply, /Weaknesses/);
+  assert.doesNotMatch(res.body.reply, /\b\d+(\.\d+)?% win rate/i);
+});
+
 test('card lookup returns canonical public-number card URL', async () => {
   const assistant = loadAssistantWithStubs({
     marketplaceQuery: async (sql, values) => {
@@ -961,7 +1486,86 @@ test('quick project prompt returns local Poko explanation, not card lookup failu
   assert.equal(res.body.intent, 'project');
   assert.match(res.body.reply, /I am Poko/);
   assert.match(res.body.reply, /Pokoin is a collector project/);
+  assert.match(res.body.reply, /marketplace.*cart.*checkout.*orders/i);
+  assert.match(res.body.reply, /sharded into PKN value/i);
+  assert.match(res.body.reply, /marketplace flows|order flows/i);
+  assert.doesNotMatch(res.body.reply, /CardTrader/i);
   assert.doesNotMatch(res.body.reply, /could not resolve a direct card page/i);
+});
+
+test('shard question explains Earn PKN review flow without forbidden provider name', async () => {
+  const assistant = loadAssistantWithStubs({
+    marketplaceQuery: async () => {
+      throw new Error('marketplace should not be queried for shard explanation');
+    },
+  });
+  const res = createResponse();
+
+  await assistant({
+    method: 'POST',
+    headers: {},
+    body: {
+      message: 'how do shards work?',
+      messages: [],
+      page: 'https://pokoin.com/earn',
+      username: 'guest',
+    },
+  }, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.intent, 'earn');
+  assert.match(res.body.reply, /Earn PKN \/ PKN Shard Review/i);
+  assert.match(res.body.reply, /card list or full decklist/i);
+  assert.match(res.body.reply, /eligible.*sharded into PKN value/i);
+  assert.match(res.body.reply, /not an instant guaranteed disenchant button/i);
+  assert.doesNotMatch(res.body.reply, /CardTrader/i);
+});
+
+test('turn cards into new cards prompt includes shard and order concept', async () => {
+  const assistant = loadAssistantWithStubs({});
+  const res = createResponse();
+
+  await assistant({
+    method: 'POST',
+    headers: {},
+    body: {
+      message: 'can I turn cards into new cards?',
+      messages: [],
+      page: 'https://pokoin.com/marketplace',
+      username: 'guest',
+    },
+  }, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.intent, 'earn');
+  assert.match(res.body.reply, /eligible.*sharded into PKN value/i);
+  assert.match(res.body.reply, /used toward cards you actually want/i);
+  assert.match(res.body.reply, /marketplace\/order flows/i);
+  assert.doesNotMatch(res.body.reply, /CardTrader/i);
+});
+
+test('Italian videogame shard prompt gets Italian review-flow answer', async () => {
+  const assistant = loadAssistantWithStubs({});
+  const res = createResponse();
+
+  await assistant({
+    method: 'POST',
+    headers: {},
+    body: {
+      message: 'come funziona il sistema tipo videogame?',
+      messages: [],
+      page: 'https://pokoin.com/shard-review',
+      username: 'guest',
+    },
+  }, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.intent, 'earn');
+  assert.match(res.body.reply, /Sì: su Pokoin esiste il flusso Earn PKN/i);
+  assert.match(res.body.reply, /lista di carte o un decklist/i);
+  assert.match(res.body.reply, /sharded into PKN/i);
+  assert.match(res.body.reply, /non è un pulsante automatico garantito/i);
+  assert.doesNotMatch(res.body.reply, /CardTrader/i);
 });
 
 test('quick cute-card prompt returns curated card suggestion action', async () => {

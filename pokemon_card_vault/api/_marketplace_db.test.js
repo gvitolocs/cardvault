@@ -2,8 +2,11 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 
 const {
+  assertReadOnlySql,
   configuredMarketplaceReadReplicaDatabaseUrls,
   marketplaceDatabaseUrl,
+  marketplaceAssistantReadOnlyConfigured,
+  marketplaceAssistantReadOnlyDatabaseUrl,
   marketplaceAnalyticsSearchDatabaseUrls,
   marketplaceDimensionSearchDatabaseUrls,
   marketplaceDimensionSearchRoute,
@@ -12,6 +15,49 @@ const {
   supabaseNameIndexConfigured,
   supabaseNameIndexDatabaseUrl,
 } = require('./_marketplace_db');
+
+test('assistant read-only database env prefers explicit read-only URL', () => {
+  const original = {
+    assistant: process.env.POKO_ASSISTANT_READONLY_DATABASE_URL,
+    legacyAssistant: process.env.MARKETPLACE_ASSISTANT_READONLY_DATABASE_URL,
+    peer4Readonly: process.env.MARKETPLACE_PEER4_READONLY_DATABASE_URL,
+    primary: process.env.MARKETPLACE_DATABASE_URL,
+  };
+  try {
+    process.env.MARKETPLACE_DATABASE_URL = 'postgres://peer4-writer.example/db';
+    process.env.POKO_ASSISTANT_READONLY_DATABASE_URL = 'postgres://poko-readonly.example/db';
+    delete process.env.MARKETPLACE_ASSISTANT_READONLY_DATABASE_URL;
+    delete process.env.MARKETPLACE_PEER4_READONLY_DATABASE_URL;
+
+    assert.equal(marketplaceAssistantReadOnlyConfigured(), true);
+    assert.equal(marketplaceAssistantReadOnlyDatabaseUrl(), 'postgres://poko-readonly.example/db');
+  } finally {
+    for (const [key, value] of Object.entries({
+      POKO_ASSISTANT_READONLY_DATABASE_URL: original.assistant,
+      MARKETPLACE_ASSISTANT_READONLY_DATABASE_URL: original.legacyAssistant,
+      MARKETPLACE_PEER4_READONLY_DATABASE_URL: original.peer4Readonly,
+      MARKETPLACE_DATABASE_URL: original.primary,
+    })) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+});
+
+test('assistant read-only SQL guard rejects mutation statements', () => {
+  assert.doesNotThrow(() => assertReadOnlySql('select * from public.marketplace_search_candidates limit 1'));
+  assert.doesNotThrow(() => assertReadOnlySql('with cards as (select 1) select * from cards'));
+
+  for (const sql of [
+    'insert into public.marketplace_card_events(card_id, event_type) values (1, \'view\')',
+    'delete from public.marketplace_search_candidates',
+    'select 1; drop table public.marketplace_search_candidates',
+    'refresh materialized view public.anything',
+    'update public.marketplace_user_listings set status = \'paused\'',
+  ]) {
+    assert.throws(() => assertReadOnlySql(sql), /read-only/i);
+  }
+});
 
 test('marketplace search replica env defaults to primary urls', () => {
   const originalPrimary = process.env.MARKETPLACE_DATABASE_URL;

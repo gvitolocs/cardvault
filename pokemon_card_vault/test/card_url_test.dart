@@ -225,6 +225,21 @@ void main() {
       );
     });
 
+    test('generated marketplace path folds Pokemon accent', () {
+      expect(
+        marketplaceCardDetailPath(
+          _card(
+            id: '251432',
+            name: 'Poliwhirl',
+            number: '176/165',
+            set: 'Pokémon Card 151',
+            rarity: 'Card',
+          ),
+        ),
+        '/marketplace/en/cards/502864/card-poliwhirl-176-165-pokemon-card-151',
+      );
+    });
+
     test('generated marketplace path reads home snapshot collector fields', () {
       final card = PokemonCard.fromJson({
         'card_id': '316600',

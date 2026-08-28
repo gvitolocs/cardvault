@@ -20,6 +20,7 @@ const int searchPreviewVisibleChars = 3;
 const int searchPreviewHotCacheLimit = 1000;
 const int _searchPreviewMaxPrefixPools = 16;
 const int _searchPreviewMaxAggregatePrefixIds = 20000;
+const Duration _firstCharWarmupTtl = Duration(minutes: 5);
 const String _searchLanguagePreferenceKey = 'marketplace.search_language';
 const Set<String> _supportedSearchLanguages = {
   'en',
@@ -71,6 +72,18 @@ List<PokemonCard> searchPreviewFallbackRowsForTest({
     latestDepths: latestDepths,
     depthScores: depthScores,
     latestOrders: latestOrders,
+    limit: limit,
+  );
+}
+
+List<PokemonCard> mergeSearchPreviewRowsForTest({
+  required List<PokemonCard> backendRows,
+  required List<PokemonCard> fallbackRows,
+  int limit = searchPreviewLimit,
+}) {
+  return _mergePreviewRows(
+    backendRows: backendRows,
+    fallbackRows: fallbackRows,
     limit: limit,
   );
 }
@@ -310,6 +323,10 @@ class CardNotifier extends StateNotifier<CardState> {
   final Map<String, int> _searchCandidateDepthScoreById = {};
   final Map<String, int> _searchCandidateLatestOrderById = {};
   final Map<String, _SearchPrefixPool> _searchPrefixPoolsByKey = {};
+  final Map<String, Map<String, SearchPredictedNameToken>>
+      _firstCharWarmupTokensByLanguage = {};
+  final Map<String, DateTime> _firstCharWarmupLoadedAtByLanguage = {};
+  final Set<String> _firstCharWarmupInFlightLanguages = {};
   List<SearchPredictedNameToken> _searchPredictedNameTokens = const [];
   SearchTokenPredictionContext? _searchTokenPredictionContext;
 
@@ -581,6 +598,7 @@ class CardNotifier extends StateNotifier<CardState> {
     final wasShowingEmptyFocusPreviews = state.previewQuery.trim().isEmpty &&
         state.searchPreviews.isNotEmpty &&
         !state.isSearchingPreviews;
+    final previousSearchPreviews = state.searchPreviews;
     final normalizedQuery = query.trim();
     final isQueryBranchChange = normalizedQuery.isNotEmpty &&
         _isSearchSessionBranchChange(normalizedQuery);
@@ -589,6 +607,7 @@ class CardNotifier extends StateNotifier<CardState> {
     }
     final searchSessionId =
         normalizedQuery.isEmpty ? null : _ensureSearchSession(normalizedQuery);
+    _ensureFirstCharWarmup(state.searchLanguage);
     _applyFirstCharCompletionCache(normalizedQuery);
     final canShowTypedPopup =
         _meaningfulSearchLength(normalizedQuery) >= searchPreviewVisibleChars;
@@ -630,7 +649,7 @@ class CardNotifier extends StateNotifier<CardState> {
       });
     }
     final emptyFocusPreviews = wasShowingEmptyFocusPreviews
-        ? state.searchPreviews
+        ? previousSearchPreviews
         : const <PokemonCard>[];
     final filteredPreviews = _pendingSearchPreviewFallbackForQuery(
       normalizedQuery,
@@ -696,6 +715,7 @@ class CardNotifier extends StateNotifier<CardState> {
       _prepareSearchSessionForQuery(normalizedQuery);
       _ensureSearchSession(normalizedQuery);
     }
+    _ensureFirstCharWarmup(state.searchLanguage);
     _applyFirstCharCompletionCache(normalizedQuery);
     state = state.copyWith(
       previewQuery: query,
@@ -770,6 +790,11 @@ class CardNotifier extends StateNotifier<CardState> {
   }
 
   void _changeSearchLanguage(String normalized) {
+    _searchRequestId++;
+    _searchPreviewRequestId++;
+    _searchTokenPredictRequestId++;
+    _searchPreviewDebounce?.cancel();
+    _searchTokenPredictDebounce?.cancel();
     _searchAutocompleteContext = null;
     _searchPredictedNameTokens = const [];
     _searchTokenPredictionContext = null;
@@ -777,6 +802,10 @@ class CardNotifier extends StateNotifier<CardState> {
     _clearSearchPrefixPoolHistory();
     state = state.copyWith(
       searchLanguage: normalized,
+      searchPreviews: const [],
+      isSearchingPreviews: false,
+      remoteSearchResults: const [],
+      remoteSearchQuery: '',
       searchCompletion: '',
       searchCompletionConfidence: 0,
       searchCompletionSource: '',
@@ -791,6 +820,11 @@ class CardNotifier extends StateNotifier<CardState> {
                 : state.searchQuery,
           )
         : null;
+    if (_meaningfulSearchLength(state.previewQuery) >=
+            searchPreviewWarmupChars ||
+        state.searchPreviews.isNotEmpty) {
+      _ensureFirstCharWarmup(normalized);
+    }
     if (_meaningfulSearchLength(state.previewQuery) >=
         searchPreviewWarmupChars) {
       _loadSearchPreviews(
@@ -1134,8 +1168,11 @@ class CardNotifier extends StateNotifier<CardState> {
         ? _fallbackPreviewsForQuery(
             currentQuery.isEmpty ? normalizedQuery : currentQuery)
         : _fallbackPreviewsForQuery(normalizedQuery);
-    final renderedPreviews =
-        fallbackPreviews.isNotEmpty ? fallbackPreviews : effectivePreviews;
+    final renderedPreviews = _mergePreviewRows(
+      backendRows: effectivePreviews,
+      fallbackRows: fallbackPreviews,
+      limit: searchPreviewLimit,
+    );
     state = state.copyWith(
       searchPreviews: shouldShowAutocomplete ? renderedPreviews : const [],
       isSearchingPreviews: requestId == _searchPreviewRequestId
@@ -1219,6 +1256,61 @@ class CardNotifier extends StateNotifier<CardState> {
     );
   }
 
+  void _ensureFirstCharWarmup(String language) {
+    final normalizedLanguage = normalizeSearchLanguage(language);
+    final loadedAt = _firstCharWarmupLoadedAtByLanguage[normalizedLanguage];
+    if (loadedAt != null &&
+        DateTime.now().difference(loadedAt) < _firstCharWarmupTtl) {
+      return;
+    }
+    if (!_firstCharWarmupInFlightLanguages.add(normalizedLanguage)) {
+      return;
+    }
+    unawaited(_loadFirstCharWarmup(normalizedLanguage));
+  }
+
+  Future<void> _loadFirstCharWarmup(String language) async {
+    try {
+      final result = await _cardService.warmSearchFirstCharNameTokens(
+        limit: 1,
+        searchLanguage: language,
+      );
+      if (!mounted) {
+        return;
+      }
+      final resultLanguage = normalizeSearchLanguage(
+        result.language.isEmpty ? language : result.language,
+      );
+      _firstCharWarmupLoadedAtByLanguage[resultLanguage] = DateTime.now();
+      if (result.suggestions.isEmpty) {
+        return;
+      }
+      _firstCharWarmupTokensByLanguage[resultLanguage] = result.suggestions;
+      SearchDebugTrace.instance.record('provider.completion.warmup_tokens', {
+        'language': resultLanguage,
+        'sourceLanguage': result.sourceLanguage,
+        'count': result.suggestions.length,
+      });
+      final currentQuery = state.previewQuery.trim();
+      if (state.searchLanguage == resultLanguage &&
+          _meaningfulSearchLength(currentQuery) == 1 &&
+          _searchPredictedNameTokens.any(
+            (prediction) => prediction.source == 'first_char_static',
+          )) {
+        _applyFirstCharCompletionCache(currentQuery);
+        state = state.copyWith(
+          searchCompletion: _validatedSearchCompletion(currentQuery),
+          searchCompletionConfidence: _searchCompletionConfidence(currentQuery),
+          searchCompletionSource: _searchCompletionSource(currentQuery),
+        );
+      }
+    } catch (_) {
+      // Warmup is opportunistic; static suggestions and live prediction remain.
+    } finally {
+      _firstCharWarmupInFlightLanguages.remove(language);
+    }
+  }
+
   Future<void> _warmSearchPreviews() async {
     final token = _navigationPriorityToken;
     await Future<void>.delayed(const Duration(milliseconds: 80));
@@ -1266,6 +1358,7 @@ class CardNotifier extends StateNotifier<CardState> {
     _searchPredictedNameTokens = const [];
     _searchTokenPredictionContext = null;
     _clearSearchPrefixPoolHistory();
+    _ensureFirstCharWarmup(state.searchLanguage);
     final requestId = _searchPreviewRequestId;
     final recentBlueprints = recentViews.take(2).toList(growable: false);
     final localHotCards = _hotSearchPreviewCache.isNotEmpty
@@ -1901,7 +1994,9 @@ class CardNotifier extends StateNotifier<CardState> {
     final token = _firstCharCompletionToken(query, state.searchLanguage);
     if (token == null) {
       if (_searchPredictedNameTokens.any(
-        (prediction) => prediction.source == 'first_char_static',
+        (prediction) =>
+            prediction.source == 'first_char_static' ||
+            prediction.source == 'first_char_warmup',
       )) {
         _searchPredictedNameTokens = const [];
       }
@@ -1914,15 +2009,33 @@ class CardNotifier extends StateNotifier<CardState> {
     String query,
     String language,
   ) {
-    if (language.toLowerCase() != 'en') {
-      return null;
-    }
+    final normalizedLanguage = normalizeSearchLanguage(language);
     final normalizedQuery = query.trim();
     if (_meaningfulSearchLength(normalizedQuery) != 1) {
       return null;
     }
     final key = _compactSearchCompletionText(normalizedQuery);
     if (key.length != 1) {
+      return null;
+    }
+    final dynamicSuggestion =
+        _firstCharWarmupTokensByLanguage[normalizedLanguage]?[key];
+    if (dynamicSuggestion != null &&
+        (dynamicSuggestion.language.isEmpty ||
+            dynamicSuggestion.language.toLowerCase() == normalizedLanguage)) {
+      return SearchPredictedNameToken(
+        normalized: dynamicSuggestion.normalized,
+        display: dynamicSuggestion.display,
+        confidence: dynamicSuggestion.confidence,
+        sourceRank: dynamicSuggestion.sourceRank,
+        language: normalizedLanguage,
+        source: 'first_char_warmup',
+        nameFragment: key,
+        representativeCardIds: dynamicSuggestion.representativeCardIds,
+        representativeLabels: dynamicSuggestion.representativeLabels,
+      );
+    }
+    if (normalizedLanguage != 'en') {
       return null;
     }
     final suggestion = firstCharTokenSuggestions[key];
@@ -2517,8 +2630,12 @@ class CardNotifier extends StateNotifier<CardState> {
       card.number,
       card.description,
       ...card.tags,
-    ].join(' ').toLowerCase();
-    return terms.every(haystack.contains);
+    ].join(' ');
+    final haystackTerms = _searchTerms(haystack);
+    final compactHaystack = _compactPreviewField(haystack);
+    return terms.every((term) =>
+        haystackTerms.any((word) => word == term || word.startsWith(term)) ||
+        compactHaystack.contains(term));
   }
 
   bool _isStandaloneVariationQuery(String query) {
@@ -2527,7 +2644,7 @@ class CardNotifier extends StateNotifier<CardState> {
   }
 
   List<String> _searchTerms(String query) {
-    return _normalizeVariationSearchPhrases(query)
+    return _stripSearchDiacritics(_normalizeVariationSearchPhrases(query))
         .toLowerCase()
         .replaceAllMapped(
           RegExp(r'\b([a-z0-9]+)s\b'),
@@ -2584,7 +2701,9 @@ class CardNotifier extends StateNotifier<CardState> {
   }
 
   int _meaningfulSearchLength(String query) {
-    return RegExp(r'[a-z0-9]', caseSensitive: false).allMatches(query).length;
+    return RegExp(r'[a-z0-9]', caseSensitive: false)
+        .allMatches(_stripSearchDiacritics(query))
+        .length;
   }
 }
 
@@ -2789,7 +2908,10 @@ List<PokemonCard> _searchPreviewFallbackRowsFromPrefixPools({
 }
 
 String _normalizePrefixPoolQuery(String query) {
-  return query.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+  return _stripSearchDiacritics(query)
+      .trim()
+      .toLowerCase()
+      .replaceAll(RegExp(r'\s+'), ' ');
 }
 
 bool _prefixPoolQueryExtends(String previousQuery, String nextQuery) {
@@ -2995,13 +3117,19 @@ List<_SearchPreviewFallbackCandidate> _refineFallbackCandidatesByToken(
   if (term.isEmpty || candidates.isEmpty) {
     return candidates;
   }
+  final normalizedTerm = _compactPreviewField(term);
   final completedVariationMatches = _isPreviewVariationSearchTerm(term)
       ? candidates
           .where((candidate) => _previewCardHasVariation(candidate.card, term))
           .toList(growable: false)
       : const <_SearchPreviewFallbackCandidate>[];
   if (_isPreviewVariationSearchTerm(term)) {
-    return completedVariationMatches;
+    if (completedVariationMatches.isNotEmpty) {
+      return completedVariationMatches;
+    }
+    if (normalizedTerm.length >= 2) {
+      return const [];
+    }
   }
 
   final layers = [
@@ -3332,7 +3460,7 @@ List<String> _previewVariationTargets(String term) {
 }
 
 List<String> _typedPreviewTerms(String query) {
-  return query
+  return _stripSearchDiacritics(query)
       .replaceAll(
           RegExp(r'\bhearth\s+gold\b', caseSensitive: false), 'hearthgold')
       .replaceAll(
@@ -3376,11 +3504,13 @@ List<String> _previewDisplayTokens(PokemonCard card) {
 }
 
 String _compactPreviewField(String value) {
-  return value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+  return _stripSearchDiacritics(value)
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9]'), '');
 }
 
 List<String> _previewFieldWords(String value) {
-  return value
+  return _stripSearchDiacritics(value)
       .toLowerCase()
       .split(RegExp(r'[^a-z0-9]+'))
       .map(_compactPreviewField)
@@ -3422,6 +3552,26 @@ List<PokemonCard> _emptyFocusPreviews(
   return previews;
 }
 
+List<PokemonCard> _mergePreviewRows({
+  required List<PokemonCard> backendRows,
+  required List<PokemonCard> fallbackRows,
+  int limit = searchPreviewLimit,
+}) {
+  final merged = <PokemonCard>[];
+  final seen = <String>{};
+  for (final card in [...backendRows, ...fallbackRows]) {
+    final id = card.id.trim();
+    if (id.isEmpty || !seen.add(id)) {
+      continue;
+    }
+    merged.add(card);
+    if (merged.length >= limit) {
+      break;
+    }
+  }
+  return merged;
+}
+
 List<PokemonCard> _remoteSearchResults(
   Iterable<PokemonCard> results, {
   int? limit,
@@ -3439,6 +3589,162 @@ List<PokemonCard> _remoteSearchResults(
     }
   }
   return ordered;
+}
+
+String _stripSearchDiacritics(String value) {
+  const source =
+      'ÀÁÂÃÄÅĀĂĄÆÇĆĈĊČÐĎĐÈÉÊËĒĔĖĘĚÌÍÎÏĨĪĬĮİÑŃŇÒÓÔÕÖØŌŎŐŒŔŘŚŜŞŠÙÚÛÜŨŪŬŮŰŲÝŸŹŻŽ'
+      'àáâãäåāăąæçćĉċčðďđèéêëēĕėęěìíîïĩīĭįıñńňòóôõöøōŏőœŕřśŝşšßùúûüũūŭůűųýÿźżž';
+  const replacements = [
+    'A',
+    'A',
+    'A',
+    'A',
+    'A',
+    'A',
+    'A',
+    'A',
+    'A',
+    'AE',
+    'C',
+    'C',
+    'C',
+    'C',
+    'C',
+    'D',
+    'D',
+    'D',
+    'E',
+    'E',
+    'E',
+    'E',
+    'E',
+    'E',
+    'E',
+    'E',
+    'E',
+    'I',
+    'I',
+    'I',
+    'I',
+    'I',
+    'I',
+    'I',
+    'I',
+    'I',
+    'N',
+    'N',
+    'N',
+    'O',
+    'O',
+    'O',
+    'O',
+    'O',
+    'O',
+    'O',
+    'O',
+    'O',
+    'OE',
+    'R',
+    'R',
+    'S',
+    'S',
+    'S',
+    'S',
+    'U',
+    'U',
+    'U',
+    'U',
+    'U',
+    'U',
+    'U',
+    'U',
+    'U',
+    'U',
+    'Y',
+    'Y',
+    'Z',
+    'Z',
+    'Z',
+    'a',
+    'a',
+    'a',
+    'a',
+    'a',
+    'a',
+    'a',
+    'a',
+    'a',
+    'ae',
+    'c',
+    'c',
+    'c',
+    'c',
+    'c',
+    'd',
+    'd',
+    'd',
+    'e',
+    'e',
+    'e',
+    'e',
+    'e',
+    'e',
+    'e',
+    'e',
+    'e',
+    'i',
+    'i',
+    'i',
+    'i',
+    'i',
+    'i',
+    'i',
+    'i',
+    'i',
+    'n',
+    'n',
+    'n',
+    'o',
+    'o',
+    'o',
+    'o',
+    'o',
+    'o',
+    'o',
+    'o',
+    'o',
+    'oe',
+    'r',
+    'r',
+    's',
+    's',
+    's',
+    's',
+    'ss',
+    'u',
+    'u',
+    'u',
+    'u',
+    'u',
+    'u',
+    'u',
+    'u',
+    'u',
+    'u',
+    'y',
+    'y',
+    'z',
+    'z',
+    'z',
+  ];
+  final buffer = StringBuffer();
+  for (final rune in value.runes) {
+    final char = String.fromCharCode(rune);
+    final index = source.indexOf(char);
+    buffer.write(index >= 0 ? replacements[index] : char);
+  }
+  return buffer.toString();
 }
 
 PokemonCard _cardFromRecentView(RecentCardView view) {

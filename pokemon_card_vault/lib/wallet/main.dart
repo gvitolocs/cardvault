@@ -46,7 +46,9 @@ class PokoinApp extends StatelessWidget {
 }
 
 class WalletScreen extends StatefulWidget {
-  const WalletScreen({super.key});
+  const WalletScreen({super.key, this.initialSwapOpen = false});
+
+  final bool initialSwapOpen;
 
   @override
   State<WalletScreen> createState() => _WalletScreenState();
@@ -59,6 +61,7 @@ class WalletHomePage extends WalletScreen {
 class _WalletScreenState extends State<WalletScreen> {
   static const rpcUrl = 'https://rpc.pokoin.com/rpc';
   static const swapBaseUrl = 'https://rpc.pokoin.com';
+  static const pokoinApiBaseUrl = 'https://pokoin.com';
   static const nativeSymbol = 'PKN';
   static const externalCryptoSettlementAddress =
       '0x74466c3a204429B22CE8558F3F18f3C59F67fCB3';
@@ -137,7 +140,7 @@ class _WalletScreenState extends State<WalletScreen> {
       RecipientSuggestionSource.recent;
   bool _recipientSearchLoading = false;
   bool _recipientSearchHadQuery = false;
-  bool _showSwapPage = false;
+  late bool _showSwapPage = widget.initialSwapOpen;
   bool _swapQuoteLoading = false;
   bool _swapPoolsLoading = false;
   bool _swapTokenCatalogLoading = false;
@@ -192,6 +195,15 @@ class _WalletScreenState extends State<WalletScreen> {
         if (_address != null) {
           _loadBalance(_address!);
         }
+      });
+    }
+    if (widget.initialSwapOpen) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        unawaited(_loadSwapPools());
+        unawaited(_loadSwapTokenCatalog());
       });
     }
     _auth.authState.listen((user) async {
@@ -347,18 +359,18 @@ class _WalletScreenState extends State<WalletScreen> {
   Future<void> _linkWalletAddress(String address) async {
     final normalized = address.trim().toLowerCase();
     final nonce = await _auth.requestWalletNonce(normalized);
-      final message = nonce['message'];
-      if (message == null || message.isEmpty) {
-        throw Exception('Wallet sign-in nonce was empty.');
-      }
-      final signature = await _wallet.signMessage(
+    final message = nonce['message'];
+    if (message == null || message.isEmpty) {
+      throw Exception('Wallet sign-in nonce was empty.');
+    }
+    final signature = await _wallet.signMessage(
       address: normalized,
-        message: message,
-      );
+      message: message,
+    );
     await _auth.linkSignedWallet(
       address: normalized,
-        signature: signature,
-      );
+      signature: signature,
+    );
   }
 
   Future<void> _loadBalance(String address) async {
@@ -492,11 +504,11 @@ class _WalletScreenState extends State<WalletScreen> {
                           ),
                           onSelect: (recipient) {
                             _toController.text = recipient;
-                                  _recipientSuggestions.clear();
+                            _recipientSuggestions.clear();
                             _recipientSearchLoading = false;
                             _recipientSearchHadQuery = false;
-                                  setDialogState(() {});
-                                },
+                            setDialogState(() {});
+                          },
                         ),
                       ],
                       const SizedBox(height: 12),
@@ -971,7 +983,7 @@ class _WalletScreenState extends State<WalletScreen> {
 
   Future<void> _openWpknExchangeSheet() async {
     if (!_wallet.hasProvider) {
-      if (_wallet.openMetaMaskDappUrl('https://pokoin.com/wallet?swap=1')) {
+      if (_wallet.openMetaMaskDappUrl('https://pokoin.com/swap')) {
         _showMessage('Opening PokoinSwap in MetaMask.');
         return;
       }
@@ -986,9 +998,9 @@ class _WalletScreenState extends State<WalletScreen> {
       return;
     }
 
-        if (!mounted) {
-          return;
-        }
+    if (!mounted) {
+      return;
+    }
     _setSwapPageVisible(true);
     unawaited(_loadSwapPools());
     unawaited(_loadSwapTokenCatalog());
@@ -1191,7 +1203,10 @@ class _WalletScreenState extends State<WalletScreen> {
     }
     final externalSell = quote['source'] == 'external_sell';
     await _runTask(() async {
-      final txHash = await _submitSwap(from: from, quote: quote);
+      final executionQuote = quote['source'] == 'wpkn_market'
+          ? await _freshWpknMarketQuoteForSubmit()
+          : quote;
+      final txHash = await _submitSwap(from: from, quote: executionQuote);
       _swapQuote = null;
       _swapQuoteError = null;
       _exchangeAmountController.clear();
@@ -1214,6 +1229,9 @@ class _WalletScreenState extends State<WalletScreen> {
   Widget _buildSwapPage() {
     final asset = _selectedSwapAssetSymbol();
     final pool = _swapPoolsByAsset[asset];
+    final showAmmReserves =
+        !_isAcceptedSwapAssetWithoutPool(asset) && asset != 'WPKN';
+    final displayedPool = showAmmReserves ? pool : null;
     final fromAsset = _swapFromPkn ? nativeSymbol : asset;
     final toAsset = _swapFromPkn ? asset : nativeSymbol;
     final tokenOptions = <String>[..._swapAssets, customSwapAsset];
@@ -1221,7 +1239,13 @@ class _WalletScreenState extends State<WalletScreen> {
     final amountOut = quote == null ? '' : '${quote['amountOut']}';
     final amountIn = double.tryParse(
         _exchangeAmountController.text.trim().replaceAll(',', '.'));
-    final canSwap = quote != null && !_loading && _canSwapAsset(asset);
+    final wpknQuoteStale = quote != null &&
+        quote['source'] == 'wpkn_market' &&
+        _isWpknMarketQuoteExpired(quote);
+    final canSwap = quote != null &&
+        !_loading &&
+        _canSwapAsset(asset) &&
+        !wpknQuoteStale;
     final missingPool = !_swapPoolsLoading && !_canSwapAsset(asset);
     final quoteError = _swapQuoteError;
     return Scaffold(
@@ -1241,7 +1265,7 @@ class _WalletScreenState extends State<WalletScreen> {
       ),
       body: SafeArea(
         child: Center(
-                  child: SingleChildScrollView(
+          child: SingleChildScrollView(
             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             padding: EdgeInsets.fromLTRB(
               18,
@@ -1262,7 +1286,7 @@ class _WalletScreenState extends State<WalletScreen> {
                 amountOut: amountOut,
                 quoteLoading: _swapQuoteLoading,
                 quote: quote,
-                pool: pool,
+                pool: displayedPool,
                 canSwap: canSwap,
                 loading: _loading,
                 fromTokenSelector: _buildSwapTokenSelector(
@@ -1319,7 +1343,9 @@ class _WalletScreenState extends State<WalletScreen> {
                     ? 'Enter amount'
                     : missingPool
                         ? 'Pool unavailable'
-                        : quoteError ?? (quote == null ? 'No quote' : 'Ready'),
+                        : wpknQuoteStale
+                            ? 'Refreshing price'
+                            : quoteError ?? (quote == null ? 'No quote' : 'Ready'),
               ),
             ),
           ),
@@ -1341,6 +1367,9 @@ class _WalletScreenState extends State<WalletScreen> {
     if (_usesExternalSellQuote(asset)) {
       return _loadExternalSellQuote(asset: asset, amountIn: amountIn);
     }
+    if (_usesWpknMarketQuote(asset)) {
+      return _loadWpknMarketQuote(amountIn: amountIn);
+    }
     final assetIn = _swapFromPkn ? nativeSymbol : asset;
     final uri = Uri.parse('$swapBaseUrl/chain/swap/quote').replace(
       queryParameters: <String, String>{
@@ -1358,6 +1387,68 @@ class _WalletScreenState extends State<WalletScreen> {
       );
     }
     return payload;
+  }
+
+  Future<Map<String, dynamic>> _freshWpknMarketQuoteForSubmit() async {
+    final amount = double.tryParse(
+      _exchangeAmountController.text.trim().replaceAll(',', '.'),
+    );
+    if (amount == null || amount <= 0) {
+      throw StateError('Enter an amount and wait for the live quote.');
+    }
+    final fresh = await _loadWpknMarketQuote(amountIn: amount);
+    final prior = _swapQuote;
+    if (prior != null &&
+        prior['source'] == 'wpkn_market' &&
+        _readInt(prior['amountOut']) != _readInt(fresh['amountOut'])) {
+      if (mounted) {
+        setState(() => _swapQuote = fresh);
+      }
+    }
+    return fresh;
+  }
+
+  bool _isWpknMarketQuoteExpired(Map<String, dynamic> quote) {
+    final expiresAt = DateTime.tryParse(
+      quote['quoteExpiresAt'] as String? ?? '',
+    );
+    if (expiresAt == null) {
+      return false;
+    }
+    return DateTime.now().toUtc().isAfter(expiresAt.toUtc());
+  }
+
+  Future<Map<String, dynamic>> _loadWpknMarketQuote({
+    required double amountIn,
+  }) async {
+    final amount = amountIn.round();
+    if (amount <= 0) {
+      throw StateError('Enter a whole wPKN or PKN amount.');
+    }
+    final direction = _swapFromPkn ? 'pkn_to_wpkn' : 'wpkn_to_pkn';
+    final uri = Uri.parse('$pokoinApiBaseUrl/api/wpkn-pkn-quote').replace(
+      queryParameters: <String, String>{
+        'direction': direction,
+        'amountIn': amount.toString(),
+      },
+    );
+    final response = await http.get(uri).timeout(const Duration(seconds: 12));
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError(
+        payload['error'] as String? ?? 'wPKN market quote is unavailable.',
+      );
+    }
+    return <String, dynamic>{
+      ...payload,
+      'source': 'wpkn_market',
+      'assetIn': payload['fromAsset'] ?? (_swapFromPkn ? nativeSymbol : 'WPKN'),
+      'assetOut': payload['toAsset'] ?? (_swapFromPkn ? 'WPKN' : nativeSymbol),
+      'reserveIn':
+          'wPKN ${_formatQuoteNumber(_readDouble(payload['wpknUsd']))} USD',
+      'reserveOut':
+          'PKN ${_formatQuoteNumber(_readDouble(payload['pknUsd']))} USD',
+    };
   }
 
   Future<Map<String, dynamic>> _loadExternalBuyQuote({
@@ -1440,6 +1531,10 @@ class _WalletScreenState extends State<WalletScreen> {
 
   bool _usesExternalSellQuote(String asset) {
     return _swapFromPkn && _isAcceptedSwapAssetWithoutPool(asset);
+  }
+
+  bool _usesWpknMarketQuote(String asset) {
+    return asset == 'WPKN';
   }
 
   Widget _buildSwapTokenSelector({
@@ -1554,16 +1649,26 @@ class _WalletScreenState extends State<WalletScreen> {
     if (quote['source'] == 'external_sell') {
       return _submitExternalSell(quote: quote, asset: asset);
     }
+    if (quote['source'] == 'wpkn_market' && _swapFromPkn) {
+      throw StateError(
+        'The on-chain PKN-wPKN pool cannot fill this market quote. '
+        'Use the BNB Chain wPKN bridge instead.',
+      );
+    }
     await _wallet.addNetwork();
     await _wallet.switchNetwork();
     final amountOut = _readInt(quote['amountOut']);
     if (amountOut <= 0) {
       throw StateError('PokoinSwap quote returned no output amount.');
     }
-    final minAmountOut = (amountOut * 995) ~/ 1000;
+    final minAmountOut = quote['source'] == 'wpkn_market'
+        ? amountOut
+        : (amountOut * 995) ~/ 1000;
     final payload = <String, Object>{
       'action': 'amm_swap',
-      'poolId': quote['poolId'] as String? ?? _swapPoolId(asset),
+      'poolId': quote['source'] == 'wpkn_market'
+          ? _swapPoolId(asset)
+          : quote['poolId'] as String? ?? _swapPoolId(asset),
       'assetIn': quote['assetIn'] as String? ?? nativeSymbol,
       'assetOut': quote['assetOut'] as String? ?? asset,
       'amountIn': _readInt(quote['amountIn']),
@@ -1678,7 +1783,7 @@ class _WalletScreenState extends State<WalletScreen> {
     );
     final status = result['status'] as String? ?? 'pending_liquidity';
     final payoutTxHash = (result['payoutTxHash'] as String? ?? '').trim();
-                                        _showMessage(
+    _showMessage(
       payoutTxHash.isNotEmpty || status == 'payout_submitted'
           ? 'PKN received. $asset payout submitted (${_shortAddress(payoutTxHash)}).'
           : 'PKN received. $asset payout is pending settlement.',
@@ -1711,12 +1816,12 @@ class _WalletScreenState extends State<WalletScreen> {
                   labelText: '$asset payout address',
                   prefixIcon: const Icon(Icons.account_balance_wallet_outlined),
                 ),
-                            ),
-                          ],
-                        ),
+              ),
+            ],
+          ),
           actions: [
-                        TextButton(
-                          onPressed: () => Navigator.of(dialogContext).pop(),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
               child: const Text('Cancel'),
             ),
             FilledButton(
@@ -1727,9 +1832,9 @@ class _WalletScreenState extends State<WalletScreen> {
                 }
               },
               child: const Text('Send PKN'),
-                        ),
-                      ],
-                    ),
+            ),
+          ],
+        ),
       );
       if (address == null || address.trim().isEmpty) {
         throw StateError('$asset payout request cancelled.');
@@ -2335,7 +2440,7 @@ class _WalletScreenState extends State<WalletScreen> {
             style: const TextStyle(fontSize: 38, fontWeight: FontWeight.w900),
           ),
           if (hasConnectedWallet) ...<Widget>[
-          const SizedBox(height: 18),
+            const SizedBox(height: 18),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(14),
@@ -2343,14 +2448,14 @@ class _WalletScreenState extends State<WalletScreen> {
                 color: Colors.white.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(18),
               ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                const Text(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  const Text(
                     'Connected wallet balance',
                     style: TextStyle(color: Colors.white70),
-                ),
-                const SizedBox(height: 8),
+                  ),
+                  const SizedBox(height: 8),
                   Text(
                     '$_balance $nativeSymbol',
                     style: const TextStyle(
@@ -2372,11 +2477,11 @@ class _WalletScreenState extends State<WalletScreen> {
           ],
           if (!hasConnectedWallet) ...<Widget>[
             const SizedBox(height: 18),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: <Widget>[
-                    FilledButton.icon(
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: <Widget>[
+                FilledButton.icon(
                   onPressed: _connectWallet,
                   icon: const Icon(Icons.account_balance_wallet),
                   label: const Text('Connect MetaMask'),
@@ -2385,8 +2490,8 @@ class _WalletScreenState extends State<WalletScreen> {
                     elevation: 0,
                     shadowColor: Colors.transparent,
                   ),
-                    ),
-                    OutlinedButton.icon(
+                ),
+                OutlinedButton.icon(
                   onPressed: _addPokoinNetwork,
                   icon: const Icon(Icons.add_link),
                   label: const Text('Add Pokoin network'),
@@ -2394,13 +2499,13 @@ class _WalletScreenState extends State<WalletScreen> {
                     side: BorderSide.none,
                     elevation: 0,
                     shadowColor: Colors.transparent,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-          ],
               ],
-          ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -2440,7 +2545,7 @@ class _WalletScreenState extends State<WalletScreen> {
           icon: Icons.currency_exchange,
           label: 'Swap',
           onTap: _openWpknExchangeSheet,
-          ),
+        ),
         _QuickActionButton(
           icon: Icons.token_outlined,
           label: 'NFT',
@@ -2517,27 +2622,27 @@ class _WalletScreenState extends State<WalletScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             if (hasWallet) ...<Widget>[
-            const Text(
+              const Text(
                 'Receive on your linked crypto wallet',
-              style: TextStyle(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 6),
-            SelectableText(
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 6),
+              SelectableText(
                 address,
-              style: const TextStyle(fontFamily: 'monospace'),
-            ),
+                style: const TextStyle(fontFamily: 'monospace'),
+              ),
             ] else ...<Widget>[
-            const Text(
+              const Text(
                 'Receive on your account balance',
-              style: TextStyle(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 6),
-            SelectableText(
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 6),
+              SelectableText(
                 _username == null || _username!.isEmpty
                     ? 'Log in to receive by username.'
                     : _username!,
-              style: const TextStyle(fontFamily: 'monospace'),
-            ),
+                style: const TextStyle(fontFamily: 'monospace'),
+              ),
             ],
           ],
         ),
@@ -2888,7 +2993,7 @@ class _SwapExchangeCard extends StatelessWidget {
             ),
             Padding(
               padding: const EdgeInsets.all(18),
-      child: Column(
+              child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -3128,7 +3233,7 @@ class _SwapTokenSelector extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-          Text(
+              Text(
                 token.symbol,
                 style: const TextStyle(
                   color: Colors.white,
@@ -3444,7 +3549,7 @@ class _SwapQuoteDetails extends StatelessWidget {
               child: CircularProgressIndicator(strokeWidth: 2),
             ),
             SizedBox(width: 10),
-          Text(
+            Text(
               'Fetching quote',
               style: TextStyle(
                 color: Color(0xFFB8C4E6),
@@ -3456,10 +3561,11 @@ class _SwapQuoteDetails extends StatelessWidget {
       );
     }
     if (quote == null) {
+      final quoteSourceLabel = pool == null ? 'Live market quote' : 'Live AMM quote';
       return _SwapPoolPanel(
         pool: pool,
         child: Text(
-          poolError == null ? 'Live AMM quote' : poolError!,
+          poolError == null ? quoteSourceLabel : poolError!,
           style: TextStyle(
             color: poolError == null
                 ? const Color(0xFF93A4C8)
@@ -3469,10 +3575,14 @@ class _SwapQuoteDetails extends StatelessWidget {
         ),
       );
     }
+    final source = (quote['source'] as String? ?? '').trim();
+    final isExternalQuote = source == 'external_buy' ||
+        source == 'external_sell' ||
+        source == 'wpkn_market';
     final assetIn = quote['assetIn'] as String? ?? '';
     final assetOut = quote['assetOut'] as String? ?? '';
     return _SwapPoolPanel(
-      pool: pool,
+      pool: isExternalQuote ? null : pool,
       child: Column(
         children: [
           _SwapDetailRow(
@@ -3487,12 +3597,12 @@ class _SwapQuoteDetails extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           _SwapDetailRow(
-            label: 'Pool',
+            label: isExternalQuote ? 'Route' : 'Pool',
             value: '${quote['poolId']}',
           ),
           const SizedBox(height: 8),
           _SwapDetailRow(
-            label: 'Reserves',
+            label: isExternalQuote ? 'Reference' : 'Reserves',
             value: '${quote['reserveIn']} / ${quote['reserveOut']}',
           ),
         ],
@@ -3546,7 +3656,7 @@ class _SwapPoolChart extends StatelessWidget {
       children: [
         Row(
           children: [
-        const Text(
+            const Text(
               'Pool reserves',
               style: TextStyle(
                 color: Color(0xFF93A4C8),
@@ -3662,7 +3772,7 @@ class _SwapDetailRow extends StatelessWidget {
               fontWeight: FontWeight.w800,
             ),
           ),
-          ),
+        ),
       ],
     );
   }
@@ -3735,9 +3845,9 @@ class _HoverCircleActionState extends State<_HoverCircleAction> {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: widget.onTap,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
             AnimatedContainer(
               duration: const Duration(milliseconds: 140),
               curve: Curves.easeOut,

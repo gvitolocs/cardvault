@@ -28,7 +28,8 @@ reconstructing commands from chat history.
   - `/api/marketplace-competitive` for Limitless-backed tournament standings
     and pairing snapshots.
   - `/api/marketplace-search-candidates` and `/api/marketplace-autocomplete`
-    for tokenized search.
+    for tokenized search. In production, English searchbar/autocomplete
+    candidate retrieval is Meilisearch-backed; non-English remains legacy.
 - Oracle projection tables behind those APIs:
   - `public.marketplace_cards` for home/search/catalog card rows.
   - `public.marketplace_card_events` for rolling marketplace analytics.
@@ -104,6 +105,15 @@ reconstructing commands from chat history.
    Keep this page aligned with common assistant answers for wallet, PKN/wPKN,
    Swap, marketplace listings, search, NFTs, nodes, live status, and bug reports.
 
+0b. Use ChatGPT Plus/Pro Codex models inside Cursor via the local proxy:
+   ```bash
+   npm run codex:cursor-proxy
+   npm run codex:cursor-proxy:install-launchagent
+   ```
+   Uses `github:wellbritto98/codex-cursor-proxy#main` via Bun. Requires Bun and
+   `~/.codex/auth.json` from a prior `codex` login. Full setup:
+   `workflows/codex-cursor-proxy-workflow.md`.
+
 1. Deploy web after app code changes:
    ```bash
    ORACLE_API_BASE_URL=https://api.pokoin.com POKOIN_WEB_DEPLOY_TARGET=production ./deploy-pokoin-web.sh
@@ -136,6 +146,31 @@ reconstructing commands from chat history.
      `127.0.0.1:18080`, behind Caddy container `pokoin-api-caddy` on 80/443.
    - Use Vercel serverless fallback only when explicitly requested as an
      emergency rollback.
+
+1b. Maintain the API route inventory and deploy contract:
+   ```bash
+   open workflows/api-workflow.md
+   npm run api:docs
+   npm run api:check
+   ```
+   Use this workflow whenever adding, removing, or materially changing any
+   `api/*.js` endpoint. The API route manifest is the authoritative inventory for
+   the standalone Oracle API, while `vercel.json` and `deploy-pokoin-web.sh`
+   remain the emergency Vercel serverless fallback contract. New endpoints are
+   not deploy-ready until the manifest, rewrites, deploy packaging, route smoke
+   scripts, generated docs, and deploy layout tests agree.
+
+1c. Use Prisma as a secondary Oracle Postgres access layer:
+   ```bash
+   open workflows/prisma-oracle-workflow.md
+   npm run prisma:validate
+   npm run prisma:sync
+   npm run prisma:smoke
+   ```
+   Prisma reads the same primary Oracle database via `MARKETPLACE_DATABASE_URL`
+   by default, with optional `PRISMA_DATABASE_URL` override for future switch
+   tests. Keep SQL migrations in `oracle-postgres/schema/` as the source of
+   truth unless a Prisma migration plan is explicitly reviewed.
 
 2. Verify canonical account redirects:
    ```bash
@@ -373,11 +408,13 @@ reconstructing commands from chat history.
    ```bash
    node scripts/oracle-marketplace-migrate.js schema
    node scripts/refresh-cardtrader-market-listings.js --env-file=/Users/giuseppe/pokoinpos/deploy/env/peer4-postgres.env --dry-run --blueprint-id=316600 --max-blueprints=25 --max-products=250
-   node scripts/refresh-cardtrader-market-listings.js --env-file=/Users/giuseppe/pokoinpos/deploy/env/peer4-postgres.env --max-blueprints=250 --max-products=10000
+   bash scripts/run-cardtrader-daily-market-refresh.sh
    ```
    The apply path upserts `public.cardtrader_market_listing_snapshots`, then
    derives `cheapest_homepage_cache_blueprint` for the touched blueprints from
-   the daily backend listings cache/import. This projection is canonical for
+   the daily backend listings cache/import. The normal wrapper is broad coverage
+   for known Pokémon CardTrader blueprints; keep the explicit low limits only for
+   dry-runs and diagnostics. This projection is canonical for
    marketplace/homepage/catalog tile pricing: it stores eligible listing
    count/quantity and, when safely available, the cheapest Zero + 1-Day Ready EUR
    price converted to PKN plus the 200 PKN reserve markup. If production still

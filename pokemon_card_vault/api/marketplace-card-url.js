@@ -1,4 +1,5 @@
 const { marketplaceQuery } = require('./_marketplace_db');
+const { slugParts } = require('./_slug');
 const { cardIdFromDoubledId } = require('./marketplace-card-versions');
 
 const LEGACY_URL_ID_CARD_ID_OVERRIDES = {
@@ -23,6 +24,27 @@ function cleanCanonicalPath(value) {
     return '';
   }
   return path.split(/[?#]/)[0];
+}
+
+function canonicalSlugFromPath(value) {
+  const path = cleanCanonicalPath(value);
+  if (!path) {
+    return '';
+  }
+  const parts = path.split('/').filter(Boolean);
+  const cardsIndex = parts.indexOf('cards');
+  if (cardsIndex < 0 || cardsIndex + 2 >= parts.length) {
+    return '';
+  }
+  return parts.slice(cardsIndex + 2).join('-');
+}
+
+function slugsEquivalent(left, right) {
+  const leftParts = slugParts(left);
+  const rightParts = slugParts(right);
+  return leftParts.length > 0 &&
+    rightParts.length > 0 &&
+    leftParts.join('-') === rightParts.join('-');
 }
 
 function publicNumberFromCanonicalPath(value) {
@@ -111,10 +133,13 @@ async function canonicalCardUrlForLookup(
     return null;
   }
   const cleanLang = cleanLanguage(language || parseMarketplaceCardPath(path).language);
+  const requestedSlug =
+    String(cardSlug || parseMarketplaceCardPath(path).cardSlug || parseRootCardPath(path).cardSlug || '').trim();
   const numericCandidateIds = candidateIds.map((id) => Number(id));
   const requestedUrlId = cleanCardId(
     doubledCardId || urlCardId || parseMarketplaceCardPath(path).doubledCardId,
   );
+  const decodedRequestedUrlId = cardIdFromDoubledId(requestedUrlId);
   const result = await query(
     `
       select card_id, language, canonical_path
@@ -138,10 +163,28 @@ async function canonicalCardUrlForLookup(
     ? result.rows.find((row) => cleanCanonicalPath(row.canonical_path).includes(canonicalPathSegment))
     : null;
   if (pathMatchedRow) {
+    const pathMatchedCanonical = cleanCanonicalPath(pathMatchedRow.canonical_path);
+    const pathMatchedSlug = canonicalSlugFromPath(pathMatchedCanonical);
+    if (
+      requestedSlug &&
+      pathMatchedSlug &&
+      decodedRequestedUrlId &&
+      !slugsEquivalent(requestedSlug, pathMatchedSlug)
+    ) {
+      const rowByDecodedId = result.rows.find((row) => String(row.card_id || '') === decodedRequestedUrlId);
+      if (rowByDecodedId && cleanCanonicalPath(rowByDecodedId.canonical_path)) {
+        return {
+          cardId: String(rowByDecodedId.card_id),
+          language: rowByDecodedId.language || cleanLang,
+          canonicalPath: cleanCanonicalPath(rowByDecodedId.canonical_path),
+          publicNumber: publicNumberFromCanonicalPath(rowByDecodedId.canonical_path),
+        };
+      }
+    }
     return {
       cardId: String(pathMatchedRow.card_id),
       language: pathMatchedRow.language || cleanLang,
-      canonicalPath: cleanCanonicalPath(pathMatchedRow.canonical_path),
+      canonicalPath: pathMatchedCanonical,
       publicNumber: publicNumberFromCanonicalPath(pathMatchedRow.canonical_path),
     };
   }
@@ -209,7 +252,9 @@ module.exports._test = {
   cleanCardId,
   cleanLanguage,
   createHandler,
+  canonicalSlugFromPath,
   parseMarketplaceCardPath,
   publicNumberFromCanonicalPath,
   parseRootCardPath,
+  slugsEquivalent,
 };

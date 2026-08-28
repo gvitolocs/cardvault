@@ -17,62 +17,78 @@ const {
 
 const MEMORY_CACHE_TTL_MS = 30 * 1000;
 const HOT_REFRESH_INTERVAL = '2 minutes';
+const HOMEPAGE_CHEAPEST_SOURCES = new Set([
+  'cheapest_homepage_cache_blueprint',
+  'pokoin_native_homepage_cache',
+]);
+const HOMEPAGE_CHEAPEST_PROVIDERS = new Set(['cardtrader', 'pokoin_native']);
 let cachedSnapshot = null;
 let cachedSnapshotAt = 0;
 
-function fallbackSectionsForCards(cards) {
+function fallbackSectionsForCards(cards, sectionSize = 12) {
   const ids = cards.map((card) => String(card.id || '')).filter(Boolean);
-  const featuredIds = ids.slice(0, 12);
-  const bestSellerIds = ids.slice(12, 24);
+  const featuredIds = ids.slice(0, sectionSize);
+  const bestSellerIds = ids.slice(sectionSize, sectionSize * 2);
   return {
-    recentlySeenIds: ids.slice(24, 36),
+    recentlySeenIds: ids.slice(sectionSize * 2, sectionSize * 3),
     bestSellerIds: bestSellerIds.length > 0 ? bestSellerIds : featuredIds,
-    featuredIds: featuredIds.length > 0 ? featuredIds : ids.slice(0, 12),
+    featuredIds: featuredIds.length > 0 ? featuredIds : ids.slice(0, sectionSize),
   };
 }
 
-async function fetchRowsForHomeFallback() {
+async function fetchRowsForHomeFallback(cheapestCacheRelation, limit = 240) {
   const result = await marketplaceQuery(
     `
       select
-        card_id,
-        name,
-        image_url,
-        cdn_image_url,
-        preview_image_url,
-        homepage_image_url,
-        set_name,
-        rarity,
-        card_type,
-        card_number,
-        product_variant,
-        item_kind,
-        product_type,
-        trainer_name,
-        card_palette,
-        emoji,
-        imported_at,
-        0 as listed_quantity,
-        null::numeric as lowest_price_pkn,
-        false as has_cardtrader_listing,
-        0 as cardtrader_eligible_listing_count,
-        0 as cardtrader_listed_quantity,
-        null::numeric as cardtrader_lowest_price_pkn,
+        marketplace_search_candidates.card_id,
+        marketplace_search_candidates.name,
+        marketplace_search_candidates.image_url,
+        marketplace_search_candidates.cdn_image_url,
+        marketplace_search_candidates.preview_image_url,
+        marketplace_search_candidates.homepage_image_url,
+        marketplace_search_candidates.set_name,
+        marketplace_search_candidates.rarity,
+        marketplace_search_candidates.card_type,
+        marketplace_search_candidates.card_number,
+        marketplace_search_candidates.product_variant,
+        marketplace_search_candidates.item_kind,
+        marketplace_search_candidates.product_type,
+        marketplace_search_candidates.trainer_name,
+        marketplace_search_candidates.card_palette,
+        marketplace_search_candidates.emoji,
+        marketplace_search_candidates.imported_at,
+        coalesce(cardtrader.eligible_quantity, cardtrader.eligible_listing_count, 0) as listed_quantity,
+        cardtrader.cheapest_price_pkn as lowest_price_pkn,
+        case
+          when cardtrader.provider = 'pokoin_native' then 'pokoin_native_homepage_cache'
+          else 'cheapest_homepage_cache_blueprint'
+        end as homepage_cheapest_source,
+        cardtrader.provider as homepage_cheapest_provider,
+        cardtrader.sample_listing_id as homepage_cheapest_listing_id,
+        cardtrader.provider = 'cardtrader' and coalesce(cardtrader.eligible_listing_count, 0) > 0 as has_cardtrader_listing,
+        case when cardtrader.provider = 'cardtrader' then coalesce(cardtrader.eligible_listing_count, 0) else 0 end as cardtrader_eligible_listing_count,
+        case when cardtrader.provider = 'cardtrader' then coalesce(cardtrader.eligible_quantity, 0) else 0 end as cardtrader_listed_quantity,
+        case when cardtrader.provider = 'cardtrader' then cardtrader.cheapest_price_pkn else null end as cardtrader_lowest_price_pkn,
         0 as watchlist_count,
         0 as cart_holder_count
       from public.marketplace_search_candidates
+      ${cardTraderAvailabilityJoin('marketplace_search_candidates', cheapestCacheRelation)}
       where item_kind = 'single'
         and product_type = 'card'
         and coalesce(homepage_image_url, preview_image_url, cdn_image_url, image_url) is not null
-      order by search_weight desc, imported_at desc nulls last, card_id desc
+        and cardtrader.cheapest_price_pkn is not null
+        and cardtrader.cheapest_price_pkn > 0
+        and coalesce(cardtrader.eligible_listing_count, 0) > 0
+      order by search_weight desc, imported_at desc nulls last, marketplace_search_candidates.card_id desc
       limit $1
     `,
-    [120],
+    [limit],
   );
   const cards = result.rows
     .map((row) => toCardJson(row))
     .map(normalizeHomeCard)
-    .filter(hasCdnBackedImages);
+    .filter(hasCdnBackedImages)
+    .filter(hasCanonicalHomepageAvailability);
   return {
     cards,
     sections: fallbackSectionsForCards(cards),
@@ -293,6 +309,64 @@ function normalizeHomeCard(card = {}) {
   };
 }
 
+function hasCanonicalHomepageAvailability(card = {}) {
+  const price = Number(card.price ?? card.lowest_price_pkn);
+  if (!Number.isFinite(price) || price <= 0) {
+    return false;
+  }
+  const source = String(card.priceSource ?? card.price_source ?? card.homepage_cheapest_source ?? '').trim();
+  const provider = String(card.homepageCheapestProvider ?? card.homepage_cheapest_provider ?? '').trim();
+  if (HOMEPAGE_CHEAPEST_SOURCES.has(source) || HOMEPAGE_CHEAPEST_PROVIDERS.has(provider)) {
+    return true;
+  }
+  return false;
+}
+
+function mergeAvailableCard(current, incoming) {
+  if (!current) return incoming;
+  if (hasCanonicalHomepageAvailability(incoming) && !hasCanonicalHomepageAvailability(current)) {
+    return incoming;
+  }
+  return current;
+}
+
+function orderedAvailableIds(ids, availableCardIds, limit = 12) {
+  const seen = new Set();
+  const ordered = [];
+  for (const id of ids || []) {
+    const key = String(id || '').trim();
+    if (!key || seen.has(key) || !availableCardIds.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    ordered.push(key);
+    if (ordered.length >= limit) {
+      break;
+    }
+  }
+  return ordered;
+}
+
+function fillSectionIds(primaryIds, fallbackIds, availableCardIds, limit = 12) {
+  const filled = orderedAvailableIds(primaryIds, availableCardIds, limit);
+  if (filled.length >= limit) {
+    return filled;
+  }
+  const seen = new Set(filled);
+  for (const id of fallbackIds || []) {
+    const key = String(id || '').trim();
+    if (!key || seen.has(key) || !availableCardIds.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    filled.push(key);
+    if (filled.length >= limit) {
+      break;
+    }
+  }
+  return filled;
+}
+
 async function hydrateCanonicalCardTraderCache(cards, cheapestCacheRelation) {
   const ids = [...new Set(cards
     .map((card) => Number(card.id))
@@ -365,6 +439,10 @@ async function hydrateCanonicalCardTraderCache(cards, cheapestCacheRelation) {
         ? Math.trunc(eligibleQuantity)
         : card.stock,
       price: cheapestPricePkn,
+      priceSource: cache.provider === 'pokoin_native'
+        ? 'pokoin_native_homepage_cache'
+        : 'cheapest_homepage_cache_blueprint',
+      homepageCheapestProvider: cache.provider,
     });
   });
 }
@@ -398,6 +476,9 @@ function toCardJson(row) {
     cardPalette: row.card_palette || null,
     emoji: row.emoji || '',
     price: cardTilePrice(row),
+    priceSource: row.price_source || row.homepage_cheapest_source || '',
+    homepageCheapestProvider: row.homepage_cheapest_provider || '',
+    homepageCheapestListingId: row.homepage_cheapest_listing_id || '',
     stock: cardTileStock(row),
     rating: watchlistCountFromRow(row),
     cartHolderCount: cartHolderCountFromRow(row),
@@ -535,6 +616,9 @@ async function fetchMissingSectionCards(sectionIds, existingIds, cheapestCacheRe
         on urls.card_id = marketplace_search_candidates.card_id
         and urls.language = 'en'
       where marketplace_search_candidates.card_id = any($1::bigint[])
+        and cardtrader.cheapest_price_pkn is not null
+        and cardtrader.cheapest_price_pkn > 0
+        and coalesce(cardtrader.eligible_listing_count, 0) > 0
     `,
     [missingIds, String(process.env.PKN_CHECKOUT_USDT_PRICE || 0.005)],
   );
@@ -564,14 +648,16 @@ async function fetchSnapshot() {
   if (cachedSnapshot && now - cachedSnapshotAt < MEMORY_CACHE_TTL_MS) {
     return cachedSnapshot;
   }
-  const useSqlSnapshot = process.env.MARKETPLACE_HOME_SQL_SNAPSHOT === '1';
-  let snapshot = await fetchRowsForHomeFallback();
+  const cheapestCacheRelation = await cheapestHomepageCacheRelationName();
+  const useSqlSnapshot = process.env.MARKETPLACE_HOME_SQL_SNAPSHOT === '1' &&
+    process.env.MARKETPLACE_HOME_SQL_SNAPSHOT_DISABLED !== '1';
+  let snapshot = await fetchRowsForHomeFallback(cheapestCacheRelation, 240);
   if (useSqlSnapshot) {
     try {
       await refreshHotBlueprintsIfStale();
       const result = await marketplaceQuery(
         'select public.get_marketplace_home_snapshot($1) as snapshot',
-        [120],
+        [240],
       );
       snapshot = result.rows[0]?.snapshot || snapshot;
     } catch (error) {
@@ -579,7 +665,6 @@ async function fetchSnapshot() {
     }
   }
 
-  const cheapestCacheRelation = await cheapestHomepageCacheRelationName();
   const cards = Array.isArray(snapshot.cards)
     ? snapshot.cards.map(normalizeHomeCard).filter(hasCdnBackedImages)
     : [];
@@ -604,14 +689,26 @@ async function fetchSnapshot() {
     }
   }
   const hydratedCards = await hydrateCanonicalCardTraderCache(cards, cheapestCacheRelation);
-  const artistMap = await artistMapForCardIds(hydratedCards.map((card) => card.id));
+  const availableCardsById = new Map();
+  for (const card of hydratedCards.filter(hasCdnBackedImages).filter(hasCanonicalHomepageAvailability)) {
+    const id = String(card.id || '');
+    if (!id) {
+      continue;
+    }
+    availableCardsById.set(id, mergeAvailableCard(availableCardsById.get(id), card));
+  }
+  const availableCards = [...availableCardsById.values()];
+  const availableCardIds = new Set(availableCards.map((card) => String(card.id)));
+  const fallbackIds = availableCards.map((card) => String(card.id));
+  const responseCards = availableCards.slice(0, 120);
+  const artistMap = await artistMapForCardIds(responseCards.map((card) => card.id));
   const normalized = {
     ...snapshot,
-    cards: mergeArtistMetadata(hydratedCards, artistMap),
+    cards: mergeArtistMetadata(responseCards, artistMap),
     sections: {
-      recentlySeenIds: sections.recentlySeenIds.filter((id) => cardIds.has(String(id))),
-      bestSellerIds: sections.bestSellerIds.filter((id) => cardIds.has(String(id))),
-      featuredIds: sections.featuredIds.filter((id) => cardIds.has(String(id))),
+      recentlySeenIds: fillSectionIds(sections.recentlySeenIds, fallbackIds, availableCardIds),
+      bestSellerIds: fillSectionIds(sections.bestSellerIds, fallbackIds, availableCardIds),
+      featuredIds: fillSectionIds(sections.featuredIds, fallbackIds, availableCardIds),
     },
   };
   cachedSnapshot = normalized;
@@ -647,3 +744,4 @@ module.exports.normalizeHomeCard = normalizeHomeCard;
 module.exports.cardTilePrice = cardTilePrice;
 module.exports.cardTileStock = cardTileStock;
 module.exports.hasCardTraderAvailability = hasCardTraderAvailability;
+module.exports.hasCanonicalHomepageAvailability = hasCanonicalHomepageAvailability;

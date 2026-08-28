@@ -630,6 +630,8 @@ String artistSlug(String artistName) {
 
 String _slugPart(String value) {
   return value
+      .replaceAll('é', 'e')
+      .replaceAll('É', 'E')
       .trim()
       .toLowerCase()
       .replaceAll(RegExp(r'[^a-z0-9]+'), '-')

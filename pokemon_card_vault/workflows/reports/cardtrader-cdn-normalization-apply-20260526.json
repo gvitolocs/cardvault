@@ -1,0 +1,31 @@
+{
+  "generated_at": "2026-05-26T21:16:49.079Z",
+  "mode": "apply",
+  "source_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png",
+  "importer_cause": "CardTrader raw blueprint/delta import preserved blueprint.image_url fallback preview.png as image_url/cardtrader_image_url on 2026-05-17 before CDN normalization guards existed.",
+  "counts": {
+    "scanned": 1,
+    "normalized": 1,
+    "metadataOnlyFallbacks": 0,
+    "skipped": 0,
+    "failed": 0
+  },
+  "samples": [
+    {
+      "id": "390877",
+      "name": "Chien-Pao",
+      "before": {
+        "image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png",
+        "cdn_image_url": "",
+        "cardtrader_image_url": ""
+      },
+      "after": {
+        "image_url": "https://cdn.pokoin.com/390877_chien-pao-csv9c-master-ball-reverse-053-208-csv9-master-ball-reverse.png",
+        "cdn_image_url": "https://cdn.pokoin.com/390877_chien-pao-csv9c-master-ball-reverse-053-208-csv9-master-ball-reverse.png",
+        "cdn_object_key": "390877_chien-pao-csv9c-master-ball-reverse-053-208-csv9-master-ball-reverse.png",
+        "cardtrader_image_url": "https://cardtrader.com/fallbacks/card_uploader/preview.png"
+      },
+      "action": "normalized"
+    }
+  ]
+}

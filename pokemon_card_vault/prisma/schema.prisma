@@ -1,0 +1,1710 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["partialIndexes"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model assistant_user_current_pages {
+  session_id String
+  user_uid   String   @default("")
+  path       String
+  source     String   @default("assistant")
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([session_id, user_uid])
+  @@index([session_id, updated_at(sort: Desc)], map: "assistant_user_current_pages_session_recent_idx")
+  @@index([user_uid, updated_at(sort: Desc)], map: "assistant_user_current_pages_user_recent_idx", where: raw("(user_uid <> ''::text)"))
+}
+
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model cards_name_type {
+  name                   String
+  type_key               String
+  priority               Int                    @default(100)
+  source                 String                 @default("manual")
+  updated_at             DateTime               @default(now()) @db.Timestamptz(6)
+  marketplace_card_names marketplace_card_names @relation(fields: [name], references: [name], onDelete: Cascade, onUpdate: NoAction)
+  cards_type             cards_type             @relation(fields: [type_key], references: [type_key], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([name, type_key])
+  @@index([type_key, priority, name], map: "cards_name_type_type_idx")
+}
+
+model cards_type {
+  type_key        String            @id
+  label           String
+  aliases         String[]          @default([])
+  palette_key     String
+  sort_order      Int               @default(1000)
+  updated_at      DateTime          @default(now()) @db.Timestamptz(6)
+  cards_name_type cards_name_type[]
+
+  @@index([palette_key, sort_order], map: "cards_type_palette_key_idx")
+}
+
+model cardtrader_blueprint_daily_analytics {
+  observed_day                  DateTime                      @db.Date
+  blueprint_id                  BigInt
+  listing_count                 Int                           @default(0)
+  listed_quantity               Int                           @default(0)
+  seller_count                  Int                           @default(0)
+  sold_count                    Int                           @default(0)
+  sold_quantity                 Int                           @default(0)
+  min_price_pkn                 Decimal?                      @db.Decimal
+  median_price_pkn              Decimal?                      @db.Decimal
+  average_price_pkn             Decimal?                      @db.Decimal
+  max_price_pkn                 Decimal?                      @db.Decimal
+  previous_min_price_pkn        Decimal?                      @db.Decimal
+  price_change_pct              Decimal?                      @db.Decimal
+  sell_through_rate             Decimal                       @default(0) @db.Decimal
+  source_counts                 Json                          @default("{}")
+  refreshed_at                  DateTime                      @default(now()) @db.Timestamptz(6)
+  cardtrader_pokemon_blueprints cardtrader_pokemon_blueprints @relation(fields: [blueprint_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([observed_day, blueprint_id])
+  @@index([blueprint_id, observed_day(sort: Desc)], map: "cardtrader_blueprint_daily_analytics_blueprint_day_idx")
+  @@index([observed_day(sort: Desc), sold_count(sort: Desc), listed_quantity(sort: Desc), sell_through_rate(sort: Desc)], map: "cardtrader_blueprint_daily_analytics_hot_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model cardtrader_blueprint_listing_cache {
+  provider               String    @default("cardtrader")
+  blueprint_id           BigInt    @id
+  pokoin_card_id         String    @default("")
+  cheapest_price_eur     Decimal?  @db.Decimal
+  cheapest_price_pkn     Decimal?  @db.Decimal
+  eligible_listing_count Int       @default(0)
+  eligible_quantity      Int       @default(0)
+  sample_listing_id      String    @default("")
+  sample_product_id      String    @default("")
+  shipping_mode          String    @default("")
+  seller_country_code    String    @default("")
+  source_snapshot_at     DateTime? @db.Timestamptz(6)
+  updated_at             DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@index([blueprint_id], map: "cardtrader_blueprint_listing_cache_available_idx", where: raw("((eligible_quantity > 0) AND (cheapest_price_pkn IS NOT NULL))"))
+  @@index([pokoin_card_id], map: "cardtrader_blueprint_listing_cache_pokoin_available_idx", where: raw("((provider = ANY (ARRAY['cardtrader'::text, 'pokoin_native'::text])) AND (pokoin_card_id <> ''::text) AND (eligible_listing_count > 0) AND (cheapest_price_pkn IS NOT NULL))"))
+  @@index([provider, updated_at(sort: Desc)], map: "cardtrader_blueprint_listing_cache_provider_updated_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model cardtrader_market_listing_removed_history {
+  id                       String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  provider                 String    @default("cardtrader")
+  external_listing_id      String
+  external_product_id      String    @default("")
+  blueprint_id             BigInt?
+  cardtrader_blueprint_id  BigInt?
+  pokoin_card_id           String    @default("")
+  seller_account_id        String    @default("")
+  seller_account_name      String    @default("")
+  seller_country           String    @default("")
+  seller_type              String    @default("")
+  quantity                 Int       @default(0)
+  condition                String    @default("")
+  language                 String    @default("")
+  price                    Decimal?  @db.Decimal
+  price_cents              Int?
+  currency                 String    @default("")
+  properties               Json      @default("{}")
+  raw_metadata             Json      @default("{}")
+  first_seen_at            DateTime? @db.Timestamptz(6)
+  last_seen_at             DateTime? @db.Timestamptz(6)
+  imported_at              DateTime? @db.Timestamptz(6)
+  last_snapshot_updated_at DateTime? @db.Timestamptz(6)
+  removed_day              DateTime  @db.Date
+  archived_at              DateTime  @default(now()) @db.Timestamptz(6)
+  archive_reason           String    @default("missing_from_cardtrader_market_snapshot")
+  archive_metadata         Json      @default("{}")
+
+  @@unique([provider, external_listing_id, removed_day], map: "cardtrader_market_listing_removed_once_idx")
+  @@index([seller_account_id, removed_day(sort: Desc)], map: "cardtrader_market_listing_removed_seller_day_idx", where: raw("(seller_account_id <> ''::text)"))
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model cardtrader_market_listing_snapshots {
+  provider                String   @default("cardtrader")
+  external_listing_id     String
+  external_product_id     String   @default("")
+  blueprint_id            BigInt?
+  cardtrader_blueprint_id BigInt?
+  pokoin_card_id          String   @default("")
+  seller_account_id       String   @default("")
+  seller_account_name     String   @default("")
+  seller_country          String   @default("")
+  seller_type             String   @default("")
+  quantity                Int      @default(0)
+  condition               String   @default("")
+  language                String   @default("")
+  price                   Decimal? @db.Decimal
+  price_cents             Int?
+  currency                String   @default("")
+  properties              Json     @default("{}")
+  raw_metadata            Json     @default("{}")
+  first_seen_at           DateTime @default(now()) @db.Timestamptz(6)
+  last_seen_at            DateTime @default(now()) @db.Timestamptz(6)
+  imported_at             DateTime @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([provider, external_listing_id])
+  @@index([provider, external_product_id], map: "cardtrader_market_listing_snapshots_product_idx", where: raw("(external_product_id <> ''::text)"))
+  @@index([seller_account_id, last_seen_at(sort: Desc)], map: "cardtrader_market_listing_snapshots_seller_idx", where: raw("(seller_account_id <> ''::text)"))
+}
+
+model cardtrader_pokemon_blueprints {
+  id                                             BigInt                                          @id
+  name                                           String
+  version                                        String?
+  game_id                                        Int
+  category_id                                    Int?
+  expansion_id                                   Int?
+  image_url                                      String?
+  cardtrader_image_url                           String?
+  cdn_image_url                                  String?
+  cdn_object_key                                 String?
+  preview_image_url                              String?
+  preview_object_key                             String?
+  card_market_ids                                Json?
+  tcg_player_ids                                 Json?
+  editable_properties                            Json                                            @default("[]")
+  blueprint                                      Json
+  expansion                                      Json?
+  imported_at                                    DateTime                                        @default(now()) @db.Timestamptz(6)
+  card_palette                                   Json                                            @default("{}")
+  emoji                                          String                                          @default("")
+  homepage_image_url                             String?
+  homepage_object_key                            String?
+  cardtrader_blueprint_daily_analytics           cardtrader_blueprint_daily_analytics[]
+  limitless_marketplace_expansion_blueprints     limitless_marketplace_expansion_blueprints[]
+  marketplace_artist_debug_skips                 marketplace_artist_debug_skips[]
+  marketplace_blueprint_artists                  marketplace_blueprint_artists?
+  marketplace_blueprint_classification_overrides marketplace_blueprint_classification_overrides?
+  marketplace_blueprint_emojis                   marketplace_blueprint_emojis?
+  marketplace_blueprint_tcg_metadata             marketplace_blueprint_tcg_metadata?
+  marketplace_card_cart_analytics                marketplace_card_cart_analytics?
+  marketplace_card_cart_users                    marketplace_card_cart_users[]
+  marketplace_card_watchlist_analytics           marketplace_card_watchlist_analytics?
+  marketplace_card_watchlist_users               marketplace_card_watchlist_users[]
+  marketplace_cards                              marketplace_cards?
+  marketplace_cm_product_parsing                 marketplace_cm_product_parsing[]
+  marketplace_cm_refinement_log                  marketplace_cm_refinement_log[]
+  marketplace_cm_scrape_observations             marketplace_cm_scrape_observations[]
+  marketplace_cm_verified_links                  marketplace_cm_verified_links[]
+  marketplace_hot_blueprints                     marketplace_hot_blueprints?
+
+  @@index([expansion_id])
+  @@index([name])
+  @@index([name(ops: raw("gin_trgm_ops"))], map: "cardtrader_pokemon_blueprints_name_trgm_idx", type: Gin)
+}
+
+model cardtrader_pokemon_expansions {
+  expansion_id       Int?
+  game_id            Int       @default(5)
+  code               String?
+  name               String
+  normalized_name    String    @id
+  compact_name       String?
+  name_tokens        String[]  @default([])
+  source_asset_code  String?
+  symbol_image_url   String?
+  symbol_object_key  String?
+  symbol_imported_at DateTime? @db.Timestamptz(6)
+  created_at         DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime  @default(now()) @db.Timestamptz(6)
+  logo_image_url     String?
+  logo_object_key    String?
+  logo_imported_at   DateTime? @db.Timestamptz(6)
+
+  @@index([compact_name(ops: raw("gin_trgm_ops"))], map: "cardtrader_pokemon_expansions_compact_trgm_idx", type: Gin)
+  @@index([expansion_id])
+  @@index([normalized_name(ops: raw("gin_trgm_ops"))], map: "cardtrader_pokemon_expansions_normalized_trgm_idx", type: Gin)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model cardtrader_user_listing_removed_history {
+  id                       String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  provider                 String    @default("cardtrader")
+  seller_uid               String
+  seller_account_id        String    @default("")
+  seller_account_name      String    @default("")
+  external_listing_id      String
+  external_product_id      String    @default("")
+  blueprint_id             BigInt?
+  cardtrader_blueprint_id  BigInt?
+  pokoin_card_id           String    @default("")
+  quantity                 Int       @default(0)
+  condition                String    @default("")
+  language                 String    @default("")
+  price                    Decimal?  @db.Decimal
+  price_cents              Int?
+  currency                 String    @default("")
+  properties               Json      @default("{}")
+  raw_metadata             Json      @default("{}")
+  first_seen_at            DateTime? @db.Timestamptz(6)
+  last_seen_at             DateTime? @db.Timestamptz(6)
+  imported_at              DateTime? @db.Timestamptz(6)
+  last_snapshot_updated_at DateTime? @db.Timestamptz(6)
+  removed_day              DateTime  @db.Date
+  archived_at              DateTime  @default(now()) @db.Timestamptz(6)
+  archive_reason           String    @default("missing_from_cardtrader_snapshot")
+  archive_metadata         Json      @default("{}")
+
+  @@unique([provider, seller_uid, external_listing_id, removed_day], map: "cardtrader_user_listing_removed_once_idx")
+  @@index([seller_uid, removed_day(sort: Desc)], map: "cardtrader_user_listing_removed_seller_day_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model cardtrader_user_listing_snapshots {
+  provider                String   @default("cardtrader")
+  seller_uid              String
+  seller_account_id       String   @default("")
+  seller_account_name     String   @default("")
+  external_listing_id     String
+  external_product_id     String   @default("")
+  blueprint_id            BigInt?
+  cardtrader_blueprint_id BigInt?
+  pokoin_card_id          String   @default("")
+  quantity                Int      @default(0)
+  condition               String   @default("")
+  language                String   @default("")
+  price                   Decimal? @db.Decimal
+  price_cents             Int?
+  currency                String   @default("")
+  properties              Json     @default("{}")
+  raw_metadata            Json     @default("{}")
+  first_seen_at           DateTime @default(now()) @db.Timestamptz(6)
+  last_seen_at            DateTime @default(now()) @db.Timestamptz(6)
+  imported_at             DateTime @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([provider, seller_uid, external_listing_id])
+  @@index([provider, external_product_id], map: "cardtrader_user_listing_snapshots_product_idx", where: raw("(external_product_id <> ''::text)"))
+  @@index([seller_uid, last_seen_at(sort: Desc)], map: "cardtrader_user_listing_snapshots_seller_idx")
+}
+
+model flutter_debug_logs {
+  id               BigInt    @id @default(autoincrement())
+  received_at      DateTime  @default(now()) @db.Timestamptz(6)
+  client_timestamp DateTime? @db.Timestamptz(6)
+  session_id       String
+  debug_user_uid   String    @default("")
+  client_user_id   String    @default("")
+  route_path       String    @default("")
+  browser_url      String    @default("")
+  event_name       String
+  category         String    @default("flutter")
+  payload          Json      @default("{}")
+
+  @@index([category, received_at(sort: Desc)], map: "flutter_debug_logs_category_recent_idx")
+  @@index([route_path, received_at(sort: Desc)], map: "flutter_debug_logs_path_recent_idx")
+  @@index([received_at(sort: Desc), id(sort: Desc)], map: "flutter_debug_logs_recent_idx")
+  @@index([session_id, received_at(sort: Desc)], map: "flutter_debug_logs_session_recent_idx")
+  @@index([debug_user_uid, received_at(sort: Desc)], map: "flutter_debug_logs_user_recent_idx")
+}
+
+model limitless_deck_cards {
+  decklist_id         String
+  card_key            String
+  card_name           String
+  count               Int
+  section             String              @default("main")
+  set_code            String?
+  collector_number    String?
+  raw                 Json                @default("{}")
+  imported_at         DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime            @default(now()) @db.Timestamptz(6)
+  limitless_decklists limitless_decklists @relation(fields: [decklist_id], references: [decklist_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([decklist_id, section, card_key])
+  @@index([card_name], map: "limitless_deck_cards_name_idx")
+}
+
+model limitless_decklists {
+  decklist_id           String                 @id
+  tournament_id         String
+  player_id             String?
+  placing               Int?
+  title                 String?
+  archetype             String?
+  game_id               String?
+  format                String?
+  source_url            String?
+  raw                   Json                   @default("{}")
+  source                String                 @default("limitless")
+  imported_at           DateTime               @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime               @default(now()) @db.Timestamptz(6)
+  limitless_deck_cards  limitless_deck_cards[]
+  limitless_games       limitless_games?       @relation(fields: [game_id], references: [game_id], onDelete: NoAction)
+  limitless_players     limitless_players?     @relation(fields: [player_id], references: [player_id], onDelete: NoAction)
+  limitless_tournaments limitless_tournaments  @relation(fields: [tournament_id], references: [tournament_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([tournament_id, placing], map: "limitless_decklists_tournament_idx")
+}
+
+model limitless_games {
+  game_id               String                  @id
+  name                  String
+  formats               Json                    @default("{}")
+  platforms             Json                    @default("{}")
+  metagame              Boolean                 @default(false)
+  raw                   Json                    @default("{}")
+  source                String                  @default("limitless")
+  source_updated_at     DateTime?               @db.Timestamptz(6)
+  imported_at           DateTime                @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime                @default(now()) @db.Timestamptz(6)
+  limitless_decklists   limitless_decklists[]
+  limitless_tournaments limitless_tournaments[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model limitless_marketplace_expansion_blueprints {
+  expansion_key                    String
+  blueprint_id                     BigInt
+  card_id                          BigInt?                          @default(dbgenerated("blueprint_id"))
+  card_name                        String
+  collector_number                 String                           @default("")
+  normalized_collector_number      String                           @default("")
+  set_code                         String                           @default("")
+  limitless_card_key               String                           @default("")
+  limitless_card_name              String                           @default("")
+  source_card_id                   String                           @default("")
+  source_url                       String                           @default("")
+  match_confidence                 Decimal                          @default(1) @db.Decimal
+  match_reason                     String                           @default("")
+  raw_metadata                     Json                             @default("{}")
+  source                           String                           @default("limitless")
+  source_updated_at                DateTime?                        @db.Timestamptz(6)
+  imported_at                      DateTime                         @default(now()) @db.Timestamptz(6)
+  updated_at                       DateTime                         @default(now()) @db.Timestamptz(6)
+  cardtrader_pokemon_blueprints    cardtrader_pokemon_blueprints    @relation(fields: [blueprint_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  limitless_marketplace_expansions limitless_marketplace_expansions @relation(fields: [expansion_key], references: [expansion_key], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([expansion_key, blueprint_id])
+  @@index([blueprint_id], map: "limitless_marketplace_expansion_blueprints_blueprint_idx")
+  @@index([card_id], map: "limitless_marketplace_expansion_blueprints_card_idx")
+  @@index([source_card_id], map: "limitless_marketplace_expansion_blueprints_source_card_idx", where: raw("(source_card_id <> ''::text)"))
+}
+
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model limitless_marketplace_expansions {
+  expansion_key                              String                                       @id
+  pokoin_expansion_name                      String
+  pokoin_expansion_code                      String                                       @default("")
+  normalized_pokoin_expansion_name           String
+  limitless_expansion_name                   String
+  limitless_expansion_code                   String                                       @default("")
+  normalized_limitless_expansion_name        String
+  aliases                                    String[]                                     @default([])
+  raw_metadata                               Json                                         @default("{}")
+  source                                     String                                       @default("limitless")
+  source_url                                 String                                       @default("")
+  source_updated_at                          DateTime?                                    @db.Timestamptz(6)
+  created_at                                 DateTime                                     @default(now()) @db.Timestamptz(6)
+  updated_at                                 DateTime                                     @default(now()) @db.Timestamptz(6)
+  limitless_marketplace_expansion_blueprints limitless_marketplace_expansion_blueprints[]
+
+  @@unique([normalized_pokoin_expansion_name, normalized_limitless_expansion_name], map: "limitless_marketplace_expansions_name_unique_idx")
+  @@index([aliases], type: Gin)
+}
+
+model limitless_players {
+  player_id                                                                                       String                           @id
+  display_name                                                                                    String
+  country                                                                                         String?
+  raw                                                                                             Json                             @default("{}")
+  source                                                                                          String                           @default("limitless")
+  first_seen_at                                                                                   DateTime                         @default(now()) @db.Timestamptz(6)
+  updated_at                                                                                      DateTime                         @default(now()) @db.Timestamptz(6)
+  limitless_decklists                                                                             limitless_decklists[]
+  limitless_tournament_pairings_limitless_tournament_pairings_player1_idTolimitless_players       limitless_tournament_pairings[]  @relation("limitless_tournament_pairings_player1_idTolimitless_players")
+  limitless_tournament_pairings_limitless_tournament_pairings_player2_idTolimitless_players       limitless_tournament_pairings[]  @relation("limitless_tournament_pairings_player2_idTolimitless_players")
+  limitless_tournament_pairings_limitless_tournament_pairings_winner_player_idTolimitless_players limitless_tournament_pairings[]  @relation("limitless_tournament_pairings_winner_player_idTolimitless_players")
+  limitless_tournament_standings                                                                  limitless_tournament_standings[]
+}
+
+model limitless_public_deck_core_cards {
+  deck_id                String
+  card_key               String
+  display_name           String
+  count                  Decimal?               @db.Decimal(6, 2)
+  inclusion_share        Decimal?               @db.Decimal(7, 3)
+  set_code               String?
+  collector_number       String?
+  source_url             String?
+  raw                    Json                   @default("{}")
+  imported_at            DateTime               @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime               @default(now()) @db.Timestamptz(6)
+  limitless_public_decks limitless_public_decks @relation(fields: [deck_id], references: [deck_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([deck_id, card_key])
+}
+
+model limitless_public_deck_players {
+  deck_id                String
+  player_id              String
+  player_name            String
+  country                String?
+  rank                   Int?
+  points                 Int                    @default(0)
+  source_url             String?
+  raw                    Json                   @default("{}")
+  imported_at            DateTime               @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime               @default(now()) @db.Timestamptz(6)
+  limitless_public_decks limitless_public_decks @relation(fields: [deck_id], references: [deck_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([deck_id, player_id])
+}
+
+/// This model contains an index with non-default null sort order and requires additional setup for migrations. Visit https://pris.ly/d/default-index-null-ordering for more info.
+model limitless_public_deck_results {
+  deck_id                String
+  tournament_id          String
+  tournament_name        String
+  tournament_date        DateTime?              @db.Date
+  format                 String?
+  placing                Int
+  placing_label          String?
+  variant                String?
+  player_id              String?
+  player_name            String
+  decklist_id            String?
+  source_url             String?
+  raw                    Json                   @default("{}")
+  imported_at            DateTime               @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime               @default(now()) @db.Timestamptz(6)
+  limitless_public_decks limitless_public_decks @relation(fields: [deck_id], references: [deck_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([deck_id, tournament_id, placing, player_name])
+  @@index([deck_id, tournament_date(sort: Desc), placing], map: "limitless_public_deck_results_deck_date_idx")
+}
+
+model limitless_public_decklist_cards {
+  decklist_id      String
+  card_key         String
+  card_name        String
+  count            Decimal  @db.Decimal(6, 2)
+  section          String   @default("main")
+  set_code         String?
+  collector_number String?
+  source_url       String?
+  raw              Json     @default("{}")
+  imported_at      DateTime @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([decklist_id, section, card_key])
+}
+
+model limitless_public_decks {
+  deck_id                          String                             @id
+  name                             String
+  format                           String?
+  format_label                     String?
+  rank                             Int?
+  points                           Int                                @default(0)
+  share                            Decimal                            @default(0) @db.Decimal(7, 3)
+  earnings_text                    String?
+  total_points                     Int?
+  regional_top8                    Int?
+  regional_wins                    Int?
+  international_top8               Int?
+  international_wins               Int?
+  variants                         Json                               @default("[]")
+  raw                              Json                               @default("{}")
+  source                           String                             @default("limitless-public")
+  source_url                       String?
+  source_fetched_at                DateTime?                          @db.Timestamptz(6)
+  imported_at                      DateTime                           @default(now()) @db.Timestamptz(6)
+  updated_at                       DateTime                           @default(now()) @db.Timestamptz(6)
+  limitless_public_deck_core_cards limitless_public_deck_core_cards[]
+  limitless_public_deck_players    limitless_public_deck_players[]
+  limitless_public_deck_results    limitless_public_deck_results[]
+
+  @@index([rank, points(sort: Desc)], map: "limitless_public_decks_rank_idx")
+}
+
+model limitless_public_tournament_standings {
+  tournament_id                String
+  placing                      Int
+  player_id                    String?
+  player_name                  String
+  country                      String?
+  deck_id                      String?
+  deck_name                    String?
+  variant                      String?
+  decklist_id                  String?
+  source_url                   String?
+  raw                          Json                         @default("{}")
+  imported_at                  DateTime                     @default(now()) @db.Timestamptz(6)
+  updated_at                   DateTime                     @default(now()) @db.Timestamptz(6)
+  limitless_public_tournaments limitless_public_tournaments @relation(fields: [tournament_id], references: [tournament_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([tournament_id, placing, player_name])
+  @@index([deck_id, tournament_id, placing], map: "limitless_public_tournament_standings_deck_idx")
+}
+
+/// This model contains an index with non-default null sort order and requires additional setup for migrations. Visit https://pris.ly/d/default-index-null-ordering for more info.
+model limitless_public_tournaments {
+  tournament_id                         String                                  @id
+  name                                  String
+  country                               String?
+  country_name                          String?
+  format                                String?
+  format_label                          String?
+  tournament_date                       DateTime?                               @db.Date
+  player_count                          Int                                     @default(0)
+  winner_player_id                      String?
+  winner_name                           String?
+  winner_country                        String?
+  source                                String                                  @default("limitless-public")
+  source_url                            String?
+  raw                                   Json                                    @default("{}")
+  source_fetched_at                     DateTime?                               @db.Timestamptz(6)
+  imported_at                           DateTime                                @default(now()) @db.Timestamptz(6)
+  updated_at                            DateTime                                @default(now()) @db.Timestamptz(6)
+  limitless_public_tournament_standings limitless_public_tournament_standings[]
+
+  @@index([tournament_date(sort: Desc), player_count(sort: Desc)], map: "limitless_public_tournaments_date_idx")
+}
+
+model limitless_sync_runs {
+  id                   BigInt    @id @default(autoincrement())
+  sync_type            String    @default("incremental")
+  status               String    @default("running")
+  dry_run              Boolean   @default(false)
+  started_at           DateTime  @default(now()) @db.Timestamptz(6)
+  finished_at          DateTime? @db.Timestamptz(6)
+  tournaments_seen     Int       @default(0)
+  tournaments_upserted Int       @default(0)
+  details_fetched      Int       @default(0)
+  standings_fetched    Int       @default(0)
+  pairings_fetched     Int       @default(0)
+  decklists_fetched    Int       @default(0)
+  error                String?
+  metadata             Json      @default("{}")
+}
+
+model limitless_tournament_pairings {
+  tournament_id                                                                       String
+  phase                                                                               Int
+  round                                                                               Int
+  table_number                                                                        Int                   @default(0)
+  match_index                                                                         Int                   @default(0)
+  player1_id                                                                          String?
+  player2_id                                                                          String?
+  winner_player_id                                                                    String?
+  result                                                                              String?
+  raw                                                                                 Json                  @default("{}")
+  imported_at                                                                         DateTime              @default(now()) @db.Timestamptz(6)
+  updated_at                                                                          DateTime              @default(now()) @db.Timestamptz(6)
+  limitless_players_limitless_tournament_pairings_player1_idTolimitless_players       limitless_players?    @relation("limitless_tournament_pairings_player1_idTolimitless_players", fields: [player1_id], references: [player_id], onDelete: NoAction)
+  limitless_players_limitless_tournament_pairings_player2_idTolimitless_players       limitless_players?    @relation("limitless_tournament_pairings_player2_idTolimitless_players", fields: [player2_id], references: [player_id], onDelete: NoAction)
+  limitless_tournaments                                                               limitless_tournaments @relation(fields: [tournament_id], references: [tournament_id], onDelete: Cascade, onUpdate: NoAction)
+  limitless_players_limitless_tournament_pairings_winner_player_idTolimitless_players limitless_players?    @relation("limitless_tournament_pairings_winner_player_idTolimitless_players", fields: [winner_player_id], references: [player_id], onDelete: NoAction)
+
+  @@id([tournament_id, phase, round, table_number, match_index])
+  @@index([tournament_id, phase, round, table_number], map: "limitless_pairings_tournament_round_idx")
+}
+
+model limitless_tournament_standings {
+  tournament_id         String
+  player_id             String
+  placing               Int?
+  display_name          String
+  country               String?
+  wins                  Int                   @default(0)
+  losses                Int                   @default(0)
+  ties                  Int                   @default(0)
+  drop_round            Int?
+  deck_name             String?
+  deck_archetype        String?
+  decklist_id           String?
+  deck_summary          Json                  @default("{}")
+  raw                   Json                  @default("{}")
+  imported_at           DateTime              @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime              @default(now()) @db.Timestamptz(6)
+  limitless_players     limitless_players     @relation(fields: [player_id], references: [player_id], onDelete: NoAction)
+  limitless_tournaments limitless_tournaments @relation(fields: [tournament_id], references: [tournament_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([tournament_id, player_id])
+  @@index([deck_archetype], map: "limitless_standings_deck_archetype_idx")
+  @@index([tournament_id, placing], map: "limitless_standings_tournament_placing_idx")
+}
+
+/// This model contains an index with non-default null sort order and requires additional setup for migrations. Visit https://pris.ly/d/default-index-null-ordering for more info.
+model limitless_tournaments {
+  tournament_id                  String                           @id
+  game_id                        String?
+  name                           String
+  format                         String?
+  tournament_date                DateTime?                        @db.Timestamptz(6)
+  player_count                   Int                              @default(0)
+  organizer_id                   Int?
+  organizer_name                 String?
+  platform                       String?
+  decklists_available            Boolean?
+  is_public                      Boolean?
+  is_online                      Boolean?
+  phases                         Json                             @default("[]")
+  raw_listing                    Json                             @default("{}")
+  raw_details                    Json                             @default("{}")
+  source                         String                           @default("limitless")
+  source_url                     String?
+  details_fetched_at             DateTime?                        @db.Timestamptz(6)
+  standings_fetched_at           DateTime?                        @db.Timestamptz(6)
+  pairings_fetched_at            DateTime?                        @db.Timestamptz(6)
+  imported_at                    DateTime                         @default(now()) @db.Timestamptz(6)
+  updated_at                     DateTime                         @default(now()) @db.Timestamptz(6)
+  limitless_decklists            limitless_decklists[]
+  limitless_tournament_pairings  limitless_tournament_pairings[]
+  limitless_tournament_standings limitless_tournament_standings[]
+  limitless_games                limitless_games?                 @relation(fields: [game_id], references: [game_id], onDelete: NoAction)
+
+  @@index([tournament_date(sort: Desc)], map: "limitless_tournaments_date_idx")
+  @@index([game_id, format, tournament_date(sort: Desc)], map: "limitless_tournaments_game_format_idx")
+  @@index([is_public, tournament_date(sort: Desc)], map: "limitless_tournaments_public_idx")
+}
+
+model marketplace_artist_debug_skips {
+  id                            BigInt                        @id @default(autoincrement())
+  blueprint_id                  BigInt
+  debug_uid                     String                        @default("")
+  debug_email                   String                        @default("")
+  debug_username                String                        @default("")
+  reason                        String                        @default("")
+  skipped_at                    DateTime                      @default(now()) @db.Timestamptz(6)
+  cardtrader_pokemon_blueprints cardtrader_pokemon_blueprints @relation(fields: [blueprint_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([blueprint_id, debug_uid, debug_email, skipped_at(sort: Desc)], map: "marketplace_artist_debug_skips_recent_idx")
+}
+
+model marketplace_artist_profiles {
+  normalized_artist        String    @id
+  display_name             String    @default("")
+  bio                      String    @default("")
+  profile_image_url        String    @default("")
+  source_name              String    @default("")
+  source_url               String    @default("")
+  raw_metadata             Json      @default("{}")
+  created_at               DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime  @default(now()) @db.Timestamptz(6)
+  summary                  String    @default("")
+  profile_image_cdn_url    String    @default("")
+  profile_image_object_key String    @default("")
+  pocketmonsters_url       String    @default("")
+  pocketmonsters_id        String    @default("")
+  bulbapedia_url           String    @default("")
+  bulbapedia_title         String    @default("")
+  source_attribution       Json      @default("{}")
+  fetched_at               DateTime? @db.Timestamptz(6)
+
+  @@index([bulbapedia_title], map: "marketplace_artist_profiles_bulbapedia_idx", where: raw("(bulbapedia_title <> ''::text)"))
+  @@index([pocketmonsters_id], map: "marketplace_artist_profiles_pocketmonsters_idx", where: raw("(pocketmonsters_id <> ''::text)"))
+  @@index([updated_at(sort: Desc)], map: "marketplace_artist_profiles_updated_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model marketplace_blueprint_artists {
+  blueprint_id                  BigInt                        @id
+  card_id                       BigInt?                       @default(dbgenerated("blueprint_id"))
+  artist                        String
+  illustrator                   String
+  normalized_artist             String
+  source                        String
+  source_card_id                String                        @default("")
+  source_url                    String                        @default("")
+  confidence                    Decimal                       @default(0) @db.Decimal
+  match_reason                  String                        @default("")
+  matched_at                    DateTime                      @default(now()) @db.Timestamptz(6)
+  raw_metadata                  Json                          @default("{}")
+  created_at                    DateTime                      @default(now()) @db.Timestamptz(6)
+  updated_at                    DateTime                      @default(now()) @db.Timestamptz(6)
+  artist_card_count             Int                           @default(0)
+  cardtrader_pokemon_blueprints cardtrader_pokemon_blueprints @relation(fields: [blueprint_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([card_id], map: "marketplace_blueprint_artists_card_idx")
+  @@index([normalized_artist, artist_card_count(sort: Desc)], map: "marketplace_blueprint_artists_count_idx")
+  @@index([normalized_artist])
+  @@index([source, matched_at(sort: Desc)], map: "marketplace_blueprint_artists_source_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model marketplace_blueprint_classification_overrides {
+  blueprint_id                  BigInt                        @id
+  item_kind                     String                        @default("single")
+  product_type                  String                        @default("card")
+  source                        String                        @default("")
+  reason                        String                        @default("")
+  debug_uid                     String                        @default("")
+  debug_email                   String                        @default("")
+  debug_username                String                        @default("")
+  created_at                    DateTime                      @default(now()) @db.Timestamptz(6)
+  updated_at                    DateTime                      @default(now()) @db.Timestamptz(6)
+  cardtrader_pokemon_blueprints cardtrader_pokemon_blueprints @relation(fields: [blueprint_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "marketplace_blueprint_classification_override_blueprint_id_fkey")
+
+  @@index([source, updated_at(sort: Desc)], map: "marketplace_blueprint_classification_overrides_source_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model marketplace_blueprint_emojis {
+  blueprint_id                  BigInt                        @id
+  card_id                       BigInt?                       @default(dbgenerated("blueprint_id"))
+  name                          String
+  rarity                        String                        @default("Card")
+  product_variant               String                        @default("")
+  emoji_identity_a              String
+  emoji_identity_b              String                        @default("")
+  rarity_variant_emoji          String                        @default("")
+  emoji                         String
+  source                        String                        @default("manual")
+  reason                        String                        @default("")
+  confidence                    Decimal                       @default(1) @db.Decimal
+  created_at                    DateTime                      @default(now()) @db.Timestamptz(6)
+  updated_at                    DateTime                      @default(now()) @db.Timestamptz(6)
+  cardtrader_pokemon_blueprints cardtrader_pokemon_blueprints @relation(fields: [blueprint_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([source, updated_at(sort: Desc)], map: "marketplace_blueprint_emojis_source_idx")
+}
+
+model marketplace_blueprint_price_summary {
+  blueprint_id            BigInt   @id
+  listed_quantity         Int      @default(0)
+  active_listing_count    Int      @default(0)
+  lowest_ask_pkn          Decimal? @db.Decimal
+  median_ask_pkn          Decimal? @db.Decimal
+  average_ask_pkn         Decimal? @db.Decimal
+  highest_ask_pkn         Decimal? @db.Decimal
+  observation_count       Int      @default(0)
+  last_observed_price_pkn Decimal? @db.Decimal
+  source_counts           Json     @default("{}")
+  refreshed_at            DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model marketplace_blueprint_price_table {
+  blueprint_id            BigInt
+  condition               String   @default("NM")
+  language                String   @default("EN")
+  reverse                 Boolean  @default(false)
+  first_edition           Boolean  @default(false)
+  foil_state              String   @default("standard")
+  variant_state           String   @default("")
+  sealed                  Boolean  @default(false)
+  signed                  Boolean  @default(false)
+  graded                  Boolean  @default(false)
+  grading_company         String   @default("")
+  grade                   String   @default("")
+  active_listing_count    Int      @default(0)
+  listed_quantity         Int      @default(0)
+  lowest_ask_pkn          Decimal? @db.Decimal
+  highest_ask_pkn         Decimal? @db.Decimal
+  average_ask_pkn         Decimal? @db.Decimal
+  median_ask_pkn          Decimal? @db.Decimal
+  observation_count       Int      @default(0)
+  last_observed_price_pkn Decimal? @db.Decimal
+  source_counts           Json     @default("{}")
+  refreshed_at            DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([blueprint_id, condition, language, reverse, first_edition, foil_state, variant_state, sealed, signed, graded, grading_company, grade])
+  @@index([blueprint_id, lowest_ask_pkn], map: "marketplace_blueprint_price_table_lowest_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains an index with non-default null sort order and requires additional setup for migrations. Visit https://pris.ly/d/default-index-null-ordering for more info.
+model marketplace_blueprint_tcg_metadata {
+  blueprint_id                  BigInt                        @id
+  card_id                       BigInt?                       @default(dbgenerated("blueprint_id"))
+  category                      String                        @default("")
+  set_id                        String                        @default("")
+  set_name                      String                        @default("")
+  set_logo_url                  String                        @default("")
+  set_symbol_url                String                        @default("")
+  set_official_card_count       Int?
+  set_total_card_count          Int?
+  set_metadata                  Json                          @default("{}")
+  variants                      Json                          @default("{}")
+  types                         Json                          @default("[]")
+  hp                            Int?
+  stage                         String                        @default("")
+  evolve_from                   String                        @default("")
+  attacks                       Json                          @default("[]")
+  abilities                     Json                          @default("[]")
+  weaknesses                    Json                          @default("[]")
+  resistances                   Json                          @default("[]")
+  retreat                       Int?
+  description                   String                        @default("")
+  flavor_text                   String                        @default("")
+  regulation_mark               String                        @default("")
+  legal                         Json                          @default("{}")
+  source                        String                        @default("tcgdex")
+  source_card_id                String                        @default("")
+  source_url                    String                        @default("")
+  confidence                    Decimal                       @default(0) @db.Decimal
+  match_reason                  String                        @default("")
+  matched_at                    DateTime                      @default(now()) @db.Timestamptz(6)
+  source_updated_at             DateTime?                     @db.Timestamptz(6)
+  raw_metadata                  Json                          @default("{}")
+  created_at                    DateTime                      @default(now()) @db.Timestamptz(6)
+  updated_at                    DateTime                      @default(now()) @db.Timestamptz(6)
+  cardtrader_pokemon_blueprints cardtrader_pokemon_blueprints @relation(fields: [blueprint_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([card_id], map: "marketplace_blueprint_tcg_metadata_card_idx")
+  @@index([category])
+  @@index([legal], map: "marketplace_blueprint_tcg_metadata_legal_gin_idx", type: Gin)
+  @@index([regulation_mark])
+  @@index([set_id, set_name], map: "marketplace_blueprint_tcg_metadata_set_idx")
+  @@index([source, source_updated_at(sort: Desc), matched_at(sort: Desc)], map: "marketplace_blueprint_tcg_metadata_source_updated_idx")
+  @@index([types], map: "marketplace_blueprint_tcg_metadata_types_gin_idx", type: Gin)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model marketplace_card_cart_analytics {
+  blueprint_id                  BigInt                        @id
+  cart_holder_count             Int                           @default(0)
+  first_added_at                DateTime?                     @db.Timestamptz(6)
+  last_added_at                 DateTime?                     @db.Timestamptz(6)
+  updated_at                    DateTime                      @default(now()) @db.Timestamptz(6)
+  cardtrader_pokemon_blueprints cardtrader_pokemon_blueprints @relation(fields: [blueprint_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([cart_holder_count(sort: Desc), updated_at(sort: Desc)], map: "marketplace_card_cart_analytics_count_idx")
+}
+
+model marketplace_card_cart_users {
+  blueprint_id                  BigInt
+  holder_key                    String
+  added_at                      DateTime                      @default(now()) @db.Timestamptz(6)
+  updated_at                    DateTime                      @default(now()) @db.Timestamptz(6)
+  cardtrader_pokemon_blueprints cardtrader_pokemon_blueprints @relation(fields: [blueprint_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([blueprint_id, holder_key])
+  @@index([holder_key, updated_at(sort: Desc)], map: "marketplace_card_cart_users_holder_idx")
+}
+
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model marketplace_card_emoji_rules {
+  name                   String                 @id
+  emoji_a                String
+  emoji_b                String
+  source                 String                 @default("manual")
+  updated_at             DateTime               @default(now()) @db.Timestamptz(6)
+  marketplace_card_names marketplace_card_names @relation(fields: [name], references: [name], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model marketplace_card_events {
+  id          BigInt   @id @default(autoincrement())
+  card_id     BigInt
+  event_type  String
+  weight      Decimal  @default(1) @db.Decimal
+  metadata    Json     @default("{}")
+  occurred_at DateTime @default(now()) @db.Timestamptz(6)
+  user_uid    String?
+
+  @@index([card_id, occurred_at(sort: Desc)], map: "marketplace_card_events_card_recent_idx")
+  @@index([occurred_at(sort: Desc), card_id], map: "marketplace_card_events_recent_idx")
+  @@index([user_uid, occurred_at(sort: Desc), card_id], map: "marketplace_card_events_user_recent_idx", where: raw("(user_uid IS NOT NULL)"))
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model marketplace_card_name_translations {
+  language                  String
+  name                      String
+  localized_name            String
+  normalized_localized_name String
+  compact_localized_name    String
+  localized_name_tokens     String[]               @default([])
+  source                    String                 @default("tcgdex")
+  source_card_id            String?
+  updated_at                DateTime               @default(now()) @db.Timestamptz(6)
+  match_confidence          Decimal                @default(1) @db.Decimal
+  match_reason              String                 @default("")
+  raw_metadata              Json                   @default("{}")
+  marketplace_card_names    marketplace_card_names @relation(fields: [name], references: [name], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([language, name])
+  @@index([language, compact_localized_name], map: "marketplace_card_name_translations_language_compact_idx")
+  @@index([normalized_localized_name(ops: raw("gin_trgm_ops"))], map: "marketplace_card_name_translations_language_normalized_trgm_idx", type: Gin)
+  @@index([name])
+}
+
+model marketplace_card_names {
+  name                               String                               @id
+  normalized_name                    String
+  compact_name                       String
+  name_tokens                        String[]                             @default([])
+  updated_at                         DateTime                             @default(now()) @db.Timestamptz(6)
+  emoji                              String                               @default("")
+  cards_name_type                    cards_name_type[]
+  marketplace_card_emoji_rules       marketplace_card_emoji_rules?
+  marketplace_card_name_translations marketplace_card_name_translations[]
+  marketplace_card_names_en          marketplace_card_names_en?
+
+  @@index([normalized_name(ops: raw("gin_trgm_ops"))], map: "marketplace_card_names_normalized_trgm_idx", type: Gin)
+}
+
+model marketplace_card_names_de {
+  language        String   @default("en")
+  name            String   @id
+  localized_name  String
+  normalized_name String
+  compact_name    String
+  name_tokens     String[] @default([])
+  source          String   @default("fixture")
+  source_card_id  String?
+  updated_at      DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([compact_name], map: "marketplace_card_names_de_compact_idx")
+  @@index([normalized_name(ops: raw("gin_trgm_ops"))], map: "marketplace_card_names_de_normalized_trgm_idx", type: Gin)
+}
+
+model marketplace_card_names_en {
+  language               String                 @default("en")
+  name                   String                 @id
+  localized_name         String
+  normalized_name        String
+  compact_name           String
+  name_tokens            String[]               @default([])
+  source                 String                 @default("fixture")
+  source_card_id         String?
+  updated_at             DateTime               @default(now()) @db.Timestamptz(6)
+  marketplace_card_names marketplace_card_names @relation(fields: [name], references: [name], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([compact_name], map: "marketplace_card_names_en_compact_idx")
+  @@index([normalized_name(ops: raw("gin_trgm_ops"))], map: "marketplace_card_names_en_normalized_trgm_idx", type: Gin)
+}
+
+model marketplace_card_names_es {
+  language        String   @default("en")
+  name            String   @id
+  localized_name  String
+  normalized_name String
+  compact_name    String
+  name_tokens     String[] @default([])
+  source          String   @default("fixture")
+  source_card_id  String?
+  updated_at      DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([compact_name], map: "marketplace_card_names_es_compact_idx")
+  @@index([normalized_name(ops: raw("gin_trgm_ops"))], map: "marketplace_card_names_es_normalized_trgm_idx", type: Gin)
+}
+
+model marketplace_card_names_fr {
+  language        String   @default("en")
+  name            String   @id
+  localized_name  String
+  normalized_name String
+  compact_name    String
+  name_tokens     String[] @default([])
+  source          String   @default("fixture")
+  source_card_id  String?
+  updated_at      DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([compact_name], map: "marketplace_card_names_fr_compact_idx")
+  @@index([normalized_name(ops: raw("gin_trgm_ops"))], map: "marketplace_card_names_fr_normalized_trgm_idx", type: Gin)
+}
+
+model marketplace_card_names_id {
+  language        String   @default("en")
+  name            String   @id
+  localized_name  String
+  normalized_name String
+  compact_name    String
+  name_tokens     String[] @default([])
+  source          String   @default("fixture")
+  source_card_id  String?
+  updated_at      DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([compact_name], map: "marketplace_card_names_id_compact_idx")
+  @@index([compact_name])
+  @@index([normalized_name(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([normalized_name(ops: raw("gin_trgm_ops"))], map: "marketplace_card_names_id_normalized_trgm_idx", type: Gin)
+}
+
+model marketplace_card_names_it {
+  language        String   @default("en")
+  name            String   @id
+  localized_name  String
+  normalized_name String
+  compact_name    String
+  name_tokens     String[] @default([])
+  source          String   @default("fixture")
+  source_card_id  String?
+  updated_at      DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([compact_name], map: "marketplace_card_names_it_compact_idx")
+  @@index([normalized_name(ops: raw("gin_trgm_ops"))], map: "marketplace_card_names_it_normalized_trgm_idx", type: Gin)
+}
+
+model marketplace_card_names_ja {
+  language        String   @default("en")
+  name            String   @id
+  localized_name  String
+  normalized_name String
+  compact_name    String
+  name_tokens     String[] @default([])
+  source          String   @default("fixture")
+  source_card_id  String?
+  updated_at      DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([compact_name], map: "marketplace_card_names_ja_compact_idx")
+  @@index([normalized_name(ops: raw("gin_trgm_ops"))], map: "marketplace_card_names_ja_normalized_trgm_idx", type: Gin)
+}
+
+model marketplace_card_names_pt {
+  language        String   @default("en")
+  name            String   @id
+  localized_name  String
+  normalized_name String
+  compact_name    String
+  name_tokens     String[] @default([])
+  source          String   @default("fixture")
+  source_card_id  String?
+  updated_at      DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([compact_name], map: "marketplace_card_names_pt_compact_idx")
+  @@index([normalized_name(ops: raw("gin_trgm_ops"))], map: "marketplace_card_names_pt_normalized_trgm_idx", type: Gin)
+}
+
+model marketplace_card_names_th {
+  language        String   @default("en")
+  name            String   @id
+  localized_name  String
+  normalized_name String
+  compact_name    String
+  name_tokens     String[] @default([])
+  source          String   @default("fixture")
+  source_card_id  String?
+  updated_at      DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([compact_name], map: "marketplace_card_names_th_compact_idx")
+  @@index([compact_name])
+  @@index([normalized_name(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([normalized_name(ops: raw("gin_trgm_ops"))], map: "marketplace_card_names_th_normalized_trgm_idx", type: Gin)
+}
+
+model marketplace_card_names_zh_cn {
+  language        String   @default("en")
+  name            String   @id
+  localized_name  String
+  normalized_name String
+  compact_name    String
+  name_tokens     String[] @default([])
+  source          String   @default("fixture")
+  source_card_id  String?
+  updated_at      DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([compact_name], map: "marketplace_card_names_zh_cn_compact_idx")
+  @@index([normalized_name(ops: raw("gin_trgm_ops"))], map: "marketplace_card_names_zh_cn_normalized_trgm_idx", type: Gin)
+}
+
+model marketplace_card_names_zh_tw {
+  language        String   @default("en")
+  name            String   @id
+  localized_name  String
+  normalized_name String
+  compact_name    String
+  name_tokens     String[] @default([])
+  source          String   @default("fixture")
+  source_card_id  String?
+  updated_at      DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([compact_name], map: "marketplace_card_names_zh_tw_compact_idx")
+  @@index([normalized_name(ops: raw("gin_trgm_ops"))], map: "marketplace_card_names_zh_tw_normalized_trgm_idx", type: Gin)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model marketplace_card_urls {
+  card_id                       BigInt                        @id
+  language                      String                        @default("en")
+  canonical_slug                String
+  canonical_slug_normalized     String
+  canonical_path                String                        @unique(map: "marketplace_card_urls_unique_canonical_path_idx", where: raw("is_unique"))
+  canonical_path_normalized     String                        @unique(map: "marketplace_card_urls_unique_canonical_path_normalized_idx", where: raw("is_unique"))
+  rarity                        String                        @default("Card")
+  name                          String
+  card_number                   String                        @default("")
+  set_name                      String                        @default("Pokemon")
+  item_kind                     String                        @default("single")
+  product_type                  String                        @default("card")
+  source_projected_at           DateTime?                     @db.Timestamptz(6)
+  updated_at                    DateTime                      @default(now()) @db.Timestamptz(6)
+  is_unique                     Boolean                       @default(true)
+  duplicate_group_size          Int                           @default(1)
+  duplicate_keys                Json                          @default("[]")
+  marketplace_search_candidates marketplace_search_candidates @relation(fields: [card_id], references: [card_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([canonical_path])
+  @@index([canonical_path_normalized])
+  @@index([language, canonical_slug], map: "marketplace_card_urls_language_slug_idx")
+  @@index([language, canonical_slug_normalized], map: "marketplace_card_urls_language_slug_normalized_idx")
+  @@index([is_unique, duplicate_group_size(sort: Desc), language, canonical_slug_normalized], map: "marketplace_card_urls_uniqueness_idx")
+}
+
+model marketplace_card_variations {
+  card_id                       BigInt
+  variation_key                 String
+  label                         String
+  source_text                   String                        @default("")
+  updated_at                    DateTime                      @default(now()) @db.Timestamptz(6)
+  marketplace_search_candidates marketplace_search_candidates @relation(fields: [card_id], references: [card_id], onDelete: Cascade, onUpdate: NoAction)
+  marketplace_variations        marketplace_variations        @relation(fields: [variation_key], references: [variation_key], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([card_id, variation_key])
+  @@index([variation_key, card_id], map: "marketplace_card_variations_variation_idx")
+}
+
+model marketplace_card_versions {
+  card_id              BigInt   @id
+  name                 String
+  expansion_name       String
+  expansion_number     String
+  expansion_number_int Int?
+  blueprint_id         BigInt?
+  image_url            String?
+  cdn_image_url        String?
+  preview_image_url    String?
+  product_type         String   @default("card")
+  trainer_name         String   @default("")
+  projected_at         DateTime @default(now()) @db.Timestamptz(6)
+  product_variant      String   @default("")
+  card_palette         Json     @default("{}")
+  emoji                String   @default("")
+  source_name          String   @default("")
+  display_name         String   @default("")
+  canonical_name       String   @default("")
+  homepage_image_url   String?
+
+  @@index([expansion_name, expansion_number_int, expansion_number, card_id], map: "marketplace_card_versions_expansion_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model marketplace_card_watchlist_analytics {
+  blueprint_id                  BigInt                        @id
+  watchlist_count               Int                           @default(0)
+  first_watchlisted_at          DateTime?                     @db.Timestamptz(6)
+  last_watchlisted_at           DateTime?                     @db.Timestamptz(6)
+  updated_at                    DateTime                      @default(now()) @db.Timestamptz(6)
+  cardtrader_pokemon_blueprints cardtrader_pokemon_blueprints @relation(fields: [blueprint_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([watchlist_count(sort: Desc), updated_at(sort: Desc)], map: "marketplace_card_watchlist_analytics_count_idx")
+}
+
+model marketplace_card_watchlist_users {
+  blueprint_id                  BigInt
+  user_uid                      String
+  added_at                      DateTime                      @default(now()) @db.Timestamptz(6)
+  updated_at                    DateTime                      @default(now()) @db.Timestamptz(6)
+  cardtrader_pokemon_blueprints cardtrader_pokemon_blueprints @relation(fields: [blueprint_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([blueprint_id, user_uid])
+  @@index([user_uid, updated_at(sort: Desc)], map: "marketplace_card_watchlist_users_user_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains an index with non-default null sort order and requires additional setup for migrations. Visit https://pris.ly/d/default-index-null-ordering for more info.
+model marketplace_cards {
+  card_id                       BigInt                        @id
+  name                          String
+  version                       String?
+  image_url                     String?
+  cdn_image_url                 String?
+  preview_image_url             String?
+  set_name                      String                        @default("Pokemon")
+  rarity                        String                        @default("Card")
+  card_type                     String                        @default("Trading card")
+  card_number                   String                        @default("")
+  is_holo                       Boolean                       @default(false)
+  is_foil                       Boolean                       @default(false)
+  item_kind                     String                        @default("single")
+  product_type                  String                        @default("card")
+  trainer_name                  String                        @default("")
+  imported_at                   DateTime?                     @db.Timestamptz(6)
+  projected_at                  DateTime                      @default(now()) @db.Timestamptz(6)
+  product_variant               String                        @default("")
+  card_palette                  Json                          @default("{}")
+  emoji                         String                        @default("")
+  source_name                   String                        @default("")
+  display_name                  String                        @default("")
+  canonical_name                String                        @default("")
+  homepage_image_url            String?
+  cardtrader_pokemon_blueprints cardtrader_pokemon_blueprints @relation(fields: [card_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([canonical_name])
+  @@index([imported_at(sort: Desc)])
+  @@index([item_kind, product_type, imported_at(sort: Desc)], map: "marketplace_cards_item_kind_idx")
+  @@index([name])
+  @@index([name(ops: raw("gin_trgm_ops"))], map: "marketplace_cards_name_trgm_idx", type: Gin)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model marketplace_cardtrader_import_jobs {
+  job_id                String    @id
+  game                  String
+  mode                  String
+  status                String    @default("queued")
+  requested_by_uid      String    @default("")
+  requested_by_email    String    @default("")
+  requested_by_username String    @default("")
+  request_payload       Json      @default("{}")
+  worker_id             String    @default("")
+  attempt_count         Int       @default(0)
+  progress              Json      @default("{}")
+  summary               Json      @default("{}")
+  error_message         String    @default("")
+  requested_at          DateTime  @default(now()) @db.Timestamptz(6)
+  started_at            DateTime? @db.Timestamptz(6)
+  heartbeat_at          DateTime? @db.Timestamptz(6)
+  finished_at           DateTime? @db.Timestamptz(6)
+  updated_at            DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@index([status, requested_at(sort: Desc)], map: "marketplace_cardtrader_import_jobs_status_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model marketplace_cm_expansion_parsing {
+  id                        BigInt    @id @default(autoincrement())
+  expansion_name            String
+  cardtrader_expansion_code String    @default("")
+  cardmarket_locale         String    @default("en")
+  cardmarket_expansion_slug String
+  cardmarket_set_code       String    @default("")
+  cardmarket_context_code   String    @default("")
+  number_format_rule        String    @default("unknown")
+  applies_to_card_type      String    @default("")
+  confidence                String    @default("candidate")
+  notes                     String    @default("")
+  verified_at               DateTime? @db.Timestamptz(6)
+  created_at                DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@unique([expansion_name, cardmarket_locale, cardmarket_expansion_slug, applies_to_card_type], map: "marketplace_cm_expansion_pars_expansion_name_cardmarket_loc_key")
+  @@index([expansion_name, cardmarket_locale], map: "marketplace_cm_expansion_parsing_expansion_idx")
+  @@index([cardmarket_expansion_slug, cardmarket_locale], map: "marketplace_cm_expansion_parsing_slug_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model marketplace_cm_expansion_rules {
+  expansion_name            String
+  cardmarket_locale         String    @default("en")
+  cardtrader_expansion_code String    @default("")
+  cardmarket_expansion_slug String
+  cardmarket_set_code       String    @default("")
+  cardmarket_context_code   String    @default("")
+  number_format_rule        String    @default("unknown")
+  applies_to_card_type      String    @default("")
+  confidence                String    @default("candidate")
+  source                    String    @default("")
+  notes                     String    @default("")
+  verified_at               DateTime? @db.Timestamptz(6)
+  created_at                DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@id([expansion_name, cardmarket_locale, applies_to_card_type])
+  @@index([expansion_name, cardmarket_locale, confidence], map: "marketplace_cm_expansion_rules_lookup_idx")
+  @@index([cardmarket_expansion_slug, cardmarket_locale], map: "marketplace_cm_expansion_rules_slug_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model marketplace_cm_product_parsing {
+  blueprint_id                  BigInt
+  cardmarket_locale             String                        @default("en")
+  card_name                     String                        @default("")
+  cardmarket_name               String                        @default("")
+  expansion_name                String                        @default("")
+  cardmarket_expansion_slug     String                        @default("")
+  collector_number              String                        @default("")
+  normalized_collector_number   String                        @default("")
+  cardmarket_set_code           String                        @default("")
+  cardmarket_context_code       String                        @default("")
+  cardmarket_variant_marker     String                        @default("")
+  cardmarket_product_slug       String
+  cardmarket_url                String                        @unique(map: "marketplace_cm_product_parsing_url_idx")
+  match_status                  String                        @default("candidate")
+  confidence                    String                        @default("candidate")
+  verification_method           String                        @default("")
+  verification_source           String                        @default("")
+  notes                         String                        @default("")
+  verified_at                   DateTime?                     @db.Timestamptz(6)
+  created_at                    DateTime                      @default(now()) @db.Timestamptz(6)
+  updated_at                    DateTime                      @default(now()) @db.Timestamptz(6)
+  cardtrader_pokemon_blueprints cardtrader_pokemon_blueprints @relation(fields: [blueprint_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([blueprint_id, cardmarket_locale])
+  @@index([expansion_name, cardmarket_locale, match_status], map: "marketplace_cm_product_parsing_expansion_idx")
+  @@index([cardmarket_product_slug, cardmarket_locale], map: "marketplace_cm_product_parsing_slug_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model marketplace_cm_refinement_log {
+  id                            BigInt                        @id @default(autoincrement())
+  blueprint_id                  BigInt
+  cardmarket_locale             String                        @default("en")
+  pasted_cardmarket_url         String
+  candidate_cardmarket_url      String                        @default("")
+  card_name                     String                        @default("")
+  expansion_name                String                        @default("")
+  collector_number              String                        @default("")
+  cardmarket_ids                String[]                      @default([])
+  status                        String                        @default("pending")
+  debug_uid                     String                        @default("")
+  debug_email                   String                        @default("")
+  debug_username                String                        @default("")
+  notes                         String                        @default("")
+  created_at                    DateTime                      @default(now()) @db.Timestamptz(6)
+  implemented_at                DateTime?                     @db.Timestamptz(6)
+  cardtrader_pokemon_blueprints cardtrader_pokemon_blueprints @relation(fields: [blueprint_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([blueprint_id, status, created_at(sort: Desc)], map: "marketplace_cm_refinement_log_blueprint_idx")
+  @@index([status, created_at(sort: Desc)], map: "marketplace_cm_refinement_log_status_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model marketplace_cm_scrape_observations {
+  id                            String                         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cardmarket_url                String                         @unique(map: "marketplace_cm_scrape_observations_url_idx")
+  cardmarket_locale             String                         @default("en")
+  cardmarket_expansion_slug     String                         @default("")
+  cardmarket_product_slug       String                         @default("")
+  page_title                    String                         @default("")
+  scraped_name                  String                         @default("")
+  scraped_expansion             String                         @default("")
+  collector_number              String                         @default("")
+  collector_prefix              String                         @default("")
+  numeric_collector_number      String                         @default("")
+  raw_title                     String                         @default("")
+  structured_payload            Json                           @default("{}")
+  page_context                  Json                           @default("{}")
+  matched_blueprint_id          BigInt?
+  match_confidence              Decimal?                       @db.Decimal
+  match_payload                 Json                           @default("{}")
+  source                        String                         @default("pokemon-card-extension")
+  extension_version             String                         @default("")
+  user_agent                    String                         @default("")
+  debug_uid                     String                         @default("")
+  debug_email                   String                         @default("")
+  status                        String                         @default("observed")
+  notes                         String                         @default("")
+  observed_at                   DateTime                       @default(now()) @db.Timestamptz(6)
+  created_at                    DateTime                       @default(now()) @db.Timestamptz(6)
+  updated_at                    DateTime                       @default(now()) @db.Timestamptz(6)
+  cardtrader_pokemon_blueprints cardtrader_pokemon_blueprints? @relation(fields: [matched_blueprint_id], references: [id], onUpdate: NoAction)
+
+  @@index([matched_blueprint_id, observed_at(sort: Desc)], map: "marketplace_cm_scrape_observations_blueprint_idx")
+  @@index([status, observed_at(sort: Desc)], map: "marketplace_cm_scrape_observations_status_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model marketplace_cm_verified_links {
+  blueprint_id                  BigInt
+  cardmarket_locale             String                        @default("en")
+  cardmarket_url                String                        @unique(map: "marketplace_cm_verified_links_url_idx")
+  cardmarket_product_slug       String                        @default("")
+  card_name                     String                        @default("")
+  expansion_name                String                        @default("")
+  collector_number              String                        @default("")
+  source                        String                        @default("")
+  confidence                    String                        @default("verified")
+  notes                         String                        @default("")
+  verified_at                   DateTime                      @default(now()) @db.Timestamptz(6)
+  created_at                    DateTime                      @default(now()) @db.Timestamptz(6)
+  updated_at                    DateTime                      @default(now()) @db.Timestamptz(6)
+  cardtrader_pokemon_blueprints cardtrader_pokemon_blueprints @relation(fields: [blueprint_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([blueprint_id, cardmarket_locale])
+  @@index([expansion_name, cardmarket_locale, verified_at(sort: Desc)], map: "marketplace_cm_verified_links_expansion_idx")
+}
+
+model marketplace_expansion_aliases {
+  alias                     String
+  normalized_alias          String
+  compact_alias             String
+  expansion_name            String
+  normalized_expansion_name String
+  source                    String   @default("manual")
+  priority                  Int      @default(100)
+  updated_at                DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([normalized_alias, normalized_expansion_name])
+  @@index([compact_alias, priority, normalized_expansion_name], map: "marketplace_expansion_aliases_compact_idx")
+  @@index([normalized_expansion_name, priority], map: "marketplace_expansion_aliases_expansion_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model marketplace_expansion_name_translations {
+  language                  String
+  expansion_name            String
+  localized_name            String
+  normalized_localized_name String
+  compact_localized_name    String
+  localized_name_tokens     String[] @default([])
+  source                    String   @default("tcgdex")
+  source_set_id             String   @default("")
+  match_confidence          Decimal  @default(1) @db.Decimal
+  match_reason              String   @default("")
+  raw_metadata              Json     @default("{}")
+  updated_at                DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([language, expansion_name, localized_name])
+  @@index([language, compact_localized_name], map: "marketplace_expansion_name_translations_language_compact_idx")
+}
+
+model marketplace_expansion_numbers {
+  card_number       String   @id
+  number_int        Int?
+  normalized_number String
+  compact_number    String
+  number_tokens     String[] @default([])
+  updated_at        DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([compact_number], map: "marketplace_expansion_numbers_compact_idx")
+}
+
+/// This model contains an index with non-default null sort order and requires additional setup for migrations. Visit https://pris.ly/d/default-index-null-ordering for more info.
+model marketplace_firebase_users {
+  user_uid                 String    @id
+  email                    String?
+  display_name             String?
+  photo_url                String?
+  disabled                 Boolean   @default(false)
+  email_verified           Boolean   @default(false)
+  provider_ids             String[]  @default([])
+  firebase_created_at      DateTime? @db.Timestamptz(6)
+  firebase_last_sign_in_at DateTime? @db.Timestamptz(6)
+  synced_at                DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@index([firebase_last_sign_in_at(sort: Desc)], map: "marketplace_firebase_users_last_sign_in_idx")
+  @@index([synced_at(sort: Desc)])
+}
+
+/// This model contains an index with non-default null sort order and requires additional setup for migrations. Visit https://pris.ly/d/default-index-null-ordering for more info.
+model marketplace_hot_blueprints {
+  blueprint_id                  BigInt                        @id
+  name                          String
+  set_name                      String                        @default("Pokemon")
+  card_number                   String                        @default("")
+  rarity                        String                        @default("Card")
+  card_type                     String                        @default("Card")
+  item_kind                     String                        @default("single")
+  product_type                  String                        @default("card")
+  views_1h                      Int                           @default(0)
+  searches_1h                   Int                           @default(0)
+  clicks_1h                     Int                           @default(0)
+  cart_adds_1h                  Int                           @default(0)
+  reserves_1h                   Int                           @default(0)
+  sales_1h                      Int                           @default(0)
+  hot_score_1h                  Decimal                       @default(0) @db.Decimal
+  views_24h                     Int                           @default(0)
+  searches_24h                  Int                           @default(0)
+  clicks_24h                    Int                           @default(0)
+  cart_adds_24h                 Int                           @default(0)
+  reserves_24h                  Int                           @default(0)
+  sales_24h                     Int                           @default(0)
+  hot_score_24h                 Decimal                       @default(0) @db.Decimal
+  views_7d                      Int                           @default(0)
+  searches_7d                   Int                           @default(0)
+  clicks_7d                     Int                           @default(0)
+  cart_adds_7d                  Int                           @default(0)
+  reserves_7d                   Int                           @default(0)
+  sales_7d                      Int                           @default(0)
+  hot_score_7d                  Decimal                       @default(0) @db.Decimal
+  last_event_at                 DateTime?                     @db.Timestamptz(6)
+  metadata                      Json                          @default("{}")
+  refreshed_at                  DateTime                      @default(now()) @db.Timestamptz(6)
+  cardtrader_pokemon_blueprints cardtrader_pokemon_blueprints @relation(fields: [blueprint_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([hot_score_1h(sort: Desc), last_event_at(sort: Desc)], map: "marketplace_hot_blueprints_score_1h_idx")
+  @@index([hot_score_24h(sort: Desc), last_event_at(sort: Desc)], map: "marketplace_hot_blueprints_score_24h_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model marketplace_name_ngrams {
+  card_id        BigInt
+  name           String
+  language       String   @default("en")
+  source         String   @default("canonical_name")
+  chunk          String
+  chunk_length   Int      @db.SmallInt
+  chunk_position Int      @db.SmallInt
+  is_prefix      Boolean  @default(false)
+  source_weight  Float    @default(1) @db.Real
+  updated_at     DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([card_id, language, source, chunk, chunk_position])
+  @@index([card_id, language], map: "marketplace_name_ngrams_card_idx")
+  @@index([language, chunk, is_prefix, source_weight(sort: Desc), card_id], map: "marketplace_name_ngrams_chunk_idx")
+}
+
+model marketplace_pokemon_name_roots {
+  pokemon_name    String   @id
+  normalized_name String
+  compact_name    String
+  name_tokens     String[] @default([])
+  source          String   @default("fixture")
+  updated_at      DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([compact_name], map: "marketplace_pokemon_name_roots_compact_idx")
+  @@index([normalized_name], map: "marketplace_pokemon_name_roots_normalized_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model marketplace_price_observations {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  blueprint_id    BigInt
+  source          String   @default("pokoin_user_listing")
+  source_item_id  String   @default("")
+  observed_at     DateTime @default(now()) @db.Timestamptz(6)
+  currency        String   @default("PKN")
+  price           Decimal  @db.Decimal
+  price_pkn       Decimal  @db.Decimal
+  quantity        Int      @default(1)
+  condition       String   @default("NM")
+  language        String   @default("EN")
+  reverse         Boolean  @default(false)
+  first_edition   Boolean  @default(false)
+  foil_state      String   @default("standard")
+  variant_state   String   @default("")
+  sealed          Boolean  @default(false)
+  signed          Boolean  @default(false)
+  graded          Boolean  @default(false)
+  grading_company String?
+  grade           String?
+  metadata        Json     @default("{}")
+  created_at      DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([blueprint_id, observed_at(sort: Desc)], map: "marketplace_price_observations_blueprint_idx")
+  @@index([blueprint_id, source, condition, language, reverse, first_edition, foil_state, sealed, signed, graded, grading_company, grade, observed_at(sort: Desc)], map: "marketplace_price_observations_dimensions_idx")
+}
+
+model marketplace_query_chunk_events {
+  language      String   @default("en")
+  chunk         String
+  next_chunk    String   @default("")
+  event_type    String   @default("search")
+  event_count   BigInt   @default(0)
+  total_weight  BigInt   @default(0)
+  first_seen_at DateTime @default(now()) @db.Timestamptz(6)
+  last_seen_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([language, chunk, next_chunk, event_type])
+  @@index([language, event_type, total_weight(sort: Desc), last_seen_at(sort: Desc)], map: "marketplace_query_chunk_events_hot_idx")
+}
+
+model marketplace_rarities {
+  rarity            String   @id
+  normalized_rarity String
+  compact_rarity    String
+  rarity_tokens     String[] @default([])
+  updated_at        DateTime @default(now()) @db.Timestamptz(6)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains an index with non-default null sort order and requires additional setup for migrations. Visit https://pris.ly/d/default-index-null-ordering for more info.
+model marketplace_search_candidates {
+  card_id                     BigInt                        @id
+  name                        String
+  set_name                    String                        @default("Pokemon")
+  card_number                 String                        @default("")
+  rarity                      String                        @default("Card")
+  card_type                   String                        @default("Card")
+  item_kind                   String                        @default("single")
+  product_type                String                        @default("card")
+  trainer_name                String                        @default("")
+  image_url                   String?
+  cdn_image_url               String?
+  preview_image_url           String?
+  search_text                 String                        @default("")
+  name_prefix                 String                        @default("")
+  set_prefix                  String                        @default("")
+  expansion_name              String                        @default("")
+  search_weight               Decimal                       @default(0) @db.Decimal
+  imported_at                 DateTime?                     @db.Timestamptz(6)
+  projected_at                DateTime                      @default(now()) @db.Timestamptz(6)
+  product_variant             String                        @default("")
+  card_palette                Json                          @default("{}")
+  emoji                       String                        @default("")
+  source_name                 String                        @default("")
+  display_name                String                        @default("")
+  canonical_name              String                        @default("")
+  homepage_image_url          String?
+  marketplace_card_urls       marketplace_card_urls?
+  marketplace_card_variations marketplace_card_variations[]
+
+  @@index([canonical_name])
+  @@index([expansion_name, search_weight(sort: Desc)], map: "marketplace_search_candidates_expansion_name_idx")
+  @@index([name_prefix, search_weight(sort: Desc), imported_at(sort: Desc)], map: "marketplace_search_candidates_name_prefix_idx")
+  @@index([search_text(ops: raw("gin_trgm_ops"))], map: "marketplace_search_candidates_search_text_trgm_idx", type: Gin)
+  @@index([set_prefix, search_weight(sort: Desc), imported_at(sort: Desc)], map: "marketplace_search_candidates_set_prefix_idx")
+}
+
+model marketplace_trainers {
+  trainer_name String   @id
+  aliases      String[] @default([])
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime @default(now()) @db.Timestamptz(6)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model marketplace_user_listings {
+  id                      String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  card_id                 String
+  seller_uid              String
+  seller_name             String   @default("Pokoin seller")
+  seller_country          String   @default("EU")
+  seller_reputation_label String   @default("New")
+  condition               String   @default("NM")
+  language                String   @default("EN")
+  price_pkn               Decimal  @db.Decimal
+  quantity_available      Int      @default(1)
+  signed                  Boolean  @default(false)
+  reverse                 Boolean  @default(false)
+  graded                  Boolean  @default(false)
+  grading_company         String?
+  grade                   String?
+  certification_id        String?
+  shipping_available      Boolean  @default(true)
+  nft_available           Boolean  @default(false)
+  status                  String   @default("active")
+  card_name               String   @default("")
+  card_image_url          String   @default("")
+  set_name                String   @default("")
+  collector_number        String   @default("")
+  created_at              DateTime @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime @default(now()) @db.Timestamptz(6)
+  sealed                  Boolean  @default(false)
+  seller_comment          String   @default("")
+  first_edition           Boolean  @default(false)
+  foil_state              String   @default("standard")
+  variant_state           String   @default("")
+  source                  String   @default("pokoin_user_listing")
+  source_listing_id       String   @default("")
+  reserve_available       Boolean  @default(false)
+
+  @@index([card_id, status, price_pkn, created_at(sort: Desc)], map: "marketplace_user_listings_active_card_idx")
+  @@index([card_id, price_pkn, updated_at(sort: Desc)], map: "marketplace_user_listings_homepage_native_idx", where: raw("((status = 'active'::text) AND (quantity_available > 0) AND (price_pkn > (0)::numeric) AND (shipping_available = true))"))
+  @@index([card_id, status, condition, language, reverse, first_edition, foil_state, sealed, signed, graded, grading_company, grade, price_pkn], map: "marketplace_user_listings_price_dimensions_idx")
+  @@index([seller_uid, updated_at(sort: Desc)], map: "marketplace_user_listings_seller_idx")
+  @@index([status, updated_at(sort: Desc)], map: "marketplace_user_listings_status_idx")
+}
+
+model marketplace_variations {
+  variation_key               String                        @id
+  label                       String
+  aliases                     String[]                      @default([])
+  normalized_aliases          String[]                      @default([])
+  compact_aliases             String[]                      @default([])
+  updated_at                  DateTime                      @default(now()) @db.Timestamptz(6)
+  marketplace_card_variations marketplace_card_variations[]
+
+  @@index([compact_aliases], type: Gin)
+}

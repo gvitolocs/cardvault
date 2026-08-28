@@ -86,6 +86,19 @@ test('marketplace SEO canonical path uses public-number marketplace URL', () => 
   );
 });
 
+test('marketplace SEO canonical path folds Pokémon accents', () => {
+  assert.equal(
+    canonicalPathForCard({
+      card_id: '251432',
+      name: 'Poliwhirl',
+      expansion_number: '176/165',
+      expansion_name: 'Pokémon Card 151',
+      rarity: 'Card',
+    }),
+    '/marketplace/en/cards/502864/card-poliwhirl-176-165-pokemon-card-151',
+  );
+});
+
 test('marketplace SEO canonical path does not invent collector number from id', () => {
   const row = {
     card_id: '139056',

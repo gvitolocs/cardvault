@@ -1,7 +1,13 @@
 const { ethers } = require('ethers');
+const {
+  geckoTerminalWpknUsd,
+  pknUsdPrice,
+  referencePriceFromUsd,
+} = require('./_wpkn_pkn_market_quote');
 
 const WPKN_DECIMALS = 18;
 const QUOTE_TTL_MS = 60 * 1000;
+const DEFAULT_PKN_USD_PRICE = 0.005;
 const DEFAULT_SPREAD_BPS = 100;
 const DEFAULT_IMPACT_BPS = 75;
 const DEFAULT_MAX_ORDER_PKN = 100000;
@@ -163,6 +169,35 @@ async function reserveSnapshot(firestore) {
   };
 }
 
+async function bnbUsdPrice() {
+  const override = numberEnv('WPKN_EXCHANGE_BNB_USD_PRICE', 0);
+  if (override > 0) {
+    return override;
+  }
+  const response = await fetch(
+    'https://api.coingecko.com/api/v3/simple/price?ids=binancecoin&vs_currencies=usd',
+    { headers: { accept: 'application/json' } },
+  ).catch(() => null);
+  const payload = response ? await response.json().catch(() => ({})) : {};
+  const price = Number(payload?.binancecoin?.usd || 0);
+  return Number.isFinite(price) && price > 0 ? price : 1;
+}
+
+async function marketSpotPrice() {
+  try {
+    const [wpknUsd, pknUsd] = await Promise.all([
+      geckoTerminalWpknUsd(),
+      Promise.resolve(pknUsdPrice()),
+    ]);
+    if (Number.isFinite(wpknUsd) && wpknUsd > 0 && Number.isFinite(pknUsd) && pknUsd > 0) {
+      return referencePriceFromUsd(wpknUsd, pknUsd);
+    }
+  } catch (error) {
+    console.warn('GeckoTerminal wPKN price failed, falling back to Pancake', error);
+  }
+  return pancakeSpotPrice();
+}
+
 async function pancakeSpotPrice() {
   if (
     !process.env.BNB_RPC_URL ||
@@ -196,8 +231,8 @@ async function pancakeSpotPrice() {
     return numberEnv('WPKN_EXCHANGE_MARKET_PRICE', 1);
   }
 
-  const bnbUsd = numberEnv('WPKN_EXCHANGE_BNB_USD_PRICE', 1);
-  const pknUsd = numberEnv('WPKN_EXCHANGE_PKN_USD_PRICE', bnbUsd);
+  const bnbUsd = await bnbUsdPrice();
+  const pknUsd = pknUsdPrice();
   return Math.max(0.000001, (reserveBnb / reserveWpkn) * (bnbUsd / pknUsd));
 }
 
@@ -375,6 +410,7 @@ module.exports = {
   normalizeAddress,
   normalizeAmount,
   normalizeDirection,
+  marketSpotPrice,
   pancakeSpotPrice,
   publicQuote,
   reserveSnapshot,

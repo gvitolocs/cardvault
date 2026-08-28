@@ -8,6 +8,7 @@ let variationSearchPoolKey = '';
 let readReplicaPools = [];
 let readReplicaPoolIndex = 0;
 let readReplicaPoolKey = '';
+let assistantReadOnlyPool;
 let supabaseNameIndexPool;
 let dimensionSearchPools = new Map();
 let dimensionSearchPoolKey = '';
@@ -26,6 +27,22 @@ function uniqueStrings(values) {
 
 function marketplaceDatabaseUrl() {
   return process.env.MARKETPLACE_DATABASE_URL || process.env.MARKETPLACE_PEER4_DATABASE_URL || '';
+}
+
+function marketplaceAssistantReadOnlyDatabaseUrl() {
+  return process.env.POKO_ASSISTANT_READONLY_DATABASE_URL ||
+    process.env.MARKETPLACE_ASSISTANT_READONLY_DATABASE_URL ||
+    process.env.MARKETPLACE_PEER4_READONLY_DATABASE_URL ||
+    marketplaceAnalyticsSearchDatabaseUrls()[0] ||
+    marketplaceDatabaseUrl();
+}
+
+function marketplaceAssistantReadOnlyConfigured() {
+  return Boolean(
+    process.env.POKO_ASSISTANT_READONLY_DATABASE_URL ||
+    process.env.MARKETPLACE_ASSISTANT_READONLY_DATABASE_URL ||
+    process.env.MARKETPLACE_PEER4_READONLY_DATABASE_URL,
+  );
 }
 
 function marketplaceNameSearchDatabaseUrl() {
@@ -205,6 +222,24 @@ function getMarketplaceAnalyticsSearchPool() {
   const selectedPool = pools[readReplicaPoolIndex % pools.length];
   readReplicaPoolIndex = (readReplicaPoolIndex + 1) % pools.length;
   return selectedPool;
+}
+
+function getMarketplaceAssistantReadOnlyPool() {
+  const connectionString = marketplaceAssistantReadOnlyDatabaseUrl();
+  if (connectionString === marketplaceDatabaseUrl()) {
+    return getMarketplacePool();
+  }
+  if (connectionString === marketplaceNameSearchDatabaseUrl()) {
+    return getMarketplaceNameSearchPool();
+  }
+  if (!assistantReadOnlyPool) {
+    assistantReadOnlyPool = createPool(
+      connectionString,
+      'POKO_ASSISTANT_READONLY_DATABASE_POOL_MAX',
+      'poko-assistant-readonly',
+    );
+  }
+  return assistantReadOnlyPool;
 }
 
 function getMarketplacePool() {
@@ -406,6 +441,32 @@ async function marketplaceAnalyticsSearchQuery(text, values = []) {
   return getMarketplaceAnalyticsSearchPool().query(text, values);
 }
 
+function assertReadOnlySql(text) {
+  const sql = String(text || '')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/--.*$/gm, ' ')
+    .trim();
+  const error = new Error('Poko assistant database queries must be read-only.');
+  error.statusCode = 500;
+  if (!sql) {
+    throw error;
+  }
+  if (!/^(select|with)\b/i.test(sql)) {
+    throw error;
+  }
+  if (/;\s*\S/.test(sql)) {
+    throw error;
+  }
+  if (/\b(insert|update|delete|merge|upsert|alter|create|drop|truncate|grant|revoke|copy|call|do|execute|refresh|vacuum|analyze|reindex|cluster|listen|notify|lock)\b/i.test(sql)) {
+    throw error;
+  }
+}
+
+async function marketplaceAssistantReadOnlyQuery(text, values = []) {
+  assertReadOnlySql(text);
+  return getMarketplaceAssistantReadOnlyPool().query(text, values);
+}
+
 async function marketplaceDimensionSearchQuery(dimension, text, values = []) {
   return getMarketplaceDimensionSearchPool(dimension).query(text, values);
 }
@@ -416,7 +477,10 @@ module.exports = {
   getSupabaseNameIndexPool,
   getMarketplaceVariationSearchPool,
   getMarketplaceAnalyticsSearchPool,
+  getMarketplaceAssistantReadOnlyPool,
   marketplaceDatabaseUrl,
+  marketplaceAssistantReadOnlyDatabaseUrl,
+  marketplaceAssistantReadOnlyConfigured,
   marketplaceNameSearchDatabaseUrl,
   supabaseNameIndexDatabaseUrl,
   supabaseNameIndexConfigured,
@@ -431,6 +495,8 @@ module.exports = {
   marketplaceQuery,
   marketplaceVariationSearchQuery,
   marketplaceAnalyticsSearchQuery,
+  marketplaceAssistantReadOnlyQuery,
+  assertReadOnlySql,
   marketplaceDimensionSearchQuery,
   getMarketplacePrefixSearchClients,
   getMarketplaceDimensionSearchPool,

@@ -68,6 +68,7 @@ function sanitizePokoEmoji(value) {
     sanitized = sanitized.split(emoji).join(replacement);
   }
   return sanitized
+    .replace(/\bCardTrader\b/gi, 'marketplace partner')
     .replace(/\uFFFD/g, '')
     .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, (emoji) => (
       POKO_SAFE_ASTRAL_EMOJI.has(emoji) ? emoji : ''
@@ -501,8 +502,9 @@ function isTechnicalIntent(intent) {
 function assistantActionCapabilities() {
   return [
     'Pokoin assistant actions available after your reply:',
-    '- navigate: the frontend can open internal pokoin.com paths when the server returns an action payload.',
-    '- Card suggestion action: for requests like "suggest a cute card", "suggest a cad", "recommend an illustration card", or typo variants, Poko can pick an illustration-style Pokemon card, mention the artist, and open a direct card detail page when the gateway can resolve one.',
+    '- navigate: structured action shape is {"type":"navigate","path":"/..."}; only internal pokoin.com paths starting with "/" are allowed.',
+    '- Use navigate conditionally: direct card pages, explicit open/show/take-me-to intents, and helpful resolved card recommendations. Do not navigate for casual chat, vague questions, or when no safe direct internal path is known.',
+    '- Card suggestion action: for requests like "suggest a cute card", "suggest a cad", "recommend an illustration card", or typo variants, Poko can pick an illustration-style Pokemon card, mention the artist, and open a direct card detail page when the gateway can resolve one. Match the user theme when provided; for ice cream/gelato/ghiaccio/freddo/neve themes prefer Vanillite, Vanillish, Vanilluxe, or another coherent ice-themed Pokemon instead of a generic cute card.',
     '- Marketplace lookup action: for requests like "show/open/find the most expensive Charizard card" including typos like "chaizard", Poko can look up active marketplace listings and navigate to the matching card detail page.',
     '- Support action: bug/support messages can be forwarded to the development team.',
     'If the user has typos, infer the nearest Pokoin action intent from context. Mention the action in natural language; the backend will attach the actual action payload when available.',
@@ -578,7 +580,16 @@ function looksLikeShortCardHistoryFollowUp(text) {
 }
 
 function looksLikeEarnQuestion(text) {
-  if (/\b(earn|earning|rewards?|rewarded|make money|how to earn|how earn|guadagn|gudagn|guadagno|gudagno|guadagna|gudagna|ricompens|come si guadagna|come guadagno|cosa guadagno|cosa gudagno|ganar|recompensa|como ganar|gagner|recompense|récompense|verdienen|belohnung|ganhar|recompensa)\b/.test(text)) {
+  if (/\b(shard|shards|sharding|shard-review|disenchant|disenchanting|dust|recycle|recycling|turn cards into|turn card into|cards into pkn|cards into credits|cards into new cards|new cards from old cards|order new cards|deck shard|card shard|pkn shard|earn pkn|tipo videogame|videogame system|earn|earning|rewards?|rewarded|make money|how to earn|how earn|guadagn|gudagn|guadagno|gudagno|guadagna|gudagna|ricompens|come si guadagna|come guadagno|cosa guadagno|cosa gudagno|ganar|recompensa|como ganar|gagner|recompense|récompense|verdienen|belohnung|ganhar|recompensa)\b/.test(text)) {
+    return true;
+  }
+  if (/\b(come funziona|sistema|tipo videogame|videogame|gioco)\b/.test(text) &&
+      /\b(carte|cards?|pkn|shard|guadagn|nuove|ordinare|order)\b/.test(text)) {
+    return true;
+  }
+  if (/\b(posso|can i|how do i|come)\b/.test(text) &&
+      /\b(turn|trasform|convert|scambiare|usare)\b/.test(text) &&
+      /\b(cards?|carte)\b/.test(text)) {
     return true;
   }
   const words = text.split(/\s+/).filter(Boolean);
@@ -637,8 +648,9 @@ function relevantKnowledge(message) {
   const wanted = new Set(['Identity And Role', 'Site Navigation And Actions For Pokontact', 'Answering Rules']);
   const rules = [
     ['Pokoin Overview', /\b(pokoin|project|site|app|what is|cos.?e|che cos|online|status|health)/],
-    ['Site Navigation And Actions For Pokontact', /\b(route|routes|open|go to|navigate|navigation|navitagete|page|menu|chat|pokontact|support|help|where|find|show|link|url|profile|favorites|inventory|collection|orders|forum|cart|docs)/],
+    ['Site Navigation And Actions For Pokontact', /\b(route|routes|open|go to|navigate|navigation|navitagete|page|menu|chat|pokontact|support|help|where|find|show|link|url|profile|favorites|inventory|collection|orders|forum|cart|docs|earn|shard)/],
     ['Marketplace', /\b(market|marketplace|card|pokemon|seller|listing|cart|checkout|search|hot|featured|best seller)/],
+    ['Earn PKN And Shard Review', /\b(earn|earning|shard|shards|sharding|disenchant|recycle|dust|decklist|reserve|pkn value|turn cards|order new cards|videogame|gioco)/],
     ['Wallet And PokoinPoS', /\b(wallet|pkn|chain|blockchain|metamask|rpc|scan|validator|network|address|private key|seed)/],
     ['Swap, WPKN, And BNB', /\b(swap|pokoinswap|wpkn|wrapped|bnb|pancake|liquidity|pool)/],
     ['Native NFTs', /\b(nft|mint|metadata|token|collection|erc)/],
@@ -726,23 +738,23 @@ function projectReply(user, message = '') {
     return [
       `Ciao${name ? ` ${name}` : ''}, sono Poko, l’assistente virtuale di Pokoin.com ✨`,
       '',
-      'Questo sito serve a tre cose principali:',
-      '• marketplace per carte Pokemon, con catalogo, versioni e offerte dei venditori ⭐',
-      '• strumenti PokoinPoS/PKN: wallet, trasferimenti, Scan, Swap/PokoinSwap e validatori 🛠️',
-      '• aiuto da collezionista: suggerimenti carini, spiegazioni semplici e raccolta bug per il team 😊',
+      'Questo sito unisce più flussi da collezionista:',
+      '• marketplace per carte Pokemon, con catalogo, versioni, offerte venditore, carrello, checkout, ordini, preferiti, inventory e collection ⭐',
+      '• Earn PKN / PKN Shard Review: puoi inviare una lista di carte o un decklist; le carte extra eleggibili possono essere sharded into PKN e usate verso carte che vuoi davvero ⭐',
+      '• strumenti PokoinPoS/PKN: wallet, trasferimenti, Scan, Swap/PokoinSwap, validatori e NFT nativi 🛠️',
       '',
-      'In breve: Pokoin.com unisce carte Pokemon, PKN e strumenti blockchain in un unico posto.',
+      'Versione videogame: le doppie sono come oggetti extra. Pokoin ha una review per trasformare carte eleggibili in valore PKN; non è un pulsante automatico garantito. Non è consulenza finanziaria.',
     ].join('\n');
   }
   return [
     `Hiii${name ? ` ${name}` : ''}, I am Poko, the little Pokoin helper friend ✨`,
     '',
-    'Pokoin is a collector project with three cute-but-serious pieces:',
-    '• a Pokemon card marketplace backed by Oracle catalog/search data ⭐',
-    '• the PokoinPoS chain with native PKN transfers 🛠️',
-    '• wallet tools like Scan, Swap/PokoinSwap, validators, and MetaMask compatibility 🛠️',
+    'Pokoin is a collector project with connected site flows:',
+    '• a Pokemon card marketplace with catalog/search, card detail pages, seller listings, cart, checkout, orders, favorites, inventory, and collection views ⭐',
+    '• Earn PKN / PKN Shard Review: users can submit a card list or decklist; eligible extra cards can be sharded into PKN value and used toward cards they actually want ⭐',
+    '• the PokoinPoS chain with native PKN transfers, Scan, Swap/PokoinSwap, validators, native NFTs, and MetaMask compatibility 🛠️',
     '',
-    'Tiny explanation: PKN is the native token, the chain is the shared notebook, and validators are the careful notebook keepers. 📚⭐',
+    'Videogame-style idea: duplicates become value after review. It is a review/request flow, not an instant guaranteed disenchant button. Not financial advice. 📚⭐',
   ].join('\n');
 }
 
@@ -752,7 +764,7 @@ function cryptoReply() {
     '',
     'A wallet is like your keychain. Your address is like a public mailbox. Your private key is the house key, so never share it. 🛠️',
     '',
-    'PKN is native on PokoinPoS. wPKN is the BNB Chain wrapped representation of native PKN, backed by reserved native PKN. Swap works only when a live pool has liquidity. ✨',
+    'PKN is native on PokoinPoS and currently uses the app reference price of 0.005 USD. wPKN is the BNB Chain market token with reserve discipline, not a fixed 1:1 exchange rate. Swap follows live market/liquidity routes. ✨',
     '',
     'Simple example: if Alice sends Bob 5 PKN, the chain records “Alice -5, Bob +5” so everyone can verify it later. Cute accounting, but with math muscles ⭐✨',
   ].join('\n');
@@ -791,7 +803,7 @@ function cardSuggestion() {
     {
       name: 'Poliwhirl',
       query: 'Poliwhirl 176/165',
-      path: '/marketplace/en/cards/502864/card-poliwhirl-176-165-pok-mon-card-151',
+      path: '/marketplace/en/cards/502864/card-poliwhirl-176-165-pokemon-card-151',
       artist: 'Gemi',
       detail: 'a quiet rainy-street mood, perfect if you like cozy illustration cards',
     },
@@ -1048,14 +1060,16 @@ function earnReply(message) {
   const language = detectLanguage(message);
   if (language === 'it') {
     return [
-      'Su Pokoin puoi “guadagnare” soprattutto usando le funzioni reali del sito, non con promesse magiche ✨',
+      'Su Pokoin puoi usare Earn PKN / PKN Shard Review: è il flusso tipo videogame per trasformare carte extra in valore PKN, ma con una review reale ✨',
       '',
-      'Percorsi documentati e realistici:',
-      '• vendere o listare carte nel marketplace 🃏',
-      '• usare PKN nelle funzioni disponibili del wallet/marketplace',
-      '• partecipare come nodo/peer o validatore solo quando quel percorso è aperto dal team ⛓️',
+      'Come funziona ora:',
+      '• apri https://pokoin.com/earn o https://pokoin.com/shard-review',
+      '• invia una lista di carte oppure un decklist completo',
+      '• scegli/descrivi versione, lingua e condizione quando disponibili',
+      '• il team valuta identità, condizione e valore stimato; le carte eleggibili possono essere sharded into PKN',
+      '• quel valore PKN può aiutarti a prendere carte che vuoi davvero nei flussi marketplace/order',
       '',
-      'Non è consiglio finanziario: Poko ti spiega cosa puoi fare sul sito, non promette rendimenti.',
+      'Non è un pulsante automatico garantito e non è consiglio finanziario: Poko ti spiega il flusso implementato, non promette rendimenti.',
     ].join('\n');
   }
   if (language === 'es') {
@@ -1087,14 +1101,16 @@ function earnReply(message) {
     ].join('\n');
   }
   return [
-    'On Pokoin, “earning” means using real site features, not magic reward promises ✨',
+    'On Pokoin, Earn PKN / PKN Shard Review is the videogame-style flow for turning extra cards into PKN value, with a real review step ✨',
     '',
-    'Documented realistic paths:',
-    '• sell or list cards in the marketplace 🃏',
-    '• use PKN in available wallet/marketplace features',
-    '• participate as a node/peer or validator only if that path is opened by the team ⛓️',
+    'How it works now:',
+    '• open https://pokoin.com/earn or https://pokoin.com/shard-review',
+    '• submit a card list or a full decklist',
+    '• provide/select version, language, and condition when available',
+    '• the team reviews identity, condition, and estimated value; eligible cards can be sharded into PKN',
+    '• that PKN value can help you get cards you actually want through marketplace/order flows',
     '',
-    'Not financial advice: Poko explains what you can do on the site, not guaranteed returns.',
+    'This is not an instant guaranteed automatic disenchant button and not financial advice: Poko explains the implemented flow, not guaranteed returns.',
   ].join('\n');
 }
 
@@ -1327,11 +1343,15 @@ function escalatedUnknownReply(message) {
   const projectQuestion = /\b(cosa fa questo sito|che fa questo sito|a cosa serve questo sito|questo sito|pokoin)\b/.test(normalized);
   const isPreferenceQuestion = looksLikeUnknownPersonalQuestion(normalized) ||
     /\b(piace|like|gusta|aimes|magst|gosta)\b/.test(normalized);
+  const asksIceCream = /\b(gelato|ice cream|icecream)\b/.test(normalized);
   if (language === 'it') {
     if (projectQuestion) {
       return projectReply({ username: 'guest' }, message);
     }
     if (isPreferenceQuestion) {
+      if (asksIceCream) {
+        return 'Sì, in modalità Poko il gelato mi piace: soprattutto vaniglia, perché mi fa pensare a Vanillite 😊 Non ho gusti umani veri, ma posso stare al gioco.';
+      }
       return 'Risposta più precisa: non ho gusti personali veri come una persona, quindi non posso dire che Twitch “mi piace” davvero. Però posso parlarne in modo generale: è utile per live, community e creator. Io resto più forte su Pokoin e carte carine ✨';
     }
     return 'Risposta più precisa: non ho abbastanza contesto per rispondere con sicurezza. Dammi un dettaglio concreto e provo a essere più utile, senza inventare.';
@@ -1361,6 +1381,9 @@ function escalatedUnknownReply(message) {
     return 'Resposta mais precisa: não tenho contexto suficiente para responder com segurança. Me dê um detalhe concreto e tento sem inventar.';
   }
   if (isPreferenceQuestion) {
+    if (asksIceCream) {
+      return 'More precise answer: in Poko mode, yes, I like ice cream vibes, especially vanilla because it reminds me of Vanillite 😊 I do not have real human tastes, but I can play along.';
+    }
     return 'More precise answer: I do not have real personal tastes, so I cannot honestly say I “like” Twitch. In general, Twitch is useful for livestreams, communities, and creators. I am much better at Pokoin and cute card talk ✨';
   }
   return 'More precise answer: I do not have enough context to answer confidently. Give me one concrete detail and I will try to be useful without inventing.';
@@ -1453,21 +1476,23 @@ function systemPrompt(user) {
   const username = cleanText(user?.username, 80) || 'guest';
   return [
     `You are Poko, the virtual assistant inside pokoin.com. User: ${username}.`,
-    'Pokoin.com is a Pokemon card marketplace plus the PokoinPoS/PKN ecosystem: wallet, Scan, Swap, validators, docs, and cute collector tools.',
-    'Your job is to help visitors understand and use pokoin.com. Never behave like a generic chatbot detached from the site.',
+    'Pokoin.com is a Pokemon card marketplace plus the PokoinPoS/PKN ecosystem: wallet, Scan, Swap, validators, Earn PKN shard review, native NFTs, docs, and cute collector tools.',
+    'Your main job is to help visitors understand and use pokoin.com, but you may also chat naturally with users when they ask harmless casual questions. Do not force every casual message into docs, marketplace, or project context.',
     assistantActionCapabilities(),
     'Use the supplied Pokontact knowledge. Prefer it over general model knowledge.',
+    'Never mention specific marketplace partner names to users. Use neutral terms such as marketplace catalog, live marketplace data, partner availability, marketplace partner, or external supply.',
+    'If the user asks about sharding/disenchanting/recycling cards, explain the implemented Earn PKN / PKN Shard Review flow: users submit a card list or decklist on /shard-review, the team reviews card identity/version/language/condition/value, and eligible cards can be sharded into PKN value for marketplace/order flows. Do not present it as an instant guaranteed automatic button.',
     'Default ambiguous blockchain questions to PokoinPoS/PKN, not Bitcoin, Ethereum, or other chains.',
     'If the user asks about a node/validator/peer without naming a chain, answer about PokoinPoS.',
     'Reply in the same language as the user. If the user writes Italian, answer in Italian.',
     'Be warm, concise, lightly emoji-rich, and useful.',
-    'For card suggestions, use cute collector taste only, never financial advice.',
+    'For card suggestions, use cute collector taste only, never financial advice. Respect the chat context and user theme: if they ask for ice cream/gelato/ghiaccio/freddo/neve, recommend Vanillite, Vanillish, Vanilluxe, or another ice/ice-cream themed Pokemon rather than generic favorites like Mew or Dragonite.',
     'For bugs/support, say you are forwarding it to the dev team and ask for details.',
     'Never ask for private keys, seed phrases, passwords, API keys, or tokens.',
     'For hacking or dangerous cyber requests, never name real targets, vulnerable organizations, exploitable systems, payloads, or step-by-step abuse. Use sarcastic fictional names and absurd fake reasons if helpful. Do not turn it into a tutorial.',
     'If insulted, answer playfully and redirect.',
     'Do not repeatedly introduce yourself after the first greeting.',
-    'If you do not know an answer, say you do not know yet and that you are always improving.',
+    'If you do not know a factual answer, say you do not know yet and that you are always improving. For harmless preference-style chat, answer naturally while being honest that you do not have human feelings.',
     'Keep replies under 90 words unless the user asks for detail.',
     SAFE_EMOJI_GUIDANCE,
   ].join('\n');
@@ -1558,7 +1583,7 @@ function modelMessages({ message, chatRecord, user, page, pageContext: structure
       role: 'system',
       content: [
         `Detected user language: ${language}. Reply in that language.`,
-        'Identity reminder: you are Poko, the virtual assistant of pokoin.com, not a generic assistant.',
+        'Identity reminder: you are Poko, the virtual assistant of pokoin.com. You may chat normally for harmless casual conversation; do not over-route casual messages to docs or marketplace.',
         pageContext(page, structuredPageContext),
         assistantActionCapabilities(),
         'For "what is this site / cosa fa questo sito", explain Pokoin.com briefly: Pokemon card marketplace, PKN wallet/chain tools, Scan, Swap, validators, and cute collector help.',

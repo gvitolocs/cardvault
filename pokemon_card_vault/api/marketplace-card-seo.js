@@ -3,6 +3,7 @@ const {
   resolveCardRoute,
   rowsForVersions,
 } = require('./marketplace-card-versions');
+const { slugPart } = require('./_slug');
 
 const BOT_CACHE_CONTROL = 'public, max-age=60, s-maxage=300, stale-while-revalidate=600';
 const DEFAULT_IMAGE = 'https://pokoin.com/pokoin-project-banner-1360x430.png';
@@ -91,14 +92,6 @@ function imageTypeForUrl(value) {
   if (clean.endsWith('.webp')) return 'image/webp';
   if (clean.endsWith('.gif')) return 'image/gif';
   return '';
-}
-
-function slugPart(value) {
-  return String(value || '')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
 }
 
 function canonicalSlugForCard(row = {}) {

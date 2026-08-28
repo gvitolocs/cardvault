@@ -3,6 +3,9 @@ const test = require('node:test');
 
 const {
   aggregateNameTokenRows,
+  compactName,
+  nameTokens,
+  normalizedName,
   normalizeSourceRow,
   parseArgs,
   parseLanguages,
@@ -49,6 +52,10 @@ test('parseLanguages rejects unsupported languages', () => {
   assert.throws(() => parseLanguages('en,ko'), /Unsupported language/);
 });
 
+test('parseLanguages supports TCGdex-backed non-European languages', () => {
+  assert.deepEqual(parseLanguages('id,th,zh-cn,zh-tw'), ['id', 'th', 'zh-cn', 'zh-tw']);
+});
+
 test('parseArgs rejects unknown sync transports', () => {
   assert.throws(() => parseArgs(['--transport=ftp']), /--transport must be one of/);
 });
@@ -78,6 +85,35 @@ test('normalizeSourceRow keeps only compact name-index fields', () => {
   assert.equal(row.search_weight, 42.5);
   assert.equal(row.set_name, 'Paldean Fates');
 });
+
+test('sync compact helpers fold accents for Supabase token rows', () => {
+  assert.equal(compactName('Pokédex'), 'pokedex');
+  assert.equal(normalizedName('Pokémon Flabébé'), 'pokemon flabebe');
+  assert.deepEqual(nameTokens('Pokédex Black & White'), ['black', 'pokedex', 'white']);
+});
+
+test('aggregateNameTokenRows stores accent-folded compact fields', () => {
+  const [aggregated] = aggregateNameTokenRows([
+    normalizeSourceRow({
+      card_id: 1,
+      language: 'en',
+      display_name: 'Pokédex',
+      canonical_name: 'Pokédex',
+      search_name: 'Pokédex',
+      normalized_name: 'pokédex',
+      compact_name: 'pokédex',
+      name_tokens: ['pokédex'],
+      set_name: 'Black & White',
+      card_number: '98/114',
+      search_weight: 10,
+    }),
+  ]);
+
+  assert.equal(aggregated.normalized_name, 'pokedex');
+  assert.equal(aggregated.compact_name, 'pokedex');
+  assert.deepEqual(aggregated.name_tokens, ['pokedex']);
+});
+
 
 test('aggregateNameTokenRows stores one row per language and compact search name', () => {
   const rows = [
@@ -188,6 +224,8 @@ test('source SQL stores fallback rows under requested language', () => {
   assert.match(sql, /c\.product_type = 'card'/);
   assert.match(sql, /c\.item_kind <> 'product'/);
   assert.match(sql, /left join localized l\s+on l\.name = c\.name/);
+  assert.match(sql, /from public\.marketplace_card_name_translations translations/);
+  assert.match(sql, /translations\.language = \$1::text/);
   assert.match(sql, /select distinct on \(c\.card_id, \$1::text, coalesce\(nullif\(l\.localized_name, ''\), c\.name\)\)/);
   assert.match(sql, /\$1::text as language/);
   assert.doesNotMatch(sql, /distinct on \(c\.card_id, l\.language, l\.localized_name\)/);

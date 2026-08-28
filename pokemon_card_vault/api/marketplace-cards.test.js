@@ -114,3 +114,17 @@ test('marketplace cards product facets group singles and product types', async (
   assert.match(capturedSql, /group by 1/);
   assert.match(capturedSql, /marketplace_search_candidates\.name ilike/);
 });
+
+test('marketplace cards search clause uses selected Italian language', async () => {
+  let capturedValues = [];
+  await productFacetRows({
+    query: 'camilla',
+    searchLanguage: 'it',
+    dbQuery: async (_sql, values) => {
+      capturedValues = values;
+      return { rows: [] };
+    },
+  });
+
+  assert.equal(capturedValues[1], 'it');
+});

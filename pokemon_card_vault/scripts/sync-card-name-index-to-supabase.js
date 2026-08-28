@@ -7,7 +7,7 @@ const { Pool } = require('pg');
 const ROOT_DIR = path.resolve(__dirname, '..');
 const DEFAULT_BATCH_SIZE = 1000;
 const DEFAULT_PAGE_SIZE = 5000;
-const SUPPORTED_LANGUAGES = ['en', 'it', 'fr', 'de', 'es', 'pt', 'ja', 'zh-cn', 'zh-tw'];
+const SUPPORTED_LANGUAGES = ['en', 'it', 'fr', 'de', 'es', 'pt', 'id', 'th', 'ja', 'zh-cn', 'zh-tw'];
 const TARGET_TABLE = 'marketplace_card_name_tokens';
 const REPRESENTATIVE_LABEL_LIMIT = 32;
 const CARD_ID_LIMIT = 512;
@@ -185,8 +185,30 @@ function sourceRowsSql({ incrementalSince }) {
         )
     ),
     localized as (
-      select *
-      from public.marketplace_card_names_for_language($1::text)
+      select
+        names.language,
+        names.name,
+        names.localized_name,
+        names.normalized_name,
+        names.compact_name,
+        names.name_tokens,
+        names.source,
+        names.source_card_id,
+        names.updated_at
+      from public.marketplace_card_names_for_language($1::text) names
+      union all
+      select
+        translations.language,
+        translations.name,
+        translations.localized_name,
+        translations.normalized_localized_name as normalized_name,
+        translations.compact_localized_name as compact_name,
+        translations.localized_name_tokens as name_tokens,
+        translations.source,
+        translations.source_card_id,
+        translations.updated_at
+      from public.marketplace_card_name_translations translations
+      where translations.language = $1::text
     )
     select distinct on (c.card_id, $1::text, coalesce(nullif(l.localized_name, ''), c.name))
       c.card_id,
@@ -272,13 +294,40 @@ function sourceRowSort(left, right, searchName = '') {
     String(left.card_id || '').localeCompare(String(right.card_id || ''));
 }
 
+function foldDiacritics(value) {
+  return String(value || '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
 function compactName(value) {
-  return String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  return foldDiacritics(value).toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function normalizedName(value) {
+  return foldDiacritics(value).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function nameTokens(value) {
+  return [...new Set(normalizedName(value).split(/\s+/).filter((token) =>
+    token &&
+    (token.length >= 2 || token === 'v' || /^[0-9]+$/.test(token))))].sort();
+}
+
+function normalizeSearchFields(row) {
+  const sourceName = row.search_name || row.canonical_name || row.display_name;
+  return {
+    ...row,
+    normalized_name: normalizedName(sourceName),
+    compact_name: compactName(sourceName),
+    name_tokens: nameTokens(sourceName),
+  };
 }
 
 function aggregateNameTokenRows(rows) {
   const groups = new Map();
-  for (const row of rows || []) {
+  for (const rawRow of rows || []) {
+    const row = normalizeSearchFields(rawRow);
     if (!row.language || !row.search_name || !row.compact_name || !row.card_id) continue;
     const key = `${row.language}\0${row.compact_name}`;
     if (!groups.has(key)) groups.set(key, []);
@@ -632,4 +681,7 @@ module.exports = {
   sourceRowsSql,
   upsertNameIndexSql,
   upsertValues,
+  compactName,
+  normalizedName,
+  nameTokens,
 };

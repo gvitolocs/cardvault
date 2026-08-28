@@ -1,9 +1,11 @@
+create extension if not exists unaccent with schema public;
+
 create or replace function public.marketplace_search_normalize(value text)
 returns text
 language sql
 immutable
 as $$
-  select trim(regexp_replace(lower(coalesce(value, '')), '[^a-z0-9]+', ' ', 'g'));
+  select trim(regexp_replace(lower(public.unaccent(coalesce(value, ''))), '[^a-z0-9]+', ' ', 'g'));
 $$;
 
 create or replace function public.marketplace_search_compact(value text)
@@ -11,7 +13,7 @@ returns text
 language sql
 immutable
 as $$
-  select regexp_replace(lower(coalesce(value, '')), '[^a-z0-9]', '', 'g');
+  select regexp_replace(lower(public.unaccent(coalesce(value, ''))), '[^a-z0-9]', '', 'g');
 $$;
 
 create or replace function public.marketplace_search_tokenize(value text)
@@ -26,6 +28,14 @@ as $$
     where token <> ''
       and (length(token) >= 2 or token = 'v' or token ~ '^[0-9]+$')
   ) tokens;
+$$;
+
+create or replace function public.marketplace_url_slug_part(value text)
+returns text
+language sql
+immutable
+as $$
+  select trim(both '-' from regexp_replace(replace(lower(coalesce(value, '')), 'é', 'e'), '[^a-z0-9]+', '-', 'g'));
 $$;
 
 create or replace function public.marketplace_edit_distance(left_text text, right_text text)
@@ -84,6 +94,7 @@ set search_path = public
 as $$
 declare
   refreshed_count integer;
+  reset_count integer;
 begin
   insert into public.marketplace_variations (
     variation_key, label, aliases, normalized_aliases, compact_aliases, updated_at
@@ -175,6 +186,11 @@ begin
         select name as alias, name as expansion_name, 'expansion_name'::text as source, 300 as priority
         from public.cardtrader_pokemon_expansions
         where name <> ''
+        union all
+        select localized_name as alias, expansion_name, source || '_localized_expansion', 45 as priority
+        from public.marketplace_expansion_name_translations
+        where coalesce(localized_name, '') <> ''
+          and coalesce(expansion_name, '') <> ''
         union all
         select code as alias, name as expansion_name, 'cardtrader_code'::text as source, 160 as priority
         from public.cardtrader_pokemon_expansions
@@ -305,9 +321,9 @@ as $$
   select case
     when has_collector_number
     then 'card'
-    when name ~ '(^|[^a-z0-9])(coin|sleeves|sleeve|playmat|binder|portfolio|divider|dividers|accessory)([^a-z0-9]|$)'
-      or category ~ '(^|[^a-z0-9])(coin|sleeves|sleeve|playmat|binder|portfolio|divider|dividers|accessory)([^a-z0-9]|$)'
-      or type ~ '(^|[^a-z0-9])(coin|sleeves|sleeve|playmat|binder|portfolio|divider|dividers|accessory)([^a-z0-9]|$)'
+    when name ~ '(^|[^a-z0-9])(coin|sleeves|sleeve|playmat|binder|portfolio|divider|dividers|accessory|bag|shoulder bag)([^a-z0-9]|$)'
+      or category ~ '(^|[^a-z0-9])(coin|sleeves|sleeve|playmat|binder|portfolio|divider|dividers|accessory|bag|shoulder bag)([^a-z0-9]|$)'
+      or type ~ '(^|[^a-z0-9])(coin|sleeves|sleeve|playmat|binder|portfolio|divider|dividers|accessory|bag|shoulder bag)([^a-z0-9]|$)'
     then 'accessory'
     when name ~ '(^|[^a-z0-9])(booster box|display box|sealed box)([^a-z0-9]|$)'
       or category ~ '(^|[^a-z0-9])(booster box|display box|sealed box)([^a-z0-9]|$)'
@@ -333,9 +349,9 @@ as $$
       or category ~ '(^|[^a-z0-9])(premium collection|special collection|collection box|box set|gift box|card frame box|frame box|collection|collector.?s? chest|empty mini|blister|case|toolkit|figure|pin)([^a-z0-9]|$)'
       or type ~ '(^|[^a-z0-9])(premium collection|special collection|collection box|box set|gift box|card frame box|frame box|collection|collector.?s? chest|empty mini|blister|case|toolkit|figure|pin)([^a-z0-9]|$)'
     then 'collection_box'
-    when name ~ '(^|[^a-z0-9])(theme deck|starter deck|battle deck|deck)([^a-z0-9]|$)'
-      or category ~ '(^|[^a-z0-9])(theme deck|starter deck|battle deck|deck)([^a-z0-9]|$)'
-      or type ~ '(^|[^a-z0-9])(theme deck|starter deck|battle deck|deck)([^a-z0-9]|$)'
+    when name ~ '(^|[^a-z0-9])(theme decks?|starter decks?|battle decks?|decks?)([^a-z0-9]|$)'
+      or category ~ '(^|[^a-z0-9])(theme decks?|starter decks?|battle decks?|decks?)([^a-z0-9]|$)'
+      or type ~ '(^|[^a-z0-9])(theme decks?|starter decks?|battle decks?|decks?)([^a-z0-9]|$)'
     then 'deck'
     when is_championship_set and not has_collector_number and (not has_version or looks_like_blueprint_number)
     then 'championship_deck'
@@ -621,112 +637,6 @@ as $$
   from palette;
 $$;
 
-create or replace function public.marketplace_card_emoji(
-  card_type text,
-  card_name text,
-  rarity text default '',
-  product_variant text default ''
-)
-returns text
-language sql
-immutable
-as $$
-  with normalized as (
-    select
-      coalesce(nullif(public.marketplace_palette_key(card_type, card_name, rarity, product_variant), ''), 'fallback') as palette_key,
-      lower(concat_ws(' ', card_name, rarity, product_variant)) as text,
-      lower(coalesce(card_name, '')) as name_text,
-      abs(hashtext(lower(coalesce(card_name, '')))) as name_hash
-  ),
-  parts as (
-    select
-      case
-        when text ~ '(numel|camerupt)' then '🐫'
-        when text ~ '(carvanha|sharpedo)' then '🦈'
-        when text ~ '(zubat|golbat|crobat|noibat|noivern|woobat|swoobat)' then '🦇'
-        when text ~ '(caterpie|metapod|butterfree|weedle|kakuna|beedrill|pinsir|scyther|scizor|heracross|yanma|yanmega|wurmple|silcoon|cascoon|beautifly|dustox|kricketot|kricketune|burmy|wormadam|mothim|combee|vespiquen|sewaddle|swadloon|leavanny|venipede|whirlipede|scolipede|dwebble|crustle|joltik|galvantula|larvesta|volcarona|grubbin|charjabug|vikavolt|cutiefly|ribombee|sizzlipede|centiskorch|tarountula|spidops|nymble|lokix|rellor|rabsca)' then '🐛'
-        when text ~ '(ekans|arbok|seviper|snivy|servine|serperior|silicobra|sandaconda)' then '🐍'
-        when text ~ '(magikarp|goldeen|seaking|qwilfish|remoraid|octillery|feebas|milotic|basculin|wishiwashi|bruxish|arrokuda|barraskewda|finizen|palafin|veluza|dondozo|chi-yu)' then '🐟'
-        when text ~ '(squirtle|wartortle|blastoise|torkoal|turtwig|grotle|torterra|chewtle|drednaw)' then '🐢'
-        when text ~ '(psyduck|golduck|farfetch|ducklett|swanna|quaxly|quaxwell|quaquaval)' then '🦆'
-        when text ~ '(pidgey|pidgeotto|pidgeot|spearow|fearow|doduo|dodrio|hoothoot|noctowl|natu|xatu|taillow|swellow|wingull|pelipper|starly|staravia|staraptor|pidove|tranquill|unfezant|rufflet|braviary|fletchling|fletchinder|talonflame|pikipek|trumbeak|toucannon|rookidee|corvisquire|corviknight|cramorant|wattrel|kilowattrel|bombirdier|flamigo)' then '🪽'
-        when text ~ '(meowth|persian|skitty|delcatty|glameow|purugly|purrloin|liepard|litten|torracat|incineroar|sprigatito|floragato|meowscarada)' then '🐱'
-        when text ~ '(growlithe|arcanine|houndour|houndoom|poochyena|mightyena|rockruff|lycanroc|yamper|boltund|fidough|dachsbun|greavard|houndstone)' then '🐶'
-        when text ~ '(pikachu|raichu|pichu|plusle|minun|pachirisu|emolga|dedenne|togedemaru|morpeko|pawmi|pawmo|pawmot)' then '🐭'
-        when text ~ '(rattata|raticate|sentret|furret|zigzagoon|linoone|bidoof|bibarel|patrat|watchog|skwovet|greedent|lechonk|oinkologne)' then '🐾'
-        when text ~ '(ponyta|rapidash|mudbray|mudsdale|glastrier|spectrier|koraidon|miraidon)' then '🐴'
-        when text ~ '(mankey|primeape|aipom|ambipom|chimchar|monferno|infernape|panpour|simipour|pansage|simisage|pansear|simisear|grookey|thwackey|rillaboom|zarude)' then '🐵'
-        when text ~ '(teddiursa|ursaring|cubchoo|beartic|stufful|bewear|ursaluna)' then '🐻'
-        when text ~ '(eevee|vaporeon|jolteon|flareon|espeon|umbreon|leafeon|glaceon|sylveon|vulpix|ninetales|fennekin|braixen|delphox|nickit|thievul|zorua|zoroark|fennekin)' then '🦊'
-        when text ~ '(charizard|charmander|charmeleon|dratini|dragonair|dragonite|rayquaza|salamence|bagon|shelgon|gible|gabite|garchomp|axew|fraxure|haxorus|druddigon|deino|zweilous|hydreigon|goomy|sliggoo|goodra|jangmo-o|hakamo-o|kommo-o|duraludon|dracozolt|dracovish|regidrago|frigibax|arctibax|baxcalibur)' then '🐉'
-        when text ~ '(mewtwo|mew|abra|kadabra|alakazam|drowzee|hypno|mr\. mime|jynx|espeon|ralts|kirlia|gardevoir|gallade|solosis|duosion|reuniclus|gothita|gothorita|gothitelle|elgyem|beheeyem|hatenna|hattrem|hatterene)' then '🔮'
-        when text ~ '(bulbasaur|ivysaur|venusaur|oddish|gloom|vileplume|bellsprout|weepinbell|victreebel|exeggcute|exeggutor|chikorita|bayleef|meganium|treecko|grovyle|sceptile|seedot|nuzleaf|shiftry|budew|roselia|roserade|cherubi|cherrim|carnivine|snover|abomasnow|petilil|lilligant|maractus|chespin|quilladin|chesnaught|bounsweet|steenee|tsareena|smoliv|dolliv|arboliva)' then '🌿'
-        when text ~ '(diglett|dugtrio|sandshrew|sandslash|geodude|graveler|golem|onix|cubone|marowak|rhyhorn|rhydon|rhyperior|phanpy|donphan|larvitar|pupitar|tyranitar|nosepass|probopass|hippopotas|hippowdon|drilbur|excadrill|sandile|krokorok|krookodile|mudbray|mudsdale|silicobra|sandaconda|orthworm)' then '🪨'
-        when text ~ '(gastly|haunter|gengar|misdreavus|mismagius|sableye|shuppet|banette|duskull|dusclops|dusknoir|drifloon|drifblim|spiritomb|litwick|lampent|chandelure|phantump|trevenant|pumpkaboo|gourgeist|mimikyu|sinistea|polteageist|dreepy|drakloak|dragapult|annihilape|greavard|houndstone)' then '👻'
-        when text ~ '(muk|grimer|koffing|weezing|trubbish|garbodor|skrelp|dragalge|toxapex|mareanie|toxel|toxtricity|glimmet|glimmora)' then '☠️'
-        when text ~ '(magnemite|magneton|magnezone|voltorb|electrode|beldum|metang|metagross|bronzor|bronzong|klink|klang|klinklang|honedge|doublade|aegislash|klefki|togedemaru|meltan|melmetal|cufant|copperajah|tinkatink|tinkatuff|tinkaton)' then '⚙️'
-        when text ~ '(ditto|castform|rotom|unown|porygon|porygon2|porygon-z|smeargle|kecleon|zorua|zoroark|mimikyu)' then '🌀'
-        when text ~ '(snorlax|munchlax|slaking|slakoth|vigoroth|komala|drowzee|hypno)' then '💤'
-        when text ~ '(chansey|blissey|happiny|audino|alomomola|indeedee|clefairy|clefable|cleffa|igglybuff|jigglypuff|wigglytuff|togepi|togetic|togekiss)' then '💖'
-        when text ~ '(articuno|zapdos|moltres|raikou|entei|suicune|lugia|ho-oh|celebi|groudon|kyogre|rayquaza|jirachi|deoxys|dialga|palkia|giratina|darkrai|shaymin|arceus|victini|reshiram|zekrom|kyurem|xerneas|yveltal|zygarde|diancie|hoopa|volcanion|cosmog|cosmoem|solgaleo|lunala|necrozma|zacian|zamazenta|eternatus|calyrex|miraidon|koraidon)' then '🌟'
-        else ''
-      end as pokemon_emoji_a,
-      case
-        when text ~ '(numel|camerupt)' then '🌋'
-        when text ~ '(carvanha|sharpedo)' then '🌊'
-        when text ~ '(zubat|golbat|crobat|noibat|noivern|woobat|swoobat)' then '🌙'
-        when text ~ '(caterpie|metapod|butterfree|weedle|kakuna|beedrill|pinsir|scyther|scizor|heracross|yanma|yanmega|wurmple|silcoon|cascoon|beautifly|dustox|kricketot|kricketune|burmy|wormadam|mothim|combee|vespiquen|sewaddle|swadloon|leavanny|venipede|whirlipede|scolipede|dwebble|crustle|joltik|galvantula|larvesta|volcarona|grubbin|charjabug|vikavolt|cutiefly|ribombee|sizzlipede|centiskorch|tarountula|spidops|nymble|lokix|rellor|rabsca)' then '🪽'
-        when text ~ '(ekans|arbok|seviper|snivy|servine|serperior|silicobra|sandaconda)' then '🌿'
-        when text ~ '(magikarp|goldeen|seaking|qwilfish|remoraid|octillery|feebas|milotic|basculin|wishiwashi|bruxish|arrokuda|barraskewda|finizen|palafin|veluza|dondozo|chi-yu)' then '🌊'
-        when text ~ '(meowth|persian|skitty|delcatty|glameow|purugly|purrloin|liepard|litten|torracat|incineroar|sprigatito|floragato|meowscarada)' then '✨'
-        when text ~ '(growlithe|arcanine|houndour|houndoom|poochyena|mightyena|rockruff|lycanroc|yamper|boltund|fidough|dachsbun|greavard|houndstone)' then '🐾'
-        when text ~ '(pikachu|raichu|pichu|plusle|minun|pachirisu|emolga|dedenne|togedemaru|morpeko|pawmi|pawmo|pawmot)' then '⚡'
-        when text ~ '(eevee|vaporeon|jolteon|flareon|espeon|umbreon|leafeon|glaceon|sylveon|vulpix|ninetales|fennekin|braixen|delphox|nickit|thievul|zorua|zoroark)' then '✨'
-        when text ~ '(charizard|charmander|charmeleon|dratini|dragonair|dragonite|rayquaza|salamence|bagon|shelgon|gible|gabite|garchomp|axew|fraxure|haxorus|druddigon|deino|zweilous|hydreigon|goomy|sliggoo|goodra|jangmo-o|hakamo-o|kommo-o|duraludon|dracozolt|dracovish|regidrago|frigibax|arctibax|baxcalibur)' then '🔥'
-        when text ~ '(gastly|haunter|gengar|misdreavus|mismagius|sableye|shuppet|banette|duskull|dusclops|dusknoir|drifloon|drifblim|spiritomb|litwick|lampent|chandelure|phantump|trevenant|pumpkaboo|gourgeist|mimikyu|sinistea|polteageist|dreepy|drakloak|dragapult|annihilape|greavard|houndstone)' then '🌫️'
-        when text ~ '(muk|grimer|koffing|weezing|trubbish|garbodor|skrelp|dragalge|toxapex|mareanie|toxel|toxtricity|glimmet|glimmora)' then '🧪'
-        when text ~ '(snorlax|munchlax|slaking|slakoth|vigoroth|komala|drowzee|hypno)' then '🌙'
-        when text ~ '(chansey|blissey|happiny|audino|alomomola|indeedee|clefairy|clefable|cleffa|igglybuff|jigglypuff|wigglytuff|togepi|togetic|togekiss)' then '✨'
-        else ''
-      end as pokemon_emoji_b,
-      case
-        when text ~ '(promo|stamped|stamp)' then '🎟️'
-        when text ~ '(special illustration rare|special art rare|illustration rare|art rare|alternate art|alt art|full[- ]?art)' then '🎨'
-        when text ~ '(gold secret|secret rare|hyper rare|gold)' then '🏆'
-        when text ~ '(holo|foil|reverse)' then '✨'
-        when text ~ '(^|[^a-z0-9])(vmax|v max)([^a-z0-9]|$)' then '👑'
-        when text ~ '(^|[^a-z0-9])(vstar|v star)([^a-z0-9]|$)' then '🌟'
-        when text ~ '(^|[^a-z0-9])(gx|g x)([^a-z0-9]|$)' then '💥'
-        when text ~ '(^|[^a-z0-9])(ex|e x)([^a-z0-9]|$)' then '💎'
-        when text ~ '(^|[^a-z0-9])(lv\.?x|lv x|level x)([^a-z0-9]|$)' then '⬆️'
-        when text ~ '(^|[^a-z0-9])v([^a-z0-9]|$)' then '🛡️'
-        when text ~ '(gold star|goldstar)' then '🌟'
-        when text ~ '(shining|shiny)' then '✨'
-        when text ~ '(radiant)' then '🌈'
-        when text ~ '(mega)' then '🔺'
-        when text ~ '(delta)' then '🔻'
-        when text ~ '(tag team|tagteam)' then '🤝'
-        when text ~ '(prime)' then '🏅'
-        when text ~ '(^|[^a-z0-9])break([^a-z0-9]|$)' then '⚡'
-        when text ~ '(^|[^a-z0-9])rare([^a-z0-9]|$)' then '⭐'
-        when text ~ '(^|[^a-z0-9])uncommon([^a-z0-9]|$)' then '🔷'
-        when text ~ '(^|[^a-z0-9])common([^a-z0-9]|$)' then '⚪'
-        else ''
-      end as variant_emoji
-    from normalized
-  )
-  select concat_ws(' ', nullif(pokemon_emoji_a, ''), nullif(pokemon_emoji_b, ''), nullif(variant_emoji, ''))
-  from parts;
-$$;
-
-create or replace function public.marketplace_card_name_emoji(card_name text)
-returns text
-language sql
-immutable
-as $$
-  select public.marketplace_card_emoji('', card_name, '', '');
-$$;
-
 create or replace function public.marketplace_card_variant_emoji(
   card_name text default '',
   rarity text default '',
@@ -740,9 +650,11 @@ as $$
     select lower(concat_ws(' ', card_name, rarity, product_variant)) as text
   )
   select case
+    when text ~ '(1st edition|first edition)' then '🥇'
+    when text ~ '(shadowless)' then '🕰️'
     when text ~ '(promo|stamped|stamp)' then '🎟️'
     when text ~ '(special illustration rare|special art rare|illustration rare|art rare|alternate art|alt art|full[- ]?art)' then '🎨'
-    when text ~ '(gold secret|secret rare|hyper rare|gold)' then '🏆'
+    when text ~ '(gold secret|secret rare|hyper rare|(^|[^a-z0-9])gold([^a-z0-9]|$))' then '🏆'
     when text ~ '(holo|foil|reverse)' then '✨'
     when text ~ '(^|[^a-z0-9])(vmax|v max)([^a-z0-9]|$)' then '👑'
     when text ~ '(^|[^a-z0-9])(vstar|v star)([^a-z0-9]|$)' then '🌟'
@@ -764,6 +676,409 @@ as $$
     else ''
   end
   from normalized;
+$$;
+
+create or replace function public.marketplace_card_identity_emoji(
+  card_type text,
+  card_name text,
+  rarity text default '',
+  product_variant text default ''
+)
+returns text
+language sql
+stable
+as $$
+  with normalized as (
+    select
+      lower(coalesce(card_name, '')) as text,
+      ' ' || regexp_replace(lower(coalesce(card_name, '')), '[^a-z0-9é]+', ' ', 'g') || ' ' as token_text,
+      lower(coalesce(card_name, '')) as name_text
+  ),
+  rule_match as (
+    select concat_ws(' ', nullif(r.emoji_a, ''), nullif(r.emoji_b, '')) as emoji
+    from public.marketplace_card_emoji_rules r, normalized n
+    where lower(r.name) = n.name_text
+    limit 1
+  ),
+  parts as (
+    select
+      case
+        when text ~ '(aerodactyl|kabuto|kabutops|omanyte|omastar|lileep|cradily|anorith|armaldo|cranidos|rampardos|shieldon|bastiodon|tirtouga|carracosta|archen|archeops|tyrunt|tyrantrum|amaura|aurorus|dracozolt|arctozolt|dracovish|arctovish)' then '🦖'
+        when text ~ '(numel|camerupt)' then '🐫'
+        when text ~ '(carvanha|sharpedo)' then '🦈'
+        when text ~ '(zubat|golbat|crobat|noibat|noivern|woobat|swoobat)' then '🦇'
+        when text ~ '(caterpie|metapod|butterfree|weedle|kakuna|beedrill|pinsir|scyther|scizor|heracross|yanma|yanmega|wurmple|silcoon|cascoon|beautifly|dustox|kricketot|kricketune|burmy|wormadam|mothim|combee|vespiquen|sewaddle|swadloon|leavanny|venipede|whirlipede|scolipede|dwebble|crustle|joltik|galvantula|larvesta|volcarona|grubbin|charjabug|vikavolt|cutiefly|ribombee|sizzlipede|centiskorch|tarountula|spidops|nymble|lokix|rellor|rabsca)' then '🐛'
+        when text ~ '(ekans|arbok|seviper|snivy|servine|serperior|silicobra|sandaconda)' then '🐍'
+        when text ~ '(magikarp|goldeen|seaking|qwilfish|remoraid|octillery|feebas|milotic|basculin|wishiwashi|bruxish|arrokuda|barraskewda|finizen|palafin|veluza|dondozo|chi-yu|horsea|seadra|kingdra|totodile|croconaw|feraligatr|oshawott|dewott|samurott|popplio|brionne|primarina|finneon|lumineon|lapras|marill|azumarill|wailmer|wailord|staryu|starmie|spheal|sealeo|walrein)' then '🐟'
+        when text ~ '(vanillite|vanillish|vanilluxe|snorunt|glalie|froslass|frosmoth|eiscue|swinub|piloswine|mamoswine|cubchoo|beartic)' then '❄️'
+        when text ~ '(squirtle|wartortle|blastoise|torkoal|turtwig|grotle|torterra|chewtle|drednaw|terapagos)' then '🐢'
+        when text ~ '(psyduck|golduck|farfetch|ducklett|swanna|quaxly|quaxwell|quaquaval)' then '🦆'
+        when text ~ '(pidgey|pidgeotto|pidgeot|spearow|fearow|doduo|dodrio|hoothoot|noctowl|natu|xatu|taillow|swellow|wingull|pelipper|starly|staravia|staraptor|pidove|tranquill|unfezant|rufflet|braviary|fletchling|fletchinder|talonflame|pikipek|trumbeak|toucannon|rookidee|corvisquire|corviknight|cramorant|wattrel|kilowattrel|bombirdier|flamigo|delibird|oricorio|tornadus)' then '🪽'
+        when text ~ '(meowth|persian|skitty|delcatty|glameow|purugly|purrloin|liepard|litten|torracat|incineroar|sprigatito|floragato|meowscarada)' then '🐱'
+        when text ~ '(growlithe|arcanine|houndour|houndoom|poochyena|mightyena|rockruff|lycanroc|yamper|boltund|fidough|dachsbun|greavard|houndstone|maschiff|mabosstiff)' then '🐶'
+        when text ~ '(shinx|luxio|luxray|electrike|manectric|zeraora|xurkitree|thundurus|helioptile|heliolisk|mareep|flaaffy|ampharos|electabuzz|electivire|regieleki)' then '⚡'
+        when text ~ '(pikachu|raichu|pichu|plusle|minun|pachirisu|emolga|dedenne|togedemaru|morpeko|pawmi|pawmo|pawmot)' then '🐭'
+        when text ~ '(tauros|miltank|bouffalant)' then '🐂'
+        when text ~ '(buneary|lopunny|bunnelby|diggersby|azumarill|marill)' then '🐰'
+        when text ~ '(rattata|raticate|sentret|furret|zigzagoon|linoone|bidoof|bibarel|patrat|watchog|skwovet|greedent|lechonk|oinkologne)' then '🐾'
+        when text ~ '(ponyta|rapidash|mudbray|mudsdale|glastrier|spectrier|koraidon|miraidon)' then '🐴'
+        when text ~ '(mankey|primeape|aipom|ambipom|chimchar|monferno|infernape|panpour|simipour|pansage|simisage|pansear|simisear|grookey|thwackey|rillaboom|zarude)' then '🐵'
+        when text ~ '(teddiursa|ursaring|cubchoo|beartic|stufful|bewear|ursaluna)' then '🐻'
+        when text ~ '(hawlucha|makuhita|hariyama|buzzwole|machop|machoke|machamp|riolu|lucario|meditite|medicham|hitmonlee|hitmonchan|hitmontop|mienshao|mienfoo)' then '🥊'
+        when text ~ '(trapinch|vibrava|flygon)' then '🐜'
+        when text ~ '(gligar|gliscor|skorupi|drapion)' then '🦂'
+        when text ~ '(shroomish|breloom|brute bonnet|foongus|amoonguss|toedscool|toedscruel)' then '🍄'
+        when text ~ '(eevee|vaporeon|jolteon|flareon|espeon|umbreon|leafeon|glaceon|sylveon|vulpix|ninetales|fennekin|braixen|delphox|nickit|thievul|zorua|zoroark)' then '🦊'
+        when text ~ '(charizard|charmander|charmeleon|armarouge|ceruledge|combusken|torchic|blaziken|scorbunny|raboot|cinderace|dratini|dragonair|dragonite|rayquaza|salamence|bagon|shelgon|gible|gabite|garchomp|axew|fraxure|haxorus|druddigon|deino|zweilous|hydreigon|goomy|sliggoo|goodra|jangmo-o|hakamo-o|kommo-o|duraludon|dracozolt|dracovish|regidrago|frigibax|arctibax|baxcalibur|latias|latios|turtonator|hydrapple|dipplin|applin|flapple|appletun)' then '🐉'
+        when text ~ '(mewtwo|mew|abra|kadabra|alakazam|chimecho|chingling|drowzee|hypno|musharna|munna|mr\. mime|jynx|espeon|ralts|kirlia|gardevoir|gallade|solosis|duosion|reuniclus|gothita|gothorita|gothitelle|elgyem|beheeyem|hatenna|hattrem|hatterene|azelf|uxie|mesprit|cresselia|necrozma)' then '🔮'
+        when text ~ '(slurpuff|swirlix)' then '🍬'
+        when text ~ '(bulbasaur|ivysaur|venusaur|oddish|gloom|vileplume|bellsprout|weepinbell|victreebel|exeggcute|exeggutor|chikorita|bayleef|meganium|treecko|grovyle|sceptile|seedot|nuzleaf|shiftry|budew|roselia|roserade|cherubi|cherrim|carnivine|snover|abomasnow|petilil|lilligant|maractus|chespin|quilladin|chesnaught|bounsweet|steenee|tsareena|smoliv|dolliv|arboliva|rowlet|dartrix|decidueye|cacnea|cacturne|cottonee|whimsicott|tangela|tangrowth|jumpluff|hoppip|skiploom|gogoat|skiddo)' then '🌿'
+        when text ~ '(barbaracle|binacle|steelix|diglett|dugtrio|sandshrew|sandslash|geodude|graveler|golem|onix|cubone|marowak|rhyhorn|rhydon|rhyperior|phanpy|donphan|roggenrola|boldore|gigalith|larvitar|pupitar|tyranitar|nosepass|probopass|hippopotas|hippowdon|drilbur|excadrill|sandile|krokorok|krookodile|mudbray|mudsdale|silicobra|sandaconda|orthworm|golett|golurk|ting-lu)' then '🪨'
+        when text ~ '(gastly|haunter|gengar|misdreavus|mismagius|sableye|shuppet|banette|duskull|dusclops|dusknoir|drifloon|drifblim|spiritomb|litwick|lampent|chandelure|phantump|trevenant|pumpkaboo|gourgeist|mimikyu|sinistea|polteageist|sinistcha|poltchageist|dreepy|drakloak|dragapult|annihilape|greavard|houndstone|golett|golurk)' then '👻'
+        when text ~ '(muk|grimer|koffing|weezing|trubbish|garbodor|skrelp|dragalge|toxapex|mareanie|toxel|toxtricity|glimmet|glimmora)' then '☠️'
+        when text ~ '(magnemite|magneton|magnezone|voltorb|electrode|beldum|metang|metagross|bronzor|bronzong|klink|klang|klinklang|honedge|doublade|aegislash|klefki|togedemaru|meltan|melmetal|cufant|copperajah|tinkatink|tinkatuff|tinkaton|varoom|revavroom|archaludon|cobalion|pawniard|bisharp|kingambit|mawile|durant)' then '⚙️'
+        when text ~ '(ditto|castform|rotom|unown|porygon|porygon2|porygon-z|smeargle|kecleon|zorua|zoroark|mimikyu|terapagos)' then '🌀'
+        when text ~ '(snorlax|munchlax|slaking|slakoth|vigoroth|komala|drowzee|hypno)' then '💤'
+        when text ~ '(chansey|blissey|happiny|audino|alomomola|indeedee|clefairy|clefable|cleffa|igglybuff|jigglypuff|wigglytuff|togepi|togetic|togekiss)' then '💖'
+        when text ~ '(articuno|zapdos|moltres|raikou|entei|suicune|lugia|ho-oh|celebi|groudon|kyogre|rayquaza|jirachi|deoxys|dialga|palkia|giratina|darkrai|shaymin|arceus|victini|reshiram|zekrom|kyurem|xerneas|yveltal|zygarde|diancie|hoopa|volcanion|cosmog|cosmoem|solgaleo|lunala|necrozma|zacian|zamazenta|eternatus|calyrex|miraidon|koraidon|cobalion|terrakion|virizion|tornadus|thundurus|landorus|latias|latios|zeraora)' then '🌟'
+        when name_text ~ '^(basic |special )?fire energy$' then '🔥'
+        when name_text ~ '^(basic |special )?water energy$' then '🌊'
+        when name_text ~ '^(basic |special )?grass energy$' then '🌿'
+        when name_text ~ '^(basic |special )?psychic energy$' then '🔮'
+        when name_text ~ '^(basic |special )?fighting energy$' then '🪨'
+        when name_text ~ '^(basic |special )?darkness energy$' then '🌙'
+        when name_text ~ '^(basic |special )?metal energy$' then '⚙️'
+        when name_text ~ '^(basic |special )?(lightning|electric) energy$' then '⚡'
+        when name_text ~ '^(basic |special )?.*energy$' then '⚡'
+        when token_text ~ ' (stadium|gym|tower|city|court|arena|lab|laboratory|factory|festival|dojo|mine|cave|forest|mountain|beach|park|ruins|shrine|temple|lake|valley|spring|plaza|school|house|castle|center|swell|grounds|road) ' then '🏟️'
+        when token_text ~ ' (professor|prof|boss|judge|worker|research|researcher|lady|lass|boy|girl|man|woman|mom|dad|fan|club|breeder|collector|fisherman|hiker|ranger|scientist|engineer|nurse|teammates|friends|clerk|student|biker|karate|black|belt|beauty|gentleman|idol|artist|camper|picnicker|sisters|siblings|mentor|guidance|adventurer|explorer|merchant|backpacker|ace|trainer|team|rocket|galactic|plasma|flare|skull|yell|aqua|magma|cipher|giovanni|misty|brock|erika|sabrina|koga|blaine|lance|cynthia|iris|lillie|marnie|hop|iono|nemona|arven|penny|clavell|jacq|diantha|colress|guzma|lusamine|gladion|hau|acerola|mallow|lana|kiawe|gordie|melony|raihan|leon|cheren|irida|skyla|carmine|kieran|klara|roxanne|gardenia|steven|phoebe|giacomo|welder|cook|bruno|wallace|olivia|chuck) ' then '🤝'
+        when token_text ~ ' (ball|switch|candy|potion|rod|catcher|search|seeker|stretcher|vacuum|treasure|medal|gain|pad|receiver|communicator|communication|mail|ticket|map|pokedex|pokédex|gear|tool|scales|band|stone|fossil|incense|rope|flute|lantern|capsule|patch|shoes|bike|bicycle|gloves|helmet|vest|cape|charm|amulet|scoop|recycler|recycle|blower|compressor|machine|device|transceiver|computer|phone|tablet|camera|spray|powder|herb|berry|candy|elixir|crystal|vessel|container|badge|pass|letter|coin|whistle|doll|hammer|shovel|mirror|scope|radar|scanner|rescue|revive) ' then '🧰'
+        else ''
+      end as emoji_a,
+      case
+        when text ~ '(aerodactyl|kabuto|kabutops|omanyte|omastar|lileep|cradily|anorith|armaldo|cranidos|rampardos|shieldon|bastiodon|tirtouga|carracosta|archen|archeops|tyrunt|tyrantrum|amaura|aurorus|dracozolt|arctozolt|dracovish|arctovish)' then '🪨'
+        when text ~ '(numel|camerupt)' then '🌋'
+        when text ~ '(carvanha|sharpedo)' then '🌊'
+        when text ~ '(zubat|golbat|crobat|noibat|noivern|woobat|swoobat)' then '🌙'
+        when text ~ '(caterpie|metapod|butterfree|weedle|kakuna|beedrill|pinsir|scyther|scizor|heracross|yanma|yanmega|wurmple|silcoon|cascoon|beautifly|dustox|kricketot|kricketune|burmy|wormadam|mothim|combee|vespiquen|sewaddle|swadloon|leavanny|venipede|whirlipede|scolipede|dwebble|crustle|joltik|galvantula|larvesta|volcarona|grubbin|charjabug|vikavolt|cutiefly|ribombee|sizzlipede|centiskorch|tarountula|spidops|nymble|lokix|rellor|rabsca)' then '🪽'
+        when text ~ '(ekans|arbok|seviper|snivy|servine|serperior|silicobra|sandaconda)' then '🌿'
+        when text ~ '(magikarp|goldeen|seaking|qwilfish|remoraid|octillery|feebas|milotic|basculin|wishiwashi|bruxish|arrokuda|barraskewda|finizen|palafin|veluza|dondozo|chi-yu|horsea|seadra|kingdra|totodile|croconaw|feraligatr|oshawott|dewott|samurott|popplio|brionne|primarina|finneon|lumineon|lapras|marill|azumarill|wailmer|wailord|staryu|starmie|spheal|sealeo|walrein)' then '🌊'
+        when text ~ '(vanillite|vanillish|vanilluxe|snorunt|glalie|froslass|frosmoth|eiscue|swinub|piloswine|mamoswine|cubchoo|beartic)' then '✨'
+        when text ~ '(meowth|persian|skitty|delcatty|glameow|purugly|purrloin|liepard|litten|torracat|incineroar|sprigatito|floragato|meowscarada)' then '✨'
+        when text ~ '(growlithe|arcanine|houndour|houndoom|poochyena|mightyena|rockruff|lycanroc|yamper|boltund|fidough|dachsbun|greavard|houndstone)' then '🐾'
+        when text ~ '(shinx|luxio|luxray|electrike|manectric|zeraora|xurkitree|thundurus|helioptile|heliolisk|mareep|flaaffy|ampharos|electabuzz|electivire|regieleki)' then '✨'
+        when text ~ '(pikachu|raichu|pichu|plusle|minun|pachirisu|emolga|dedenne|togedemaru|morpeko|pawmi|pawmo|pawmot)' then '⚡'
+        when text ~ '(buneary|lopunny|bunnelby|diggersby|azumarill|marill)' then '✨'
+        when text ~ '(eevee|vaporeon|jolteon|flareon|espeon|umbreon|leafeon|glaceon|sylveon|vulpix|ninetales|fennekin|braixen|delphox|nickit|thievul|zorua|zoroark)' then '✨'
+        when text ~ '(charizard|charmander|charmeleon|armarouge|ceruledge|combusken|torchic|blaziken|scorbunny|raboot|cinderace|dratini|dragonair|dragonite|rayquaza|salamence|bagon|shelgon|gible|gabite|garchomp|axew|fraxure|haxorus|druddigon|deino|zweilous|hydreigon|goomy|sliggoo|goodra|jangmo-o|hakamo-o|kommo-o|duraludon|dracozolt|dracovish|regidrago|frigibax|arctibax|baxcalibur|latias|latios|turtonator|hydrapple|dipplin|applin|flapple|appletun)' then '🔥'
+        when text ~ '(hawlucha|makuhita|hariyama|buzzwole|machop|machoke|machamp|riolu|lucario|meditite|medicham|hitmonlee|hitmonchan|hitmontop)' then '💥'
+        when text ~ '(gligar|gliscor|skorupi|drapion)' then '✨'
+        when text ~ '(shroomish|breloom|brute bonnet|foongus|amoonguss|toedscool|toedscruel)' then '🌿'
+        when text ~ '(gastly|haunter|gengar|misdreavus|mismagius|sableye|shuppet|banette|duskull|dusclops|dusknoir|drifloon|drifblim|spiritomb|litwick|lampent|chandelure|phantump|trevenant|pumpkaboo|gourgeist|mimikyu|sinistea|polteageist|sinistcha|poltchageist|dreepy|drakloak|dragapult|annihilape|greavard|houndstone)' then '🌫️'
+        when text ~ '(muk|grimer|koffing|weezing|trubbish|garbodor|skrelp|dragalge|toxapex|mareanie|toxel|toxtricity|glimmet|glimmora)' then '🧪'
+        when text ~ '(snorlax|munchlax|slaking|slakoth|vigoroth|komala|drowzee|hypno)' then '🌙'
+        when text ~ '(chansey|blissey|happiny|audino|alomomola|indeedee|clefairy|clefable|cleffa|igglybuff|jigglypuff|wigglytuff|togepi|togetic|togekiss)' then '✨'
+        when name_text ~ '^(basic |special )?.*energy$' then '✨'
+        when token_text ~ ' (stadium|gym|tower|city|court|arena|lab|laboratory|factory|festival|dojo|mine|cave|forest|mountain|beach|park|ruins|shrine|temple|lake|valley|spring|plaza|school|house|castle|center|swell|grounds|road) ' then '✨'
+        when token_text ~ ' (professor|prof|boss|judge|worker|research|researcher|lady|lass|boy|girl|man|woman|mom|dad|fan|club|breeder|collector|fisherman|hiker|ranger|scientist|engineer|nurse|teammates|friends|clerk|student|biker|karate|black|belt|beauty|gentleman|idol|artist|camper|picnicker|sisters|siblings|mentor|guidance|adventurer|explorer|merchant|backpacker|ace|trainer|team|rocket|galactic|plasma|flare|skull|yell|aqua|magma|cipher|giovanni|misty|brock|erika|sabrina|koga|blaine|lance|cynthia|iris|lillie|marnie|hop|iono|nemona|arven|penny|clavell|jacq|diantha|colress|guzma|lusamine|gladion|hau|acerola|mallow|lana|kiawe|gordie|melony|raihan|leon|cheren|irida|skyla|carmine|kieran|klara|roxanne|gardenia|steven|phoebe|giacomo|welder|cook|bruno|wallace) ' then '✨'
+        when token_text ~ ' (ball|switch|candy|potion|rod|catcher|search|seeker|stretcher|vacuum|treasure|medal|gain|pad|receiver|communicator|communication|mail|ticket|map|pokedex|pokédex|gear|tool|scales|band|stone|fossil|incense|rope|flute|lantern|capsule|patch|shoes|bike|bicycle|gloves|helmet|vest|cape|charm|amulet|scoop|recycler|recycle|blower|compressor|machine|device|transceiver|computer|phone|tablet|camera|spray|powder|herb|berry|candy|elixir|crystal|vessel|container|badge|pass|letter|coin|whistle|doll|hammer|shovel|mirror|scope|radar|scanner|rescue|revive) ' then '✨'
+        else ''
+      end as emoji_b
+    from normalized
+  )
+  select coalesce(
+    (select nullif(emoji, '') from rule_match),
+    (select concat_ws(' ', nullif(emoji_a, ''), nullif(emoji_b, '')) from parts)
+  );
+$$;
+
+create or replace function public.marketplace_card_accent_emoji(
+  card_type text,
+  card_name text,
+  rarity text default '',
+  product_variant text default ''
+)
+returns text
+language sql
+stable
+as $$
+  with normalized as (
+    select
+      lower(coalesce(card_name, '')) as text,
+      lower(coalesce(card_type, '')) as type_text,
+      ' ' || regexp_replace(lower(coalesce(card_name, '')), '[^a-z0-9é]+', ' ', 'g') || ' ' as token_text
+  )
+  select case
+    when text ~ '(aerodactyl|kabuto|kabutops|omanyte|omastar|lileep|cradily|anorith|armaldo|cranidos|rampardos|shieldon|bastiodon|tirtouga|carracosta|archen|archeops|tyrunt|tyrantrum|amaura|aurorus|dracozolt|arctozolt|dracovish|arctovish)' then '🦖'
+    when text ~ '(numel|camerupt|volcanion|torkoal)' then '🔥'
+    when text ~ '(carvanha|sharpedo|magikarp|goldeen|seaking|qwilfish|remoraid|octillery|feebas|milotic|basculin|wishiwashi|bruxish|arrokuda|barraskewda|finizen|palafin|veluza|dondozo|chi-yu|horsea|seadra|kingdra|totodile|croconaw|feraligatr|oshawott|dewott|samurott|popplio|brionne|primarina|finneon|lumineon|lapras|marill|azumarill|wailmer|wailord|clamperl|slowpoke|slowbro|slowking|tentacool|tentacruel|seel|dewgong|wugtrio|wiglett|crawdaunt|corphish|mantyke|mantine|jellicent|frillish)' then '🌊'
+    when text ~ '(caterpie|metapod|butterfree|weedle|kakuna|beedrill|pinsir|scyther|scizor|heracross|yanma|yanmega|wurmple|silcoon|cascoon|beautifly|dustox|kricketot|kricketune|burmy|wormadam|mothim|combee|vespiquen|sewaddle|swadloon|leavanny|venipede|whirlipede|scolipede|dwebble|crustle|joltik|galvantula|larvesta|volcarona|grubbin|charjabug|vikavolt|cutiefly|ribombee|sizzlipede|centiskorch|tarountula|spidops|nymble|lokix|rellor|rabsca|spinarak|ariados)' then '🪽'
+    when text ~ '(ekans|arbok|seviper|snivy|servine|serperior|silicobra|sandaconda)' then '🌿'
+    when text ~ '(vanillite|vanillish|vanilluxe|snorunt|glalie|froslass|eiscue|swinub|piloswine|mamoswine|cubchoo|beartic|galarian darmanitan)' then '✨'
+    when text ~ '(pidgey|pidgeotto|pidgeot|spearow|fearow|doduo|dodrio|hoothoot|noctowl|natu|xatu|taillow|swellow|wingull|pelipper|starly|staravia|staraptor|pidove|tranquill|unfezant|rufflet|braviary|fletchling|fletchinder|talonflame|pikipek|trumbeak|toucannon|rookidee|corvisquire|corviknight|cramorant|wattrel|kilowattrel|bombirdier|flamigo|delibird|oricorio|tornadus|chatot)' then '💨'
+    when text ~ '(shinx|luxio|luxray|electrike|manectric|zeraora|xurkitree|thundurus|helioptile|heliolisk|mareep|flaaffy|ampharos|electabuzz|electivire)' then '✨'
+    when text ~ '(pikachu|raichu|pichu|plusle|minun|pachirisu|emolga|dedenne|togedemaru|morpeko|pawmi|pawmo|pawmot)' then '⚡'
+    when text ~ '(growlithe|arcanine|houndour|houndoom|poochyena|mightyena|rockruff|lycanroc|yamper|boltund|fidough|dachsbun|greavard|houndstone|maschiff|mabosstiff)' then '🐾'
+    when text ~ '(buneary|lopunny|bunnelby|diggersby)' then '✨'
+    when text ~ '(rattata|raticate|sentret|furret|zigzagoon|linoone|bidoof|bibarel|patrat|watchog|skwovet|greedent|lechonk|oinkologne|minccino|cinccino|gumshoos|yungoos)' then '✨'
+    when text ~ '(ponyta|rapidash|mudbray|mudsdale|glastrier|spectrier|koraidon|miraidon)' then '💨'
+    when text ~ '(mankey|primeape|aipom|ambipom|chimchar|monferno|infernape|panpour|simipour|pansage|simisage|pansear|simisear|grookey|thwackey|rillaboom|zarude)' then '✨'
+    when text ~ '(teddiursa|ursaring|cubchoo|beartic|stufful|bewear|ursaluna)' then '✨'
+    when text ~ '(hawlucha|makuhita|hariyama|buzzwole|machop|machoke|machamp|riolu|lucario|meditite|medicham|hitmonlee|hitmonchan|hitmontop|timburr|gurdurr|conkeldurr|mienshao|mienfoo)' then '💥'
+    when text ~ '(gligar|gliscor|skorupi|drapion)' then '✨'
+    when text ~ '(shroomish|breloom|brute bonnet|foongus|amoonguss|toedscool|toedscruel)' then '🌿'
+    when text ~ '(eevee|vaporeon|jolteon|flareon|espeon|umbreon|leafeon|glaceon|sylveon|vulpix|ninetales|fennekin|braixen|delphox|nickit|thievul|zorua|zoroark)' then '✨'
+    when text ~ '(charizard|charmander|charmeleon|dratini|dragonair|dragonite|rayquaza|salamence|bagon|shelgon|gible|gabite|garchomp|axew|fraxure|haxorus|druddigon|deino|zweilous|hydreigon|goomy|sliggoo|goodra|jangmo-o|hakamo-o|kommo-o|duraludon|dracozolt|dracovish|regidrago|frigibax|arctibax|baxcalibur|latias|latios|turtonator|archaludon)' then '🔥'
+    when text ~ '(mewtwo|mew|abra|kadabra|alakazam|drowzee|hypno|mr\. mime|jynx|espeon|ralts|kirlia|gardevoir|gallade|solosis|duosion|reuniclus|gothita|gothorita|gothitelle|elgyem|beheeyem|hatenna|hattrem|hatterene|azelf|uxie|mesprit|cresselia|malamar|inkay|meloetta)' then '✨'
+    when text ~ '(bulbasaur|ivysaur|venusaur|oddish|gloom|vileplume|bellsprout|weepinbell|victreebel|exeggcute|exeggutor|chikorita|bayleef|meganium|treecko|grovyle|sceptile|seedot|nuzleaf|shiftry|budew|roselia|roserade|cherubi|cherrim|carnivine|snover|abomasnow|petilil|lilligant|maractus|chespin|quilladin|chesnaught|bounsweet|steenee|tsareena|smoliv|dolliv|arboliva|rowlet|dartrix|decidueye|cacnea|cacturne|cottonee|whimsicott|tangela|tangrowth|jumpluff|hoppip|skiploom|gogoat|skiddo|ogerpon)' then '✨'
+    when text ~ '(diglett|dugtrio|sandshrew|sandslash|geodude|graveler|golem|onix|cubone|marowak|rhyhorn|rhydon|rhyperior|phanpy|donphan|larvitar|pupitar|tyranitar|nosepass|probopass|hippopotas|hippowdon|drilbur|excadrill|sandile|krokorok|krookodile|mudbray|mudsdale|silicobra|sandaconda|orthworm|golett|golurk|ting-lu|carkol|rolycoly|coalossal|tirtouga|carracosta)' then '✨'
+    when text ~ '(gastly|haunter|gengar|misdreavus|mismagius|sableye|shuppet|banette|duskull|dusclops|dusknoir|drifloon|drifblim|spiritomb|litwick|lampent|chandelure|phantump|trevenant|pumpkaboo|gourgeist|mimikyu|sinistea|polteageist|dreepy|drakloak|dragapult|annihilape|greavard|houndstone|golett|golurk)' then '🌫️'
+    when text ~ '(muk|grimer|koffing|weezing|trubbish|garbodor|skrelp|dragalge|toxapex|mareanie|toxel|toxtricity|glimmet|glimmora|grafaiai|salandit|salazzle)' then '🧪'
+    when text ~ '(magnemite|magneton|magnezone|voltorb|electrode|beldum|metang|metagross|bronzor|bronzong|klink|klang|klinklang|honedge|doublade|aegislash|klefki|togedemaru|meltan|melmetal|cufant|copperajah|tinkatink|tinkatuff|tinkaton|varoom|revavroom|archaludon|cobalion|pawniard|bisharp|kingambit|mawile|durant|iron hands|iron treads)' then '✨'
+    when text ~ '(ditto|castform|rotom|unown|porygon|porygon2|porygon-z|smeargle|kecleon|zorua|zoroark|mimikyu|terapagos)' then '✨'
+    when text ~ '(snorlax|munchlax|slaking|slakoth|vigoroth|komala|drowzee|hypno)' then '🌙'
+    when text ~ '(chansey|blissey|happiny|audino|alomomola|indeedee|clefairy|clefable|cleffa|igglybuff|jigglypuff|wigglytuff|togepi|togetic|togekiss)' then '✨'
+    when text ~ '(articuno|zapdos|moltres|raikou|entei|suicune|lugia|ho-oh|celebi|groudon|kyogre|rayquaza|jirachi|deoxys|dialga|palkia|giratina|darkrai|shaymin|arceus|victini|reshiram|zekrom|kyurem|xerneas|yveltal|zygarde|diancie|hoopa|volcanion|cosmog|cosmoem|solgaleo|lunala|necrozma|zacian|zamazenta|eternatus|calyrex|miraidon|koraidon|cobalion|terrakion|virizion|tornadus|thundurus|landorus|latias|latios|zeraora)' then '✨'
+    when text ~ '^(basic |special )?fire energy$' then '✨'
+    when text ~ '^(basic |special )?water energy$' then '✨'
+    when text ~ '^(basic |special )?grass energy$' then '✨'
+    when text ~ '^(basic |special )?psychic energy$' then '✨'
+    when text ~ '^(basic |special )?fighting energy$' then '✨'
+    when text ~ '^(basic |special )?darkness energy$' then '✨'
+    when text ~ '^(basic |special )?metal energy$' then '✨'
+    when text ~ '^(basic |special )?(lightning|electric) energy$' then '✨'
+    when text ~ '^(basic |special )?.*energy$' then '✨'
+    when token_text ~ ' (stadium|gym|tower|city|court|arena|lab|laboratory|factory|festival|dojo|mine|cave|forest|mountain|beach|park|ruins|shrine|temple|lake|valley|spring|plaza|school|house|castle|center|swell|grounds|road) ' then '✨'
+    when token_text ~ ' (professor|prof|boss|judge|worker|research|researcher|lady|lass|boy|girl|man|woman|mom|dad|fan|club|breeder|collector|fisherman|hiker|ranger|scientist|engineer|nurse|teammates|friends|clerk|student|biker|karate|black|belt|beauty|gentleman|idol|artist|camper|picnicker|sisters|siblings|mentor|guidance|adventurer|explorer|merchant|backpacker|ace|trainer|team|rocket|galactic|plasma|flare|skull|yell|aqua|magma|cipher|giovanni|misty|brock|erika|sabrina|koga|blaine|lance|cynthia|iris|lillie|marnie|hop|iono|nemona|arven|penny|clavell|jacq|diantha|colress|guzma|lusamine|gladion|hau|acerola|mallow|lana|kiawe|gordie|melony|raihan|leon|cheren|irida|skyla|carmine|kieran|klara|roxanne|gardenia|steven|phoebe|giacomo|welder|cook|bea|bruno|blacksmith|janine) ' then '✨'
+    when token_text ~ ' (ball|switch|candy|potion|rod|catcher|search|seeker|stretcher|vacuum|treasure|medal|gain|pad|receiver|communicator|communication|mail|ticket|map|pokedex|pokédex|gear|tool|scales|band|stone|fossil|incense|rope|flute|lantern|capsule|patch|shoes|bike|bicycle|gloves|helmet|vest|cape|charm|amulet|scoop|recycler|blower|compressor|machine|device|transceiver|computer|phone|tablet|camera|spray|powder|herb|berry|candy|elixir|crystal|vessel|container|badge|pass|letter|coin|whistle|doll|hammer|shovel|mirror|scope|radar|scanner|rescue|revive|ether|lantern) ' then '✨'
+    else ''
+  end
+  from normalized;
+$$;
+
+create or replace function public.marketplace_card_finish_emoji(
+  card_type text,
+  card_name text,
+  rarity text default '',
+  product_variant text default ''
+)
+returns text
+language sql
+stable
+as $$
+  with normalized as (
+    select
+      lower(coalesce(card_name, '')) as text,
+      ' ' || regexp_replace(lower(coalesce(card_name, '')), '[^a-z0-9é]+', ' ', 'g') || ' ' as token_text
+  )
+  select case
+    when text ~ '(aerodactyl|kabuto|kabutops|omanyte|omastar|lileep|cradily|anorith|armaldo|cranidos|rampardos|shieldon|bastiodon|tirtouga|carracosta|archen|archeops|tyrunt|tyrantrum|amaura|aurorus|dracozolt|arctozolt|dracovish|arctovish)' then '🪨'
+    when text ~ '(numel|camerupt|volcanion|torkoal)' then '🌋'
+    when text ~ '(carvanha|sharpedo|magikarp|goldeen|seaking|qwilfish|remoraid|octillery|feebas|milotic|basculin|wishiwashi|bruxish|arrokuda|barraskewda|finizen|palafin|veluza|dondozo|chi-yu|horsea|seadra|kingdra|totodile|croconaw|feraligatr|oshawott|dewott|samurott|popplio|brionne|primarina|finneon|lumineon|lapras|marill|azumarill|wailmer|wailord|clamperl|slowpoke|slowbro|slowking|tentacool|tentacruel|seel|dewgong|wugtrio|wiglett|crawdaunt|corphish|mantyke|mantine|jellicent|frillish)' then '💧'
+    when text ~ '(caterpie|metapod|butterfree|weedle|kakuna|beedrill|pinsir|scyther|scizor|heracross|yanma|yanmega|wurmple|silcoon|cascoon|beautifly|dustox|kricketot|kricketune|burmy|wormadam|mothim|combee|vespiquen|sewaddle|swadloon|leavanny|venipede|whirlipede|scolipede|dwebble|crustle|joltik|galvantula|larvesta|volcarona|grubbin|charjabug|vikavolt|cutiefly|ribombee|sizzlipede|centiskorch|tarountula|spidops|nymble|lokix|rellor|rabsca|spinarak|ariados)' then '🍃'
+    when text ~ '(ekans|arbok|seviper|snivy|servine|serperior|silicobra|sandaconda)' then '☀️'
+    when text ~ '(vanillite|vanillish|vanilluxe|snorunt|glalie|froslass|eiscue|swinub|piloswine|mamoswine|cubchoo|beartic|galarian darmanitan)' then '❄️'
+    when text ~ '(pidgey|pidgeotto|pidgeot|spearow|fearow|doduo|dodrio|hoothoot|noctowl|natu|xatu|taillow|swellow|wingull|pelipper|starly|staravia|staraptor|pidove|tranquill|unfezant|rufflet|braviary|fletchling|fletchinder|talonflame|pikipek|trumbeak|toucannon|rookidee|corvisquire|corviknight|cramorant|wattrel|kilowattrel|bombirdier|flamigo|delibird|oricorio|tornadus|chatot)' then '☁️'
+    when text ~ '(pikachu|raichu|pichu|plusle|minun|pachirisu|emolga|dedenne|togedemaru|morpeko|pawmi|pawmo|pawmot|shinx|luxio|luxray|electrike|manectric|zeraora|xurkitree|thundurus|helioptile|heliolisk|mareep|flaaffy|ampharos|electabuzz|electivire)' then '⚡'
+    when text ~ '(meowth|persian|skitty|delcatty|glameow|purugly|purrloin|liepard|litten|torracat|incineroar|sprigatito|floragato|meowscarada)' then '🐾'
+    when text ~ '(growlithe|arcanine|houndour|houndoom|poochyena|mightyena|rockruff|lycanroc|yamper|boltund|fidough|dachsbun|greavard|houndstone|maschiff|mabosstiff)' then '🌟'
+    when text ~ '(buneary|lopunny|bunnelby|diggersby|minccino|cinccino|rattata|raticate|sentret|furret|zigzagoon|linoone|bidoof|bibarel|patrat|watchog|skwovet|greedent|lechonk|oinkologne|gumshoos|yungoos)' then '🐾'
+    when text ~ '(ponyta|rapidash|mudbray|mudsdale|glastrier|spectrier|koraidon|miraidon)' then '🌟'
+    when text ~ '(mankey|primeape|aipom|ambipom|chimchar|monferno|infernape|panpour|simipour|pansage|simisage|pansear|simisear|grookey|thwackey|rillaboom|zarude)' then '🍃'
+    when text ~ '(teddiursa|ursaring|cubchoo|beartic|stufful|bewear|ursaluna)' then '🐾'
+    when text ~ '(hawlucha|makuhita|hariyama|buzzwole|machop|machoke|machamp|riolu|lucario|meditite|medicham|hitmonlee|hitmonchan|hitmontop|timburr|gurdurr|conkeldurr|mienshao|mienfoo)' then '🏅'
+    when text ~ '(gligar|gliscor|skorupi|drapion)' then '🌙'
+    when text ~ '(shroomish|breloom|brute bonnet|foongus|amoonguss|toedscool|toedscruel)' then '🍄'
+    when text ~ '(eevee|vaporeon|jolteon|flareon|espeon|umbreon|leafeon|glaceon|sylveon|vulpix|ninetales|fennekin|braixen|delphox|nickit|thievul|zorua|zoroark)' then '🌟'
+    when text ~ '(charizard|charmander|charmeleon|dratini|dragonair|dragonite|rayquaza|salamence|bagon|shelgon|gible|gabite|garchomp|axew|fraxure|haxorus|druddigon|deino|zweilous|hydreigon|goomy|sliggoo|goodra|jangmo-o|hakamo-o|kommo-o|duraludon|dracozolt|dracovish|regidrago|frigibax|arctibax|baxcalibur|latias|latios|turtonator|archaludon)' then '🌟'
+    when text ~ '(mewtwo|mew|abra|kadabra|alakazam|drowzee|hypno|mr\. mime|jynx|espeon|ralts|kirlia|gardevoir|gallade|solosis|duosion|reuniclus|gothita|gothorita|gothitelle|elgyem|beheeyem|hatenna|hattrem|hatterene|azelf|uxie|mesprit|cresselia|malamar|inkay|meloetta)' then '🌌'
+    when text ~ '(bulbasaur|ivysaur|venusaur|oddish|gloom|vileplume|bellsprout|weepinbell|victreebel|exeggcute|exeggutor|chikorita|bayleef|meganium|treecko|grovyle|sceptile|seedot|nuzleaf|shiftry|budew|roselia|roserade|cherubi|cherrim|carnivine|snover|abomasnow|petilil|lilligant|maractus|chespin|quilladin|chesnaught|bounsweet|steenee|tsareena|smoliv|dolliv|arboliva|rowlet|dartrix|decidueye|cacnea|cacturne|cottonee|whimsicott|tangela|tangrowth|jumpluff|hoppip|skiploom|gogoat|skiddo|ogerpon)' then '🌱'
+    when text ~ '(diglett|dugtrio|sandshrew|sandslash|geodude|graveler|golem|onix|cubone|marowak|rhyhorn|rhydon|rhyperior|phanpy|donphan|larvitar|pupitar|tyranitar|nosepass|probopass|hippopotas|hippowdon|drilbur|excadrill|sandile|krokorok|krookodile|mudbray|mudsdale|silicobra|sandaconda|orthworm|golett|golurk|ting-lu|carkol|rolycoly|coalossal|tirtouga|carracosta)' then '⛰️'
+    when text ~ '(gastly|haunter|gengar|misdreavus|mismagius|sableye|shuppet|banette|duskull|dusclops|dusknoir|drifloon|drifblim|spiritomb|litwick|lampent|chandelure|phantump|trevenant|pumpkaboo|gourgeist|mimikyu|sinistea|polteageist|dreepy|drakloak|dragapult|annihilape|greavard|houndstone|golett|golurk)' then '🌙'
+    when text ~ '(muk|grimer|koffing|weezing|trubbish|garbodor|skrelp|dragalge|toxapex|mareanie|toxel|toxtricity|glimmet|glimmora|grafaiai|salandit|salazzle)' then '🧪'
+    when text ~ '(magnemite|magneton|magnezone|voltorb|electrode|beldum|metang|metagross|bronzor|bronzong|klink|klang|klinklang|honedge|doublade|aegislash|klefki|togedemaru|meltan|melmetal|cufant|copperajah|tinkatink|tinkatuff|tinkaton|varoom|revavroom|archaludon|cobalion|pawniard|bisharp|kingambit|mawile|durant|iron hands|iron treads)' then '🔩'
+    when text ~ '(ditto|castform|rotom|unown|porygon|porygon2|porygon-z|smeargle|kecleon|zorua|zoroark|mimikyu|terapagos)' then '🌀'
+    when text ~ '(snorlax|munchlax|slaking|slakoth|vigoroth|komala|drowzee|hypno)' then '💤'
+    when text ~ '(chansey|blissey|happiny|audino|alomomola|indeedee|clefairy|clefable|cleffa|igglybuff|jigglypuff|wigglytuff|togepi|togetic|togekiss)' then '🌸'
+    when text ~ '(articuno|zapdos|moltres|raikou|entei|suicune|lugia|ho-oh|celebi|groudon|kyogre|rayquaza|jirachi|deoxys|dialga|palkia|giratina|darkrai|shaymin|arceus|victini|reshiram|zekrom|kyurem|xerneas|yveltal|zygarde|diancie|hoopa|volcanion|cosmog|cosmoem|solgaleo|lunala|necrozma|zacian|zamazenta|eternatus|calyrex|miraidon|koraidon|cobalion|terrakion|virizion|tornadus|thundurus|landorus|latias|latios|zeraora)' then '🌟'
+    when text ~ '^(basic |special )?fire energy$' then '🌋'
+    when text ~ '^(basic |special )?water energy$' then '💧'
+    when text ~ '^(basic |special )?grass energy$' then '🌱'
+    when text ~ '^(basic |special )?psychic energy$' then '🌌'
+    when text ~ '^(basic |special )?fighting energy$' then '⛰️'
+    when text ~ '^(basic |special )?darkness energy$' then '🌑'
+    when text ~ '^(basic |special )?metal energy$' then '🔩'
+    when text ~ '^(basic |special )?(lightning|electric) energy$' then '⚡'
+    when text ~ '^(basic |special )?.*energy$' then '✨'
+    when token_text ~ ' (stadium|gym|tower|city|court|arena|lab|laboratory|factory|festival|dojo|mine|cave|forest|mountain|beach|park|ruins|shrine|temple|lake|valley|spring|plaza|school|house|castle|center|swell|grounds|road) ' then '🏟️'
+    when token_text ~ ' (professor|prof|boss|judge|worker|research|researcher|lady|lass|boy|girl|man|woman|mom|dad|fan|club|breeder|collector|fisherman|hiker|ranger|scientist|engineer|nurse|teammates|friends|clerk|student|biker|karate|black|belt|beauty|gentleman|idol|artist|camper|picnicker|sisters|siblings|mentor|guidance|adventurer|explorer|merchant|backpacker|ace|trainer|team|rocket|galactic|plasma|flare|skull|yell|aqua|magma|cipher|giovanni|misty|brock|erika|sabrina|koga|blaine|lance|cynthia|iris|lillie|marnie|hop|iono|nemona|arven|penny|clavell|jacq|diantha|colress|guzma|lusamine|gladion|hau|acerola|mallow|lana|kiawe|gordie|melony|raihan|leon|cheren|irida|skyla|carmine|kieran|klara|roxanne|gardenia|steven|phoebe|giacomo|welder|cook|bea|bruno|blacksmith|janine) ' then '🤝'
+    when token_text ~ ' (ball|switch|candy|potion|rod|catcher|search|seeker|stretcher|vacuum|treasure|medal|gain|pad|receiver|communicator|communication|mail|ticket|map|pokedex|pokédex|gear|tool|scales|band|stone|fossil|incense|rope|flute|lantern|capsule|patch|shoes|bike|bicycle|gloves|helmet|vest|cape|charm|amulet|scoop|recycler|blower|compressor|machine|device|transceiver|computer|phone|tablet|camera|spray|powder|herb|berry|candy|elixir|crystal|vessel|container|badge|pass|letter|coin|whistle|doll|hammer|shovel|mirror|scope|radar|scanner|rescue|revive|ether|lantern) ' then '🧰'
+    else ''
+  end
+  from normalized;
+$$;
+
+create or replace function public.marketplace_card_emoji(
+  card_type text,
+  card_name text,
+  rarity text default '',
+  product_variant text default ''
+)
+returns text
+language sql
+stable
+as $$
+  with tokens as (
+    select
+      regexp_split_to_array(public.marketplace_card_identity_emoji(card_type, card_name, rarity, product_variant), '\s+') as identity_tokens,
+      nullif(public.marketplace_card_accent_emoji(card_type, card_name, rarity, product_variant), '') as accent_emoji,
+      nullif(public.marketplace_card_variant_emoji(card_name, rarity, product_variant), '') as variant_emoji,
+      nullif(public.marketplace_card_finish_emoji(card_type, card_name, rarity, product_variant), '') as finish_emoji
+  ),
+  ordered as (
+    select array_remove(array[
+      nullif(identity_tokens[1], ''),
+      nullif(identity_tokens[2], ''),
+      case
+        when nullif(identity_tokens[2], '') is null then accent_emoji
+        else null
+      end,
+      variant_emoji,
+      case
+        when variant_emoji is null then finish_emoji
+        else null
+      end
+    ], null) as emojis
+    from tokens
+  ),
+  distinct_ordered as (
+    select array_agg(emoji order by first_position) as emojis
+    from (
+      select emoji, min(position) as first_position
+      from ordered, unnest(emojis) with ordinality as item(emoji, position)
+      group by emoji
+    ) deduped
+  )
+  select array_to_string(emojis[1:3], ' ')
+  from distinct_ordered
+  where array_length(emojis, 1) >= 3;
+$$;
+
+create or replace function public.marketplace_card_name_emoji(card_name text)
+returns text
+language sql
+stable
+as $$
+  select public.marketplace_card_identity_emoji('', card_name, '', '');
+$$;
+
+create or replace function public.marketplace_seed_card_emoji_rules()
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  seeded_count integer;
+begin
+  insert into public.marketplace_card_emoji_rules (name, emoji_a, emoji_b, source, updated_at)
+  select n.name, rule.emoji_a, rule.emoji_b, 'seed-rule', now()
+  from public.marketplace_card_names n
+  join (
+    values
+      ('Air Balloon', '🎈', '💨'),
+      ('Battle VIP Pass', '🎟️', '✨'),
+      ('Rare Candy', '🍬', '✨'),
+      ('Ultra Ball', '⚾', '✨'),
+      ('Great Ball', '⚾', '✨'),
+      ('Pokémon Communication', '📡', '✨'),
+      ('Pokemon Communication', '📡', '✨'),
+      ('Professor''s Research', '📚', '✨'),
+      ('Boss''s Orders', '🤝', '✨'),
+      ('Cynthia', '🤝', '⚡'),
+      ('Volkner', '🤝', '⚡'),
+      ('Team Rocket''s Admin.', '🌙', '🤝')
+  ) as rule(name, emoji_a, emoji_b) on rule.name = n.name
+  on conflict (name) do update set
+    emoji_a = excluded.emoji_a,
+    emoji_b = excluded.emoji_b,
+    source = excluded.source,
+    updated_at = now();
+
+  get diagnostics seeded_count = row_count;
+  return seeded_count;
+end;
+$$;
+
+create or replace function public.refresh_marketplace_blueprint_emojis()
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  refreshed_count integer;
+begin
+  perform public.marketplace_seed_card_emoji_rules();
+
+  insert into public.marketplace_blueprint_emojis (
+    blueprint_id, name, rarity, product_variant,
+    emoji_identity_a, emoji_identity_b, rarity_variant_emoji, emoji,
+    source, reason, confidence, updated_at
+  )
+  select
+    source.blueprint_id,
+    source.name,
+    source.rarity,
+    source.product_variant,
+    source.emoji_tokens[1],
+    source.emoji_tokens[2],
+    source.emoji_tokens[3],
+    source.emoji,
+    'projection-classifier',
+    source.reason,
+    0.75,
+    now()
+  from (
+    select
+      b.id as blueprint_id,
+      b.name,
+      coalesce(nullif(b.blueprint->>'rarity', ''), nullif(b.blueprint->>'collector_rarity', ''), 'Card') as rarity,
+      coalesce(b.version, '') as product_variant,
+      regexp_split_to_array(public.marketplace_card_emoji(
+        coalesce(nullif(b.blueprint->>'card_type', ''), nullif(b.blueprint->>'type', ''), nullif(b.blueprint->>'category_name', ''), 'Trading card'),
+        b.name,
+        coalesce(nullif(b.blueprint->>'rarity', ''), nullif(b.blueprint->>'collector_rarity', ''), 'Card'),
+        coalesce(b.version, '')
+      ), '\s+') as emoji_tokens,
+      public.marketplace_card_emoji(
+        coalesce(nullif(b.blueprint->>'card_type', ''), nullif(b.blueprint->>'type', ''), nullif(b.blueprint->>'category_name', ''), 'Trading card'),
+        b.name,
+        coalesce(nullif(b.blueprint->>'rarity', ''), nullif(b.blueprint->>'collector_rarity', ''), 'Card'),
+        coalesce(b.version, '')
+      ) as emoji,
+      'card-name-plus-rarity-variation classifier' as reason
+    from public.cardtrader_pokemon_blueprints b
+  ) source
+  where array_length(source.emoji_tokens, 1) = 3
+    and trim(source.emoji) <> ''
+    and position('🃏' in source.emoji) = 0
+  on conflict (blueprint_id) do update set
+    name = excluded.name,
+    rarity = excluded.rarity,
+    product_variant = excluded.product_variant,
+    emoji_identity_a = excluded.emoji_identity_a,
+    emoji_identity_b = excluded.emoji_identity_b,
+    rarity_variant_emoji = excluded.rarity_variant_emoji,
+    emoji = excluded.emoji,
+    reason = excluded.reason,
+    confidence = excluded.confidence,
+    updated_at = now()
+  where public.marketplace_blueprint_emojis.source = 'projection-classifier';
+
+  get diagnostics refreshed_count = row_count;
+  return refreshed_count;
+end;
 $$;
 
 create or replace function public.refresh_marketplace_cards_from_blueprints()
@@ -806,6 +1121,7 @@ begin
     updated_at = now();
 
   perform public.marketplace_seed_cards_name_type();
+  perform public.refresh_marketplace_blueprint_emojis();
 
   update public.cardtrader_pokemon_blueprints b
   set
@@ -815,15 +1131,11 @@ begin
       coalesce(nullif(b.blueprint->>'rarity', ''), nullif(b.blueprint->>'collector_rarity', ''), 'Card'),
       concat_ws(' ', coalesce(nullif(b.expansion->>'name', ''), nullif(b.blueprint->>'expansion_name', ''), 'Pokemon'), b.version)
     ),
-    emoji = concat_ws(
-      ' ',
-      nullif(n.emoji, ''),
-      public.marketplace_card_variant_emoji(
-        b.name,
-        coalesce(nullif(b.blueprint->>'rarity', ''), nullif(b.blueprint->>'collector_rarity', ''), 'Card'),
-        b.version
-      )
-    )
+    emoji = coalesce((
+      select e.emoji
+      from public.marketplace_blueprint_emojis e
+      where e.blueprint_id = b.id
+    ), '')
   from public.marketplace_card_names n
   where n.name = b.name;
 
@@ -881,17 +1193,11 @@ begin
         coalesce(nullif(b.blueprint->>'rarity', ''), nullif(b.blueprint->>'collector_rarity', ''), 'Card'),
         concat_ws(' ', coalesce(nullif(b.expansion->>'name', ''), nullif(b.blueprint->>'expansion_name', ''), 'Pokemon'), b.version)
       ) as card_palette,
-      coalesce(
-        nullif(b.emoji, ''),
-        public.marketplace_card_emoji(
-          coalesce(nullif(b.blueprint->>'card_type', ''), nullif(b.blueprint->>'type', ''), nullif(b.blueprint->>'category_name', ''), 'Trading card'),
-          b.name,
-          coalesce(nullif(b.blueprint->>'rarity', ''), nullif(b.blueprint->>'collector_rarity', ''), 'Card'),
-          b.version
-        )
-      ) as emoji,
+      coalesce(e.emoji, '') as emoji,
       b.imported_at
     from public.cardtrader_pokemon_blueprints b
+    left join public.marketplace_blueprint_emojis e
+      on e.blueprint_id = b.id
   ) source
   where coalesce(source.preview_image_url, source.cdn_image_url, source.image_url) is not null
   on conflict (card_id) do update set
@@ -1072,6 +1378,61 @@ begin
 
   get diagnostics refreshed_count = row_count;
   return refreshed_count;
+end;
+$$;
+
+create or replace function public.refresh_marketplace_artist_card_counts()
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  refreshed_count integer;
+  reset_count integer;
+begin
+  drop table if exists pg_temp.marketplace_artist_card_counts_tmp;
+  create temp table marketplace_artist_card_counts_tmp on commit drop as
+  select
+    artist.normalized_artist,
+    count(*)::integer as card_count
+  from public.marketplace_blueprint_artists artist
+  join public.marketplace_card_versions versions
+    on versions.blueprint_id = artist.blueprint_id
+  where coalesce(artist.normalized_artist, '') <> ''
+    and versions.product_type = 'card'
+    and coalesce(
+      versions.preview_image_url,
+      versions.homepage_image_url,
+      versions.cdn_image_url,
+      versions.image_url
+    ) is not null
+  group by artist.normalized_artist;
+
+  update public.marketplace_blueprint_artists artist
+  set artist_card_count = coalesce(counts.card_count, 0),
+    updated_at = now()
+  from pg_temp.marketplace_artist_card_counts_tmp counts
+  where artist.normalized_artist = counts.normalized_artist
+    and artist.artist_card_count is distinct from coalesce(counts.card_count, 0);
+
+  get diagnostics refreshed_count = row_count;
+
+  update public.marketplace_blueprint_artists artist
+  set artist_card_count = 0,
+    updated_at = now()
+  where (
+      coalesce(artist.normalized_artist, '') = ''
+      or not exists (
+      select 1
+      from pg_temp.marketplace_artist_card_counts_tmp counts
+      where counts.normalized_artist = artist.normalized_artist
+      )
+    )
+    and artist.artist_card_count is distinct from 0;
+
+  get diagnostics reset_count = row_count;
+  return refreshed_count + reset_count;
 end;
 $$;
 

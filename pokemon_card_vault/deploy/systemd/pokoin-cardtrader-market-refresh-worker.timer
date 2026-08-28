@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Pokoin CardTrader market refresh daily
+
+[Timer]
+OnCalendar=*-*-* 23:56:00 Europe/Rome
+Persistent=true
+Unit=pokoin-cardtrader-market-refresh-worker.service
+
+[Install]
+WantedBy=timers.target

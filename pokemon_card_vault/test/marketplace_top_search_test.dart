@@ -120,6 +120,37 @@ void main() {
     expect(recentCards.single.isMarketAvailable, isTrue);
   });
 
+  test('recent marketplace cards omit unavailable stale cards', () {
+    final recentCards = marketplaceRecentCardsForTest(
+      recentViews: [
+        RecentCardView(
+          cardId: '391257',
+          name: 'Teal Mask Ogerpon ex',
+          expansion: 'CSVNC: Land of Kitakami Special Pack',
+          number: '043/040',
+          imageUrl: 'https://cdn.pokoin.com/391257_ogerpon.jpg',
+          previewImageUrl: 'https://cdn.pokoin.com/previews/391257.jpg',
+          homepageImageUrl: 'https://cdn.pokoin.com/home/391257.jpg',
+          viewedAt: DateTime(2026),
+        ),
+      ],
+      cards: [
+        _previewCard(
+          id: '391257',
+          name: 'Teal Mask Ogerpon ex',
+        ).copyWith(
+          set: 'CSVNC: Land of Kitakami Special Pack',
+          price: 0,
+          stock: 0,
+          hasCardTraderListing: false,
+          cardtraderEligibleListingCount: 0,
+        ),
+      ],
+    );
+
+    expect(recentCards, isEmpty);
+  });
+
   test('recent marketplace cards apply cheapest cache to catalog card', () {
     final catalogCard = _previewCard(
       id: '241674',
@@ -165,6 +196,43 @@ void main() {
     expect(recentCards.single.hasCardTraderListing, isTrue);
     expect(recentCards.single.cardtraderEligibleListingCount, 56);
     expect(recentCards.single.isMarketAvailable, isTrue);
+  });
+
+  test('homepage sections filter cached unavailable cards', () {
+    final available = _previewCard(
+      id: '316600',
+      name: 'Leafeon',
+    ).copyWith(
+      price: 780,
+      stock: 3,
+      hasCardTraderListing: true,
+      cardtraderEligibleListingCount: 1,
+    );
+    final unavailable = _previewCard(
+      id: '391257',
+      name: 'Teal Mask Ogerpon ex',
+    ).copyWith(
+      price: 0,
+      stock: 0,
+      hasCardTraderListing: false,
+      cardtraderEligibleListingCount: 0,
+    );
+
+    final sections = marketplaceHomeSectionCardsForTest(
+      cards: [available, unavailable],
+      cachedSections: const MarketplaceHomeSections(
+        recentlySeenIds: [],
+        bestSellerIds: ['391257', '316600'],
+        featuredIds: ['391257'],
+      ),
+    );
+
+    expect(sections['bestSellers']!.map((card) => card.id), ['316600']);
+    expect(sections['featured']!.map((card) => card.id), ['316600']);
+    expect(
+      sections.values.expand((cards) => cards),
+      everyElement(predicate<PokemonCard>((card) => card.isMarketAvailable)),
+    );
   });
 
   test(
@@ -413,6 +481,7 @@ void main() {
       'booster_box': 1,
       'booster_pack': 2,
     });
+    expect(marketplaceProductTypeTitleForTest('card'), 'Graded');
     expect(marketplaceProductTypeLabelForTest('booster_pack'), 'Boosters');
   });
 

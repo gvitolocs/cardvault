@@ -1,0 +1,8 @@
+schema_version: 1
+project_name: cardvault
+created_at: '2026-05-27T18:59:01.262558+00:00'
+codevira_version: 3.0.0
+agents_md_max_kb: 5
+inject_max_decisions: 3
+inject_max_tokens: 600
+archive_after_days: 90

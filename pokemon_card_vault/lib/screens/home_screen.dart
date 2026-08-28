@@ -379,7 +379,7 @@ class _MarketplaceSearchScreenState
       const SizedBox(height: 24),
       if (!isProductCategory) ...[
         _SearchResultSection(
-          title: isSingleCategory ? 'Graded candidates' : 'Singles',
+          title: isSingleCategory ? 'Graded' : 'Singles',
           cards: singles,
         ),
         const SizedBox(height: 28),
@@ -615,7 +615,7 @@ class _MarketplaceSearchScreenState
 
   String _productTypeTitle(String productType) {
     return productType == 'card'
-        ? 'Graded candidates'
+        ? 'Graded'
         : _marketplaceProductTypeLabel(productType);
   }
 }
@@ -801,6 +801,13 @@ String marketplaceProductTypeLabelForTest(String productType) {
   return _marketplaceProductTypeLabel(productType);
 }
 
+@visibleForTesting
+String marketplaceProductTypeTitleForTest(String productType) {
+  return productType == 'card'
+      ? 'Graded'
+      : _marketplaceProductTypeLabel(productType);
+}
+
 PokemonCard? _exactSearchAutoOpenCard({
   required String query,
   required List<PokemonCard> results,
@@ -853,6 +860,26 @@ List<PokemonCard> marketplaceRecentCardsForTest({
     cards,
     cheapestPricesByCardId,
   );
+}
+
+@visibleForTesting
+Map<String, List<PokemonCard>> marketplaceHomeSectionCardsForTest({
+  required List<PokemonCard> cards,
+  MarketplaceHomeSections? cachedSections,
+  List<RecentCardView> recentViews = const [],
+  Map<String, MarketplaceCheapestPrice> cheapestPricesByCardId = const {},
+}) {
+  final sections = _MarketplaceSections.fromCards(
+    cards,
+    cachedSections: cachedSections,
+    recentViews: recentViews,
+    cheapestPricesByCardId: cheapestPricesByCardId,
+  );
+  return {
+    'recentlySeen': sections.recentlySeen,
+    'bestSellers': sections.bestSellers,
+    'featured': sections.featured,
+  };
 }
 
 @visibleForTesting
@@ -6811,7 +6838,8 @@ class _MarketplaceSections {
     List<RecentCardView> recentViews = const [],
     Map<String, MarketplaceCheapestPrice> cheapestPricesByCardId = const {},
   }) {
-    final singles = cards.where(_isSingleCard).toList();
+    final singles =
+        cards.where((card) => _isSingleCard(card) && card.isMarketAvailable).toList();
     final personalized = _rankCardsByRecentViews(singles, recentViews);
     final recentCards = _cardsForRecentViews(
       recentViews,
@@ -6854,7 +6882,12 @@ class _MarketplaceSections {
     List<String> ids,
     Map<String, PokemonCard> byId,
   ) {
-    return ids.map((id) => byId[id]).whereType<PokemonCard>().take(9).toList();
+    return ids
+        .map((id) => byId[id])
+        .whereType<PokemonCard>()
+        .where((card) => card.isMarketAvailable)
+        .take(9)
+        .toList();
   }
 
   static List<String> _recentViewCheapestLookupIds(RecentCardView view) {
@@ -6888,7 +6921,14 @@ class _MarketplaceSections {
               cardsByNameAndSet[
                   '${_normalizePersonalizationKey(view.name)}|${_normalizePersonalizationKey(view.expansion)}'];
           if (card != null) {
-            return _applyCheapestPriceToRecentCard(card, cheapestPrice);
+            final hydrated = _applyCheapestPriceToRecentCard(
+              card,
+              cheapestPrice,
+            );
+            return hydrated.isMarketAvailable ? hydrated : null;
+          }
+          if (!_cheapestPriceIsAvailable(cheapestPrice)) {
+            return null;
           }
           return _cardFromRecentView(view, cheapestPrice);
         })
@@ -7282,9 +7322,9 @@ class _SuggestedCategories extends StatelessWidget {
         ),
       ),
       _CategoryCard(
-        title: 'Graded candidates',
+        title: 'Graded',
         path: '/product/graded',
-        query: 'special illustration rare',
+        query: '',
         productType: 'card',
         card: _CategoryCardData(
           id: '272855',

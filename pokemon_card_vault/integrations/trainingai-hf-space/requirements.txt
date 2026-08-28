@@ -4,6 +4,7 @@ gradio
 numpy
 open_clip_torch
 pillow
+pytesseract
 python-multipart
 requests
 torch

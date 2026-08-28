@@ -51,6 +51,25 @@ function sameOriginArtistProfileImageUrl(value) {
   return clean;
 }
 
+function generatedProfileImageVersionedUrl(value, generatedProfileImage = {}) {
+  const imageUrl = sameOriginArtistProfileImageUrl(value);
+  if (!imageUrl || generatedProfileImage.source !== 'card_art_fallback') {
+    return imageUrl;
+  }
+  const version = cleanText(generatedProfileImage.generatedAt, 120);
+  if (!version) {
+    return imageUrl;
+  }
+  try {
+    const url = new URL(imageUrl);
+    url.searchParams.set('v', version);
+    return url.toString();
+  } catch {
+    const separator = imageUrl.includes('?') ? '&' : '?';
+    return `${imageUrl}${separator}v=${encodeURIComponent(version)}`;
+  }
+}
+
 function projectedExpansionNumberSql() {
   const imageSource = `coalesce(
     versions.cdn_image_url,
@@ -96,8 +115,9 @@ function artistProfileFromRow(row) {
     sourceAttribution.generatedProfileImage && typeof sourceAttribution.generatedProfileImage === 'object'
       ? sourceAttribution.generatedProfileImage
       : {};
-  const imageUrl = sameOriginArtistProfileImageUrl(
+  const imageUrl = generatedProfileImageVersionedUrl(
     row.profile_image_cdn_url || row.profile_image_url || '',
+    generatedProfileImage,
   );
   return {
     displayName: displayNameForArtist({
@@ -124,37 +144,54 @@ function artistProfileFromRow(row) {
 async function artistSummaries({ limit, query = marketplaceQuery }) {
   const result = await query(
     `
-      select distinct on (artist.normalized_artist)
-        artist.artist,
-        artist.illustrator,
-        artist.normalized_artist,
-        ${slugSql('artist.normalized_artist')} as artist_slug,
-        artist.artist_card_count,
+      with artist_cards as (
+        select
+          artist.artist,
+          artist.illustrator,
+          artist.normalized_artist,
+          ${slugSql('artist.normalized_artist')} as artist_slug,
+          artist.artist_card_count,
+          versions.blueprint_id,
+          versions.projected_at,
+          coalesce(
+            versions.preview_image_url,
+            versions.homepage_image_url,
+            versions.cdn_image_url,
+            versions.image_url,
+            ''
+          ) as image_url,
+          count(*) over (partition by artist.normalized_artist)::integer as visible_card_count
+        from public.marketplace_blueprint_artists artist
+        join public.marketplace_card_versions versions
+          on versions.blueprint_id = artist.blueprint_id
+        where versions.product_type = 'card'
+          and coalesce(
+            versions.preview_image_url,
+            versions.homepage_image_url,
+            versions.cdn_image_url,
+            versions.image_url
+          ) is not null
+      )
+      select distinct on (artist_cards.normalized_artist)
+        artist_cards.artist,
+        artist_cards.illustrator,
+        artist_cards.normalized_artist,
+        artist_cards.artist_slug,
+        greatest(
+          coalesce(artist_cards.artist_card_count, 0),
+          coalesce(artist_cards.visible_card_count, 0)
+        )::integer as artist_card_count,
+        artist_cards.visible_card_count,
         profiles.display_name as profile_display_name,
         coalesce(nullif(profiles.profile_image_cdn_url, ''), profiles.profile_image_url) as profile_image_url,
-        coalesce(
-          versions.preview_image_url,
-          versions.homepage_image_url,
-          versions.cdn_image_url,
-          versions.image_url,
-          ''
-        ) as image_url
-      from public.marketplace_blueprint_artists artist
-      join public.marketplace_card_versions versions
-        on versions.blueprint_id = artist.blueprint_id
+        artist_cards.image_url
+      from artist_cards
       left join public.marketplace_artist_profiles profiles
-        on profiles.normalized_artist = artist.normalized_artist
-      where versions.product_type = 'card'
-        and coalesce(
-          versions.preview_image_url,
-          versions.homepage_image_url,
-          versions.cdn_image_url,
-          versions.image_url
-        ) is not null
+        on profiles.normalized_artist = artist_cards.normalized_artist
       order by
-        artist.normalized_artist asc,
-        versions.projected_at desc nulls last,
-        versions.blueprint_id asc
+        artist_cards.normalized_artist asc,
+        artist_cards.projected_at desc nulls last,
+        artist_cards.blueprint_id asc
       limit $1
     `,
     [cleanLimit(limit, 1000)],
@@ -172,7 +209,7 @@ async function artistSummaries({ limit, query = marketplaceQuery }) {
       illustrator: displayName || row.illustrator || row.artist || '',
       normalizedArtist: row.normalized_artist || '',
       slug: row.artist_slug || '',
-      cardCount: Number(row.artist_card_count || 0),
+      cardCount: Number(row.artist_card_count || row.visible_card_count || 0),
       imageUrl: row.image_url || '',
       profileImageUrl: sameOriginArtistProfileImageUrl(row.profile_image_url || ''),
       };

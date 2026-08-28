@@ -10,6 +10,7 @@ const {
   cardDetailSlugParts,
   cardIdFromDoubledId,
   collectorNumberTokenVariants,
+  gradedListingSummaryJoin,
   projectedExpansionNumberIntSql,
   projectedExpansionNumberSql,
   resolveCardRoute,
@@ -73,6 +74,17 @@ test('card detail slug parser ignores punctuation and numeric separators', () =>
   );
 });
 
+test('card detail slug parser folds Pokémon accent and legacy slug', () => {
+  assert.deepEqual(
+    cardDetailSlugParts('Card Poliwhirl 176/165 Pokémon Card 151'),
+    ['card', 'poliwhirl', '176', '165', 'pokemon', 'card', '151'],
+  );
+  assert.deepEqual(
+    cardDetailSlugParts('card-poliwhirl-176-165-pok-mon-card-151'),
+    ['card', 'poliwhirl', '176', '165', 'pokemon', 'card', '151'],
+  );
+});
+
 test('card detail slug parser keeps Fan Rotom collector tokens', () => {
   assert.deepEqual(
     cardDetailSlugParts('common-fan-rotom-085-131-prismatic-evolutions'),
@@ -90,6 +102,25 @@ test('public number route segment decodes to real card id', () => {
   assert.equal(cardIdFromDoubledId('633200'), '316600');
   assert.equal(cardIdFromDoubledId('633201'), '');
   assert.equal(cardIdFromDoubledId('316600'), '158300');
+});
+
+test('card versions search clause uses selected Italian language', async () => {
+  const captured = [];
+  await rowsForVersions({
+    dbQuery: async (sql, values) => {
+      captured.push({ sql, values });
+      return { rows: [] };
+    },
+    query: 'camilla',
+    searchLanguage: 'it',
+    limit: 20,
+  });
+
+  const searchCall = captured.find(({ sql }) =>
+    sql.includes('marketplace_card_name_translations'),
+  );
+  assert.ok(searchCall);
+  assert.equal(searchCall.values[1], 'it');
 });
 
 test('route resolver only decodes public number when a slug is present', () => {
@@ -190,7 +221,7 @@ test('card versions projected rarity SQL uses TCG metadata before generic Card',
   assert.match(sql, /lower\(coalesce\(candidates\.rarity, ''\)\) <> 'card'/);
 });
 
-test('card versions payload repairs Servine-style two-token emoji', async () => {
+test('card versions payload preserves database emoji', async () => {
   const rows = await rowsForVersions({
     cardId: '111409',
     limit: 10,
@@ -219,8 +250,8 @@ test('card versions payload repairs Servine-style two-token emoji', async () => 
   });
 
   assert.equal(rows[0].rarity, 'Uncommon');
-  assert.equal(rows[0].rarityVariantEmoji, '🔷');
-  assert.equal(rows[0].emoji, '🐍 🌿 🔷');
+  assert.equal(rows[0].rarityVariantEmoji, '');
+  assert.equal(rows[0].emoji, '🐍 🌿');
 });
 
 test('card versions rows use canonical homepage cheapest availability', async () => {
@@ -269,6 +300,68 @@ test('card versions rows use canonical homepage cheapest availability', async ()
   ]);
 });
 
+test('card versions graded product category filters active graded listings', async () => {
+  const captured = [];
+  await rowsForVersions({
+    productType: 'card',
+    productCategory: 'graded',
+    limit: 10,
+    dbQuery: async (sql, values) => {
+      captured.push({ sql, values });
+      return {
+        rows: [
+          {
+            card_id: '391030',
+            name: 'Mega Venusaur ex',
+            expansion_name: 'Play! Pokémon Prize Pack Series',
+            expansion_number: '003/132',
+            product_variant: '',
+            blueprint_id: '391030',
+            image_url: 'https://cdn.pokoin.test/mega-venusaur-ex.webp',
+            product_type: 'card',
+            rarity: 'Promo',
+            card_type: 'Trading card',
+            listed_quantity: 1,
+            lowest_price_pkn: '2500',
+            is_graded: true,
+            graded_listing_count: 1,
+            grading_company: 'PSA',
+            grade: '10',
+          },
+        ],
+      };
+    },
+  });
+
+  const versionQuery = captured.at(-1);
+  assert.equal(captured.length, 1);
+  assert.match(versionQuery.sql, /marketplace_user_listings native_listing/);
+  assert.match(versionQuery.sql, /listing\.graded = true/);
+  assert.match(versionQuery.sql, /listing\.status = 'active'/);
+  assert.match(versionQuery.sql, /coalesce\(listing\.quantity_available, 0\) > 0/);
+  assert.match(versionQuery.sql, /listing\.price_pkn > 0/);
+  assert.match(versionQuery.sql, /coalesce\(graded_listings\.active_listing_count, 0\) > 0/);
+  assert.match(versionQuery.sql, /graded_listings\.lowest_price_pkn as lowest_price_pkn/);
+  assert.match(versionQuery.sql, /true as is_graded/);
+  assert.doesNotMatch(versionQuery.sql, /to_regclass/);
+  assert.doesNotMatch(versionQuery.sql, /cardtrader_cache/);
+  assert.deepEqual(versionQuery.values, ['card', 10]);
+});
+
+test('graded listing summary exposes cheapest active native graded listing', () => {
+  const joinSql = gradedListingSummaryJoin('versions');
+
+  assert.match(joinSql, /left join lateral/);
+  assert.match(joinSql, /marketplace_user_listings native_listing/);
+  assert.match(joinSql, /listing\.card_id_bigint = versions\.card_id/);
+  assert.match(joinSql, /listing\.graded = true/);
+  assert.match(joinSql, /listing\.status = 'active'/);
+  assert.match(joinSql, /coalesce\(listing\.quantity_available, 0\) > 0/);
+  assert.match(joinSql, /listing\.price_pkn > 0/);
+  assert.match(joinSql, /min\(listing\.price_pkn\) as lowest_price_pkn/);
+  assert.match(joinSql, /array_agg\(nullif\(listing\.grading_company, ''\)/);
+});
+
 test('slug match clause can use projected collector number', () => {
   const values = [];
   const clause = slugMatchClause(
@@ -312,6 +405,19 @@ test('slug match clause keeps unpadded collector number slugs exact', () => {
     '(^|-)131(-|$)',
   ]);
   assert.match(clause, /projected_expansion_number/);
+});
+
+test('slug match clause folds accents in database fields', () => {
+  const values = [];
+  const clause = slugMatchClause(
+    'card-poliwhirl-176-165-pokemon-card-151',
+    values,
+    { collectorNumberSql: 'projected_expansion_number' },
+  );
+
+  assert.match(clause, /replace\(lower\(coalesce\(versions\.expansion_name/);
+  assert.ok(values.includes('%pokemon%'));
+  assert.ok(values.includes('%151%'));
 });
 
 test('slug match clause can ignore leading rarity classifier', () => {

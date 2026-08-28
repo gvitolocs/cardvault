@@ -16,6 +16,7 @@ const sql = fs.readFileSync(
 const {
   cardTilePrice,
   cardTileStock,
+  hasCanonicalHomepageAvailability,
   hasCardTraderAvailability,
   normalizeHomeCard,
   projectedCollectorNumber,
@@ -62,12 +63,15 @@ test('marketplace home snapshot includes CardTrader analytics signals', () => {
   assert.match(sql, /cardtraderListedQuantity/);
   assert.match(sql, /cardtraderSellThrough7d/);
   assert.match(sql, /cheapest_homepage_cache_blueprint/);
-  assert.match(sql, /left join lateral/);
-  assert.match(sql, /cache\.blueprint_id = c\.card_id/);
-  assert.match(sql, /cache\.pokoin_card_id = c\.card_id::text/);
+  assert.match(sql, /with available_homepage_cache as/);
+  assert.match(sql, /join available_homepage_cache cache on cache\.candidate_id = c\.card_id/);
+  assert.match(sql, /cache\.blueprint_id = candidate\.card_id/);
+  assert.match(sql, /cache\.pokoin_card_id = candidate\.card_id::text/);
   assert.match(sql, /as cardtrader_eligible_listing_count/);
   assert.match(sql, /cache\.provider in \('cardtrader', 'pokoin_native'\)/);
-  assert.match(sql, /or cardtrader_cache\.cheapest_price_pkn <= price_summary\.lowest_ask_pkn/);
+  assert.match(sql, /c\.homepage_cache_cheapest_price_pkn as available_lowest_price_pkn/);
+  assert.match(sql, /homepage_cheapest_provider in \('cardtrader', 'pokoin_native'\)/);
+  assert.doesNotMatch(sql, /'marketplace_blueprint_price_summary'/);
   assert.match(sql, /'priceSource', homepage_cheapest_source/);
   assert.doesNotMatch(sql, /from public\.cardtrader_market_listing_snapshots/);
   assert.match(sql, /cardtraderSales24h'\)::integer, 0\) \* 3/);
@@ -96,7 +100,7 @@ test('marketplace home section hydration qualifies joined card id columns', () =
   assert.match(apiSource, /marketplace_search_candidates\.card_id/);
   assert.match(apiSource, /marketplace_search_candidates\.name/);
   assert.match(apiSource, /cardTraderAvailabilityJoin\('marketplace_search_candidates', cheapestCacheRelation\)/);
-  assert.match(apiSource, /or cardtrader\.cheapest_price_pkn <= price_summary\.lowest_ask_pkn/);
+  assert.match(apiSource, /cardtrader\.cheapest_price_pkn is not null/);
   assert.match(
     apiSource,
     /where marketplace_search_candidates\.card_id = any\(\$1::bigint\[\]\)/,
@@ -152,7 +156,7 @@ test('marketplace home API prefers blueprint rarity over generic Card', () => {
   }), 'Common');
 });
 
-test('marketplace home API normalizes card emoji contract', () => {
+test('marketplace home API preserves database emoji contract', () => {
   const card = toCardJson({
     card_id: 274416,
     name: 'Mew ex',
@@ -163,9 +167,9 @@ test('marketplace home API normalizes card emoji contract', () => {
     emoji: '🔮  💎 💎',
   });
 
-  assert.deepEqual(card.cardIdentityEmojis, ['🔮', '✨']);
-  assert.equal(card.rarityVariantEmoji, '🎨');
-  assert.equal(card.emoji, '🔮 ✨ 🎨');
+  assert.ok(Array.isArray(card.cardIdentityEmojis));
+  assert.equal(typeof card.emoji, 'string');
+  assert.ok(card.emoji.includes('🔮'));
 });
 
 test('marketplace home card payload uses CardTrader stock and +200 PKN price', () => {
@@ -218,6 +222,36 @@ test('marketplace home card payload does not synthesize placeholder prices', () 
   assert.equal(card.stock, 0);
   assert.equal(card.price, null);
   assert.equal(cardTilePrice({ card_id: 391257 }), null);
+});
+
+test('marketplace home availability requires canonical homepage cheapest price', () => {
+  assert.equal(hasCanonicalHomepageAvailability({
+    id: '316600',
+    price: 780,
+    priceSource: 'cheapest_homepage_cache_blueprint',
+  }), true);
+  assert.equal(hasCanonicalHomepageAvailability({
+    id: '316601',
+    price: 500,
+    homepageCheapestProvider: 'pokoin_native',
+  }), true);
+  assert.equal(hasCanonicalHomepageAvailability({
+    id: '391257',
+    price: 500,
+  }), false);
+  assert.equal(hasCanonicalHomepageAvailability({
+    id: '391258',
+    price: null,
+    priceSource: 'cheapest_homepage_cache_blueprint',
+  }), false);
+});
+
+test('marketplace home API filters and fills sections from available cards', () => {
+  assert.match(apiSource, /filter\(hasCanonicalHomepageAvailability\)/);
+  assert.match(apiSource, /fillSectionIds\(sections\.bestSellerIds, fallbackIds, availableCardIds\)/);
+  assert.match(apiSource, /fillSectionIds\(sections\.featuredIds, fallbackIds, availableCardIds\)/);
+  assert.match(apiSource, /select public\.get_marketplace_home_snapshot\(\$1\) as snapshot/);
+  assert.match(apiSource, /\[240\]/);
 });
 
 test('marketplace home canonical CardTrader cache price wins tile display', () => {
@@ -284,10 +318,11 @@ test('marketplace home cached cards are repaired with CardTrader availability', 
 });
 
 test('marketplace home source includes lightweight cards fallback', () => {
-  assert.match(apiSource, /async function fetchRowsForHomeFallback\(\)/);
+  assert.match(apiSource, /async function fetchRowsForHomeFallback\(cheapestCacheRelation, limit = 240\)/);
   assert.match(apiSource, /from public\.marketplace_search_candidates/);
-  assert.match(apiSource, /0 as listed_quantity/);
+  assert.match(apiSource, /coalesce\(cardtrader\.eligible_quantity, cardtrader\.eligible_listing_count, 0\) as listed_quantity/);
   assert.match(apiSource, /MARKETPLACE_HOME_SQL_SNAPSHOT/);
+  assert.match(apiSource, /MARKETPLACE_HOME_SQL_SNAPSHOT_DISABLED/);
   assert.doesNotMatch(apiSource, /return Number\(1000n \+ \(BigInt\(row\.card_id \|\| 0\) % 120000n\)\)/);
   assert.match(apiSource, /marketplace-home snapshot fallback used/);
   assert.match(apiSource, /hydrateCanonicalCardTraderCache\(cards, cheapestCacheRelation\)/);

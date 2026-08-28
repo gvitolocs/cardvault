@@ -12,6 +12,7 @@ const {
   filterRowsByRequiredNameTokens,
   intersectionTokenPlan,
   intersectRows,
+  compact,
   poolSearchTerm,
   rankAutocompleteRows,
   searchFastNamePreviewWithDatabase,
@@ -143,6 +144,12 @@ test('autocomplete fetches the full query for tokenized database search', () => 
   assert.equal(poolSearchTerm('porygon'), 'porygon');
   assert.equal(poolSearchTerm('piachu 151'), 'piachu 151');
   assert.equal(poolSearchTerm('  char ex  '), 'char ex');
+});
+
+test('autocomplete compact normalization folds accents', () => {
+  assert.equal(compact('Pokédex'), 'pokedex');
+  assert.equal(compact('Pokémon'), 'pokemon');
+  assert.equal(compact('Flabébé'), 'flabebe');
 });
 
 test('autocomplete pool limit stays bounded for keypress latency', () => {
@@ -299,6 +306,7 @@ test('Supabase name index query returns compact candidate rows', async () => {
       calls.push({ sql, values });
       assert.match(sql, /public\.marketplace_card_name_tokens/);
       assert.match(sql, /i\.language = input\.language/);
+      assert.match(sql, /public\.marketplace_search_compact\(i\.search_name\) = input\.compact_q/);
       assert.equal(values[0], 'pi');
       assert.equal(values[1], 'fr');
       assert.equal(values[2], 5000);
@@ -321,6 +329,55 @@ test('Supabase name index query returns compact candidate rows', async () => {
 
   assert.equal(calls.length, 1);
   assert.deepEqual(rows.map((candidate) => candidate.card_id), ['25', '26']);
+});
+
+test('Supabase name index query folds accented search fragments', async () => {
+  const rows = await supabaseNameIndexCandidateRows(
+    'Pokédex',
+    20,
+    'en',
+    async (sql, values) => {
+      assert.match(sql, /public\.marketplace_card_name_tokens/);
+      assert.match(sql, /public\.marketplace_search_compact\(i\.search_name\) = input\.compact_q/);
+      assert.equal(values[0], 'pokedex');
+      return {
+        rows: [
+          {
+            display_name: 'Pokédex',
+            canonical_name: 'Pokédex',
+            compact_name: 'pokedex',
+            name_tokens: ['pokedex'],
+            language: 'en',
+            card_ids: ['100', '101'],
+            representative_labels: [],
+            search_rank: 3900,
+          },
+        ],
+      };
+    },
+  );
+
+  assert.deepEqual(rows.map((candidate) => candidate.card_id), ['100', '101']);
+});
+
+test('Supabase name index returns no English rows for Italian search miss', async () => {
+  const calls = [];
+  const rows = await supabaseNameIndexCandidateRows(
+    'camilla',
+    20,
+    'it',
+    async (sql, values) => {
+      calls.push({ sql, values });
+      assert.match(sql, /i\.language = input\.language/);
+      assert.equal(values[1], 'it');
+      return {
+        rows: [],
+      };
+    },
+  );
+
+  assert.equal(calls.length, 1);
+  assert.deepEqual(rows, []);
 });
 
 test('Supabase predicted name tokens are provisional and pivot with each fragment', async () => {
@@ -1521,6 +1578,80 @@ test('typed one-character autocomplete returns prefix rows without generic hot f
   assert.equal(debug.tokenPlan.matchedRowCount, 2);
 });
 
+test('english meili autocomplete falls through when meili pool is empty', async () => {
+  const originalEngine = process.env.MARKETPLACE_SEARCH_ENGINE;
+  const originalShadow = process.env.MARKETPLACE_SEARCH_SHADOW;
+  const originalHost = process.env.MEILI_HOST;
+  const originalSupabaseNameIndex = process.env.SUPABASE_NAME_INDEX_DATABASE_URL;
+  const originalSupabasePooler = process.env.SUPABASE_DB_POOLER_URL;
+  const originalSupabaseDb = process.env.SUPABASE_DB_URL;
+  const originalFetch = global.fetch;
+  delete process.env.SUPABASE_NAME_INDEX_DATABASE_URL;
+  delete process.env.SUPABASE_DB_POOLER_URL;
+  delete process.env.SUPABASE_DB_URL;
+  resetSupabaseNameIndexCircuitForTest();
+  const debug = {};
+  let fetchCalls = 0;
+  let prefixCalls = 0;
+  try {
+    process.env.MARKETPLACE_SEARCH_ENGINE = 'meili';
+    process.env.MARKETPLACE_SEARCH_SHADOW = '0';
+    process.env.MEILI_HOST = 'http://meili.test';
+    global.fetch = async (_url, options) => {
+      fetchCalls += 1;
+      const body = JSON.parse(options.body || '{}');
+      assert.equal(body.q, 'p');
+      assert.equal(body.showRankingScore, true);
+      return {
+        ok: true,
+        text: async () => JSON.stringify({ hits: [] }),
+      };
+    };
+
+    const rows = await rowsForAutocompleteSearchTermWithQuery(
+      'p',
+      500,
+      'en',
+      debug,
+      null,
+      async (sql, values) => {
+        prefixCalls += 1;
+        assert.deepEqual(values.slice(0, 3), ['p', 500, 'en']);
+        assert.doesNotMatch(sql, /from public\.marketplace_hot_blueprints h\s+join public\.marketplace_search_candidates/);
+        return {
+          rows: [
+            row({ id: '1', name: 'Pikachu', rank: 1200 }),
+            row({ id: '2', name: 'Porygon', rank: 900 }),
+          ],
+        };
+      },
+    );
+
+    assert.equal(fetchCalls, 1);
+    assert.equal(prefixCalls, 1);
+    assert.deepEqual(rows.map((result) => result.name), ['Pikachu', 'Porygon']);
+    assert.equal(debug.meiliAutocompleteFallback.reason, 'empty_meili_pool');
+    assert.equal(debug.meiliAutocompleteFallback.candidateRowCount, 0);
+    assert.equal(debug.searchPath, 'typed_one_character_sharded_prefix');
+    assert.equal(debug.tokenPlan.strategy, 'typed_one_character_sharded_prefix');
+  } finally {
+    resetSupabaseNameIndexCircuitForTest();
+    if (originalEngine === undefined) delete process.env.MARKETPLACE_SEARCH_ENGINE;
+    else process.env.MARKETPLACE_SEARCH_ENGINE = originalEngine;
+    if (originalShadow === undefined) delete process.env.MARKETPLACE_SEARCH_SHADOW;
+    else process.env.MARKETPLACE_SEARCH_SHADOW = originalShadow;
+    if (originalHost === undefined) delete process.env.MEILI_HOST;
+    else process.env.MEILI_HOST = originalHost;
+    if (originalSupabaseNameIndex === undefined) delete process.env.SUPABASE_NAME_INDEX_DATABASE_URL;
+    else process.env.SUPABASE_NAME_INDEX_DATABASE_URL = originalSupabaseNameIndex;
+    if (originalSupabasePooler === undefined) delete process.env.SUPABASE_DB_POOLER_URL;
+    else process.env.SUPABASE_DB_POOLER_URL = originalSupabasePooler;
+    if (originalSupabaseDb === undefined) delete process.env.SUPABASE_DB_URL;
+    else process.env.SUPABASE_DB_URL = originalSupabaseDb;
+    global.fetch = originalFetch;
+  }
+});
+
 test('typed one-character autocomplete prefers Supabase token table over Oracle shard', async () => {
   const original = process.env.SUPABASE_NAME_INDEX_DATABASE_URL;
   try {
@@ -2698,6 +2829,37 @@ test('name-only fanout uses card-name table for trainer cards', async () => {
 
   assert.equal(debug.tokenPlan.strategy, 'name_table_fanout');
   assert.deepEqual(rows.map((result) => result.name), ['Cynthia']);
+});
+
+test('combined card-name search joins collector-number projection', async () => {
+  const rows = await searchCombinedCardNameWithDatabase(
+    ['ecarlate', 'violet'],
+    20,
+    async (sql) => {
+      assert.match(sql, /collectorNumberJoinSql|left join public\.marketplace_cards mc/);
+      assert.match(sql, /candidate_number\.card_number/);
+      assert.doesNotMatch(sql, /order by c\.search_weight desc, c\.name asc, c\.card_number asc/);
+      return { rows: [row({ id: '1', name: 'Pikachu', number: '063/198' })] };
+    },
+  );
+
+  assert.equal(rows[0].card_number, '063/198');
+});
+
+test('name-only fallback joins collector-number projection', async () => {
+  const rows = await searchNameOnlyRowsWithDatabase(
+    ['super', 'bonbon'],
+    20,
+    'fr',
+    async (sql, values) => {
+      assert.match(sql, /left join public\.marketplace_cards mc/);
+      assert.match(sql, /candidate_number\.card_number/);
+      assert.equal(values[2], 'fr');
+      return { rows: [row({ id: '2', name: 'Rare Candy', number: '82/95' })] };
+    },
+  );
+
+  assert.equal(rows[0].card_number, '82/95');
 });
 
 test('direct name-only query joins card-name table to candidates in one request', async () => {

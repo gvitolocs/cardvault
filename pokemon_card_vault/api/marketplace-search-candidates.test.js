@@ -6,6 +6,7 @@ const {
   searchNonNameCategoryWithContext,
   searchNonNameWithDatabase,
   searchVariationReplicaNonNameWithDatabase,
+  rowsForSearchTerm,
   searchTerms,
 } = require('./marketplace-search-candidates');
 
@@ -99,6 +100,62 @@ test('non-name category planner recognizes HGSS era expansion aliases', () => {
     token.term === 'heartgold' && token.categories.includes('expansion')));
   assert(nonNameCategoryPlan('rare candy soulsilver').tokens.some((token) =>
     token.term === 'soulsilver' && token.categories.includes('expansion')));
+});
+
+test('meili-only candidate fetch returns empty without legacy split fallback', async () => {
+  const originalEngine = process.env.MARKETPLACE_SEARCH_ENGINE;
+  const originalHost = process.env.MEILI_HOST;
+  const originalFetch = global.fetch;
+  try {
+    process.env.MARKETPLACE_SEARCH_ENGINE = 'meili';
+    process.env.MEILI_HOST = 'http://meili.test';
+    global.fetch = async () => ({
+      ok: true,
+      text: async () => JSON.stringify({ hits: [] }),
+    });
+    const debug = {};
+    const rows = await rowsForSearchTerm('p', 20, 0, 'en', debug, null, { meiliOnly: true });
+
+    assert.deepEqual(rows, []);
+    assert.equal(debug.searchPath, 'meili_en_candidates');
+    assert.equal(debug.searchEngine.mode, 'meili');
+    assert.equal(debug.searchEngine.candidateCount, 0);
+  } finally {
+    if (originalEngine === undefined) delete process.env.MARKETPLACE_SEARCH_ENGINE;
+    else process.env.MARKETPLACE_SEARCH_ENGINE = originalEngine;
+    if (originalHost === undefined) delete process.env.MEILI_HOST;
+    else process.env.MEILI_HOST = originalHost;
+    global.fetch = originalFetch;
+  }
+});
+
+test('meili-only candidate fetch delegates unavailable fallback to caller', async () => {
+  const originalEngine = process.env.MARKETPLACE_SEARCH_ENGINE;
+  const originalHost = process.env.MEILI_HOST;
+  const originalFetch = global.fetch;
+  const originalError = console.error;
+  try {
+    process.env.MARKETPLACE_SEARCH_ENGINE = 'meili';
+    process.env.MEILI_HOST = 'http://meili.test';
+    global.fetch = async () => {
+      throw new Error('meili down');
+    };
+    console.error = () => {};
+    const debug = {};
+    const rows = await rowsForSearchTerm('p', 20, 0, 'en', debug, null, { meiliOnly: true });
+
+    assert.deepEqual(rows, []);
+    assert.equal(debug.searchPath, 'meili_en_unavailable');
+    assert.equal(debug.searchEngine.fallback, 'caller');
+    assert.match(debug.searchEngine.reason, /meili down/);
+  } finally {
+    if (originalEngine === undefined) delete process.env.MARKETPLACE_SEARCH_ENGINE;
+    else process.env.MARKETPLACE_SEARCH_ENGINE = originalEngine;
+    if (originalHost === undefined) delete process.env.MEILI_HOST;
+    else process.env.MEILI_HOST = originalHost;
+    global.fetch = originalFetch;
+    console.error = originalError;
+  }
 });
 
 test('non-name category planner preserves short variation prefixes', () => {

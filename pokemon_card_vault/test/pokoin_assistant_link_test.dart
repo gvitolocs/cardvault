@@ -70,17 +70,17 @@ void main() {
             'url': 'https://pokoin.com/marketplace/search?q=Mew',
           },
         ]),
-        ['/marketplace/search?q=Mew'],
+        isEmpty,
       );
     });
 
-    test('treats local assistant navigation current-page writes as one-shot echoes',
+    test(
+        'treats local assistant navigation current-page writes as one-shot echoes',
         () {
       resetAssistantNavigationReplayGuardForTest();
       final now = DateTime.utc(2026, 5, 24, 17, 0);
       const sessionId = 'flutter-12345678-1';
-      const whirlpoolPath =
-          '/marketplace/en/cards/123456/whirlpool-card-page';
+      const whirlpoolPath = '/marketplace/en/cards/123456/whirlpool-card-page';
       const leafeonPath = '/marketplace/en/cards/633200/leafeon';
 
       recordAssistantLocalNavigationForTest(
