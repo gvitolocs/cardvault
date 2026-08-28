@@ -854,7 +854,7 @@ class CardNotifier extends StateNotifier<CardState> {
 
     final results = await _cardService.searchMarketplaceCards(
       normalizedQuery,
-      limit: 240,
+      limit: 100,
       searchLanguage: state.searchLanguage,
       searchSessionId: searchSessionId,
     );
@@ -865,7 +865,7 @@ class CardNotifier extends StateNotifier<CardState> {
     if (results.isEmpty) {
       return;
     }
-    final remoteResults = _remoteSearchResults(results, limit: 240);
+    final remoteResults = _remoteSearchResults(results, limit: 100);
     state = state.copyWith(
       cards: _mergeCards(state.cards, remoteResults),
       remoteSearchResults: remoteResults,

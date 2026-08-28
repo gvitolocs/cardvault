@@ -106,6 +106,10 @@ class _MarketplaceSearchScreenState
   String _productFacetRequestKey = '';
   String _autoOpenedSearchKey = '';
   int _requestId = 0;
+  static const int _searchPageSize = 100;
+  int _nextOffset = 0;
+  bool _hasMore = true;
+  bool _loadingMore = false;
   Timer? _debounce;
 
   @override
@@ -139,9 +143,6 @@ class _MarketplaceSearchScreenState
   }
 
   void _handleSearchFocusChanged() {
-    if (!_searchFocusNode.hasFocus) {
-      _cardNotifier.exitSearch(reason: 'search_page_blur');
-    }
     if (mounted) {
       setState(() => _searchFocused = _searchFocusNode.hasFocus);
     }
@@ -214,10 +215,28 @@ class _MarketplaceSearchScreenState
     setState(() {
       _isSearching = true;
       _error = null;
+      _nextOffset = 0;
+      _hasMore = true;
+      _loadingMore = false;
     });
 
     try {
       final productType = _selectedProductType?.trim();
+      final cardState = ref.read(cardProvider);
+      final warmedQuery = cardState.previewQuery.trim().isNotEmpty
+          ? cardState.previewQuery.trim()
+          : cardState.searchQuery.trim();
+      if (expansion == null || expansion.isEmpty) {
+        final warmed = warmedQuery.toLowerCase() == normalizedQuery.toLowerCase()
+            ? cardState.searchPreviews
+            : const <PokemonCard>[];
+        if (warmed.isNotEmpty && mounted && requestId == _requestId) {
+          setState(() {
+            _results = warmed;
+            _error = null;
+          });
+        }
+      }
       final results = expansion != null && expansion.isNotEmpty
           ? await _cardService.getCardsByExpansion(expansion)
           : await _loadSearchResults(
@@ -322,29 +341,93 @@ class _MarketplaceSearchScreenState
     required String? productType,
     required String searchLanguage,
   }) async {
-    final baseResults = _meaningfulSearchLength(normalizedQuery) < 1
-        ? await _cardService.getAllCards()
-        : await _cardService.searchMarketplaceCards(
-            normalizedQuery,
-            limit: 240,
-            searchLanguage: searchLanguage,
-          );
     final selectedProductType = productType?.trim();
-    if (selectedProductType == null || selectedProductType.isEmpty) {
-      return baseResults;
+    if (_meaningfulSearchLength(normalizedQuery) < 1) {
+      _nextOffset = 0;
+      _hasMore = false;
+      if (selectedProductType == null || selectedProductType.isEmpty) {
+        return _cardService.getAllCards();
+      }
+      return _cardService.getMarketplaceCardsByProductType(
+        selectedProductType,
+        limit: _searchPageSize,
+      );
     }
-    final productResults = _meaningfulSearchLength(normalizedQuery) < 1
-        ? await _cardService.getMarketplaceCardsByProductType(
-            selectedProductType,
-            limit: 240,
-          )
-        : await _cardService.searchMarketplaceCards(
-            normalizedQuery,
-            limit: 240,
-            productType: selectedProductType,
-            searchLanguage: searchLanguage,
-          );
-    return _mergeSearchResults(baseResults, productResults);
+    if (selectedProductType == null || selectedProductType.isEmpty) {
+      final page = await _cardService.searchMarketplaceCards(
+        normalizedQuery,
+        limit: _searchPageSize,
+        offset: 0,
+        searchLanguage: searchLanguage,
+      );
+      _nextOffset = page.length;
+      _hasMore = page.length >= _searchPageSize;
+      return page;
+    }
+    final baseResults = await _cardService.searchMarketplaceCards(
+      normalizedQuery,
+      limit: _searchPageSize,
+      offset: 0,
+      searchLanguage: searchLanguage,
+    );
+    final productResults = await _cardService.searchMarketplaceCards(
+      normalizedQuery,
+      limit: _searchPageSize,
+      productType: selectedProductType,
+      searchLanguage: searchLanguage,
+    );
+    final merged = _mergeSearchResults(baseResults, productResults);
+    _nextOffset = baseResults.length;
+    _hasMore = baseResults.length >= _searchPageSize;
+    return merged;
+  }
+
+  Future<void> _loadMoreSearchResults() async {
+    if (_loadingMore || !_hasMore || _isSearching) {
+      return;
+    }
+    final normalizedQuery = _controller.text.trim();
+    if (_meaningfulSearchLength(normalizedQuery) < 1) {
+      return;
+    }
+    setState(() => _loadingMore = true);
+    try {
+      final page = await _cardService.searchMarketplaceCards(
+        normalizedQuery,
+        limit: _searchPageSize,
+        offset: _nextOffset,
+        searchLanguage: ref.read(cardProvider).searchLanguage,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _results = _dedupeSearchPageCards([..._results, ...page]);
+        _nextOffset += page.length;
+        _hasMore = page.length >= _searchPageSize;
+        _loadingMore = false;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _loadingMore = false;
+        _error = '$error';
+      });
+    }
+  }
+
+  List<PokemonCard> _dedupeSearchPageCards(List<PokemonCard> cards) {
+    final seen = <String>{};
+    final out = <PokemonCard>[];
+    for (final card in cards) {
+      if (card.id.isEmpty || !seen.add(card.id)) {
+        continue;
+      }
+      out.add(card);
+    }
+    return out;
   }
 
   @override
@@ -501,6 +584,18 @@ class _MarketplaceSearchScreenState
                     const SizedBox(height: 14),
                   ],
                   ...content,
+                  if (_hasMore && query.isNotEmpty) ...[
+                    const SizedBox(height: 18),
+                    Center(
+                      child: TextButton(
+                        onPressed: _loadingMore ? null : _loadMoreSearchResults,
+                        child: Text(
+                          _loadingMore ? 'Loading…' : 'Load more cards',
+                          style: const TextStyle(color: Color(0xFFFACC15)),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               );
               if (constraints.maxWidth < 880) {
@@ -519,6 +614,18 @@ class _MarketplaceSearchScreenState
                       const SizedBox(height: 14),
                     ],
                     ...content,
+                    if (_hasMore && query.isNotEmpty) ...[
+                      const SizedBox(height: 18),
+                      Center(
+                        child: TextButton(
+                          onPressed: _loadingMore ? null : _loadMoreSearchResults,
+                          child: Text(
+                            _loadingMore ? 'Loading…' : 'Load more cards',
+                            style: const TextStyle(color: Color(0xFFFACC15)),
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 );
               }
@@ -2214,7 +2321,6 @@ void goToMarketplaceSearch(
   void Function(String query)? onShowAll,
   Map<String, String> extraQueryParameters = const {},
 }) {
-  ref.read(cardProvider.notifier).exitSearch(reason: 'show_all');
   final searchLanguage = ref.read(cardProvider).searchLanguage;
   if (onShowAll != null) {
     onShowAll(query);

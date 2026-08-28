@@ -3575,7 +3575,7 @@ class CardService {
       return getAllCards();
     }
 
-    final remote = await searchMarketplaceCards(normalizedQuery, limit: 240);
+    final remote = await searchMarketplaceCards(normalizedQuery, limit: 100);
     if (remote.isNotEmpty) {
       return remote;
     }
@@ -3590,7 +3590,8 @@ class CardService {
 
   Future<List<PokemonCard>> searchMarketplaceCards(
     String query, {
-    int limit = 120,
+    int limit = 100,
+    int offset = 0,
     String? productType,
     String searchLanguage = 'en',
     String? searchSessionId,
@@ -3604,53 +3605,82 @@ class CardService {
     final queries = _searchQueryVariants([normalizedQuery]);
     final results = <PokemonCard>[];
 
+    final pageSize = limit < 1 ? 100 : (limit > 100 ? 100 : limit);
     if (productType != null && productType.trim().isNotEmpty) {
       for (final searchQuery in queries) {
         final rows = await _searchMarketplaceCardVersions(
           searchQuery,
-          limit: limit,
+          limit: pageSize,
           productType: productType,
           searchLanguage: queryLanguage,
           searchSessionId: searchSessionId,
         );
         results.addAll(rows);
-        if (results.length >= limit) {
+        if (results.length >= pageSize) {
           break;
         }
       }
-      return _dedupeCards(results).take(limit).toList();
+      return _dedupeCards(results).take(pageSize).toList();
     }
 
-    for (final searchQuery in queries) {
-      final rows = await Future.wait([
-        _searchMarketplaceCardVersions(
-          searchQuery,
-          limit: limit,
-          searchLanguage: queryLanguage,
-          searchSessionId: searchSessionId,
-        ),
-        _searchMarketplaceCardRows(
-          searchQuery,
-          limit: limit,
-          searchLanguage: queryLanguage,
-          searchSessionId: searchSessionId,
-        ),
-        _searchMarketplaceCardRows(
-          searchQuery,
-          limit: limit,
-          searchLanguage: queryLanguage,
-          productSearchOnly: true,
-          searchSessionId: searchSessionId,
-        ),
-      ]);
-      results.addAll(rows[0].where((card) => card.itemKind != 'product'));
-      results.addAll(rows[1].where((card) => card.itemKind != 'product'));
-      results.addAll(rows[2]);
-      if (results.length >= limit) {
-        break;
+    final rows = await _searchMarketplaceCandidateRows(
+      normalizedQuery,
+      limit: pageSize,
+      offset: offset < 0 ? 0 : offset,
+      searchLanguage: queryLanguage,
+      searchSessionId: searchSessionId,
+    );
+    return _dedupeCards(rows).take(pageSize).toList();
+  }
+
+  Future<List<PokemonCard>> _searchMarketplaceCandidateRows(
+    String normalizedQuery, {
+    required int limit,
+    int offset = 0,
+    String searchLanguage = 'en',
+    String? searchSessionId,
+  }) async {
+    try {
+      final authHeaders =
+          await PokoinApiAuthService.instance().authorizationHeaders(
+        requireSignedIn: false,
+      );
+      final response = await http
+          .post(
+            Uri.base.resolve('/api/marketplace-search-candidates'),
+            headers: {
+              'content-type': 'application/json',
+              ...authHeaders,
+            },
+            body: jsonEncode({
+              'search_term': normalizedQuery,
+              'result_limit': limit,
+              'result_offset': offset,
+              'search_language': searchLanguage,
+              if (searchSessionId?.trim().isNotEmpty == true)
+                'search_session_id': searchSessionId,
+            }),
+          )
+          .timeout(const Duration(seconds: 8));
+      if (response.statusCode >= 400) {
+        debugPrint(
+            'Marketplace candidate search failed: ${response.statusCode}');
+        return const [];
       }
+      final decoded = jsonDecode(response.body);
+      final rows = decoded is Map
+          ? (decoded['rows'] as List<dynamic>? ?? const [])
+          : decoded is List
+              ? decoded
+              : const [];
+      return _dedupeCards(rows
+          .whereType<Map>()
+          .map((row) => _cardFromSearchCandidate(Map<String, dynamic>.from(row)))
+          .toList());
+    } catch (error) {
+      debugPrint('Marketplace candidate search failed: $error');
+      return const [];
     }
-    return _dedupeCards(results).take(limit).toList();
   }
 
   Future<List<PokemonCard>> lookupDeckCardVersions({
@@ -4553,7 +4583,7 @@ class CardService {
     String? searchSessionId,
   }) async {
     try {
-      final queryParameters = <String, String>{'limit': '${limit * 4}'};
+      final queryParameters = <String, String>{'limit': '$limit'};
       final normalizedProductType = productType?.trim();
       if (normalizedProductType != null && normalizedProductType.isNotEmpty) {
         queryParameters['productType'] = normalizedProductType;
@@ -4599,7 +4629,7 @@ class CardService {
     String? searchSessionId,
   }) async {
     try {
-      final queryParameters = <String, String>{'limit': '${limit * 4}'};
+      final queryParameters = <String, String>{'limit': '$limit'};
       final normalizedProductType = productType?.trim();
       if (normalizedProductType != null && normalizedProductType.isNotEmpty) {
         queryParameters['productType'] = normalizedProductType;

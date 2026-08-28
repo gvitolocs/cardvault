@@ -1166,40 +1166,39 @@ async function rowsForMeiliSearchTerm(
   debug = null,
   previousContext = null,
 ) {
-  const poolLimit = Math.min(Math.max(resultLimit * 3, 120), 500);
+  const pageSize = Math.min(Math.max(Math.trunc(Number(resultLimit) || 100), 1), 100);
+  const pageOffset = Math.min(Math.max(Math.trunc(Number(resultOffset) || 0), 0), 10000);
   const meiliCandidates = await meiliMarketplaceCandidates(
     searchTerm,
     searchLanguage,
-    poolLimit,
-    resultOffset,
+    pageSize,
+    pageOffset,
   );
-  const ids = meiliCandidates.map((candidate) => candidate.card_id);
+  const ids = meiliCandidates.map((candidate) => String(candidate.card_id)).filter(Boolean);
   const hydratedRows = await searchRowsByCardIdsWithDatabase(ids);
-  const scoreById = new Map(meiliCandidates.map((candidate) => [String(candidate.card_id), candidate]));
-  const merged = hydratedRows
-    .map((row) => {
-      const meili = scoreById.get(String(row.card_id));
-      return {
-        ...row,
-        search_rank: Number(row.search_weight || 0) + Number(meili?.meili_rank || 0) * 10_000,
-      };
-    })
-    .sort((left, right) =>
-      Number(right.search_rank || 0) - Number(left.search_rank || 0) ||
-      String(left.name || '').localeCompare(String(right.name || '')) ||
-      String(left.card_number || '').localeCompare(String(right.card_number || '')))
-    .slice(0, resultLimit);
+  const byId = new Map(hydratedRows.map((row) => [String(row.card_id), row]));
+  const merged = ids.map((id, index) => {
+    const row = byId.get(id);
+    if (!row) return null;
+    const meili = meiliCandidates[index];
+    return {
+      ...row,
+      search_rank: Number(meili?.meili_rank || 0),
+    };
+  }).filter(Boolean);
   if (debug) {
     debug.searchPath = 'meili_en_candidates';
     debug.tokenPlan = {
       strategy: 'meili_en_candidates',
-      poolLimit,
+      poolLimit: pageSize,
       candidateCount: meiliCandidates.length,
       hydratedCount: hydratedRows.length,
+      offset: pageOffset,
     };
     debug.searchEngine = {
       mode: 'meili',
-      poolLimit,
+      poolLimit: pageSize,
+      offset: pageOffset,
       candidateCount: meiliCandidates.length,
       hydratedCount: hydratedRows.length,
       shadow: marketplaceSearchShadowEnabled(),

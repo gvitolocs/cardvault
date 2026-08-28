@@ -1,4 +1,6 @@
 const { marketplaceQuery } = require('./_marketplace_db');
+const { rowsForSearchTerm } = require('./marketplace-search-candidates');
+const { useMeiliSearchForLanguage } = require('./_marketplace_search_engine');
 const {
   watchlistAnalyticsJoin,
   watchlistCountColumn,
@@ -22,6 +24,22 @@ function cleanLimit(value, fallback = 240) {
     return fallback;
   }
   return Math.min(Math.max(Math.trunc(limit), 1), 1000);
+}
+
+function cleanSearchPageLimit(value, fallback = 100) {
+  const limit = Number(value);
+  if (!Number.isFinite(limit)) {
+    return fallback;
+  }
+  return Math.min(Math.max(Math.trunc(limit), 1), 100);
+}
+
+function cleanOffset(value) {
+  const offset = Number(value);
+  if (!Number.isFinite(offset)) {
+    return 0;
+  }
+  return Math.min(Math.max(Math.trunc(offset), 0), 10000);
 }
 
 function cleanText(value, maxLength = 120) {
@@ -268,7 +286,23 @@ async function fallbackRowsForStructuredCards({ query, limit, searchLanguage }) 
   return result.rows.map(({ ordinality, ...row }) => withCardEmojiFields(row));
 }
 
-async function rowsForCards({ query, limit, productType, productSearchOnly, searchLanguage }) {
+async function rowsForCards({ query, limit, offset = 0, productType, productSearchOnly, searchLanguage }) {
+  const nameQuery = cleanText(query);
+  const typedProduct = cleanText(productType, 60);
+  const language = cleanLanguage(searchLanguage);
+  if (
+    nameQuery &&
+    !typedProduct &&
+    !productSearchOnly &&
+    useMeiliSearchForLanguage(language)
+  ) {
+    return rowsForSearchTerm(
+      nameQuery,
+      cleanSearchPageLimit(limit),
+      cleanOffset(offset),
+      language,
+    );
+  }
   const values = [];
   const raritySql = projectedRaritySql({
     rarityColumn: 'marketplace_search_candidates.rarity',
@@ -405,6 +439,7 @@ module.exports = async function handler(req, res) {
     const rows = await rowsForCards({
       query: url.searchParams.get('query'),
       limit: url.searchParams.get('limit'),
+      offset: url.searchParams.get('offset'),
       productType: url.searchParams.get('productType'),
       productSearchOnly: url.searchParams.get('productSearchOnly') === '1',
       searchLanguage: url.searchParams.get('search_language') ||
