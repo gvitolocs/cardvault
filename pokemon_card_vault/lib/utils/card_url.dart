@@ -106,6 +106,24 @@ Future<String> resolveDatabaseBackedCardDetailPath(
   );
 }
 
+/// Our marketplace/URL id. Catalog `card.id` is already this number.
+/// Odd leftovers are treated as raw CardTrader `ct_id` and doubled.
+/// Even values are already our id — do not multiply again.
+String marketplacePublicCardId(String cardId) {
+  final cleanId = cardId.trim();
+  if (!RegExp(r'^\d+$').hasMatch(cleanId)) {
+    return '';
+  }
+  final value = BigInt.tryParse(cleanId);
+  if (value == null || value <= BigInt.zero) {
+    return '';
+  }
+  if (value.isOdd) {
+    return (value * BigInt.from(2)).toString();
+  }
+  return cleanId;
+}
+
 String marketplaceCardDetailPathFromParts({
   required String cardId,
   required String slug,
@@ -113,12 +131,47 @@ String marketplaceCardDetailPathFromParts({
 }) {
   final cleanLanguage =
       _slugPart(language).isEmpty ? 'en' : _slugPart(language);
-  final doubledId = doubledCardId(cardId);
+  final publicId = marketplacePublicCardId(cardId);
   final cleanSlug = normalizeCardDetailSlug(slug);
-  if (doubledId.isEmpty || cleanSlug.isEmpty) {
+  if (publicId.isEmpty || cleanSlug.isEmpty) {
     return '';
   }
-  return '/marketplace/$cleanLanguage/cards/$doubledId/$cleanSlug';
+  return '/marketplace/$cleanLanguage/cards/$publicId/$cleanSlug';
+}
+
+/// Shareable root shortlink: `/{publicNumber}/{slug}`.
+///
+/// [cardId] is the Pokoin public id (CardTrader id * 2, stored as card_id).
+String marketplacePublicShortLinkPathFromParts({
+  required String cardId,
+  String slug = '',
+}) {
+  final publicId = marketplacePublicCardId(cardId);
+  if (publicId.isEmpty) {
+    return '';
+  }
+  final cleanSlug = normalizeCardDetailSlug(slug);
+  return cleanSlug.isEmpty ? '/$publicId' : '/$publicId/$cleanSlug';
+}
+
+String marketplacePublicShortLinkPath(PokemonCard card) {
+  final canonical = marketplaceCardDetailPath(card);
+  if (canonical.isEmpty) {
+    return '';
+  }
+  final parts = canonical.split('/').where((part) => part.isNotEmpty).toList();
+  final cardsIndex = parts.indexOf('cards');
+  if (cardsIndex < 0 || cardsIndex + 1 >= parts.length) {
+    return '';
+  }
+  final publicNumber = parts[cardsIndex + 1];
+  final slug = parts.length > cardsIndex + 2
+      ? normalizeCardDetailSlug(parts.sublist(cardsIndex + 2).join('-'))
+      : '';
+  if (!RegExp(r'^\d+$').hasMatch(publicNumber)) {
+    return '';
+  }
+  return slug.isEmpty ? '/$publicNumber' : '/$publicNumber/$slug';
 }
 
 String marketplaceCardShortLinkRedirectPath(
@@ -129,7 +182,7 @@ String marketplaceCardShortLinkRedirectPath(
   if (!isRootCardShortLink(cleanId)) {
     return '';
   }
-  return '/$cleanId';
+  return '/marketplace/$cleanId';
 }
 
 bool isRootCardShortLink(String value) {
@@ -496,6 +549,8 @@ String cardIdFromSlug(String slug) {
   return match?.group(0) ?? slug.trim();
 }
 
+/// Our marketplace id from a CardTrader `ct_id` (`n * 2`).
+/// Catalog `card.id` is already our id — do not run this on it.
 String doubledCardId(String id) {
   final cleanId = id.trim();
   if (!RegExp(r'^\d+$').hasMatch(cleanId)) {
@@ -508,6 +563,9 @@ String doubledCardId(String id) {
   return (value * BigInt.from(2)).toString();
 }
 
+/// CardTrader `ct_id` from our marketplace/URL id (`n / 2`).
+///
+/// Our ids are even. Odd numbers are leftover raw CT ids, not our id.
 String cardIdFromDoubledId(String doubledId) {
   final cleanId = doubledId.trim();
   if (!RegExp(r'^\d+$').hasMatch(cleanId)) {
@@ -520,6 +578,103 @@ String cardIdFromDoubledId(String doubledId) {
   return (value ~/ BigInt.from(2)).toString();
 }
 
+/// CDN leftover R2 keys stay on CardTrader `ct_id`. Public URLs use our id.
+bool isFragileCdnPreviewWebp(String url) {
+  return RegExp(r'/previews/[^?\s]+\.webp(?:\?|$)', caseSensitive: false)
+      .hasMatch(url.trim());
+}
+
+bool isMarketplacePreviewRaster(String url) {
+  final value = url.trim().toLowerCase();
+  return value.contains('/previews/') || value.contains('/preview_');
+}
+
+String preferDecodableMarketplaceImage({
+  String homepage = '',
+  String preview = '',
+  String image = '',
+}) {
+  final candidates = [homepage, preview, image]
+      .map((value) => value.trim())
+      .where((value) => value.isNotEmpty)
+      .toList(growable: false);
+  if (candidates.isEmpty) {
+    return '';
+  }
+  for (final url in candidates) {
+    if (!isFragileCdnPreviewWebp(url)) {
+      return url;
+    }
+  }
+  return candidates.first;
+}
+
+/// Detail/hero art must use the full raster. Homepage/preview are 180px
+/// thumbnails; Flutter web's HTML <img> can decode progressive JPEG.
+String preferDetailMarketplaceImage({
+  String homepage = '',
+  String preview = '',
+  String image = '',
+}) {
+  final ranked = [image, homepage, preview]
+      .map((value) => value.trim())
+      .where((value) => value.isNotEmpty)
+      .toList(growable: false);
+  for (final url in ranked) {
+    if (!isFragileCdnPreviewWebp(url) && !isMarketplacePreviewRaster(url)) {
+      return url;
+    }
+  }
+  return preferDecodableMarketplaceImage(
+    homepage: homepage,
+    preview: preview,
+    image: image,
+  );
+}
+
+/// Rewrite leftover `{ct_id}_` CDN prefixes to our `{card_id}_`.
+///
+/// R2 objects stay named with `ct_id`. The CDN Worker maps our id to that
+/// leftover key. Do not rewrite public URLs back to CardTrader numbers.
+String rewriteCdnPrefixToOurId(
+  String url, {
+  String pokoinCardId = '',
+  String ctId = '',
+}) {
+  final source = url.trim();
+  if (source.isEmpty) {
+    return source;
+  }
+  final pokoin = pokoinCardId.trim();
+  var trader = ctId.trim();
+  if (trader.isEmpty) {
+    trader = cardIdFromDoubledId(pokoin);
+  }
+  if (pokoin.isEmpty || trader.isEmpty || pokoin == trader) {
+    return source;
+  }
+  if (!RegExp(r'^\d+$').hasMatch(trader) || !RegExp(r'^\d+$').hasMatch(pokoin)) {
+    return source;
+  }
+  return source.replaceAllMapped(
+    RegExp('(^|/)(previews/)?${RegExp.escape(trader)}_'),
+    (match) => '${match[1]}${match[2] ?? ''}${pokoin}_',
+  );
+}
+
+/// Historical name. Same as [rewriteCdnPrefixToOurId] (D00000B).
+String rewriteCdnPokoinPrefixToCt(
+  String url, {
+  String pokoinCardId = '',
+  String ctId = '',
+}) {
+  return rewriteCdnPrefixToOurId(
+    url,
+    pokoinCardId: pokoinCardId,
+    ctId: ctId,
+  );
+}
+
 MarketplaceCardRouteParts parseMarketplaceCardRoute({
   required String firstSegment,
   String? slugSegment,
@@ -528,18 +683,10 @@ MarketplaceCardRouteParts parseMarketplaceCardRoute({
   final slug =
       slugSegment == null ? null : normalizeCardDetailSlug(slugSegment);
   if (slug != null && slug.isNotEmpty) {
-    final decodedId = cardIdFromDoubledId(first);
-    if (decodedId.isNotEmpty) {
-      return MarketplaceCardRouteParts(
-        cardId: decodedId,
-        cardSlug: slug,
-        isCanonicalShape: true,
-      );
-    }
     return MarketplaceCardRouteParts(
       cardId: cardIdFromSlug(first),
       cardSlug: slug,
-      isCanonicalShape: false,
+      isCanonicalShape: cardIdFromDoubledId(first).isNotEmpty,
     );
   }
   if (isRootCardShortLink(first)) {

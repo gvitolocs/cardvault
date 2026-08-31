@@ -11,6 +11,7 @@ import '../constants/project_links.dart';
 import '../providers/auth_provider.dart';
 import '../providers/marketplace_account_provider.dart';
 import '../utils/price_format.dart';
+import '../utils/public_home.dart';
 import '../wallet/wallet_bridge_stub.dart';
 import '../widgets/site_footer.dart';
 
@@ -769,7 +770,7 @@ class _ProfileTopBar extends StatelessWidget implements PreferredSizeWidget {
                 child: Row(
                   children: [
                     InkWell(
-                      onTap: () => context.go('/'),
+                      onTap: () => goPublicHome(context),
                       borderRadius: BorderRadius.circular(20),
                       child: const _ProfileBrand(),
                     ),

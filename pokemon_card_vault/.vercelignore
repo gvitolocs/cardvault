@@ -1,0 +1,7 @@
+# Production pokoin.com is rewrite-only. Node handlers run on api.pokoin.com
+# (marketplace Oracle API). Do not upload api/*.js — Hobby is capped at 12
+# serverless functions and those files would each become one.
+api/**
+server/**
+oracle-postgres/**
+node_modules/**

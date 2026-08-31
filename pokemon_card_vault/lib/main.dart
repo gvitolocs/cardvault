@@ -15,6 +15,7 @@ import 'screens/inventory_screen.dart';
 import 'screens/landing_screen.dart';
 import 'screens/health_screen.dart';
 import 'screens/scan_screen.dart';
+import 'screens/card_scan_screen.dart';
 import 'screens/cart_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/favorites_screen.dart';
@@ -533,6 +534,15 @@ final routerProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) => _appPage(state, const ScanScreen()),
       ),
       GoRoute(
+        path: '/cardscan',
+        pageBuilder: (context, state) =>
+            _appPage(state, const CardScanScreen()),
+      ),
+      GoRoute(
+        path: '/scancard',
+        redirect: (context, state) => '/cardscan',
+      ),
+      GoRoute(
         path: '/tx/:hash',
         pageBuilder: (context, state) => _appPage(
           state,
@@ -833,6 +843,25 @@ final routerProvider = Provider<GoRouter>((ref) {
                 _appPage(state, const MarketplaceCardmarketGuessReviewScreen()),
           ),
           GoRoute(
+            path: '/marketplace/:publicNumber',
+            redirect: (context, state) {
+              final publicNumber = state.pathParameters['publicNumber'] ?? '';
+              if (!isRootCardShortLink(publicNumber)) {
+                return '/marketplace';
+              }
+              return null;
+            },
+            pageBuilder: (context, state) {
+              final publicNumber = state.pathParameters['publicNumber']!;
+              return _appPage(
+                state,
+                CardDetailScreen(
+                  cardId: publicNumber,
+                ),
+              );
+            },
+          ),
+          GoRoute(
             path: '/admin',
             pageBuilder: (context, state) =>
                 _appPage(state, const MarketplaceDebugScreen()),
@@ -974,13 +1003,15 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/:cardId/:cardSlug',
             pageBuilder: (context, state) {
-              final cardId = cardIdFromSlug(state.pathParameters['cardId']!);
-              final cardSlug = state.pathParameters['cardSlug']!;
+              final routeParts = parseMarketplaceCardRoute(
+                firstSegment: state.pathParameters['cardId']!,
+                slugSegment: state.pathParameters['cardSlug'],
+              );
               return _appPage(
                 state,
                 CardDetailScreen(
-                  cardId: cardId,
-                  cardSlug: cardSlug,
+                  cardId: routeParts.cardId,
+                  cardSlug: routeParts.cardSlug,
                   heroTag:
                       state.extra is String ? state.extra! as String : null,
                 ),
@@ -989,14 +1020,15 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/:cardSlug',
+            redirect: (context, state) {
+              final slug = state.pathParameters['cardSlug'] ?? '';
+              if (isRootCardShortLink(slug)) {
+                return marketplaceCardShortLinkRedirectPath(slug);
+              }
+              return null;
+            },
             pageBuilder: (context, state) {
               final slug = state.pathParameters['cardSlug']!;
-              if (isRootCardShortLink(slug)) {
-                return _appPage(
-                  state,
-                  CardDetailScreen(cardId: slug),
-                );
-              }
               return _appPage(
                 state,
                 ExpansionOrCardSlugScreen(slug: slug),

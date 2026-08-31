@@ -2439,7 +2439,9 @@ class CardNotifier extends StateNotifier<CardState> {
 
   PokemonCard? _findLoadedCard(String id) {
     for (final card in state.cards) {
-      if (card.id == id) {
+      if (card.id == id ||
+          marketplacePublicCardId(card.id) == id ||
+          marketplacePublicCardId(id) == card.id) {
         return card;
       }
     }

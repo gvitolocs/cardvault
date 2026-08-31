@@ -1,5 +1,11 @@
 # macOS
 .DS_Store
+# AppleDouble / resource forks from copying files onto Linux
+._*
+
+# Codevira local graph (rebuilt by `codevira`; too large for GitHub)
+.codevira/graph/
+.codevira/.registered
 
 # Local environment and secrets
 .env
@@ -50,3 +56,12 @@ pokemon_card_vault/integrations/trainingai-oracle-api/best-blueprint-images.json
 
 # Local operator accident backups
 *.bak-rebootloop-*
+
+# Public web (landing, React market, HTML cardscan) lives in pokoin-web
+# (gvitolocs/pokoin) and BattleScan. Leftover copies — do not commit here.
+pokemon_card_vault/web/home.html
+pokemon_card_vault/web/home/
+pokemon_card_vault/web/market/
+pokemon_card_vault/web/cardscan.html
+docs/react-api-architecture.md
+docs/react-page-apis.md

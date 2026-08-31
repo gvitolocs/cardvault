@@ -10,6 +10,7 @@ import '../constants/project_links.dart';
 import '../providers/auth_provider.dart';
 import '../services/pokoin_api_client.dart';
 import '../utils/price_format.dart';
+import '../utils/public_home.dart';
 import '../widgets/site_footer.dart';
 
 class BuyPknScreen extends ConsumerStatefulWidget {
@@ -638,7 +639,7 @@ class _BuyTopBar extends StatelessWidget implements PreferredSizeWidget {
                     ),
                   ),
                   TextButton(
-                      onPressed: () => context.go('/'),
+                      onPressed: () => goPublicHome(context),
                       child: const Text('Home')),
                   TextButton(
                       onPressed: () => context.go('/forum'),

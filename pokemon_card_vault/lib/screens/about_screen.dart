@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../constants/project_links.dart';
+import '../utils/public_home.dart';
 import '../widgets/site_footer.dart';
 
 class AboutScreen extends StatelessWidget {
@@ -151,7 +152,7 @@ class _InfoTopBar extends StatelessWidget implements PreferredSizeWidget {
       ),
       actions: [
         TextButton(
-          onPressed: () => context.go('/'),
+          onPressed: () => goPublicHome(context),
           child: const Text('Home'),
         ),
         const SizedBox(width: 10),

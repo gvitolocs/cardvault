@@ -3,10 +3,12 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/link.dart';
 
 import '../models/card_listing.dart';
 import '../models/app_user_profile.dart';
@@ -24,7 +26,10 @@ import '../utils/browser_capabilities.dart';
 import '../utils/card_navigation.dart';
 import '../utils/card_palette.dart';
 import '../utils/card_url.dart';
+import '../utils/marketplace_image_log.dart';
 import '../utils/price_format.dart';
+import '../utils/public_home.dart';
+import '../widgets/marketplace_network_image.dart';
 import '../widgets/site_footer.dart';
 
 const double topBarActionSize = 44;
@@ -1490,6 +1495,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           !compactTopBar && !cardState.isLoading && cardState.error == null,
     );
     final renderedWarmupCards = [
+      ...sections.newArrivals,
       ...sections.recentlySeen,
       ...sections.bestSellers,
       ...sections.featured,
@@ -1581,6 +1587,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         seeMoreQuery: '',
                         isLoading: recentViewsState.isLoading &&
                             sections.recentlySeen.isEmpty,
+                      ),
+                      const SizedBox(height: 24),
+                    ],
+                    if (sections.newArrivals.isNotEmpty) ...[
+                      _CardCarouselSection(
+                        title: 'New cards',
+                        cards: sections.newArrivals,
+                        seeMoreQuery: '',
                       ),
                       const SizedBox(height: 24),
                     ],
@@ -2243,6 +2257,10 @@ Widget marketplaceTopBarActions({
 }) {
   void go(String location) {
     beforeNavigate?.call(location);
+    if (location == '/') {
+      goPublicHome(context);
+      return;
+    }
     context.go(location);
   }
 
@@ -4147,6 +4165,7 @@ class _SearchPreviewRow extends StatelessWidget {
       card.cardPalette,
       fallbackType: paletteHint,
     );
+    final href = safeCardDetailPath(card);
     final row = InkWell(
       onTap: () => onSelected(
         SearchPreviewSelection(
@@ -4252,7 +4271,14 @@ class _SearchPreviewRow extends StatelessWidget {
         ),
       ),
     );
-    return _SearchPreviewHeroRow(heroTag: heroTag, child: row);
+    final preview = href.isEmpty
+        ? row
+        : Link(
+            uri: Uri.parse(href),
+            target: LinkTarget.self,
+            builder: (context, followLink) => row,
+          );
+    return _SearchPreviewHeroRow(heroTag: heroTag, child: preview);
   }
 
   String _previewTitle(PokemonCard card) {
@@ -4271,7 +4297,7 @@ class _SearchPreviewHeroRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (heroTag.isEmpty) {
+    if (heroTag.isEmpty || kIsWeb) {
       return child;
     }
     return Hero(
@@ -4280,7 +4306,7 @@ class _SearchPreviewHeroRow extends StatelessWidget {
         _,
         animation,
         __,
-        ___,
+        fromHeroContext,
         toHeroContext,
       ) {
         return ScaleTransition(
@@ -4289,7 +4315,7 @@ class _SearchPreviewHeroRow extends StatelessWidget {
           ),
           child: Material(
             color: Colors.transparent,
-            child: toHeroContext.widget,
+            child: fromHeroContext.widget,
           ),
         );
       },
@@ -4323,7 +4349,12 @@ class _SearchPreviewArtwork extends StatelessWidget {
         _CardImageFrame(
           width: compact ? 50 : 80,
           height: compact ? 66 : 100,
-          imageUrl: card.previewImageUrl,
+          pokoinCardId: card.id,
+          imageUrl: preferDecodableMarketplaceImage(
+            homepage: card.homepageImageUrl,
+            preview: card.previewImageUrl,
+            image: card.imageUrl,
+          ),
           fallbackImageUrl: card.imageUrl,
           cardType: paletteHint,
           cardPalette: card.cardPalette,
@@ -4587,8 +4618,8 @@ class _CardCarouselSectionState extends State<_CardCarouselSection> {
               children: [
                 ListView.separated(
                   controller: _scrollController,
-                  cacheExtent: 0,
-                  addAutomaticKeepAlives: false,
+                  cacheExtent: widget.title == 'Recently seen' ? 480 : 0,
+                  addAutomaticKeepAlives: widget.title == 'Recently seen',
                   addRepaintBoundaries: true,
                   padding: const EdgeInsets.symmetric(horizontal: 22),
                   physics: useDesktopControls
@@ -5862,6 +5893,7 @@ class _SpotlightMarketCard extends ConsumerWidget {
           children: [
             Positioned.fill(
               child: _CardImageFrame(
+                pokoinCardId: card.id,
                 imageUrl: card.imageUrl,
                 cardType: paletteHint,
                 cardPalette: card.cardPalette,
@@ -6088,6 +6120,7 @@ class _MarketCard extends ConsumerWidget {
                       children: [
                         Positioned.fill(
                           child: _CardImageFrame(
+                            pokoinCardId: card.id,
                             imageUrl: card.imageUrl,
                             cardType: paletteHint,
                             cardPalette: card.cardPalette,
@@ -6266,6 +6299,7 @@ class _FeaturedCard extends ConsumerWidget {
             Row(
               children: [
                 _CardImageFrame(
+                  pokoinCardId: card.id,
                   imageUrl: compact
                       ? card.previewImageUrl
                       : _homepageCardImageUrl(card),
@@ -6464,7 +6498,7 @@ class _HeroCardTileState extends State<_HeroCardTile> {
       ),
     );
     final tag = widget.heroTag;
-    if (tag == null || tag.isEmpty) {
+    if (tag == null || tag.isEmpty || kIsWeb) {
       return tile;
     }
     return Hero(
@@ -6473,7 +6507,7 @@ class _HeroCardTileState extends State<_HeroCardTile> {
         _,
         animation,
         __,
-        ___,
+        fromHeroContext,
         toHeroContext,
       ) {
         return ScaleTransition(
@@ -6482,7 +6516,7 @@ class _HeroCardTileState extends State<_HeroCardTile> {
           ),
           child: Material(
             color: Colors.transparent,
-            child: toHeroContext.widget,
+            child: fromHeroContext.widget,
           ),
         );
       },
@@ -6575,25 +6609,24 @@ void _goToCardDetail(
   PokemonCard card, {
   String? heroTag,
 }) {
+  ref.read(cardProvider.notifier).cacheCards([card]);
+  ref.read(recentViewsProvider.notifier).rememberNow(card);
   ref.read(cardProvider.notifier).beginNavigationTransition();
   unawaited(navigateToCanonicalCardDetail(
     context,
     card,
-    extra: heroTag,
+    extra: kIsWeb ? null : heroTag,
     source: 'marketplace_home',
   ));
 }
 
 String _homepageCardImageUrl(PokemonCard card) {
-  final homepage = card.homepageImageUrl.trim();
-  if (homepage.isNotEmpty) {
-    return homepage;
-  }
-  final preview = card.previewImageUrl.trim();
-  if (preview.isNotEmpty) {
-    return preview;
-  }
-  return card.imageUrl;
+  final raw = preferDecodableMarketplaceImage(
+    homepage: card.homepageImageUrl,
+    preview: card.previewImageUrl,
+    image: card.imageUrl,
+  );
+  return rewriteCdnPrefixToOurId(raw, pokoinCardId: card.id);
 }
 
 String _recentlySeenHeroTag(PokemonCard card, int index) {
@@ -6629,6 +6662,7 @@ class _CardImageFrame extends StatelessWidget {
     required this.borderRadius,
     this.cardType = '',
     this.fallbackImageUrl,
+    this.pokoinCardId = '',
     this.width,
     this.height,
     this.padding = const EdgeInsets.all(6),
@@ -6639,6 +6673,7 @@ class _CardImageFrame extends StatelessWidget {
   final String imageUrl;
   final String cardType;
   final String? fallbackImageUrl;
+  final String pokoinCardId;
   final BorderRadius borderRadius;
   final double? width;
   final double? height;
@@ -6648,8 +6683,16 @@ class _CardImageFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final primaryUrl = imageUrl.trim();
-    final fallback = fallbackImageUrl?.trim();
+    final primaryUrl = rewriteCdnPrefixToOurId(
+      imageUrl.trim(),
+      pokoinCardId: pokoinCardId,
+    );
+    final fallback = fallbackImageUrl == null
+        ? null
+        : rewriteCdnPrefixToOurId(
+            fallbackImageUrl!.trim(),
+            pokoinCardId: pokoinCardId,
+          );
     final placeholder = Icon(
       Icons.style,
       color: const Color(0xFFFACC15),
@@ -6657,19 +6700,36 @@ class _CardImageFrame extends StatelessWidget {
     );
     final image = primaryUrl.isEmpty
         ? placeholder
-        : CachedNetworkImage(
+        : MarketplaceNetworkImage(
             imageUrl: primaryUrl,
             fit: BoxFit.contain,
             alignment: Alignment.center,
-            errorWidget: (_, __, ___) {
+            errorWidget: (_, failedUrl, error) {
+              logMarketplaceCardImage(
+                url: failedUrl,
+                source: 'home_card_image',
+                status: 'error',
+                cardId: pokoinCardId,
+                fallbackUrl: fallback ?? '',
+                error: error,
+              );
               if (fallback != null &&
                   fallback.isNotEmpty &&
                   fallback != primaryUrl) {
-                return CachedNetworkImage(
+                return MarketplaceNetworkImage(
                   imageUrl: fallback,
                   fit: BoxFit.contain,
                   alignment: Alignment.center,
-                  errorWidget: (_, __, ___) => placeholder,
+                  errorWidget: (_, fallbackFailed, fallbackError) {
+                    logMarketplaceCardImage(
+                      url: fallbackFailed,
+                      source: 'home_card_image_fallback',
+                      status: 'error',
+                      cardId: pokoinCardId,
+                      error: fallbackError,
+                    );
+                    return placeholder;
+                  },
                 );
               }
               return placeholder;
@@ -6932,11 +6992,13 @@ class _MarketplaceSections {
     required this.recentlySeen,
     required this.bestSellers,
     required this.featured,
+    this.newArrivals = const [],
   });
 
   final List<PokemonCard> recentlySeen;
   final List<PokemonCard> bestSellers;
   final List<PokemonCard> featured;
+  final List<PokemonCard> newArrivals;
 
   factory _MarketplaceSections.fromCards(
     List<PokemonCard> cards, {
@@ -6952,11 +7014,15 @@ class _MarketplaceSections {
       singles,
       cheapestPricesByCardId,
     );
+    final byIdAll = {for (final card in cards) if (card.id.isNotEmpty) card.id: card};
+    final newArrivals = cachedSections == null
+        ? const <PokemonCard>[]
+        : _cardsForIdsAllowUnavailable(cachedSections.newArrivalIds, byIdAll);
     if (cachedSections != null) {
       final byId = {for (final card in singles) card.id: card};
       final bestSellers = _cardsForIds(cachedSections.bestSellerIds, byId);
       final featured = _cardsForIds(cachedSections.featuredIds, byId);
-      if (bestSellers.isNotEmpty || featured.isNotEmpty) {
+      if (bestSellers.isNotEmpty || featured.isNotEmpty || newArrivals.isNotEmpty) {
         return _MarketplaceSections(
           recentlySeen: recentCards,
           bestSellers: bestSellers.isNotEmpty
@@ -6964,6 +7030,7 @@ class _MarketplaceSections {
               : personalized.take(9).toList(),
           featured:
               featured.isNotEmpty ? featured : personalized.take(9).toList(),
+          newArrivals: newArrivals,
         );
       }
     }
@@ -6981,7 +7048,19 @@ class _MarketplaceSections {
       recentlySeen: recentCards,
       bestSellers: byPrice.take(9).toList(),
       featured: featured.take(9).toList(),
+      newArrivals: newArrivals,
     );
+  }
+
+  static List<PokemonCard> _cardsForIdsAllowUnavailable(
+    List<String> ids,
+    Map<String, PokemonCard> byId,
+  ) {
+    return ids
+        .map((id) => byId[id])
+        .whereType<PokemonCard>()
+        .take(12)
+        .toList();
   }
 
   static List<PokemonCard> _cardsForIds(
@@ -7016,6 +7095,14 @@ class _MarketplaceSections {
         () => card,
       );
     }
+    PokemonCard? lookupCard(String id) {
+      if (id.isEmpty) {
+        return null;
+      }
+      return byId[id] ??
+          byId[doubledCardId(id)] ??
+          byId[cardIdFromDoubledId(id)];
+    }
     return views
         .map((view) {
           final cheapestPrice = _cheapestPriceForRecentView(
@@ -7023,18 +7110,14 @@ class _MarketplaceSections {
                 cheapestPricesByCardId,
               ) ??
               _cheapestPriceFromRecentView(view);
-          final card = byId[view.cardId] ??
+          final card = lookupCard(view.cardId) ??
               cardsByNameAndSet[
                   '${_normalizePersonalizationKey(view.name)}|${_normalizePersonalizationKey(view.expansion)}'];
           if (card != null) {
-            final hydrated = _applyCheapestPriceToRecentCard(
+            return _applyCheapestPriceToRecentCard(
               card,
               cheapestPrice,
             );
-            return hydrated.isMarketAvailable ? hydrated : null;
-          }
-          if (!_cheapestPriceIsAvailable(cheapestPrice)) {
-            return null;
           }
           return _cardFromRecentView(view, cheapestPrice);
         })
@@ -7555,6 +7638,7 @@ class _CategoryCard extends StatelessWidget {
         child: Row(
           children: [
             _CardImageFrame(
+              pokoinCardId: card.id,
               imageUrl: card.previewImageUrl,
               fallbackImageUrl: card.imageUrl,
               width: 72,

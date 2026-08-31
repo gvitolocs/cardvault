@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../constants/project_links.dart';
+import '../utils/public_home.dart';
 import '../widgets/site_footer.dart';
 
 class HealthScreen extends StatefulWidget {
@@ -433,7 +434,8 @@ class _HealthNavAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return TextButton(
-      onPressed: () => context.go(path),
+      onPressed: () =>
+          path == '/' ? goPublicHome(context) : context.go(path),
       style: TextButton.styleFrom(
         foregroundColor: const Color(0xFFE2E8F0),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../utils/public_home.dart';
+
 class PokoinNotFoundScreen extends StatelessWidget {
   const PokoinNotFoundScreen({super.key, required this.location});
 
@@ -146,7 +148,7 @@ class _NotFoundCopy extends StatelessWidget {
               ),
             ),
             OutlinedButton.icon(
-              onPressed: () => context.go('/'),
+              onPressed: () => goPublicHome(context),
               icon: const Icon(Icons.home_rounded),
               label: const Text('Go home'),
               style: OutlinedButton.styleFrom(

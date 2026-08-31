@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../constants/project_links.dart';
+import '../utils/public_home.dart';
 
 class SiteFooter extends StatelessWidget {
   const SiteFooter({super.key});
@@ -154,7 +155,7 @@ class SiteFooter extends StatelessWidget {
     return _FooterColumn(
       title: 'Explore',
       links: [
-        _FooterLink('Home', () => context.go('/')),
+        _FooterLink('Home', () => goPublicHome(context)),
         _FooterLink('About Us', () => context.go('/about')),
         _FooterLink('Earn PKN', () => context.go('/earn')),
         _FooterLink('Whitepaper', () => context.go('/whitepaper')),
@@ -162,6 +163,7 @@ class SiteFooter extends StatelessWidget {
         _FooterLink('Contact Us', () => context.go('/contact')),
         _FooterLink('Privacy Policy', () => context.go('/privacy')),
         _FooterLink('PokoinScan', () => context.go('/scan')),
+        _FooterLink('Card scan', () => context.go('/cardscan')),
         _FooterLink('Network health', () => context.go('/health')),
       ],
     );

@@ -7,6 +7,7 @@ import '../constants/project_links.dart';
 import '../providers/auth_provider.dart';
 import '../providers/forum_provider.dart';
 import '../services/forum_service.dart';
+import '../utils/public_home.dart';
 import '../widgets/site_footer.dart';
 
 class ForumScreen extends ConsumerWidget {
@@ -1197,7 +1198,8 @@ class _ForumNavAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return TextButton(
-      onPressed: () => context.go(path),
+      onPressed: () =>
+          path == '/' ? goPublicHome(context) : context.go(path),
       style: TextButton.styleFrom(
         foregroundColor: const Color(0xFFE2E8F0),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),

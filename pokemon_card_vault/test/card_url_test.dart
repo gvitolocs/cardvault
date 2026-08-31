@@ -5,7 +5,7 @@ import 'package:pokoin/utils/card_navigation.dart';
 import 'package:pokoin/utils/card_url.dart';
 
 PokemonCard _card({
-  String id = '316600',
+  String id = '633200',
   String name = 'Leafeon',
   String number = '005/131',
   String set = 'Prismatic Evolutions',
@@ -89,7 +89,7 @@ void main() {
           card,
           databaseCanonicalPath: '/248768/some-slug',
         ),
-        '/marketplace/en/cards/497536/card-drifloon-lv-17-6-17-pop-series-6',
+        '/marketplace/en/cards/248768/card-drifloon-lv-17-6-17-pop-series-6',
       );
     });
 
@@ -194,13 +194,27 @@ void main() {
     test('safe public path doubles pasted blueprint id', () {
       expect(
         safeCardDetailPath(_card(
-          id: '139056',
+          id: '278112',
           name: 'Super Rod',
           number: '',
           set: 'Gold, Silver, to a New World...',
           rarity: 'Common',
         )),
         '/marketplace/en/cards/278112/common-super-rod-gold-silver-to-a-new-world',
+      );
+    });
+
+    test('searchbar autocomplete blueprint id doubles into public marketplace path', () {
+      final card = PokemonCard.fromJson({
+        'card_id': '220962',
+        'name': 'Espurr',
+        'set_name': 'BREAKpoint',
+        'card_number': '58/122',
+        'rarity': 'Reverse Holo',
+      });
+      expect(
+        safeCardDetailPath(card),
+        '/marketplace/en/cards/220962/reverse-holo-espurr-58-122-breakpoint',
       );
     });
 
@@ -215,7 +229,7 @@ void main() {
       expect(
         marketplaceCardDetailPath(
           _card(
-            id: '316698',
+            id: '633396',
             name: 'Fan Rotom',
             number: '085/131',
             rarity: 'Common',
@@ -229,7 +243,7 @@ void main() {
       expect(
         marketplaceCardDetailPath(
           _card(
-            id: '251432',
+            id: '502864',
             name: 'Poliwhirl',
             number: '176/165',
             set: 'Pokémon Card 151',
@@ -242,7 +256,7 @@ void main() {
 
     test('generated marketplace path reads home snapshot collector fields', () {
       final card = PokemonCard.fromJson({
-        'card_id': '316600',
+        'card_id': '633200',
         'name': 'Leafeon',
         'image_url': 'https://cdn.pokoin.com/cards/prismatic-leafeon.png',
         'rarity': 'Rare',
@@ -284,11 +298,60 @@ void main() {
       );
     });
 
-    test('doubled id helpers decode only valid even ids', () {
+    test('our id is even and is not doubled again', () {
+      expect(marketplacePublicCardId('110481'), '220962');
+      expect(marketplacePublicCardId('220962'), '220962');
+      expect(marketplacePublicCardId('633200'), '633200');
+    });
+
+    test('doubled id helpers convert raw ct_id only', () {
       expect(doubledCardId('316600'), '633200');
       expect(cardIdFromDoubledId('633200'), '316600');
       expect(cardIdFromDoubledId('633201'), isEmpty);
       expect(cardIdFromDoubledId('leafeon'), isEmpty);
+    });
+
+    test('CDN filenames in public URLs use our id; leftover ct_id is rewritten', () {
+      expect(
+        rewriteCdnPrefixToOurId(
+          'https://cdn.pokoin.com/110481_espurr-58-122-breakpoint.jpg',
+          pokoinCardId: '220962',
+        ),
+        'https://cdn.pokoin.com/220962_espurr-58-122-breakpoint.jpg',
+      );
+      expect(
+        rewriteCdnPrefixToOurId(
+          'https://cdn.pokoin.com/220962_espurr-58-122-breakpoint.jpg',
+          pokoinCardId: '220962',
+          ctId: '110481',
+        ),
+        'https://cdn.pokoin.com/220962_espurr-58-122-breakpoint.jpg',
+      );
+      expect(
+        rewriteCdnPokoinPrefixToCt(
+          'https://cdn.pokoin.com/previews/110481_espurr.jpg',
+          pokoinCardId: '220962',
+        ),
+        'https://cdn.pokoin.com/previews/220962_espurr.jpg',
+      );
+    });
+
+    test('public shortlink uses doubled id and human slug', () {
+      expect(
+        marketplacePublicShortLinkPath(_card()),
+        '/633200/rare-leafeon-005-131-prismatic-evolutions',
+      );
+      expect(
+        marketplacePublicShortLinkPathFromParts(
+          cardId: '220962',
+          slug: 'common-espurr-58-122-breakpoint',
+        ),
+        '/220962/common-espurr-58-122-breakpoint',
+      );
+      expect(
+        marketplacePublicShortLinkPathFromParts(cardId: 'tcg-not-a-card'),
+        isEmpty,
+      );
     });
 
     test('canonical public-number route parses to real id and slug', () {
@@ -297,17 +360,19 @@ void main() {
         slugSegment: 'rare-leafeon-005-131-prismatic-evolutions',
       );
 
-      expect(route.cardId, '316600');
+      expect(route.cardId, '633200');
       expect(route.cardSlug, 'rare-leafeon-005-131-prismatic-evolutions');
       expect(route.isCanonicalShape, isTrue);
     });
 
-    test('simple marketplace numeric route keeps real card id', () {
-      final route = parseMarketplaceCardRoute(firstSegment: '316600');
+    test('path-only marketplace route keeps our id', () {
+      final publicRoute = parseMarketplaceCardRoute(firstSegment: '220962');
+      expect(publicRoute.cardId, '220962');
+      expect(publicRoute.cardSlug, isNull);
+      expect(publicRoute.isCanonicalShape, isFalse);
 
-      expect(route.cardId, '316600');
-      expect(route.cardSlug, isNull);
-      expect(route.isCanonicalShape, isFalse);
+      final oddLegacy = parseMarketplaceCardRoute(firstSegment: '110481');
+      expect(oddLegacy.cardId, '110481');
     });
 
     test('legacy numeric marketplace slug keeps real card id', () {
@@ -326,7 +391,7 @@ void main() {
     test('legacy numeric slugs remain detectable for compatibility', () {
       expect(
         legacyCardDetailSlug(_card()),
-        '316600-leafeon-005-131-prismatic-evolutions',
+        '633200-leafeon-005-131-prismatic-evolutions',
       );
       expect(cardIdFromSlug('316600-leafeon-005-131'), '316600');
       expect(numericCardIdFromSlug('316600-leafeon-005-131'), '316600');
@@ -383,16 +448,16 @@ void main() {
       );
     });
 
-    test('root numeric short links stay on the direct root route', () {
+    test('root numeric short links hop to /marketplace/{publicNumber}', () {
       expect(isRootCardShortLink('113046'), isTrue);
-      expect(marketplaceCardShortLinkRedirectPath('129834'), '/129834');
-      expect(marketplaceCardShortLinkRedirectPath(' 129834 '), '/129834');
+      expect(marketplaceCardShortLinkRedirectPath('129834'), '/marketplace/129834');
+      expect(marketplaceCardShortLinkRedirectPath(' 129834 '), '/marketplace/129834');
     });
 
     test('root detail paths remain legacy-only while safe paths are canonical',
         () {
       final card = _card(
-        id: '124384',
+        id: '248768',
         name: 'Drifloon Lv.17',
         number: '6/17',
         set: 'POP Series 6',
@@ -401,7 +466,7 @@ void main() {
 
       expect(
         rootCardDetailPath(card),
-        '/124384/card-drifloon-lv-17-6-17-pop-series-6',
+        '/248768/card-drifloon-lv-17-6-17-pop-series-6',
       );
       expect(
         safeCardDetailPath(card),
@@ -603,7 +668,7 @@ void main() {
 
     test('safe card detail path returns empty instead of fallback routes', () {
       expect(
-        safeCardDetailPath(_card(id: '316600')),
+        safeCardDetailPath(_card(id: '633200')),
         '/marketplace/en/cards/633200/rare-leafeon-005-131-prismatic-evolutions',
       );
       expect(safeCardDetailPath(_card(id: '316600-leafeon')), isEmpty);
@@ -613,7 +678,7 @@ void main() {
     test('safe card detail path from parts returns empty for invalid ids', () {
       expect(
         safeCardDetailPathFromParts(
-          id: '316600',
+          id: '633200',
           name: 'Leafeon',
           number: '005/131',
           setName: 'Prismatic Evolutions',
@@ -638,6 +703,44 @@ void main() {
           setName: 'Prismatic Evolutions',
         ),
         isEmpty,
+      );
+    });
+
+    test('preferDecodableMarketplaceImage skips fragile preview webp', () {
+      expect(
+        preferDecodableMarketplaceImage(
+          homepage: '',
+          preview:
+              'https://cdn.pokoin.com/previews/241674_drowzee-210-198-scarlet-violet.webp',
+          image: 'https://cdn.pokoin.com/241674_drowzee-210-198-scarlet-violet.jpg',
+        ),
+        'https://cdn.pokoin.com/241674_drowzee-210-198-scarlet-violet.jpg',
+      );
+    });
+
+    test('preferDecodableMarketplaceImage still prefers jpeg preview over full', () {
+      expect(
+        preferDecodableMarketplaceImage(
+          homepage: '',
+          preview:
+              'https://cdn.pokoin.com/previews/299053_dachsbun-ex.jpg',
+          image:
+              'https://cdn.pokoin.com/299053_dachsbun-ex-special-illustration-rare-169-142-stellar-crown.jpg',
+        ),
+        'https://cdn.pokoin.com/previews/299053_dachsbun-ex.jpg',
+      );
+    });
+
+    test('preferDetailMarketplaceImage uses full raster instead of 180px preview', () {
+      expect(
+        preferDetailMarketplaceImage(
+          homepage: '',
+          preview:
+              'https://cdn.pokoin.com/previews/299053_dachsbun-ex.jpg',
+          image:
+              'https://cdn.pokoin.com/299053_dachsbun-ex-special-illustration-rare-169-142-stellar-crown.jpg',
+        ),
+        'https://cdn.pokoin.com/299053_dachsbun-ex-special-illustration-rare-169-142-stellar-crown.jpg',
       );
     });
   });

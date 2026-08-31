@@ -120,7 +120,7 @@ void main() {
     expect(recentCards.single.isMarketAvailable, isTrue);
   });
 
-  test('recent marketplace cards omit unavailable stale cards', () {
+  test('recent marketplace cards keep unavailable viewed cards', () {
     final recentCards = marketplaceRecentCardsForTest(
       recentViews: [
         RecentCardView(
@@ -148,7 +148,8 @@ void main() {
       ],
     );
 
-    expect(recentCards, isEmpty);
+    expect(recentCards.single.id, '391257');
+    expect(recentCards.single.isMarketAvailable, isFalse);
   });
 
   test('recent marketplace cards apply cheapest cache to catalog card', () {

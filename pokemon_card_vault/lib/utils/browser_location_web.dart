@@ -7,3 +7,7 @@ Uri? currentBrowserUri() {
     '${location.search}${location.hash}',
   );
 }
+
+void assignPublicHome() {
+  web.window.location.assign('/');
+}

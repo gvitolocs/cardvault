@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../constants/project_links.dart';
+import '../utils/public_home.dart';
 import '../widgets/site_footer.dart';
 
 class ScanScreen extends StatefulWidget {
@@ -415,7 +416,7 @@ class _ExplorerTopBar extends StatelessWidget implements PreferredSizeWidget {
                 child: Row(
                   children: [
                     InkWell(
-                      onTap: () => context.go('/'),
+                      onTap: () => goPublicHome(context),
                       borderRadius: BorderRadius.circular(20),
                       child: const _ExplorerBrand(),
                     ),

@@ -1576,7 +1576,7 @@ class CardService {
   // Local storage
   static const String _cardsBoxName = 'pokemon_cards';
   static const String _homeSnapshotBoxName = 'marketplace_home_snapshot';
-  static const String _homeSnapshotKey = 'snapshot';
+  static const String _homeSnapshotKey = 'snapshot_v3_cdn_hero';
   static const String _spotlightCardsKey = 'spotlightCards';
   static const String _listCacheBoxName = 'marketplace_card_list_cache';
   static const String _cacheMetaBoxName = 'pokoin_cache_meta';
@@ -1584,7 +1584,7 @@ class CardService {
   static const String _cacheCachedAtKey = 'cachedAtMs';
   static const int _cacheSchemaVersion = 2;
   static const Duration _catalogCacheTtl = Duration(days: 7);
-  static const Duration _homeSnapshotCacheTtl = Duration(hours: 12);
+  static const Duration _homeSnapshotCacheTtl = Duration(minutes: 2);
   static const Duration _detailCacheTtl = Duration(days: 7);
   static const Duration _listCacheTtl = Duration(days: 3);
   static const Map<String, double> _pknPrices = <String, double>{
@@ -1780,6 +1780,7 @@ class CardService {
         recentlySeenIds: _stringList(sectionData['recentlySeenIds']),
         bestSellerIds: _stringList(sectionData['bestSellerIds']),
         featuredIds: _stringList(sectionData['featuredIds']),
+        newArrivalIds: _stringList(sectionData['newArrivalIds']),
       ),
     );
   }
@@ -2102,9 +2103,11 @@ class CardService {
       fallback: _cleanLabel(row['card_type'], fallback: 'Card'),
     );
     final imageUrl =
-        _normalizeImageUrl(row['cdn_image_url'] ?? row['image_url']);
+        _normalizeImageUrl(row['cdn_image_url'] ?? row['image_url'], cardId: id, ctId: row['ct_id'] ?? row['ctId']);
     final previewImageUrl = _normalizeImageUrl(
       row['preview_image_url'] ?? row['cdn_image_url'] ?? row['image_url'],
+      cardId: id,
+      ctId: row['ct_id'] ?? row['ctId'],
     );
     final homepageImageUrl = _normalizeImageUrl(
       row['homepage_image_url'] ??
@@ -2112,6 +2115,8 @@ class CardService {
           row['preview_image_url'] ??
           row['cdn_image_url'] ??
           row['image_url'],
+      cardId: id,
+      ctId: row['ct_id'] ?? row['ctId'],
     );
     final listedQuantity = (row['listed_quantity'] as num?)?.toInt() ?? 0;
     final listedPrice = _readMarketplaceTilePrice(row);
@@ -2200,9 +2205,11 @@ class CardService {
     );
     final trainerName = _cleanLabel(row['trainer_name'], fallback: '');
     final imageUrl =
-        _normalizeImageUrl(row['cdn_image_url'] ?? row['image_url']);
+        _normalizeImageUrl(row['cdn_image_url'] ?? row['image_url'], cardId: id, ctId: row['ct_id'] ?? row['ctId']);
     final previewImageUrl = _normalizeImageUrl(
       row['preview_image_url'] ?? row['cdn_image_url'] ?? row['image_url'],
+      cardId: id,
+      ctId: row['ct_id'] ?? row['ctId'],
     );
     final homepageImageUrl = _normalizeImageUrl(
       row['homepage_image_url'] ??
@@ -2210,6 +2217,8 @@ class CardService {
           row['preview_image_url'] ??
           row['cdn_image_url'] ??
           row['image_url'],
+      cardId: id,
+      ctId: row['ct_id'] ?? row['ctId'],
     );
     final listedQuantity = (row['listed_quantity'] as num?)?.toInt() ?? 0;
     final listedPrice = _readMarketplaceTilePrice(row);
@@ -2323,6 +2332,8 @@ class CardService {
           row['image_url'] ??
           _fullBlueprintImageUrl(blueprint) ??
           blueprint['image_url'],
+      cardId: id,
+      ctId: row['ct_id'] ?? row['ctId'] ?? blueprint['id'],
     );
     final previewImageUrl = _normalizeImageUrl(
       row['preview_image_url'] ??
@@ -2331,6 +2342,8 @@ class CardService {
           row['cdn_image_url'] ??
           row['image_url'] ??
           blueprint['image_url'],
+      cardId: id,
+      ctId: row['ct_id'] ?? row['ctId'] ?? blueprint['id'],
     );
     final homepageImageUrl = _normalizeImageUrl(
       row['homepage_image_url'] ??
@@ -2341,6 +2354,8 @@ class CardService {
           row['cdn_image_url'] ??
           row['image_url'] ??
           blueprint['image_url'],
+      cardId: id,
+      ctId: row['ct_id'] ?? row['ctId'] ?? blueprint['id'],
     );
     final price = _pknPrices[id] ?? 1000 + (_stableSeed(id) % 120000);
     return PokemonCard(
@@ -2592,12 +2607,16 @@ class CardService {
     }
   }
 
-  String _normalizeImageUrl(Object? value) {
+  String _normalizeImageUrl(Object? value, {Object? cardId, Object? ctId}) {
     final text = '${value ?? ''}'.trim();
     if (text.isEmpty) {
       return '';
     }
-    return _publicCardImageUrl(text);
+    return rewriteCdnPrefixToOurId(
+      _publicCardImageUrl(text),
+      pokoinCardId: '${cardId ?? ''}'.trim(),
+      ctId: '${ctId ?? ''}'.trim(),
+    );
   }
 
   String _publicCardImageUrl(String value) {
@@ -4269,9 +4288,11 @@ class CardService {
       fallback: _cleanLabel(row['card_type'], fallback: 'Card'),
     );
     final imageUrl =
-        _normalizeImageUrl(row['cdn_image_url'] ?? row['image_url']);
+        _normalizeImageUrl(row['cdn_image_url'] ?? row['image_url'], cardId: id, ctId: row['ct_id'] ?? row['ctId']);
     final previewImageUrl = _normalizeImageUrl(
       row['preview_image_url'] ?? row['cdn_image_url'] ?? row['image_url'],
+      cardId: id,
+      ctId: row['ct_id'] ?? row['ctId'],
     );
     final homepageImageUrl = _normalizeImageUrl(
       row['homepage_image_url'] ??
@@ -4279,6 +4300,8 @@ class CardService {
           row['preview_image_url'] ??
           row['cdn_image_url'] ??
           row['image_url'],
+      cardId: id,
+      ctId: row['ct_id'] ?? row['ctId'],
     );
     final artist = _cleanLabel(
       row['artist'] ?? row['illustrator'],
@@ -4361,13 +4384,17 @@ class CardService {
       id: id,
       name: '${row['name'] ?? 'Pokemon card'}',
       imageUrl: _normalizeImageUrl(
-          row['cdn_image_url'] ?? row['imageUrl'] ?? row['image_url']),
+          row['cdn_image_url'] ?? row['imageUrl'] ?? row['image_url'],
+          cardId: id,
+          ctId: row['ct_id'] ?? row['ctId']),
       previewImageUrl: _normalizeImageUrl(
         row['preview_image_url'] ??
             row['previewImageUrl'] ??
             row['cdn_image_url'] ??
             row['imageUrl'] ??
             row['image_url'],
+        cardId: id,
+        ctId: row['ct_id'] ?? row['ctId'],
       ),
       homepageImageUrl: _normalizeImageUrl(
         row['homepage_image_url'] ??
@@ -4377,6 +4404,8 @@ class CardService {
             row['cdn_image_url'] ??
             row['imageUrl'] ??
             row['image_url'],
+        cardId: id,
+        ctId: row['ct_id'] ?? row['ctId'],
       ),
       rarity: itemKind == 'product' ? type : rarity,
       type: type,
@@ -6006,17 +6035,20 @@ class MarketplaceHomeSections {
     required this.recentlySeenIds,
     required this.bestSellerIds,
     required this.featuredIds,
+    this.newArrivalIds = const [],
   });
 
   final List<String> recentlySeenIds;
   final List<String> bestSellerIds;
   final List<String> featuredIds;
+  final List<String> newArrivalIds;
 
   Map<String, dynamic> toJson() {
     return {
       'recentlySeenIds': recentlySeenIds,
       'bestSellerIds': bestSellerIds,
       'featuredIds': featuredIds,
+      'newArrivalIds': newArrivalIds,
     };
   }
 }

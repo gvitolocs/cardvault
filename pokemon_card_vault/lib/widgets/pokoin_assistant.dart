@@ -530,8 +530,7 @@ Future<void> _sendAssistantMessage({
                 ? ''
                 : FirebaseAuth.instance.currentUser?.displayName ?? '',
           }),
-        )
-        .timeout(const Duration(seconds: 18));
+        );
     final decoded = jsonDecode(response.body);
     final payload = decoded is Map<String, dynamic>
         ? decoded
@@ -768,8 +767,8 @@ Map<String, String> _assistantCardSummary(PokemonCard card) {
   ).firstMatch(path);
   if (marketplaceMatch != null) {
     final doubledId = int.tryParse(marketplaceMatch.group(1) ?? '');
-    final cardId = doubledId != null && doubledId.isEven && doubledId > 0
-        ? '${doubledId ~/ 2}'
+    final cardId = doubledId != null && doubledId > 0
+        ? '$doubledId'
         : marketplaceMatch.group(1) ?? '';
     return (
       cardId: cardId,

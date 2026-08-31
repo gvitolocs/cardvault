@@ -3,8 +3,8 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -30,9 +30,11 @@ import '../utils/browser_location.dart';
 import '../utils/card_navigation.dart';
 import '../utils/card_palette.dart';
 import '../utils/card_url.dart';
+import '../utils/marketplace_image_log.dart';
 import '../utils/price_format.dart';
 import '../widgets/artist_suggestion_field.dart';
 import '../widgets/listing_metadata_chips.dart';
+import '../widgets/marketplace_network_image.dart';
 import 'home_screen.dart'
     show
         MarketplaceLogoButton,
@@ -1253,11 +1255,11 @@ bool _isWarmableCardDetailRoutePath(String path, PokemonCard card) {
   if (cardId.isEmpty || !RegExp(r'^\d+$').hasMatch(cardId)) {
     return false;
   }
-  final doubledId = doubledCardId(cardId);
+  final publicId = marketplacePublicCardId(cardId);
   return path == '/$cardId' ||
-      path == '/$doubledId' ||
+      path == '/$publicId' ||
       path == '/card/$cardId' ||
-      path == '/card/$doubledId';
+      path == '/card/$publicId';
 }
 
 PokemonCard? _bestDetailCard(
@@ -1904,15 +1906,32 @@ class _ArtworkPanel extends StatelessWidget {
                   borderRadius: BorderRadius.circular(22),
                 ),
                 clipBehavior: Clip.none,
-                child: CachedNetworkImage(
-                  imageUrl: card.imageUrl,
+                child: MarketplaceNetworkImage(
+                  imageUrl: rewriteCdnPrefixToOurId(
+                    preferDetailMarketplaceImage(
+                      homepage: card.homepageImageUrl,
+                      preview: card.previewImageUrl,
+                      image: card.imageUrl,
+                    ),
+                    pokoinCardId: card.id,
+                  ),
                   fit: BoxFit.contain,
                   alignment: Alignment.center,
-                  errorWidget: (_, __, ___) => const Icon(
-                    Icons.style,
-                    color: Color(0xFFFACC15),
-                    size: 72,
-                  ),
+                  errorWidget: (_, failedUrl, error) {
+                    logMarketplaceCardImage(
+                      url: failedUrl,
+                      source: 'card_detail',
+                      status: 'error',
+                      cardId: card.id,
+                      name: card.name,
+                      error: error,
+                    );
+                    return const Icon(
+                      Icons.style,
+                      color: Color(0xFFFACC15),
+                      size: 72,
+                    );
+                  },
                 ),
               ),
             ),
@@ -2246,7 +2265,7 @@ class _HeroCardDetailSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tag = heroTag;
-    if (tag == null || tag.isEmpty) {
+    if (tag == null || tag.isEmpty || kIsWeb) {
       return child;
     }
     return Hero(
@@ -2255,7 +2274,7 @@ class _HeroCardDetailSection extends StatelessWidget {
         _,
         animation,
         __,
-        ___,
+        fromHeroContext,
         toHeroContext,
       ) {
         return ScaleTransition(
@@ -2264,7 +2283,7 @@ class _HeroCardDetailSection extends StatelessWidget {
           ),
           child: Material(
             color: Colors.transparent,
-            child: toHeroContext.widget,
+            child: fromHeroContext.widget,
           ),
         );
       },

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../constants/project_links.dart';
+import '../utils/public_home.dart';
 import '../widgets/site_footer.dart';
 
 class PrivacyScreen extends StatelessWidget {
@@ -292,7 +293,7 @@ class _PrivacyTopBar extends StatelessWidget implements PreferredSizeWidget {
                     ),
                   ),
                   TextButton(
-                    onPressed: () => context.go('/'),
+                    onPressed: () => goPublicHome(context),
                     child: const Text('Home'),
                   ),
                   TextButton(
