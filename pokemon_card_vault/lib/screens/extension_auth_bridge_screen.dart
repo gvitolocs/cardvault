@@ -1,18 +1,10 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:js_interop';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/auth_provider.dart';
 import '../utils/auth_window_bridge_stub.dart';
-
-@JS('window.opener.postMessage')
-external void _postMessageToOpener(JSAny? message, String targetOrigin);
-
-@JS('window.parent.postMessage')
-external void _postMessageToParent(JSAny? message, String targetOrigin);
 
 class ExtensionAuthBridgeScreen extends ConsumerStatefulWidget {
   const ExtensionAuthBridgeScreen({super.key});
@@ -82,18 +74,7 @@ class _ExtensionAuthBridgeScreenState
   }
 
   void _post(Map<String, Object?> payload) {
-    final json = jsonEncode(payload);
-    final targetOrigin = _targetOrigin();
-    try {
-      _postMessageToOpener(json.toJS, targetOrigin);
-    } catch (_) {
-      // The bridge can also be embedded in a hidden iframe.
-    }
-    try {
-      _postMessageToParent(json.toJS, targetOrigin);
-    } catch (_) {
-      // A popup may not have a useful parent.
-    }
+    postAuthBridgeMessage(payload, _targetOrigin());
   }
 
   String _targetOrigin() {

@@ -13,10 +13,33 @@ import 'search_debug_trace.dart';
 const String _cardImageProxyOrigin = 'https://pokoin.com';
 const String _cardImageProxyPrefix = '/card-images';
 const String _cardImageCdnHost = 'cdn.pokoin.com';
+const String _marketplaceApiBaseUrl = String.fromEnvironment(
+  'MARKETPLACE_API_BASE_URL',
+  defaultValue: 'https://api.pokoin.com',
+);
 const String _competitiveApiBaseUrl = String.fromEnvironment(
     'COMPETITIVE_API_BASE_URL',
     defaultValue: 'https://api.pokoin.com');
 const int _marketplaceArtistSnapshotLimit = 300;
+
+/// Resolve `/api/...` against the browser origin on web, else api.pokoin.com.
+Uri _marketplaceApiUri(String path, {Map<String, String>? queryParameters}) {
+  final normalized = path.startsWith('/') ? path : '/$path';
+  final base = Uri.base;
+  final Uri resolved;
+  if (kIsWeb && base.hasScheme && base.host.isNotEmpty) {
+    resolved = base.resolve(normalized);
+  } else {
+    resolved = Uri.parse('$_marketplaceApiBaseUrl$normalized');
+  }
+  if (queryParameters == null || queryParameters.isEmpty) {
+    return resolved;
+  }
+  return resolved.replace(queryParameters: {
+    ...resolved.queryParameters,
+    ...queryParameters,
+  });
+}
 
 Map<String, dynamic> _mapFromJson(Object? value) {
   if (value is Map) {
@@ -1770,7 +1793,35 @@ class CardService {
   MarketplaceHomeSnapshot _homeSnapshotFromMap(Map<String, dynamic> data) {
     final cards = (data['cards'] as List<dynamic>? ?? const [])
         .whereType<Map>()
-        .map((row) => PokemonCard.fromJson(Map<String, dynamic>.from(row)))
+        .map((row) {
+          final map = Map<String, dynamic>.from(row);
+          final id = '${map['id'] ?? map['card_id'] ?? ''}'.trim();
+          final ctId = '${map['ct_id'] ?? map['ctId'] ?? ''}'.trim();
+          map['imageUrl'] = _normalizeImageUrl(
+            map['imageUrl'] ?? map['image_url'],
+            cardId: id,
+            ctId: ctId,
+          );
+          map['previewImageUrl'] = _normalizeImageUrl(
+            map['previewImageUrl'] ??
+                map['preview_image_url'] ??
+                map['imageUrl'] ??
+                map['image_url'],
+            cardId: id,
+            ctId: ctId,
+          );
+          map['homepageImageUrl'] = _normalizeImageUrl(
+            map['homepageImageUrl'] ??
+                map['homepage_image_url'] ??
+                map['previewImageUrl'] ??
+                map['preview_image_url'] ??
+                map['imageUrl'] ??
+                map['image_url'],
+            cardId: id,
+            ctId: ctId,
+          );
+          return PokemonCard.fromJson(map);
+        })
         .toList();
     final sectionData =
         Map<String, dynamic>.from(data['sections'] as Map? ?? {});
@@ -1834,9 +1885,25 @@ class CardService {
     await _saveCardList(_spotlightCardsKey, cards.take(48).toList());
   }
 
-  Future<http.Response?> _getMarketplaceHomeResponse() {
-    final uri = Uri.base.resolve('/api/marketplace-home');
-    return http.get(uri).timeout(const Duration(seconds: 8));
+  Future<http.Response?> _getMarketplaceHomeResponse() async {
+    // Prefer the classic hydrate snapshot; fall back to the fast React BFF when
+    // marketplace-home times out (cache-first SQL deploy lag / DB load).
+    for (final path in const [
+      '/api/marketplace-home',
+      '/api/marketplace-home-page',
+    ]) {
+      try {
+        final response = await http
+            .get(_marketplaceApiUri(path))
+            .timeout(const Duration(seconds: 12));
+        if (response.statusCode < 400) {
+          return response;
+        }
+      } catch (error) {
+        debugPrint('Marketplace home GET $path failed: $error');
+      }
+    }
+    return null;
   }
 
   Future<Map<String, MarketplaceCheapestPrice>> getCheapestPricesForCardIds(

@@ -16,6 +16,7 @@ import 'screens/landing_screen.dart';
 import 'screens/health_screen.dart';
 import 'screens/scan_screen.dart';
 import 'screens/card_scan_screen.dart';
+import 'screens/live_card_scan_screen.dart';
 import 'screens/cart_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/favorites_screen.dart';
@@ -536,10 +537,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/cardscan',
         pageBuilder: (context, state) =>
-            _appPage(state, const CardScanScreen()),
+            _appPage(state, const LiveCardScanScreen()),
       ),
       GoRoute(
         path: '/scancard',
+        redirect: (context, state) => '/cardscan',
+      ),
+      GoRoute(
+        path: '/livescan',
         redirect: (context, state) => '/cardscan',
       ),
       GoRoute(

@@ -6626,7 +6626,23 @@ String _homepageCardImageUrl(PokemonCard card) {
     preview: card.previewImageUrl,
     image: card.imageUrl,
   );
-  return rewriteCdnPrefixToOurId(raw, pokoinCardId: card.id);
+  return _absoluteMarketplaceImageUrl(
+    rewriteCdnPrefixToOurId(raw, pokoinCardId: card.id),
+  );
+}
+
+String _absoluteMarketplaceImageUrl(String url) {
+  final text = url.trim();
+  if (text.isEmpty) {
+    return text;
+  }
+  if (text.startsWith('/card-images')) {
+    return 'https://pokoin.com$text';
+  }
+  if (text.startsWith('card-images/')) {
+    return 'https://pokoin.com/$text';
+  }
+  return text;
 }
 
 String _recentlySeenHeroTag(PokemonCard card, int index) {
@@ -6683,15 +6699,19 @@ class _CardImageFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final primaryUrl = rewriteCdnPrefixToOurId(
-      imageUrl.trim(),
-      pokoinCardId: pokoinCardId,
+    final primaryUrl = _absoluteMarketplaceImageUrl(
+      rewriteCdnPrefixToOurId(
+        imageUrl.trim(),
+        pokoinCardId: pokoinCardId,
+      ),
     );
     final fallback = fallbackImageUrl == null
         ? null
-        : rewriteCdnPrefixToOurId(
-            fallbackImageUrl!.trim(),
-            pokoinCardId: pokoinCardId,
+        : _absoluteMarketplaceImageUrl(
+            rewriteCdnPrefixToOurId(
+              fallbackImageUrl!.trim(),
+              pokoinCardId: pokoinCardId,
+            ),
           );
     final placeholder = Icon(
       Icons.style,

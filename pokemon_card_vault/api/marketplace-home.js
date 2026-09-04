@@ -37,6 +37,10 @@ function fallbackSectionsForCards(cards, sectionSize = 12) {
 }
 
 async function fetchRowsForHomeFallback(cheapestCacheRelation, limit = 240) {
+  // Cache-first join: lateral over all ~74k candidates times out (30s). Drive from
+  // the small cheapest-homepage cache (~1k rows) and index-lookup candidates by ct_id.
+  const cacheRelation = String(cheapestCacheRelation || 'public.cheapest_homepage_cache_blueprint')
+    .replace(/[^a-zA-Z0-9_."]/g, '');
   const result = await marketplaceQuery(
     `
       select
@@ -71,15 +75,25 @@ async function fetchRowsForHomeFallback(cheapestCacheRelation, limit = 240) {
         case when cardtrader.provider = 'cardtrader' then cardtrader.cheapest_price_pkn else null end as cardtrader_lowest_price_pkn,
         0 as watchlist_count,
         0 as cart_holder_count
-      from public.marketplace_search_candidates
-      ${cardTraderAvailabilityJoin('marketplace_search_candidates', cheapestCacheRelation)}
-      where item_kind = 'single'
-        and product_type = 'card'
-        and coalesce(homepage_image_url, preview_image_url, cdn_image_url, image_url) is not null
+      from ${cacheRelation} cardtrader
+      inner join public.marketplace_search_candidates
+        on marketplace_search_candidates.ct_id = cardtrader.blueprint_id
+      where cardtrader.provider in ('cardtrader', 'pokoin_native')
+        and coalesce(cardtrader.eligible_listing_count, 0) > 0
         and cardtrader.cheapest_price_pkn is not null
         and cardtrader.cheapest_price_pkn > 0
-        and coalesce(cardtrader.eligible_listing_count, 0) > 0
-      order by search_weight desc, imported_at desc nulls last, marketplace_search_candidates.card_id desc
+        and marketplace_search_candidates.item_kind = 'single'
+        and marketplace_search_candidates.product_type = 'card'
+        and coalesce(
+          marketplace_search_candidates.homepage_image_url,
+          marketplace_search_candidates.preview_image_url,
+          marketplace_search_candidates.cdn_image_url,
+          marketplace_search_candidates.image_url
+        ) is not null
+      order by
+        marketplace_search_candidates.search_weight desc nulls last,
+        marketplace_search_candidates.imported_at desc nulls last,
+        marketplace_search_candidates.card_id desc
       limit $1
     `,
     [limit],
@@ -163,13 +177,22 @@ function isCardTraderImageUrl(value) {
 function hasCdnBackedImages(card) {
   const imageUrl = String(card.imageUrl || '').trim();
   const previewImageUrl = String(card.previewImageUrl || card.imageUrl || '').trim();
-  const homepageImageUrl = String(card.homepageImageUrl || card.previewImageUrl || card.imageUrl || '').trim();
-  return Boolean(imageUrl) &&
-    Boolean(previewImageUrl) &&
-    Boolean(homepageImageUrl) &&
-    !isCardTraderImageUrl(imageUrl) &&
-    !isCardTraderImageUrl(previewImageUrl) &&
-    !isCardTraderImageUrl(homepageImageUrl);
+  const homepageImageUrl = String(
+    card.homepageImageUrl || card.previewImageUrl || card.imageUrl || '',
+  ).trim();
+  // Require a non-CardTrader primary (or preview) URL. Empty homepage is OK —
+  // tiles fall back to preview/image (React home-page often omits homepageImageUrl).
+  const primary = imageUrl || previewImageUrl || homepageImageUrl;
+  if (!primary || isCardTraderImageUrl(primary)) {
+    return false;
+  }
+  if (previewImageUrl && isCardTraderImageUrl(previewImageUrl)) {
+    return false;
+  }
+  if (homepageImageUrl && isCardTraderImageUrl(homepageImageUrl)) {
+    return false;
+  }
+  return true;
 }
 
 function normalizeSections(sections = {}) {

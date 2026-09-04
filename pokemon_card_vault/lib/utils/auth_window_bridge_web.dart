@@ -11,21 +11,11 @@ external void _postMessageToParent(JSAny? message, String targetOrigin);
 external void _closeWindow();
 
 void notifyAuthWindowAuthenticated() {
-  final message = jsonEncode({
+  postAuthBridgeMessage({
     'type': 'pokoin-auth-complete',
     'ok': true,
     'status': 'authenticated',
-  });
-  try {
-    _postMessageToOpener(message.toJS, '*');
-  } catch (_) {
-    // The auth page may have been opened as a normal tab without an opener.
-  }
-  try {
-    _postMessageToParent(message.toJS, '*');
-  } catch (_) {
-    // A popup may not have a useful parent.
-  }
+  }, '*');
 }
 
 void closeAuthWindow() {
@@ -33,5 +23,19 @@ void closeAuthWindow() {
     _closeWindow();
   } catch (_) {
     // Browsers may block closing tabs that were not script-opened.
+  }
+}
+
+void postAuthBridgeMessage(Map<String, Object?> payload, String targetOrigin) {
+  final json = jsonEncode(payload);
+  try {
+    _postMessageToOpener(json.toJS, targetOrigin);
+  } catch (_) {
+    // The bridge can also be embedded in a hidden iframe.
+  }
+  try {
+    _postMessageToParent(json.toJS, targetOrigin);
+  } catch (_) {
+    // A popup may not have a useful parent.
   }
 }

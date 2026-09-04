@@ -29,8 +29,12 @@ pokemon_card_vault/.flutter-plugins-dependencies
 pokemon_card_vault/linux/flutter/ephemeral/.plugin_symlinks/
 pokemon_card_vault/windows/flutter/ephemeral/.plugin_symlinks/
 
-# Large local CardTrader exports
-pokemon_card_vault/data/cardtrader/pokemon-blueprints.jsonl
+# Large on-device scan models / catalogs (sync from pokoin-cardapp; not for GitHub)
+pokemon_card_vault/assets/models/
+pokemon_card_vault/assets/milo_index/
+pokemon_card_vault/assets/milo_cnn_index/
+pokemon_card_vault/assets/pokoin_tcg_ids.json
+pokemon_card_vault/assets/test_photos/
 
 # Adjacent local support checkouts/assets
 pokemon-tcg-data/
