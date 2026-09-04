@@ -194,7 +194,7 @@ class _MarketplaceCompetitiveScreenState
                 },
                 onDeckSelected: (id) {
                   if (id.trim().isEmpty) return;
-                  context.go('/marketplace/competitive/decks/${id.trim()}');
+                  context.go('/marketplace/competitive-wip/decks/${id.trim()}');
                 },
                 onTournamentSelected: (id) {
                   setState(() {
@@ -205,12 +205,12 @@ class _MarketplaceCompetitiveScreenState
                 },
                 onDecklistSelected: (id) {
                   if (id.trim().isEmpty) return;
-                  context.go('/marketplace/competitive/decklists/${id.trim()}');
+                  context.go('/marketplace/competitive-wip/decklists/${id.trim()}');
                 },
                 onBackToList: () {
                   if (widget.initialDeckId.trim().isNotEmpty ||
                       widget.initialDecklistId.trim().isNotEmpty) {
-                    context.go('/marketplace/competitive');
+                    context.go('/marketplace/competitive-wip');
                   } else {
                     setState(() {
                       _selectedTournamentId = '';
@@ -973,7 +973,7 @@ class _CompetitiveNetworkPanel extends StatelessWidget {
                   icon: Icons.emoji_events_outlined,
                   title: 'Tournament platform',
                   body: 'Browse public events and open standings instantly.',
-                  onTap: () => context.go('/marketplace/competitive'),
+                  onTap: () => context.go('/marketplace/competitive-wip'),
                 ),
                 const SizedBox(height: 10),
                 _NetworkCard(
@@ -987,7 +987,7 @@ class _CompetitiveNetworkPanel extends StatelessWidget {
                   icon: Icons.leaderboard_outlined,
                   title: 'Rankings and results',
                   body: 'Use synced standings to spot emerging archetypes.',
-                  onTap: () => context.go('/marketplace/competitive'),
+                  onTap: () => context.go('/marketplace/competitive-wip'),
                 ),
                 const SizedBox(height: 10),
                 _NetworkCard(
@@ -1908,7 +1908,7 @@ class _DecklistDetailState extends State<_DecklistDetail> {
                       icon: Icons.analytics_outlined,
                       label: 'Deck profile',
                       onTap: () => context.go(
-                        '/marketplace/competitive/decks/${decklist.deckId}',
+                        '/marketplace/competitive-wip/decks/${decklist.deckId}',
                       ),
                     ),
                   if (decklist.tournamentId.isNotEmpty)
