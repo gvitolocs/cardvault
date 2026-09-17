@@ -155,9 +155,7 @@ succeeds.
 Operational expectations:
 
 - Configure the Stripe webhook endpoint to call
-  `https://api.pokoin.com/api/stripe-webhook` (Oracle production API).
-  `https://pokoin.com/api/stripe-webhook` only works if the web host still
-  proxies `/api/*` to that same backend.
+  `https://pokoin.com/api/stripe-webhook`.
 - Subscribe at least to `checkout.session.completed`.
 - Treat any `Webhook Error: ...` response as signature, endpoint secret, or raw
   body mismatch until proven otherwise.
@@ -201,10 +199,3 @@ rather than reusing verification email defaults.
 - `docs/pokoin-api.md`: public API index.
 - `.env.example`: environment variable names.
 - `deploy-pokoin-web.sh`: production build and Vercel deploy script.
-
-## Vercel raw body
-
-`api/stripe-webhook.js` exports `handler.config.api.bodyParser = false`
-so Vercel does not JSON-parse the webhook body before signature verification.
-On Oracle (`server/oracle-api-server.js`), the route is marked `rawBody: true`
-and the handler reads either `req.rawBody` or the raw request stream.
