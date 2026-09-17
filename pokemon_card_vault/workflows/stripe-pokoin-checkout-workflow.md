@@ -202,10 +202,9 @@ rather than reusing verification email defaults.
 - `.env.example`: environment variable names.
 - `deploy-pokoin-web.sh`: production build and Vercel deploy script.
 
-
 ## Vercel raw body
 
-`api/stripe-webhook.js` exports `module.exports.config.api.bodyParser = false`
+`api/stripe-webhook.js` exports `handler.config.api.bodyParser = false`
 so Vercel does not JSON-parse the webhook body before signature verification.
 On Oracle (`server/oracle-api-server.js`), the route is marked `rawBody: true`
 and the handler reads either `req.rawBody` or the raw request stream.
