@@ -76,7 +76,7 @@ module.exports = async function handler(req, res) {
       if (session.metadata?.uid !== decoded.uid) {
         return res.status(403).json({ error: 'Checkout session does not belong to this account.' });
       }
-      if (session.payment_status !== 'paid') {
+      if (session.payment_status !== 'paid' && session.status !== 'complete') {
         return res.status(409).json({ error: 'Payment is not complete yet.' });
       }
       const result = await handleCompletedCheckout({ admin, session });
