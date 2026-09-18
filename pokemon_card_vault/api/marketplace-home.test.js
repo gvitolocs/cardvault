@@ -319,7 +319,7 @@ test('marketplace home cached cards are repaired with CardTrader availability', 
 
 test('marketplace home source includes lightweight cards fallback', () => {
   assert.match(apiSource, /async function fetchRowsForHomeFallback\(cheapestCacheRelation, limit = 240\)/);
-  assert.match(apiSource, /from public\.marketplace_search_candidates/);
+  assert.match(apiSource, /inner join public\.marketplace_search_candidates/);
   assert.match(apiSource, /coalesce\(cardtrader\.eligible_quantity, cardtrader\.eligible_listing_count, 0\) as listed_quantity/);
   assert.match(apiSource, /MARKETPLACE_HOME_SQL_SNAPSHOT/);
   assert.match(apiSource, /MARKETPLACE_HOME_SQL_SNAPSHOT_DISABLED/);
@@ -350,4 +350,57 @@ test('marketplace home card payload uses cache listing availability as stock', (
   assert.equal(card.cardtraderEligibleListingCount, 1);
   assert.equal(hasCardTraderAvailability(card), true);
   assert.equal(cardTileStock(card), 1);
+});
+
+test('marketplace home-page new arrivals are newest English singles', () => {
+  const pageSource = fs.readFileSync(
+    path.join(__dirname, 'marketplace-home-page.js'),
+    'utf8',
+  );
+  const sqlSource = fs.readFileSync(
+    path.join(__dirname, '_marketplace_react_sql.js'),
+    'utf8',
+  );
+  assert.match(pageSource, /newArrivalIds: newestIds/);
+  assert.match(sqlSource, /async function readNewestEnglishCards/);
+  assert.match(sqlSource, /NEWEST_ENGLISH_SET_NAMES/);
+  assert.match(sqlSource, /Storm Emeralda/);
+  assert.doesNotMatch(apiSource, /fetchNewestArrivalIds/);
+});
+
+test('marketplace home artist overlay uses public card_id, never leftover PK = public id', () => {
+  assert.match(apiSource, /from public\.marketplace_blueprint_artists/);
+  assert.match(apiSource, /where marketplace_blueprint_artists\.card_id = any\(\$1::bigint\[\]\)/);
+  assert.match(apiSource, /marketplace_search_candidates\.artist/);
+  assert.match(apiSource, /marketplace_search_candidates\.illustrator/);
+  assert.doesNotMatch(apiSource, /artist\.blueprint_id = marketplace_search_candidates\.card_id/);
+  assert.doesNotMatch(apiSource, /artist\.artist,/);
+  assert.match(apiSource, /on blueprints\.id = marketplace_search_candidates\.ct_id/);
+  assert.match(apiSource, /price_summary\.blueprint_id = marketplace_search_candidates\.ct_id/);
+});
+
+test('marketplace home cache hydrate joins leftover blueprint_id to ct_id', () => {
+  assert.match(apiSource, /cache\.blueprint_id = c\.ct_id/);
+  assert.match(apiSource, /cache\.pokoin_card_id = c\.card_id::text/);
+  assert.doesNotMatch(apiSource, /cache\.blueprint_id = candidate\.card_id/);
+});
+
+test('marketplace home snapshot is day-keyed and rebuilds after the CardTrader ingest', () => {
+  // Key = UTC day + cheapest-cache generation (cardtrader_blueprint_listing_cache
+  // .updated_at bumps when the ingest lands), probed at most every 5 minutes.
+  assert.match(apiSource, /function utcDayKey/);
+  assert.match(apiSource, /async function homeSnapshotKey/);
+  assert.match(
+    apiSource,
+    /select max\(updated_at\) as refreshed_at from public\.cardtrader_blueprint_listing_cache/,
+  );
+  assert.match(apiSource, /GENERATION_PROBE_TTL_MS/);
+  assert.match(apiSource, /cachedSnapshotKey = await homeSnapshotKey\(\)/);
+  // Stale-while-revalidate: a key mismatch serves the last good snapshot and
+  // rebuilds in the background — only a cold process waits on the rebuild.
+  assert.match(apiSource, /if \(cachedSnapshot && cachedSnapshotKey === key\)/);
+  assert.match(apiSource, /marketplace-home background rebuild failed/);
+  // The 30-second memo is gone; nothing may read the old TTL knob.
+  assert.doesNotMatch(apiSource, /MEMORY_CACHE_TTL_MS/);
+  assert.doesNotMatch(apiSource, /cachedSnapshotAt/);
 });

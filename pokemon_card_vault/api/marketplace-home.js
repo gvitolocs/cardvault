@@ -15,7 +15,7 @@ const {
   cartHolderCountFromRow,
 } = require('./_marketplace_cart_analytics');
 
-const MEMORY_CACHE_TTL_MS = 30 * 1000;
+const GENERATION_PROBE_TTL_MS = 5 * 60 * 1000;
 const HOT_REFRESH_INTERVAL = '2 minutes';
 const HOMEPAGE_CHEAPEST_SOURCES = new Set([
   'cheapest_homepage_cache_blueprint',
@@ -23,7 +23,10 @@ const HOMEPAGE_CHEAPEST_SOURCES = new Set([
 ]);
 const HOMEPAGE_CHEAPEST_PROVIDERS = new Set(['cardtrader', 'pokoin_native']);
 let cachedSnapshot = null;
-let cachedSnapshotAt = 0;
+let cachedSnapshotKey = '';
+let snapshotRebuild = null;
+let generationProbedAt = 0;
+let generationValue = '';
 
 function fallbackSectionsForCards(cards, sectionSize = 12) {
   const ids = cards.map((card) => String(card.id || '')).filter(Boolean);
@@ -416,15 +419,17 @@ async function hydrateCanonicalCardTraderCache(cards, cheapestCacheRelation) {
           cache.eligible_listing_count,
           cache.eligible_quantity,
           cache.cheapest_price_pkn,
-          case when cache.blueprint_id = candidate.card_id then 0 else 1 end as match_rank
+          case when cache.blueprint_id = c.ct_id then 0 else 1 end as match_rank
         from unnest($1::bigint[]) as candidate(card_id)
+        join public.marketplace_search_candidates c
+          on c.card_id = candidate.card_id
         join ${cheapestCacheRelation} cache
           on cache.provider in ('cardtrader', 'pokoin_native')
           and cache.eligible_listing_count > 0
           and cache.cheapest_price_pkn is not null
           and (
-            cache.blueprint_id = candidate.card_id
-            or cache.pokoin_card_id = candidate.card_id::text
+            cache.blueprint_id = c.ct_id
+            or cache.pokoin_card_id = c.card_id::text
           )
       ) matches
       order by
@@ -531,14 +536,14 @@ async function artistMapForCardIds(cardIds) {
   }
   const result = await marketplaceQuery(
     `
-      select blueprint_id, artist, illustrator
+      select card_id, artist, illustrator
       from public.marketplace_blueprint_artists
-      where blueprint_id = any($1::bigint[])
+      where marketplace_blueprint_artists.card_id = any($1::bigint[])
     `,
     [ids],
   );
   return new Map(result.rows.map((row) => [
-    String(row.blueprint_id),
+    String(row.card_id),
     {
       artist: row.artist || row.illustrator || '',
       illustrator: row.illustrator || row.artist || '',
@@ -599,8 +604,8 @@ async function fetchMissingSectionCards(sectionIds, existingIds, cheapestCacheRe
         marketplace_search_candidates.item_kind,
         marketplace_search_candidates.product_type,
         marketplace_search_candidates.trainer_name,
-        artist.artist,
-        artist.illustrator,
+        marketplace_search_candidates.artist,
+        marketplace_search_candidates.illustrator,
         marketplace_search_candidates.card_palette,
         marketplace_search_candidates.emoji,
         ${watchlistCountColumn('watchlist_analytics')},
@@ -627,11 +632,9 @@ async function fetchMissingSectionCards(sectionIds, existingIds, cheapestCacheRe
       from settings,
         public.marketplace_search_candidates
       left join public.cardtrader_pokemon_blueprints blueprints
-        on blueprints.id = marketplace_search_candidates.card_id
-      left join public.marketplace_blueprint_artists artist
-        on artist.blueprint_id = marketplace_search_candidates.card_id
+        on blueprints.id = marketplace_search_candidates.ct_id
       left join public.marketplace_blueprint_price_summary price_summary
-        on price_summary.blueprint_id = marketplace_search_candidates.card_id
+        on price_summary.blueprint_id = marketplace_search_candidates.ct_id
       ${cardTraderAvailabilityJoin('marketplace_search_candidates', cheapestCacheRelation)}
       ${watchlistAnalyticsJoin('marketplace_search_candidates', 'watchlist_analytics')}
       ${cartAnalyticsJoin('marketplace_search_candidates', 'cart_analytics')}
@@ -666,11 +669,32 @@ async function refreshHotBlueprintsIfStale() {
   }
 }
 
-async function fetchSnapshot() {
+function utcDayKey(now = new Date()) {
+  return now.toISOString().slice(0, 10);
+}
+
+async function homeSnapshotKey() {
+  // Day-keyed snapshot cache: built once per UTC day, and again when the
+  // CardTrader ingest bumps cardtrader_blueprint_listing_cache.updated_at
+  // (indexed max(), probed at most every GENERATION_PROBE_TTL_MS).
   const now = Date.now();
-  if (cachedSnapshot && now - cachedSnapshotAt < MEMORY_CACHE_TTL_MS) {
-    return cachedSnapshot;
+  if (!generationProbedAt || now - generationProbedAt >= GENERATION_PROBE_TTL_MS) {
+    try {
+      const result = await marketplaceQuery(
+        'select max(updated_at) as refreshed_at from public.cardtrader_blueprint_listing_cache',
+      );
+      const refreshedAt = result.rows[0]?.refreshed_at;
+      generationValue = refreshedAt ? new Date(refreshedAt).toISOString() : 'empty';
+    } catch (error) {
+      console.warn('marketplace-home generation probe failed', error);
+      generationValue = generationValue || 'unknown';
+    }
+    generationProbedAt = now;
   }
+  return `${utcDayKey(new Date(now))}|${generationValue}`;
+}
+
+async function buildSnapshot() {
   const cheapestCacheRelation = await cheapestHomepageCacheRelationName();
   const useSqlSnapshot = process.env.MARKETPLACE_HOME_SQL_SNAPSHOT === '1' &&
     process.env.MARKETPLACE_HOME_SQL_SNAPSHOT_DISABLED !== '1';
@@ -735,8 +759,36 @@ async function fetchSnapshot() {
     },
   };
   cachedSnapshot = normalized;
-  cachedSnapshotAt = now;
+  cachedSnapshotKey = await homeSnapshotKey();
   return normalized;
+}
+
+async function fetchSnapshot() {
+  const key = await homeSnapshotKey();
+  if (cachedSnapshot && cachedSnapshotKey === key) {
+    return cachedSnapshot;
+  }
+  if (cachedSnapshot) {
+    // Day rolled over or the CardTrader ingest bumped the cheapest cache:
+    // serve the last good snapshot now and rebuild once in the background so
+    // no visitor waits on the seconds-long rebuild.
+    if (!snapshotRebuild) {
+      snapshotRebuild = buildSnapshot()
+        .catch((error) => {
+          console.error('marketplace-home background rebuild failed', error);
+        })
+        .finally(() => {
+          snapshotRebuild = null;
+        });
+    }
+    return cachedSnapshot;
+  }
+  if (!snapshotRebuild) {
+    snapshotRebuild = buildSnapshot().finally(() => {
+      snapshotRebuild = null;
+    });
+  }
+  return snapshotRebuild;
 }
 
 module.exports = async function handler(req, res) {
@@ -746,12 +798,21 @@ module.exports = async function handler(req, res) {
   }
 
   try {
+    const { parseGameFromRequest, isPokemonGame } = require('./_marketplace_game');
+    const game = parseGameFromRequest(req);
+    // Flutter Pokemon home stays on this path. One Piece / Riftbound use the
+    // React home-page SQL against their isolated DBs (same handler as
+    // /api/marketplace-home-page).
+    if (!isPokemonGame(game)) {
+      return require('./marketplace-home-page')(req, res);
+    }
+
     const snapshot = await fetchSnapshot();
     res.setHeader(
       'Cache-Control',
       'public, max-age=10, s-maxage=30, stale-while-revalidate=60',
     );
-    return res.status(200).json(snapshot);
+    return res.status(200).json({ ...snapshot, game: 'pokemon' });
   } catch (error) {
     console.error('marketplace-home failed', error);
     return res.status(500).json({ error: 'Marketplace home failed.' });
