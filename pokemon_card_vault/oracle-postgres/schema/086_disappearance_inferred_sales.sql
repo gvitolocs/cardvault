@@ -1159,6 +1159,31 @@ $$;
 -- One-time (idempotent) September 2026 backfill
 -- ---------------------------------------------------------------------------
 
+-- Shared set-based inputs: grouped live stacks, live listing ids, sellers on
+-- vacation, and an index that makes observation idempotency probes cheap.
+create temp table cardtrader_live_stacks on commit drop as
+select
+  coalesce(s.blueprint_id, s.cardtrader_blueprint_id) as blueprint_id,
+  s.seller_account_id,
+  lower(btrim(s.condition)) as cond,
+  lower(btrim(s.language)) as lang,
+  public.cardtrader_listing_is_reverse(coalesce(s.properties, '{}'::jsonb), false, '') as rev,
+  public.cardtrader_listing_is_first_edition(coalesce(s.properties, '{}'::jsonb), false) as fe,
+  public.cardtrader_listing_is_graded(coalesce(s.raw_metadata, '{}'::jsonb), coalesce(s.properties, '{}'::jsonb)) as gr
+from public.cardtrader_market_listing_snapshots s
+where s.provider = 'cardtrader'
+  and coalesce(s.seller_account_id, '') <> '';
+create index on cardtrader_live_stacks (blueprint_id, seller_account_id, cond, lang, rev, fe, gr);
+
+create temp table cardtrader_vacation_sellers on commit drop as
+select distinct seller_account_id
+from public.cardtrader_seller_vacation
+where provider = 'cardtrader'
+  and cardtrader_seller_is_on_vacation(provider, seller_account_id);
+
+create index if not exists marketplace_price_observations_source_item_idx
+  on public.marketplace_price_observations (source_item_id);
+
 -- 1) Mass cutover runs (>1000 rows per archiving run) are stale-Pi-clone
 --    diff artifacts, never market sales.
 create temp table cardtrader_artifact_runs on commit drop as
@@ -1202,20 +1227,16 @@ with backfill as (
     )
     and not exists (
       select 1
-      from public.cardtrader_market_listing_snapshots s2
-      where s2.provider = 'cardtrader'
-        and s2.blueprint_id is not distinct from coalesce(h.blueprint_id, h.cardtrader_blueprint_id)
-        and s2.seller_account_id = h.seller_account_id
-        and lower(btrim(s2.condition)) = lower(btrim(h.condition))
-        and lower(btrim(s2.language)) = lower(btrim(h.language))
-        and public.cardtrader_listing_is_reverse(coalesce(s2.properties, '{}'::jsonb), false, '')
-            is not distinct from public.cardtrader_listing_is_reverse(coalesce(h.properties, '{}'::jsonb), false, '')
-        and public.cardtrader_listing_is_first_edition(coalesce(s2.properties, '{}'::jsonb), false)
-            is not distinct from public.cardtrader_listing_is_first_edition(coalesce(h.properties, '{}'::jsonb), false)
-        and public.cardtrader_listing_is_graded(coalesce(s2.raw_metadata, '{}'::jsonb), coalesce(s2.properties, '{}'::jsonb))
-            is not distinct from public.cardtrader_listing_is_graded(coalesce(h.raw_metadata, '{}'::jsonb), coalesce(h.properties, '{}'::jsonb))
+      from cardtrader_live_stacks ls
+      where ls.blueprint_id is not distinct from coalesce(h.blueprint_id, h.cardtrader_blueprint_id)
+        and ls.seller_account_id = h.seller_account_id
+        and ls.cond = lower(btrim(h.condition))
+        and ls.lang = lower(btrim(h.language))
+        and ls.rev is not distinct from public.cardtrader_listing_is_reverse(coalesce(h.properties, '{}'::jsonb), false, '')
+        and ls.fe is not distinct from public.cardtrader_listing_is_first_edition(coalesce(h.properties, '{}'::jsonb), false)
+        and ls.gr is not distinct from public.cardtrader_listing_is_graded(coalesce(h.raw_metadata, '{}'::jsonb), coalesce(h.properties, '{}'::jsonb))
     )
-    and not public.cardtrader_seller_is_on_vacation('cardtrader', h.seller_account_id)
+    and h.seller_account_id not in (select seller_account_id from cardtrader_vacation_sellers)
 )
 update public.cardtrader_market_listing_removed_history h
 set archive_reason = 'inferred_sale',
@@ -1245,20 +1266,16 @@ with continuity_found as (
       )
       or exists (
         select 1
-        from public.cardtrader_market_listing_snapshots s2
-        where s2.provider = 'cardtrader'
-          and s2.blueprint_id is not distinct from coalesce(h.blueprint_id, h.cardtrader_blueprint_id)
-          and s2.seller_account_id = h.seller_account_id
-          and lower(btrim(s2.condition)) = lower(btrim(h.condition))
-          and lower(btrim(s2.language)) = lower(btrim(h.language))
-          and public.cardtrader_listing_is_reverse(coalesce(s2.properties, '{}'::jsonb), false, '')
-              is not distinct from public.cardtrader_listing_is_reverse(coalesce(h.properties, '{}'::jsonb), false, '')
-          and public.cardtrader_listing_is_first_edition(coalesce(s2.properties, '{}'::jsonb), false)
-              is not distinct from public.cardtrader_listing_is_first_edition(coalesce(h.properties, '{}'::jsonb), false)
-          and public.cardtrader_listing_is_graded(coalesce(s2.raw_metadata, '{}'::jsonb), coalesce(s2.properties, '{}'::jsonb))
-              is not distinct from public.cardtrader_listing_is_graded(coalesce(h.raw_metadata, '{}'::jsonb), coalesce(h.properties, '{}'::jsonb))
+        from cardtrader_live_stacks ls
+        where ls.blueprint_id is not distinct from coalesce(h.blueprint_id, h.cardtrader_blueprint_id)
+          and ls.seller_account_id = h.seller_account_id
+          and ls.cond = lower(btrim(h.condition))
+          and ls.lang = lower(btrim(h.language))
+          and ls.rev is not distinct from public.cardtrader_listing_is_reverse(coalesce(h.properties, '{}'::jsonb), false, '')
+          and ls.fe is not distinct from public.cardtrader_listing_is_first_edition(coalesce(h.properties, '{}'::jsonb), false)
+          and ls.gr is not distinct from public.cardtrader_listing_is_graded(coalesce(h.raw_metadata, '{}'::jsonb), coalesce(h.properties, '{}'::jsonb))
       )
-      or public.cardtrader_seller_is_on_vacation('cardtrader', h.seller_account_id)
+      or h.seller_account_id in (select seller_account_id from cardtrader_vacation_sellers)
     )
 )
 update public.cardtrader_market_listing_removed_history h
