@@ -1225,6 +1225,50 @@ set archive_reason = 'inferred_sale',
     )
 where h.id in (select id from backfill);
 
+-- 2b) Pre-cutover inferred_sale rows that FAIL continuity (same id back in
+--     the book, equivalent seller stack still live, or seller on vacation)
+--     are not sales — invalidate them the way the runtime correction pass
+--     would (mirrors T4c/T4e classification and the retraction semantics).
+with continuity_found as (
+  select h.id
+  from public.cardtrader_market_listing_removed_history h
+  where h.provider = 'cardtrader'
+    and h.removed_day < '2026-09-11'
+    and h.archive_reason = 'inferred_sale'
+    and h.status = 'confirmed'
+    and (
+      exists (
+        select 1
+        from public.cardtrader_market_listing_snapshots s
+        where s.provider = 'cardtrader'
+          and s.external_listing_id = h.external_listing_id
+      )
+      or exists (
+        select 1
+        from public.cardtrader_market_listing_snapshots s2
+        where s2.provider = 'cardtrader'
+          and s2.blueprint_id is not distinct from coalesce(h.blueprint_id, h.cardtrader_blueprint_id)
+          and s2.seller_account_id = h.seller_account_id
+          and lower(btrim(s2.condition)) = lower(btrim(h.condition))
+          and lower(btrim(s2.language)) = lower(btrim(h.language))
+          and public.cardtrader_listing_is_reverse(coalesce(s2.properties, '{}'::jsonb), false, '')
+              is not distinct from public.cardtrader_listing_is_reverse(coalesce(h.properties, '{}'::jsonb), false, '')
+          and public.cardtrader_listing_is_first_edition(coalesce(s2.properties, '{}'::jsonb), false)
+              is not distinct from public.cardtrader_listing_is_first_edition(coalesce(h.properties, '{}'::jsonb), false)
+          and public.cardtrader_listing_is_graded(coalesce(s2.raw_metadata, '{}'::jsonb), coalesce(s2.properties, '{}'::jsonb))
+              is not distinct from public.cardtrader_listing_is_graded(coalesce(h.raw_metadata, '{}'::jsonb), coalesce(h.properties, '{}'::jsonb))
+      )
+      or public.cardtrader_seller_is_on_vacation('cardtrader', h.seller_account_id)
+    )
+)
+update public.cardtrader_market_listing_removed_history h
+set status = 'invalid',
+    resolved_at = now(),
+    archive_metadata = coalesce(h.archive_metadata, '{}'::jsonb) || jsonb_build_object(
+      'reclassifiedBecause', 'backfill_continuity_found_d000070'
+    )
+where h.id in (select id from continuity_found);
+
 -- 3) Project observations for every eligible unprojected row (idempotent via
 --    source_item_id), then rebuild the sold graph.
 insert into public.marketplace_price_observations (
