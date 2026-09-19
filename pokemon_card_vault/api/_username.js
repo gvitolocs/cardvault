@@ -25,6 +25,17 @@ function baseUsernameFrom(value) {
   return compact.length >= 3 ? compact.slice(0, 24) : 'pokoin';
 }
 
+/** Compact letters/digits for display-name prefix search (spaces stripped). */
+function displayNameSearchKey(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/g, '')
+    .slice(0, 48);
+}
+
 function normalizeRequestedUsername(value) {
   const clean = String(value || '').trim().toLowerCase();
   if (!/^[a-z0-9]{3,32}$/.test(clean)) {
@@ -87,6 +98,7 @@ async function assignUniqueUsername({
           uid,
           username: candidate,
           displayName: String(displayName || ''),
+          displayNameSearch: displayNameSearchKey(displayName || candidate),
           createdAt: usernameDoc.exists ? usernameDoc.data()?.createdAt || now : now,
           updatedAt: now,
         },
@@ -209,6 +221,7 @@ async function claimExactUsername({
         uid,
         username: clean,
         displayName: String(displayName || clean),
+        displayNameSearch: displayNameSearchKey(displayName || clean),
         createdAt: usernameDoc.exists ? usernameDoc.data()?.createdAt || now : now,
         updatedAt: now,
       },
@@ -235,6 +248,7 @@ module.exports = {
   assignUniqueUsername,
   baseUsernameFrom,
   claimExactUsername,
+  displayNameSearchKey,
   ensureUniqueUsername,
   normalizeRequestedUsername,
   randomPokemonUsernameBase,
