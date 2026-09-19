@@ -1,4 +1,5 @@
 const { marketplaceQuery } = require('./_marketplace_db');
+const { recordVersionImages } = require('./_marketplace_image_log');
 const { withCardEmojiFields } = require('./_marketplace_card_emoji');
 const { projectedRaritySql } = require('./_marketplace_card_rarity');
 const {
@@ -57,12 +58,24 @@ function cardIdFromDoubledId(value) {
   return String(numeric / 2);
 }
 
+function pokoinOurId(value) {
+  const raw = String(value || '').trim();
+  if (!/^\d+$/.test(raw)) {
+    return '';
+  }
+  const numeric = Number(raw);
+  if (!Number.isSafeInteger(numeric) || numeric <= 0) {
+    return '';
+  }
+  return String(numeric % 2 === 1 ? numeric * 2 : numeric);
+}
+
 function resolveCardRoute({ cardId, cardSlug, doubledCardId }) {
   const cleanCardSlug = cleanText(cardSlug, 240);
-  const decodedDoubledId = cleanCardSlug ? cardIdFromDoubledId(doubledCardId) : '';
+  const pathOurId = cleanText(doubledCardId, 80);
   const cleanCardId = cleanText(cardId, 80);
   return {
-    cardId: decodedDoubledId || cleanCardId,
+    cardId: pathOurId || cleanCardId,
     cardSlug: cleanCardSlug,
   };
 }
@@ -347,7 +360,7 @@ async function candidateRowsForCardId(cardId, query = marketplaceQuery) {
         candidates.card_number as expansion_number,
         nullif(substring(candidates.card_number from '([0-9]+)'), '')::integer as expansion_number_int,
         candidates.product_variant,
-        candidates.card_id as blueprint_id,
+        coalesce(candidates.ct_id, candidates.card_id) as blueprint_id,
         candidates.image_url,
         candidates.cdn_image_url,
         candidates.preview_image_url,
@@ -366,18 +379,19 @@ async function candidateRowsForCardId(cardId, query = marketplaceQuery) {
         ${availabilityColumns('price_summary', 'cardtrader')}
       from public.marketplace_search_candidates candidates
       left join public.cardtrader_pokemon_blueprints blueprints
-        on blueprints.id = candidates.card_id
+        on blueprints.id = candidates.ct_id
       left join public.marketplace_blueprint_tcg_metadata tcg_metadata
-        on tcg_metadata.blueprint_id = candidates.card_id
+        on tcg_metadata.card_id = candidates.card_id
+        or tcg_metadata.blueprint_id = candidates.ct_id
       ${cardTraderAvailabilityJoin('candidates', cheapestCacheRelation)}
       left join (
         select name, min(symbol_image_url) as symbol_image_url
-        from public.cardtrader_pokemon_expansions
+        from public.pokoin_pokemon_expansions
         group by name
       ) expansions
         on expansions.name = candidates.set_name
       left join public.marketplace_blueprint_artists artist
-        on artist.blueprint_id = candidates.card_id
+        on artist.card_id = candidates.card_id
       left join public.marketplace_card_urls urls
         on urls.card_id = candidates.card_id
         and urls.language = 'en'
@@ -415,7 +429,19 @@ async function rowsForVersions({
   const normalizedCardId = Number(route.cardId);
   if (Number.isSafeInteger(normalizedCardId) && normalizedCardId > 0) {
     values.push(normalizedCardId);
-    where += ` and versions.card_id = $${values.length}`;
+    where += ` and versions.card_id = coalesce((
+      select resolved.card_id
+      from (
+        select c.card_id
+        from public.marketplace_search_candidates c
+        where c.card_id = $${values.length}::bigint
+        union all
+        select c.card_id
+        from public.marketplace_search_candidates c
+        where c.ct_id = $${values.length}::bigint
+      ) resolved
+      limit 1
+    ), $${values.length}::bigint)`;
   }
   where += slugMatchClause(route.cardSlug, values, {
     collectorNumberSql: expansionNumberSql,
@@ -493,14 +519,15 @@ async function rowsForVersions({
       left join public.marketplace_search_candidates candidates
         on candidates.card_id = versions.card_id
       left join public.cardtrader_pokemon_blueprints blueprints
-        on blueprints.id = versions.card_id
+        on blueprints.id = versions.ct_id
       left join public.marketplace_blueprint_tcg_metadata tcg_metadata
-        on tcg_metadata.blueprint_id = versions.card_id
+        on tcg_metadata.card_id = versions.card_id
+        or tcg_metadata.blueprint_id = versions.ct_id
       ${availabilityJoinSql}
       left join lateral (
         select collector_number
         from public.marketplace_cm_verified_links link
-        where link.blueprint_id = versions.card_id
+        where link.blueprint_id = versions.ct_id
           and nullif(link.collector_number, '') is not null
         order by
           case link.confidence when 'verified' then 0 when 'manual' then 1 else 2 end,
@@ -511,19 +538,19 @@ async function rowsForVersions({
       left join lateral (
         select collector_number
         from public.marketplace_cm_product_parsing parsing
-        where parsing.blueprint_id = versions.card_id
+        where parsing.blueprint_id = versions.ct_id
           and nullif(parsing.collector_number, '') is not null
         order by parsing.verified_at desc nulls last, parsing.updated_at desc nulls last
         limit 1
       ) product_parsing on true
       left join (
         select name, min(symbol_image_url) as symbol_image_url
-        from public.cardtrader_pokemon_expansions
+        from public.pokoin_pokemon_expansions
         group by name
       ) expansions
         on expansions.name = versions.expansion_name
       left join public.marketplace_blueprint_artists artist
-        on artist.blueprint_id = versions.blueprint_id
+        on artist.card_id = versions.card_id
       left join public.marketplace_card_urls urls
         on urls.card_id = versions.card_id
         and urls.language = 'en'
@@ -590,6 +617,10 @@ module.exports = async function handler(req, res) {
         url.searchParams.get('lang') ||
         url.searchParams.get('language'),
     });
+    recordVersionImages(rows, {
+      cardId: route.cardId,
+      route: url.pathname + url.search,
+    });
     res.setHeader('Cache-Control', 'public, max-age=20, s-maxage=120');
     return res.status(200).json(rows);
   } catch (error) {
@@ -604,6 +635,7 @@ module.exports.rowsForVersions = rowsForVersions;
 module.exports.cardDetailSlugParts = cardDetailSlugParts;
 module.exports.collectorNumberTokenVariants = collectorNumberTokenVariants;
 module.exports.cardIdFromDoubledId = cardIdFromDoubledId;
+module.exports.pokoinOurId = pokoinOurId;
 module.exports.projectedExpansionNumberSql = projectedExpansionNumberSql;
 module.exports.projectedExpansionNumberIntSql = projectedExpansionNumberIntSql;
 module.exports.projectedRaritySql = projectedRaritySql;

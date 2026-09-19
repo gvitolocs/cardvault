@@ -56,6 +56,8 @@ const READ_HEAVY_CACHE_ROUTES = new Set([
   'marketplace-blueprint-price.js',
   'marketplace-card-cheapest-price.js',
   'marketplace-card-sales.js',
+  'marketplace-sales-pulse.js',
+  'marketplace-card-last-median.js',
   'marketplace-card-seo.js',
   'marketplace-card-shortlink.js',
   'marketplace-card-url.js',
@@ -64,9 +66,12 @@ const READ_HEAVY_CACHE_ROUTES = new Set([
   'marketplace-competitive.js',
   'marketplace-expansions.js',
   'marketplace-home.js',
+  'marketplace-home-page.js',
   'marketplace-hot-blueprints.js',
   'marketplace-listings.js',
   'marketplace-search-candidates.js',
+  'marketplace-search-page.js',
+  'marketplace-suggest.js',
   'searchbar-cards.js',
   'searchbar-token-predict.js',
 ]);
@@ -120,7 +125,7 @@ const DUPLICATED_LOGIC_PATTERNS = [
 function routeFiles() {
   return fs
     .readdirSync(API_DIR)
-    .filter((name) => name.endsWith('.js') && !name.endsWith('.test.js') && !name.startsWith('_'))
+    .filter((name) => name.endsWith('.js') && !name.endsWith('.test.js') && !name.startsWith('_') && !name.startsWith('.'))
     .sort();
 }
 

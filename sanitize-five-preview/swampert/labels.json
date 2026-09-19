@@ -1,0 +1,72 @@
+{
+  "outline": {
+    "r": 237,
+    "g": 214,
+    "b": 83
+  },
+  "thickness": {
+    "top": 13,
+    "bottom": 0,
+    "left": 10,
+    "right": 6
+  },
+  "skew0": -4.4946444945488055,
+  "labels": [
+    {
+      "id": 1,
+      "name": "1-weld",
+      "note": "old: paint AABB + weld"
+    },
+    {
+      "id": 2,
+      "name": "2-round-only",
+      "note": "8× round, no white punch, no deskew"
+    },
+    {
+      "id": 3,
+      "name": "3-pipeline",
+      "note": "current: diecut-only/studio-diecut",
+      "job": {
+        "action": "diecut-only",
+        "reason": "studio-diecut",
+        "family": "yellow",
+        "tMed": 10,
+        "overNumber": null
+      },
+      "thickness": {
+        "top": 13,
+        "bottom": 0,
+        "left": 10,
+        "right": 6
+      },
+      "punched": 1337,
+      "cornerKind": "white-ears"
+    },
+    {
+      "id": 4,
+      "name": "4-crop-aabb",
+      "note": "crop 314x450 then round",
+      "box": {
+        "left": 0,
+        "top": 0,
+        "width": 314,
+        "height": 450
+      }
+    },
+    {
+      "id": 5,
+      "name": "5-deskew-pipeline",
+      "note": "rotate 4.49° then pipeline",
+      "deg": -4.4946444945488055,
+      "job": {
+        "action": "diecut-only",
+        "reason": "studio-diecut",
+        "family": "yellow",
+        "tMed": 14,
+        "overNumber": null
+      },
+      "punched": 21487
+    }
+  ],
+  "size": "314x450"
+}

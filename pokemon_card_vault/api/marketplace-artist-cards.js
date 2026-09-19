@@ -9,13 +9,14 @@ const {
 } = require('./_artist_display');
 const { withCardEmojiFields } = require('./_marketplace_card_emoji');
 const { projectedRaritySql } = require('./_marketplace_card_rarity');
+const { overlayCheapestOnRows } = require('./_marketplace_react_sql');
 
 function cleanLimit(value, fallback = 240) {
   const limit = Number(value);
   if (!Number.isFinite(limit)) {
     return fallback;
   }
-  return Math.min(Math.max(Math.trunc(limit), 1), 1000);
+  return Math.min(Math.max(Math.trunc(limit), 1), 5000);
 }
 
 function cleanText(value, maxLength = 120) {
@@ -106,6 +107,54 @@ function normalCollectorSql(column) {
   end`;
 }
 
+/** Illustrators index cover: Pikachu, then a gen 1 starter, then Eevee, else listed PKN. */
+function artistCoverTier(name) {
+  const key = String(name || '').trim().toLowerCase();
+  if (/^pikachu(\s|$)/.test(key)) return 1;
+  if (/^(bulbasaur|charmander|squirtle)(\s|$)/.test(key)) return 2;
+  if (/^eevee(\s|$)/.test(key)) return 3;
+  return 4;
+}
+
+function leftoverArtistImage(row = {}) {
+  for (const value of [row.cdn_image_url, row.image_url, row.homepage_image_url, row.imageUrl]) {
+    const text = String(value || '').trim();
+    if (!text || /\/previews\//i.test(text) || /\/preview_/i.test(text)) continue;
+    return text;
+  }
+  return '';
+}
+
+function leftoverImageSql() {
+  return `coalesce(
+    nullif(versions.cdn_image_url, ''),
+    nullif(versions.image_url, ''),
+    nullif(versions.homepage_image_url, '')
+  )`;
+}
+
+function coverTierSql() {
+  return `case
+    when lower(versions.name) ~ '^pikachu([[:space:]]|$)' then 1
+    when lower(versions.name) ~ '^(bulbasaur|charmander|squirtle)([[:space:]]|$)' then 2
+    when lower(versions.name) ~ '^eevee([[:space:]]|$)' then 3
+    else 4
+  end`;
+}
+
+function pickArtistCover(cards) {
+  const ranked = (Array.isArray(cards) ? cards : [])
+    .map((row) => ({
+      row,
+      tier: artistCoverTier(row?.name),
+      price: Number(row?.lowest_price_pkn || row?.price || 0) || 0,
+      imageUrl: leftoverArtistImage(row),
+    }))
+    .filter((entry) => entry.imageUrl)
+    .sort((a, b) => a.tier - b.tier || b.price - a.price);
+  return ranked[0]?.row || null;
+}
+
 function artistProfileFromRow(row) {
   const sourceAttribution =
     row.profile_source_attribution && typeof row.profile_source_attribution === 'object'
@@ -142,9 +191,19 @@ function artistProfileFromRow(row) {
 }
 
 async function artistSummaries({ limit, query = marketplaceQuery }) {
+  const leftoverImage = leftoverImageSql();
   const result = await query(
     `
-      with artist_cards as (
+      with cheap as (
+        select blueprint_id, max(cheapest_price_pkn) as cheapest_price_pkn
+        from public.cheapest_homepage_cache_blueprint
+        where provider in ('cardtrader', 'pokoin_native')
+          and cheapest_price_pkn is not null
+          and cheapest_price_pkn > 0
+          and coalesce(eligible_listing_count, 0) > 0
+        group by blueprint_id
+      ),
+      artist_cards as (
         select
           artist.artist,
           artist.illustrator,
@@ -152,46 +211,54 @@ async function artistSummaries({ limit, query = marketplaceQuery }) {
           ${slugSql('artist.normalized_artist')} as artist_slug,
           artist.artist_card_count,
           versions.blueprint_id,
+          versions.ct_id,
+          versions.name,
           versions.projected_at,
-          coalesce(
-            versions.preview_image_url,
-            versions.homepage_image_url,
-            versions.cdn_image_url,
-            versions.image_url,
-            ''
-          ) as image_url,
+          ${leftoverImage} as image_url,
+          shades.shade as art_shade,
+          ${coverTierSql()} as cover_tier,
+          cheap.cheapest_price_pkn,
           count(*) over (partition by artist.normalized_artist)::integer as visible_card_count
         from public.marketplace_blueprint_artists artist
         join public.marketplace_card_versions versions
           on versions.blueprint_id = artist.blueprint_id
+        left join public.marketplace_leftover_art_shades shades
+          on shades.ct_id = versions.ct_id
+        left join cheap
+          on cheap.blueprint_id = versions.blueprint_id
         where versions.product_type = 'card'
-          and coalesce(
-            versions.preview_image_url,
-            versions.homepage_image_url,
-            versions.cdn_image_url,
-            versions.image_url
-          ) is not null
+          and ${leftoverImage} is not null
+          and ${leftoverImage} !~* '/previews/|/preview_'
+      ),
+      picked as (
+        select distinct on (artist_cards.normalized_artist)
+          artist_cards.artist,
+          artist_cards.illustrator,
+          artist_cards.normalized_artist,
+          artist_cards.artist_slug,
+          greatest(
+            coalesce(artist_cards.artist_card_count, 0),
+            coalesce(artist_cards.visible_card_count, 0)
+          )::integer as artist_card_count,
+          artist_cards.visible_card_count,
+          profiles.display_name as profile_display_name,
+          coalesce(nullif(profiles.profile_image_cdn_url, ''), profiles.profile_image_url) as profile_image_url,
+          artist_cards.image_url,
+          artist_cards.name as cover_name,
+          artist_cards.art_shade
+        from artist_cards
+        left join public.marketplace_artist_profiles profiles
+          on profiles.normalized_artist = artist_cards.normalized_artist
+        order by
+          artist_cards.normalized_artist asc,
+          artist_cards.cover_tier asc,
+          artist_cards.cheapest_price_pkn desc nulls last,
+          artist_cards.projected_at desc nulls last,
+          artist_cards.blueprint_id asc
       )
-      select distinct on (artist_cards.normalized_artist)
-        artist_cards.artist,
-        artist_cards.illustrator,
-        artist_cards.normalized_artist,
-        artist_cards.artist_slug,
-        greatest(
-          coalesce(artist_cards.artist_card_count, 0),
-          coalesce(artist_cards.visible_card_count, 0)
-        )::integer as artist_card_count,
-        artist_cards.visible_card_count,
-        profiles.display_name as profile_display_name,
-        coalesce(nullif(profiles.profile_image_cdn_url, ''), profiles.profile_image_url) as profile_image_url,
-        artist_cards.image_url
-      from artist_cards
-      left join public.marketplace_artist_profiles profiles
-        on profiles.normalized_artist = artist_cards.normalized_artist
-      order by
-        artist_cards.normalized_artist asc,
-        artist_cards.projected_at desc nulls last,
-        artist_cards.blueprint_id asc
+      select *
+      from picked
+      order by artist_card_count desc, artist asc, artist_slug asc
       limit $1
     `,
     [cleanLimit(limit, 1000)],
@@ -210,7 +277,9 @@ async function artistSummaries({ limit, query = marketplaceQuery }) {
       normalizedArtist: row.normalized_artist || '',
       slug: row.artist_slug || '',
       cardCount: Number(row.artist_card_count || row.visible_card_count || 0),
-      imageUrl: row.image_url || '',
+      imageUrl: leftoverArtistImage({ image_url: row.image_url }),
+      coverName: row.cover_name || '',
+      artShade: row.art_shade || '',
       profileImageUrl: sameOriginArtistProfileImageUrl(row.profile_image_url || ''),
       };
     })
@@ -218,7 +287,13 @@ async function artistSummaries({ limit, query = marketplaceQuery }) {
     .sort((a, b) => b.cardCount - a.cardCount || a.name.localeCompare(b.name));
 }
 
-async function artistCardsForSlug({ artistSlug, artist, limit, query = marketplaceQuery }) {
+async function artistCardsForSlug({
+  artistSlug,
+  artist,
+  limit,
+  query = marketplaceQuery,
+  overlayCheapest = overlayCheapestOnRows,
+} = {}) {
   const normalizedSlugs = slugAliasesForArtistSlug(artistSlug);
   const normalizedArtists = lookupAliasesForArtistName(artist);
   const values = [];
@@ -261,6 +336,14 @@ async function artistCardsForSlug({ artistSlug, artist, limit, query = marketpla
         versions.trainer_name,
         versions.card_palette,
         versions.emoji,
+        shades.shade as art_shade,
+        coalesce(nullif(leftover_layouts.layout, ''), nullif(candidates.art_layout, ''), nullif(version_sets.art_layout, '')) as art_layout,
+        nullif(candidates.version, '') as version,
+        candidates.pokedex_num,
+        candidates.expansion_sort,
+        candidates.collector_sort,
+        candidates.artwork_cluster_sort,
+        candidates.pokedex_sort,
         urls.canonical_path,
         artist.artist,
         artist.illustrator,
@@ -284,34 +367,44 @@ async function artistCardsForSlug({ artistSlug, artist, limit, query = marketpla
         ${raritySql} as rarity,
         candidates.card_type,
         versions.projected_at,
-        expansions.symbol_image_url as expansion_symbol_url
+        expansions.symbol_image_url as expansion_symbol_url,
+        expansions.nationality
       from public.marketplace_card_versions versions
       join public.marketplace_blueprint_artists artist
         on artist.blueprint_id = versions.blueprint_id
+      left join public.marketplace_leftover_art_shades shades
+        on shades.ct_id = versions.ct_id
       left join public.marketplace_artist_profiles profiles
         on profiles.normalized_artist = artist.normalized_artist
       left join public.marketplace_search_candidates candidates
         on candidates.card_id = versions.card_id
+      left join public.marketplace_leftover_art_layouts leftover_layouts
+        on leftover_layouts.ct_id = versions.ct_id
+      left join public.pokoin_version_sets version_sets
+        on version_sets.version = candidates.version
       left join public.cardtrader_pokemon_blueprints blueprints
-        on blueprints.id = versions.card_id
+        on blueprints.id = versions.ct_id
       left join public.marketplace_blueprint_tcg_metadata tcg_metadata
-        on tcg_metadata.blueprint_id = versions.card_id
+        on tcg_metadata.card_id = versions.card_id
+        or tcg_metadata.blueprint_id = versions.ct_id
       left join public.marketplace_card_urls urls
         on urls.card_id = versions.card_id
         and urls.language = 'en'
       left join (
-        select name, min(symbol_image_url) as symbol_image_url
-        from public.cardtrader_pokemon_expansions
+        select name,
+          min(symbol_image_url) as symbol_image_url,
+          min(nationality) as nationality
+        from public.pokoin_pokemon_expansions
         group by name
       ) expansions
         on expansions.name = versions.expansion_name
       ${where}
       order by
-        versions.expansion_name asc,
+        candidates.pokedex_sort asc nulls last,
+        candidates.version asc nulls last,
+        candidates.expansion_sort asc nulls last,
+        candidates.collector_sort asc nulls last,
         ${normalCollectorSql(expansionNumberSql)} asc,
-        ${expansionNumberIntSql} asc nulls last,
-        ${normalizedCollectorNumberSql(expansionNumberSql)} asc,
-        versions.blueprint_id asc nulls last,
         versions.card_id asc
       limit ${limitPlaceholder}
     `,
@@ -338,7 +431,9 @@ async function artistCardsForSlug({ artistSlug, artist, limit, query = marketpla
         }
       : null,
     profile: first ? artistProfileFromRow(first) : null,
-    cards: result.rows.map(applyArtistDisplayNameToRow).map(withCardEmojiFields),
+    cards: await overlayCheapest(
+      result.rows.map(applyArtistDisplayNameToRow).map(withCardEmojiFields),
+    ),
   };
 }
 
@@ -374,7 +469,10 @@ module.exports = async function handler(req, res) {
 
 module.exports.artistCardsForSlug = artistCardsForSlug;
 module.exports.artistSummaries = artistSummaries;
+module.exports.artistCoverTier = artistCoverTier;
 module.exports.artistProfileFromRow = artistProfileFromRow;
+module.exports.leftoverArtistImage = leftoverArtistImage;
+module.exports.pickArtistCover = pickArtistCover;
 module.exports.normalizeArtistSlug = normalizeArtistSlug;
 module.exports.normalizeArtistLookupName = normalizeArtistLookupName;
 module.exports.lookupAliasesForArtistName = lookupAliasesForArtistName;

@@ -53,11 +53,11 @@ test('marketplace search event records aggregate predictive chunks without raw q
     await handler(req, res);
 
     assert.equal(res.statusCode, 204);
-    assert.equal(calls.length, 3);
+    assert.equal(calls.length, 2);
     assert.match(calls[0].sql, /marketplace_card_events/);
+    assert.match(calls[0].sql, /ct_id/);
     assert.match(calls[1].sql, /record_marketplace_query_chunks/);
     assert.deepEqual(calls[1].values, ['Pikchu', 'en', 'search', 2]);
-    assert.match(calls[2].sql, /refresh_marketplace_hot_blueprints/);
   } finally {
     db.marketplaceQuery = originalQuery;
   }

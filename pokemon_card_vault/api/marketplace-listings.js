@@ -1,4 +1,4 @@
-const { marketplaceQuery } = require('./_marketplace_db');
+const { marketplaceQuery, marketplaceWriteQuery } = require('./_marketplace_db');
 const { getFirebaseAdmin, verifyBearerToken } = require('./_firebase');
 const { requireReserveAccess } = require('./_firebase_roles');
 const { publicSellerComment } = require('./_seller_comment_filter');
@@ -28,8 +28,11 @@ function cleanListingId(value) {
 }
 
 function cleanUsername(value) {
-  const text = cleanText(value, 32).toLowerCase();
-  return /^[a-z0-9]{3,32}$/.test(text) ? text : '';
+  // Native seller handles are display names ("Raffaella Sabatino"); they
+  // resolve through the listings seller_name match. Require at least one
+  // letter or digit so punctuation-only strings never reach Firestore doc ids.
+  const text = cleanText(value, 64).toLowerCase();
+  return /^[\p{L}\p{N} .'_-]{3,64}$/u.test(text) && /\p{L}/u.test(text) ? text : '';
 }
 
 function collectionKeyPart(value) {
@@ -113,7 +116,8 @@ async function verifyOwnedNftForListing({ uid, body, quantityAvailable, reserveL
   }
 }
 
-function listingRow(row) {
+// `location` is the seller's private storage position: only owner reads get it.
+function listingRow(row, { owner = false } = {}) {
   const source = row.source || 'pokoin_user_listing';
   const sourceListingId = row.source_listing_id || '';
   const canonicalPath = cleanText(
@@ -127,6 +131,7 @@ function listingRow(row) {
     sellerUid: row.seller_uid,
     sellerName: sellerDisplayName,
     sellerDisplayName,
+    sellerUsername: listingUsername(row, source, sourceListingId),
     sellerCountry: row.seller_country,
     sellerReputationLabel: row.seller_reputation_label,
     condition: row.condition,
@@ -136,6 +141,8 @@ function listingRow(row) {
     signed: row.signed === true,
     reverse: row.reverse === true,
     firstEdition: row.first_edition === true,
+    altered: row.altered === true,
+    ...(owner ? { location: row.location || '' } : {}),
     foilState: row.foil_state || 'standard',
     variantState: row.variant_state || '',
     sealed: row.sealed === true,
@@ -179,6 +186,21 @@ function displaySellerName(row, source = row.source, sourceListingId = row.sourc
       row.seller_name,
     120,
   ) || 'Pokoin seller';
+}
+
+function listingUsername(row, source = row.source, sourceListingId = row.source_listing_id) {
+  if (
+    row.reserve_available === true ||
+    cleanText(source, 80).toLowerCase() === 'cardtrader_live' ||
+    isReserveListingBody({ source, sourceListingId })
+  ) {
+    return PKNRESERVE_SELLER_USERNAME;
+  }
+  const claimed = cleanUsername(row.profile_username);
+  if (claimed && claimed !== PKNRESERVE_SELLER_USERNAME) {
+    return claimed;
+  }
+  return cleanUsername(row.seller_name);
 }
 
 function isPublicCardPageListingRead({ cardId, sellerUid, sellerUsername }) {
@@ -301,7 +323,7 @@ async function readLiveCardTraderListingsForCard(cardId, limit) {
   if (!cleanCard) return [];
   let seller;
   try {
-    seller = await sellerProfileForUsername(PKNRESERVE_SELLER_USERNAME);
+    seller = await sellerProfileForUsername(PKNRESERVE_SELLER_USERNAME, { listingsFirst: false });
   } catch (error) {
     console.error('pknreserve seller profile lookup failed', {
       statusCode: error.statusCode || 500,
@@ -334,13 +356,13 @@ async function readLiveCardTraderListingsForCard(cardId, limit) {
 async function refreshPriceSummary(cardId) {
   const cleanCardId = cleanText(cardId, 80);
   if (!cleanCardId) return;
-  await marketplaceQuery(
+  await marketplaceWriteQuery(
     'select public.refresh_marketplace_blueprint_price_summary($1)',
     [cleanCardId],
   );
 }
 
-async function sellerProfileForUsername(username) {
+async function sellerProfileForUsername(username, { listingsFirst = true } = {}) {
   const clean = cleanUsername(username);
   if (!clean) {
     const error = new Error('Seller username is invalid.');
@@ -348,23 +370,31 @@ async function sellerProfileForUsername(username) {
     throw error;
   }
 
-  const admin = getFirebaseAdmin();
-  const firestore = admin.firestore();
-  const usernameDoc = await firestore.collection('usernames').doc(clean).get();
-  const usernameData = usernameDoc.data() || {};
-  let uid = cleanText(usernameData.uid, 160);
-  let displayName = cleanText(usernameData.displayName, 120);
+  let uid = '';
+  let displayName = '';
+  if (listingsFirst) {
+    uid = await sellerUidFromListingName(clean);
+  }
 
   if (!uid) {
-    const users = await firestore
-      .collection('users')
-      .where('usernameLower', '==', clean)
-      .limit(1)
-      .get();
-    const userDoc = users.docs?.[0];
-    const userData = userDoc?.data?.() || {};
-    uid = cleanText(userData.uid || userDoc?.id, 160);
-    displayName = cleanText(userData.displayName, 120);
+    const admin = getFirebaseAdmin();
+    const firestore = admin.firestore();
+    const usernameDoc = await firestore.collection('usernames').doc(clean).get();
+    const usernameData = usernameDoc.data() || {};
+    uid = cleanText(usernameData.uid, 160);
+    displayName = cleanText(usernameData.displayName, 120);
+
+    if (!uid) {
+      const users = await firestore
+        .collection('users')
+        .where('usernameLower', '==', clean)
+        .limit(1)
+        .get();
+      const userDoc = users.docs?.[0];
+      const userData = userDoc?.data?.() || {};
+      uid = cleanText(userData.uid || userDoc?.id, 160);
+      displayName = cleanText(userData.displayName, 120);
+    }
   }
 
   if (!uid) {
@@ -378,6 +408,22 @@ async function sellerProfileForUsername(username) {
     username: clean,
     displayName,
   };
+}
+
+async function sellerUidFromListingName(username) {
+  const result = await marketplaceQuery(
+    `
+      select seller_uid
+      from public.marketplace_user_listings
+      where lower(btrim(seller_name)) = $1
+        and seller_uid is not null
+        and btrim(seller_uid) <> ''
+      order by updated_at desc nulls last, created_at desc nulls last
+      limit 1
+    `,
+    [username],
+  ).catch(() => ({ rows: [] }));
+  return cleanText(result.rows[0]?.seller_uid, 160);
 }
 
 async function enrichListingRowsWithSellerProfiles(rows = []) {
@@ -485,7 +531,7 @@ async function readListings(url, decoded) {
   const listingId = cleanListingId(rawListingId);
   const cardId = cleanText(url.searchParams.get('cardId'), 80);
   const sellerUid = cleanText(url.searchParams.get('sellerUid'), 160);
-  const sellerUsername = cleanText(url.searchParams.get('sellerUsername'), 32);
+  const sellerUsername = cleanText(url.searchParams.get('sellerUsername'), 64);
   if (rawListingId && !listingId) {
     return [];
   }
@@ -511,7 +557,7 @@ async function readListings(url, decoded) {
     values.push(sellerUid);
     where.push(`seller_uid = $${values.length}`);
   } else if (sellerUsername) {
-    const seller = await sellerProfileForUsername(sellerUsername);
+    const seller = await sellerProfileForUsername(sellerUsername, { listingsFirst: true });
     values.push(seller.uid);
     where.push(`seller_uid = $${values.length}`);
     where.push("status = 'active'");
@@ -533,10 +579,14 @@ async function readListings(url, decoded) {
     `,
     values,
   );
-  const enrichedRows = await enrichListingRowsWithSellerProfiles(result.rows);
+  const enrichedRows = sellerUsername
+    ? result.rows
+    : await enrichListingRowsWithSellerProfiles(result.rows);
   const urlEnrichedRows = await enrichListingRowsWithCardUrls(enrichedRows);
-  const nativeListings = urlEnrichedRows.map(listingRow);
-  if (!isPublicCardPageListingRead({ cardId, sellerUid, sellerUsername })) {
+  const nativeListings = urlEnrichedRows.map((row) => listingRow(row, { owner: Boolean(sellerUid) }));
+  const skipLive = url.searchParams.get('nativeOnly') === '1' ||
+    url.searchParams.get('live') === '0';
+  if (!isPublicCardPageListingRead({ cardId, sellerUid, sellerUsername }) || skipLive) {
     return nativeListings;
   }
   const cardTraderListings = await readLiveCardTraderListingsForCard(cardId, cleanLimit(url.searchParams.get('limit')));
@@ -633,8 +683,10 @@ async function createListing(req, decoded) {
     cardImageUrl,
     setName,
     collectorNumber,
+    cleanText(body.location, 64),
+    body.altered === true,
   ];
-  const result = await marketplaceQuery(
+  const result = await marketplaceWriteQuery(
     `
       insert into public.marketplace_user_listings (
         card_id, seller_uid, seller_name, seller_country, seller_reputation_label,
@@ -643,17 +695,17 @@ async function createListing(req, decoded) {
         grading_company, grade, certification_id, shipping_available,
         reserve_available, nft_available, seller_comment, source,
         source_listing_id, card_name,
-        card_image_url, set_name, collector_number
+        card_image_url, set_name, collector_number, location, altered
       )
       values (
-        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31
       )
       returning *
     `,
     values,
   );
   const [row] = await enrichListingRowsWithSellerProfiles(result.rows);
-  const listing = listingRow(row || result.rows[0]);
+  const listing = listingRow(row || result.rows[0], { owner: true });
   await refreshPriceSummary(listing.cardId);
   return listing;
 }
@@ -715,6 +767,8 @@ async function updateListing(req, decoded, id) {
   addBooleanField(sets, values, body, 'signed', 'signed');
   addBooleanField(sets, values, body, 'reverse', 'reverse');
   addBooleanField(sets, values, body, 'firstEdition', 'first_edition');
+  addBooleanField(sets, values, body, 'altered', 'altered');
+  addTextField(sets, values, body, 'location', 'location', 64, '');
   addTextField(sets, values, body, 'foilState', 'foil_state', 40, 'standard');
   addTextField(sets, values, body, 'variantState', 'variant_state', 80, '');
   addBooleanField(sets, values, body, 'sealed', 'sealed');
@@ -732,7 +786,7 @@ async function updateListing(req, decoded, id) {
   addNonEmptyTextField(sets, values, body, 'cardImageUrl', 'card_image_url', 800);
   addNonEmptyTextField(sets, values, body, 'setName', 'set_name', 240);
   addNonEmptyTextField(sets, values, body, 'collectorNumber', 'collector_number', 80);
-  const result = await marketplaceQuery(
+  const result = await marketplaceWriteQuery(
     `
       update public.marketplace_user_listings
       set ${sets.join(', ')}
@@ -742,7 +796,7 @@ async function updateListing(req, decoded, id) {
     values,
   );
   const [row] = await enrichListingRowsWithSellerProfiles(result.rows);
-  const listing = listingRow(row || result.rows[0]);
+  const listing = listingRow(row || result.rows[0], { owner: true });
   await refreshPriceSummary(listing.cardId);
   return listing;
 }
@@ -752,7 +806,7 @@ async function decrementListing(req, id) {
   if (!Number.isSafeInteger(quantity) || quantity <= 0) {
     return null;
   }
-  const result = await marketplaceQuery(
+  const result = await marketplaceWriteQuery(
     `
       update public.marketplace_user_listings
       set
@@ -774,18 +828,28 @@ async function decrementListing(req, id) {
   return listing;
 }
 
+async function readPublicOffersForCard(cardId, limit = 40, options = {}) {
+  const url = new URL('https://pokoin.com/api/marketplace-listings');
+  url.searchParams.set('cardId', String(cardId || ''));
+  url.searchParams.set('limit', String(limit));
+  if (options.nativeOnly) {
+    url.searchParams.set('nativeOnly', '1');
+  }
+  return readListings(url, null);
+}
+
 module.exports = async function handler(req, res) {
   try {
     if (req.method === 'GET') {
       const url = new URL(req.url, `https://${req.headers.host || 'pokoin.com'}`);
       const sellerUid = cleanText(url.searchParams.get('sellerUid'), 160);
-      const sellerUsername = cleanText(url.searchParams.get('sellerUsername'), 32);
+      const sellerUsername = cleanText(url.searchParams.get('sellerUsername'), 64);
       if (sellerUid && sellerUsername) {
         return res.status(400).json({ error: 'Use either sellerUid or sellerUsername, not both.' });
       }
       const decoded = sellerUid ? await verifyBearerToken(req) : null;
       const listings = await readListings(url, decoded);
-      res.setHeader('Cache-Control', 'public, max-age=10, s-maxage=30');
+      res.setHeader('Cache-Control', 'private, no-store');
       return res.status(200).json({ listings });
     }
 
@@ -816,6 +880,9 @@ module.exports = async function handler(req, res) {
     });
   }
 };
+
+module.exports.readPublicOffersForCard = readPublicOffersForCard;
+module.exports.readListings = readListings;
 
 module.exports._test = {
   cleanLimit,

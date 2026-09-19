@@ -472,6 +472,55 @@ test('card suggestion resolves to direct card navigation action', async () => {
   );
 });
 
+test('leftover CardTrader id does not open a colliding public card', async () => {
+  let callCount = 0;
+  const assistant = loadAssistantWithStubs({
+    marketplaceQuery: async (sql, values) => {
+      callCount += 1;
+      assert.match(String(sql), /marketplace_search_candidates/);
+      if (callCount === 1) {
+        assert.equal(values[0], '274416');
+        assert.equal(values[1], 'en');
+        return {
+          rows: [{
+            card_id: '274416',
+            card_name: 'Shining Kabutops',
+            collector_number: 'Shining Holo Rare | No. 141',
+            set_name: 'Darkness, and to Light...',
+            rarity: 'Card',
+            canonical_path: '/marketplace/en/cards/274416/card-shining-kabutops-lv-40-shining-holo-rare-no-141-darkness-and-to-light',
+          }],
+        };
+      }
+      assert.equal(values[0], '548832');
+      assert.equal(values[1], 'en');
+      return {
+        rows: [{
+          card_id: '548832',
+          card_name: 'Mew ex',
+          collector_number: '232/091',
+          set_name: 'Paldean Fates',
+          rarity: 'Special Illustration Rare',
+          canonical_path: '/marketplace/en/cards/548832/stored-mew-ex-path',
+        }],
+      };
+    },
+  });
+
+  const path = await assistant._test.resolveCardQueryPath({
+    name: 'Mew ex',
+    query: 'Mew ex 232/091',
+    cardId: '274416',
+    setName: 'Paldean Fates',
+  }, 'en');
+
+  assert.equal(callCount, 2);
+  assert.equal(
+    path,
+    '/marketplace/en/cards/548832/stored-mew-ex-path',
+  );
+});
+
 test('card suggestion resolves by specific card id first', async () => {
   const assistant = loadAssistantWithStubs({
     marketplaceQuery: async (sql, values) => {
@@ -518,11 +567,16 @@ test('card suggestion resolver falls back when collector number has rarity prefi
         return { rows: [] };
       }
       if (callCount === 2) {
+        assert.equal(values[0], '497712');
+        assert.equal(values[1], 'en');
+        return { rows: [] };
+      }
+      if (callCount === 3) {
         assert.equal(values[0], 'Magikarp');
         assert.equal(values[1], '203/193');
         return { rows: [] };
       }
-      if (callCount === 3) {
+      if (callCount === 4) {
         assert.equal(values[0], 'Magikarp');
         assert.equal(values[1], '203/193');
         return { rows: [] };
@@ -564,11 +618,11 @@ test('curated card suggestion response includes navigate action for current tab'
       marketplaceQuery: async (sql, values) => {
         assert.match(String(sql), /marketplace_search_candidates/);
         assert.match(String(sql), /marketplace_card_urls/);
-        assert.equal(values[0], '274416');
+        assert.equal(values[0], '548832');
         assert.equal(values[1], 'en');
         return {
           rows: [{
-            card_id: '274416',
+            card_id: '548832',
             card_name: 'Mew ex',
             collector_number: '232/091',
             set_name: 'Paldean Fates',
@@ -609,11 +663,11 @@ test('curated Dragonite suggestion opens direct card page instead of search', as
       marketplaceQuery: async (sql, values) => {
         assert.match(String(sql), /marketplace_search_candidates/);
         assert.match(String(sql), /marketplace_card_urls/);
-        assert.equal(values[0], '166430');
+        assert.equal(values[0], '332860');
         assert.equal(values[1], 'en');
         return {
           rows: [{
-            card_id: '166430',
+            card_id: '332860',
             card_name: 'Dragonite V',
             collector_number: 'Ultra Rare | 192/203',
             set_name: 'Evolving Skies',
@@ -1244,11 +1298,11 @@ test('peer service card search links are rewritten to direct card URLs', async (
   assert.doesNotMatch(rewritten.reply, /(?:Open|Search) it on Pokoin/);
   assert.equal(
     rewritten.reply,
-    'https://pokoin.com/marketplace/en/cards/24690/illustration-rare-drowzee-010-198-scarlet-violet',
+    'https://pokoin.com/marketplace/en/cards/12345/illustration-rare-drowzee-010-198-scarlet-violet',
   );
   assert.equal(
     rewritten.actions[0].path,
-    '/marketplace/en/cards/24690/illustration-rare-drowzee-010-198-scarlet-violet',
+    '/marketplace/en/cards/12345/illustration-rare-drowzee-010-198-scarlet-violet',
   );
   assert.equal(rewritten.actions[0].label, 'Open Drowzee');
 });
@@ -1624,7 +1678,7 @@ test('local Poko replies avoid unsupported emoji glyphs', async () => {
   }
 });
 
-test('service URL resolves to documented Oracle peer2 endpoint by default', () => {
+test('service URL resolves to peer1 Poko endpoint by default', () => {
   const assistant = loadAssistantWithStubs({});
 
   assert.equal(
@@ -1637,7 +1691,7 @@ test('service URL resolves to documented Oracle peer2 endpoint by default', () =
   );
 });
 
-test('token-only configuration calls documented Oracle peer2 endpoint', async () => {
+test('token-only configuration calls peer1 Poko endpoint', async () => {
   const originalFetch = global.fetch;
   let requestedUrl = '';
   let requestBody = null;
@@ -1652,7 +1706,7 @@ test('token-only configuration calls documented Oracle peer2 endpoint', async ()
         intent: 'general',
         provider: 'local-ollama',
         model: 'qwen2.5:0.5b',
-        source: 'peer2-service',
+        source: 'poko-peer1',
       }),
     };
   };
@@ -1689,7 +1743,7 @@ test('token-only configuration calls documented Oracle peer2 endpoint', async ()
     assert.match(requestBody.context, /Visible cards/);
     assert.equal(res.body.reply, 'Oracle Poko is awake ✨');
     assert.equal(res.body.serviceDelivery.ok, true);
-    assert.equal(res.body.serviceDelivery.source, 'peer2-service');
+    assert.equal(res.body.serviceDelivery.source, 'poko-peer1');
   } finally {
     global.fetch = originalFetch;
   }

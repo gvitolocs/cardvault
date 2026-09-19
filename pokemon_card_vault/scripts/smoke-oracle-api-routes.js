@@ -169,6 +169,8 @@ function primaryCase(route) {
       return get(route, '?cardId=0');
     case 'marketplace-card-sales.js':
       return get(route);
+    case 'marketplace-card-last-median.js':
+      return get(route, '?cardId=0');
     case 'marketplace-card-shortlink.js':
       return get(route);
     case 'marketplace-card-url.js':
@@ -334,6 +336,12 @@ async function main() {
   const results = [];
   try {
     const health = await request(server, { method: 'GET', pathname: '/healthz' });
+    let healthJson = {};
+    try {
+      healthJson = JSON.parse(health.body);
+    } catch (_) {
+      healthJson = {};
+    }
     results.push({
       route: '/healthz',
       file: 'server',
@@ -343,7 +351,9 @@ async function main() {
       statusCode: health.statusCode,
       class: classify(health.statusCode),
       mode: 'health',
-      passed: health.statusCode === 200,
+      passed: Boolean(healthJson.checks && typeof healthJson.checks.postgres?.ok === 'boolean')
+        && ((health.statusCode === 200 && healthJson.ok === true)
+          || (health.statusCode === 503 && healthJson.ok === false)),
     });
 
     for (const route of routeDefinitions) {

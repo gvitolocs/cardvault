@@ -23,9 +23,16 @@ test('jumbos stay item_kind single through ingest and re-derivation', () => {
   assert.match(sql, /select public\.apply_cardtrader_category_kind\(\);/);
 });
 
-test('jumbo card surfaces keep jumbos visible: search, set desks, canonical redirects', () => {
-  assert.match(cards, /product_type in \('card', 'jumbo'\)/);
-  assert.match(cards, /typedProduct === 'card'[\s\S]*?productType === 'jumbo'/);
+test('set desks and canonical redirects keep jumbos; Product search owns the jumbo subtype', () => {
   assert.match(reactSql, /and c\.product_type in \('card', 'jumbo'\)/);
   assert.match(redirect, /versions\.product_type in \('card', 'jumbo'\)/);
+  // Top-level search types are single | product | user only. productType stays
+  // an exact subtype filter; the Product tab (productSearchOnly) must include
+  // jumbos even though they keep item_kind 'single'.
+  assert.match(cards, /marketplace_search_candidates\.product_type = \$\$\{values\.length\}/);
+  assert.match(cards, /marketplace_search_candidates\.item_kind = 'product'/);
+  assert.match(cards, /or marketplace_search_candidates\.product_type = 'jumbo'/);
+  assert.doesNotMatch(cards, /product_type in \('card', 'jumbo'\)/);
+  // The jumbo subtype browse bypasses the Meili window so it lists every jumbo.
+  assert.match(cards, /typedProduct !== 'jumbo'/);
 });

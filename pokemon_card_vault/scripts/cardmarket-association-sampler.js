@@ -650,7 +650,7 @@ async function sampleBlueprints(pool, limit) {
         order by random()
         limit $1
       ) versions
-      left join public.cardtrader_pokemon_expansions expansions
+      left join public.pokoin_pokemon_expansions expansions
         on expansions.name = versions.expansion_name
       left join public.marketplace_cards cards
         on cards.card_id = versions.card_id
@@ -700,7 +700,7 @@ async function blueprintsById(pool, blueprintIds) {
         where product_type = 'card'
           and card_id = any($1::bigint[])
       ) versions
-      left join public.cardtrader_pokemon_expansions expansions
+      left join public.pokoin_pokemon_expansions expansions
         on expansions.name = versions.expansion_name
       left join public.marketplace_cards cards
         on cards.card_id = versions.card_id

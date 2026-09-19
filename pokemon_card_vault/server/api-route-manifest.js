@@ -34,7 +34,7 @@ const routeDefinitions = [
     purpose: 'Resolve a marketplace blueprint to a Cardmarket product/search URL and redirect, or return JSON when requested.',
     auth: 'Public.',
     params: {
-      query: '`id` required blueprint ID, `locale` optional two-letter locale, `format=json` optional.',
+      query: '`id` public card_id or leftover ct_id, optional `blueprintId` leftover, `locale` optional two-letter locale, `format=json` optional, `game` for One Piece / Riftbound.',
     },
     dependencies: {
       env: ['MARKETPLACE_DATABASE_URL'],
@@ -158,14 +158,14 @@ const routeDefinitions = [
     path: '/api/cardtrader-redirect',
     file: 'cardtrader-redirect.js',
     methods: ['GET'],
-    purpose: 'Redirect a CardTrader blueprint ID to CardTrader.',
+    purpose: 'Redirect a public card id or leftover ct_id to the CardTrader leftover blueprint page.',
     auth: 'Public.',
     params: {
-      query: '`id` required numeric CardTrader blueprint ID.',
+      query: '`id` public card_id (ct_id × 2) or leftover ct_id. Optional `blueprintId` leftover. `game` for One Piece / Riftbound. `format=json` returns `{ url, ct_id }`.',
     },
     dependencies: {
-      env: [],
-      services: ['CardTrader website'],
+      env: ['MARKETPLACE_DATABASE_URL', 'ONE_PIECE_MARKETPLACE_DATABASE_URL', 'RIFTBOUND_MARKETPLACE_DATABASE_URL'],
+      services: ['Oracle/Postgres marketplace DB', 'CardTrader website'],
     },
   },
   {
@@ -385,6 +385,20 @@ const routeDefinitions = [
     },
   },
   {
+    path: '/api/marketplace-suggest',
+    file: 'marketplace-suggest.js',
+    methods: ['GET', 'OPTIONS'],
+    purpose: 'Meili-only typeahead for pokoin-web: grouped printings, no SQL listing hydrate.',
+    auth: 'Public.',
+    params: {
+      query: '`q` or `query`; `limit` max groups (default 12, max 24); `lang` / `search_language` (EN Meili only).',
+    },
+    dependencies: {
+      env: ['MEILI_HOST', 'MEILI_API_KEY', 'MEILI_MARKETPLACE_INDEX', 'MARKETPLACE_SEARCH_ENGINE'],
+      services: ['Meilisearch on pokoin-marketplace localhost :7700'],
+    },
+  },
+  {
     path: '/api/marketplace-autocomplete',
     file: 'marketplace-autocomplete.js',
     methods: ['POST', 'OPTIONS'],
@@ -427,6 +441,20 @@ const routeDefinitions = [
     },
   },
   {
+    path: '/api/marketplace-card-page',
+    file: 'marketplace-card-page.js',
+    methods: ['GET', 'OPTIONS'],
+    purpose: 'React BFF: one card-detail payload (card, versions, versionCount, offers, cheapest, artist, canonicalPath).',
+    auth: 'Public.',
+    params: {
+      query: '`cardId` required (public id). `lang`, `slug`, `includeSales`, `includeOffers`, `includeSameAs` (off by default), `liveOffers` optional.',
+    },
+    dependencies: {
+      env: ['MARKETPLACE_DATABASE_URL'],
+      services: ['Oracle/Postgres marketplace DB', 'optional Firebase for sales'],
+    },
+  },
+  {
     path: '/api/marketplace-card-seo',
     file: 'marketplace-card-seo.js',
     methods: ['GET'],
@@ -444,24 +472,52 @@ const routeDefinitions = [
     path: '/api/marketplace-card-sales',
     file: 'marketplace-card-sales.js',
     methods: ['GET'],
-    purpose: 'Return recent paid sale history for a marketplace card from Firestore orders.',
+    purpose: 'Daily sold-median series from CardTrader inferred comps. Pi aggregates the requested language/condition slice; default payload is series + available filter keys, not observation rows.',
     auth: 'Public.',
     params: {
-      query: '`cardId` required, `limit` optional.',
+      query: '`cardId` required. Optional `condition` / `cond` (NM, SP, MP, PL, Poor) and `language` / `lang` (EN, IT, JP, …). Series includes `sampleCount` (observations in the current slice) and per-day `sampleCount`. `includeRows=1` returns a capped observation sample; omit it for series-only. `limit` only applies with includeRows.',
     },
     dependencies: {
-      env: ['FIREBASE_*'],
-      services: ['Firebase Admin'],
+      env: ['MARKETPLACE_DATABASE_URL'],
+      services: ['Oracle/Postgres marketplace DB'],
+    },
+  },
+  {
+    path: '/api/marketplace-sales-pulse',
+    file: 'marketplace-sales-pulse.js',
+    methods: ['GET', 'OPTIONS'],
+    purpose: 'Return the latest completed daily marketplace sales leaders plus a bounded activity trend.',
+    auth: 'Public.',
+    params: {
+      query: '`metric=sales` (default, observed samples) or diagnostic `metric=quantity`; `limit` (max 24) and `days` (max 30) are optional.',
+    },
+    dependencies: {
+      env: ['MARKETPLACE_DATABASE_URL'],
+      services: ['Pi/Postgres marketplace DB'],
+    },
+  },
+  {
+    path: '/api/marketplace-card-last-median',
+    file: 'marketplace-card-last-median.js',
+    methods: ['GET'],
+    purpose: 'Return the latest UTC-day median inferred sold PKN for one or more marketplace cards from CardTrader removed-sale comps.',
+    auth: 'Public.',
+    params: {
+      query: '`cardId` or comma-separated `cardIds` (max 40). `blueprintId` is accepted as an alias of `cardId`. Optional `condition` / `cond` and `language` / `lang` slice the last-day median the same way as marketplace-card-sales.',
+    },
+    dependencies: {
+      env: ['MARKETPLACE_DATABASE_URL'],
+      services: ['Oracle/Postgres marketplace DB'],
     },
   },
   {
     path: '/api/marketplace-card-shortlink',
     file: 'marketplace-card-shortlink.js',
     methods: ['GET', 'HEAD'],
-    purpose: 'Redirect numeric root short links to canonical marketplace card URLs.',
+    purpose: 'Redirect our-id short links to canonical marketplace card URLs (our id = CardTrader ct_id * 2).',
     auth: 'Public.',
     params: {
-      query: '`cardId` required via rewrite or query string.',
+      query: '`cardId` is our marketplace id (ct_id * 2) or leftover ct_id; `path` is `/marketplace/220962` or `/220962/slug`. See docs/marketplace-public-ids.md.',
     },
     dependencies: {
       env: ['MARKETPLACE_DATABASE_URL'],
@@ -472,10 +528,10 @@ const routeDefinitions = [
     path: '/api/marketplace-card-url',
     file: 'marketplace-card-url.js',
     methods: ['GET', 'HEAD'],
-    purpose: 'Return the stored canonical marketplace card URL for a card id or legacy root path.',
+    purpose: 'Return stored canonical_path. cardId is our marketplace id (ct_id * 2); path numbers are the same our-id.',
     auth: 'Public.',
     params: {
-      query: '`cardId` or `path` required; `language` optional.',
+      query: '`cardId` (our id, or leftover ct_id) or `path` (our-id URL); `language` optional. See docs/marketplace-public-ids.md.',
     },
     dependencies: {
       env: ['MARKETPLACE_DATABASE_URL'],
@@ -490,6 +546,20 @@ const routeDefinitions = [
     auth: 'Public.',
     params: {
       query: '`cardId`, `sameAsCardId`, `cardSlug`, `expansionName`, `query`, `limit`, `productType`, and `language` are supported.',
+    },
+    dependencies: {
+      env: ['MARKETPLACE_DATABASE_URL'],
+      services: ['Oracle/Postgres marketplace DB'],
+    },
+  },
+  {
+    path: '/api/marketplace-version-set',
+    file: 'marketplace-version-set.js',
+    methods: ['GET', 'OPTIONS'],
+    purpose: 'Return the pokoin_version_sets key, member_count, and printings for one public card id.',
+    auth: 'Public.',
+    params: {
+      query: '`cardId` (public marketplace id).',
     },
     dependencies: {
       env: ['MARKETPLACE_DATABASE_URL'],
@@ -598,6 +668,21 @@ const routeDefinitions = [
     },
   },
   {
+    path: '/api/marketplace-image-log',
+    file: 'marketplace-image-log.js',
+    methods: ['GET', 'POST', 'OPTIONS'],
+    purpose: 'Ring-buffer exact marketplace image URLs served or failed during navigation.',
+    auth: 'Public; POST is IP rate-limited. GET returns the in-memory buffer.',
+    params: {
+      query: 'GET `limit` (max 250).',
+      body: 'POST `url` required-ish; optional `cardId`, `ctId`, `source`, `status`, `error`, `route`.',
+    },
+    dependencies: {
+      env: [],
+      services: ['in-memory ring on pokoin-oracle-api'],
+    },
+  },
+  {
     path: '/api/marketplace-event',
     file: 'marketplace-event.js',
     methods: ['POST'],
@@ -627,6 +712,20 @@ const routeDefinitions = [
     },
   },
   {
+    path: '/api/marketplace-expansion-page',
+    file: 'marketplace-expansion-page.js',
+    methods: ['GET', 'OPTIONS'],
+    purpose: 'React BFF: expansion metadata plus paginated singles for a set browse page.',
+    auth: 'Public.',
+    params: {
+      query: '`expansionName` or `slug`; `productType` default card; `limit` and `offset` optional. Omit both name and slug to list expansions.',
+    },
+    dependencies: {
+      env: ['MARKETPLACE_DATABASE_URL'],
+      services: ['Oracle/Postgres marketplace DB'],
+    },
+  },
+  {
     path: '/api/marketplace-expansions',
     file: 'marketplace-expansions.js',
     methods: ['GET'],
@@ -647,7 +746,39 @@ const routeDefinitions = [
     purpose: 'Return marketplace home snapshot and carousel sections.',
     auth: 'Public.',
     params: {
-      query: 'No required query parameters.',
+      query: '`recentCardIds` optional comma-separated public ids; returned as sections.recentlySeenIds / spotlightIds.',
+    },
+    dependencies: {
+      env: ['MARKETPLACE_DATABASE_URL'],
+      services: ['Oracle/Postgres marketplace DB'],
+    },
+  },
+  {
+    path: '/api/marketplace-rails',
+    file: 'marketplace-rails.js',
+    methods: ['GET', 'OPTIONS'],
+    purpose: 'Pi browse rails. Public card_id only. No Supabase.',
+    auth: 'Public.',
+    params: { query: '`id` rail id (`new_cards`, `set:destined-rivals`).' },
+    dependencies: { env: ['MARKETPLACE_DATABASE_URL'], services: ['Pi Postgres'] },
+  },
+  {
+    path: '/api/marketplace-card-tiles',
+    file: 'marketplace-card-tiles.js',
+    methods: ['GET', 'OPTIONS'],
+    purpose: 'Pi card tiles by public id. No Supabase.',
+    auth: 'Public.',
+    params: { query: '`ids` comma-separated public card ids.' },
+    dependencies: { env: ['MARKETPLACE_DATABASE_URL'], services: ['Pi Postgres'] },
+  },
+  {
+    path: '/api/marketplace-home-page',
+    file: 'marketplace-home-page.js',
+    methods: ['GET', 'OPTIONS'],
+    purpose: 'React BFF: fast home carousels (newest English sets + hot blueprints). No CardTrader hydrate.',
+    auth: 'Public.',
+    params: {
+      query: '`recentCardIds` optional comma-separated public ids; `limit` optional (max 48).',
     },
     dependencies: {
       env: ['MARKETPLACE_DATABASE_URL'],
@@ -689,12 +820,54 @@ const routeDefinitions = [
     purpose: 'Read public active listings and create/update/decrement authenticated seller listings.',
     auth: 'Public for active listing reads; writes and seller-owned reads require Firebase bearer token. Reserve listings require reserve role.',
     params: {
-      query: '`cardId`, `sellerUid`, `sellerUsername`, `id`, `action`, and `limit` supported.',
+      query: '`cardId`, `sellerUid`, `sellerUsername`, `id`, `action`, and `limit` supported. `nativeOnly=1` (or `live=0`) skips live CardTrader merge on public card reads.',
       body: 'Create/update listing fields such as `cardId`, seller display fields, condition, language, `pricePkn`, quantity, and source flags.',
     },
     dependencies: {
       env: ['MARKETPLACE_DATABASE_URL', 'FIREBASE_*'],
       services: ['Oracle/Postgres marketplace DB', 'Firebase Admin'],
+    },
+  },
+  {
+    path: '/api/marketplace-collection-summary',
+    file: 'marketplace-collection-summary.js',
+    methods: ['GET'],
+    purpose: 'Authenticated owned-card totals for dashboard Portfolio. Admin Firestore read; uid only from verified bearer.',
+    auth: 'Firebase bearer token required. Never accepts a client uid.',
+    params: {
+      query: 'None. Owner is decoded.uid from the Authorization bearer.',
+    },
+    dependencies: {
+      env: ['FIREBASE_*'],
+      services: ['Firebase Admin'],
+    },
+  },
+  {
+    path: '/api/marketplace-collection',
+    file: 'marketplace-collection.js',
+    methods: ['GET'],
+    purpose: 'Authenticated owned holdings rows for /collection (physical + NFT). Admin Firestore read; uid only from verified bearer.',
+    auth: 'Firebase bearer token required. Never accepts a client uid.',
+    params: {
+      query: 'None. Owner is decoded.uid from the Authorization bearer.',
+    },
+    dependencies: {
+      env: ['FIREBASE_*'],
+      services: ['Firebase Admin'],
+    },
+  },
+  {
+    path: '/api/marketplace-portfolio',
+    file: 'marketplace-portfolio.js',
+    methods: ['GET', 'OPTIONS'],
+    purpose: 'React BFF: Pokoin catalog + native PKN overlay (Portfolio / Explore). No CardTrader leftover images. No USD.',
+    auth: 'Public.',
+    params: {
+      query: '`id` / `cardId` optional public card id or leftover ct_id; `limit` optional (Pokemon max 500, satellite max 2500); `game` for One Piece / Riftbound.',
+    },
+    dependencies: {
+      env: ['MARKETPLACE_DATABASE_URL'],
+      services: ['Oracle/Postgres marketplace DB'],
     },
   },
   {
@@ -713,6 +886,20 @@ const routeDefinitions = [
     },
   },
   {
+    path: '/api/marketplace-search-page',
+    file: 'marketplace-search-page.js',
+    methods: ['GET', 'OPTIONS'],
+    purpose: 'React BFF: Meili/SQL search results with pagination and product facets.',
+    auth: 'Public.',
+    params: {
+      query: '`query` or `q`; `limit`, `offset`, `productType`, `productSearchOnly`, `lang`, `includeFacets`.',
+    },
+    dependencies: {
+      env: ['MARKETPLACE_DATABASE_URL', 'MEILI_HOST', 'MEILI_API_KEY'],
+      services: ['Oracle/Postgres marketplace DB', 'Meilisearch'],
+    },
+  },
+  {
     path: '/api/marketplace-search-candidates',
     file: 'marketplace-search-candidates.js',
     methods: ['POST'],
@@ -724,6 +911,20 @@ const routeDefinitions = [
     dependencies: {
       env: ['MARKETPLACE_DATABASE_URL', 'MARKETPLACE_*_DATABASE_URL', 'MARKETPLACE_ADMIN_EMAILS', 'MARKETPLACE_DEBUG_EMAILS', 'FIREBASE_*'],
       services: ['Oracle/Postgres marketplace DB', 'Firebase Admin for debug auth'],
+    },
+  },
+  {
+    path: '/api/marketplace-recents',
+    file: 'marketplace-recents.js',
+    methods: ['GET', 'PUT', 'POST', 'OPTIONS'],
+    purpose: 'Signed-in recently seen public card ids. Writer is nezopt 15T. Tile JSON is not stored.',
+    auth: 'Firebase bearer token required.',
+    params: {
+      body: '`cardIds` array (PUT/POST), optional `cardId` prepended. Max 24 unique public ids.',
+    },
+    dependencies: {
+      env: ['MARKETPLACE_DATABASE_URL', 'MARKETPLACE_WRITER_DATABASE_URL', 'FIREBASE_*'],
+      services: ['nezopt 15T writer', 'Pi replica reads', 'Firebase Admin'],
     },
   },
   {
@@ -816,13 +1017,13 @@ const routeDefinitions = [
     path: '/api/register-email',
     file: 'register-email.js',
     methods: ['POST'],
-    purpose: 'Start email/password signup by storing pending signup data and sending verification mail.',
+    purpose: 'Start email/password signup by storing pending signup data and sending verification mail, or resend a pending verification (resend: true) with per-email rate limiting.',
     auth: 'Public.',
     params: {
-      body: '`email`, password fields, and optional requested username/profile fields.',
+      body: '`email`, `password`, optional `username` and `redirectPath`; or `resend: true` with `email` only.',
     },
     dependencies: {
-      env: ['FIREBASE_*', 'RESEND_API_KEY', 'PUBLIC_SITE_URL', 'PENDING_SIGNUP_SECRET'],
+      env: ['FIREBASE_*', 'RESEND_API_KEY', 'PUBLIC_SITE_URL', 'SIGNUP_ENCRYPTION_SECRET', 'POKOIN_REQUIRE_VERIFIED_PASSWORD'],
       services: ['Firebase Admin', 'email provider'],
     },
   },
@@ -852,6 +1053,79 @@ const routeDefinitions = [
     dependencies: {
       env: ['FIREBASE_*', 'POKOIN_RPC_URL', 'POKOIN_BANK_ADDRESS', 'POKOIN_BANK_PRIVATE_KEY'],
       services: ['Firebase Admin', 'Pokoin RPC'],
+    },
+  },
+  {
+    path: '/api/scan-batch',
+    file: 'scan-batch.js',
+    methods: ['GET', 'POST', 'OPTIONS'],
+    purpose: 'Scan Connect staged batch: snapshot, Batch Defaults, row edits (duplicate, merge undo), idempotent submit to marketplace_user_listings.',
+    auth: 'Required Firebase bearer token; rows are scoped to the seller uid.',
+    params: {
+      query: '`batchId`; `list=open`; `action=image&itemId=` returns the scan JPEG.',
+      body: '`action` = defaults | item | add | remove | restore | duplicate | unmerge | submit | discard (pokoin-web docs/SCAN_LISTING_WORKFLOW.md).',
+    },
+    dependencies: {
+      env: ['MARKETPLACE_WRITER_DATABASE_URL', 'MARKETPLACE_DATABASE_URL', 'FIREBASE_*'],
+      services: ['Oracle/Postgres marketplace writer', 'Firebase Admin'],
+    },
+  },
+  {
+    path: '/api/scan-pair',
+    file: 'scan-pair.js',
+    methods: ['POST', 'OPTIONS'],
+    purpose: 'Phone claims a 4-digit Scan Connect pairing code or QR secret and receives a session-scoped phone token.',
+    auth: 'Public. Postgres-backed per-IP and global failure limits; identical error for wrong, expired and used codes.',
+    params: {
+      body: '`pin` (4 digits) or `qr`, optional `device` label.',
+    },
+    dependencies: {
+      env: ['MARKETPLACE_WRITER_DATABASE_URL', 'MARKETPLACE_DATABASE_URL'],
+      services: ['Oracle/Postgres marketplace writer'],
+    },
+  },
+  {
+    path: '/api/scan-phone',
+    file: 'scan-phone.js',
+    methods: ['POST', 'OPTIONS'],
+    purpose: 'Paired phone heartbeat, idempotent scan events (scanEventId), and leave.',
+    auth: '`Authorization: Scan <phoneToken>` from /api/scan-pair. No Firebase.',
+    params: {
+      query: '`action` = heartbeat | scan | leave.',
+      body: 'scan: `scanEventId`, `clientSequence`, `capturedAt`, `clockOffsetMs`, `recognition.hits`, optional `image` (base64 JPEG ≤ 45 KB), `timings`.',
+    },
+    dependencies: {
+      env: ['MARKETPLACE_WRITER_DATABASE_URL', 'MARKETPLACE_DATABASE_URL'],
+      services: ['Oracle/Postgres marketplace writer'],
+    },
+  },
+  {
+    path: '/api/scan-session',
+    file: 'scan-session.js',
+    methods: ['GET', 'POST', 'OPTIONS'],
+    purpose: 'Desktop Scan Session: start/resume with pairing code, regenerate code, disconnect phone, pause, end.',
+    auth: 'Required Firebase bearer token.',
+    params: {
+      query: '`sessionId` (GET), `action` = start | pairing | disconnect | pause | end (POST).',
+      body: '`batchId`, `sessionId`, `paused`, `reason`.',
+    },
+    dependencies: {
+      env: ['MARKETPLACE_WRITER_DATABASE_URL', 'MARKETPLACE_DATABASE_URL', 'FIREBASE_*'],
+      services: ['Oracle/Postgres marketplace writer', 'Firebase Admin'],
+    },
+  },
+  {
+    path: '/api/scan-stream',
+    file: 'scan-stream.js',
+    methods: ['GET', 'OPTIONS'],
+    purpose: 'Server-sent change stream for one Scan Batch (rows, defaults, session) with cursor replay; closes after 55 s.',
+    auth: 'Required Firebase bearer token.',
+    params: {
+      query: '`batchId`, `after` cursor.',
+    },
+    dependencies: {
+      env: ['MARKETPLACE_WRITER_DATABASE_URL', 'MARKETPLACE_DATABASE_URL', 'FIREBASE_*'],
+      services: ['Oracle/Postgres marketplace writer', 'Firebase Admin'],
     },
   },
   {
@@ -1017,13 +1291,13 @@ const routeDefinitions = [
     path: '/api/verify-email-signup',
     file: 'verify-email-signup.js',
     methods: ['POST'],
-    purpose: 'Verify a pending email signup token, create/claim the Firebase user, and send welcome/notification emails.',
+    purpose: 'Idempotently finalize a verified email signup into an ACTIVE Pokoin account (Firebase user, pok_email_verified claim, username claim, balances) and return a sign-in custom token.',
     auth: 'Public token verification.',
     params: {
-      body: 'Signup verification token and matching email/password verification fields.',
+      body: 'Signup verification `token`.',
     },
     dependencies: {
-      env: ['FIREBASE_*', 'RESEND_API_KEY', 'PENDING_SIGNUP_SECRET'],
+      env: ['FIREBASE_*', 'RESEND_API_KEY', 'SIGNUP_ENCRYPTION_SECRET', 'POKOIN_REQUIRE_VERIFIED_PASSWORD'],
       services: ['Firebase Admin', 'email provider'],
     },
   },
@@ -1111,6 +1385,21 @@ const routeDefinitions = [
     dependencies: {
       env: ['FIREBASE_*', 'POKOIN_RPC_URL', 'POKOIN_RESERVE_ADDRESS', 'POKOIN_RESERVE_PRIVATE_KEY'],
       services: ['Firebase Admin', 'Pokoin RPC', 'BSC/Pancake helpers'],
+    },
+  },
+  {
+    path: '/api/wpkn-pkn-quote',
+    file: 'wpkn-pkn-quote.js',
+    methods: ['GET', 'POST'],
+    purpose: 'Return a public wPKN/PKN market quote from GeckoTerminal plus the configured PKN USD price.',
+    auth: 'Public.',
+    params: {
+      query: '`direction`, `amountIn`.',
+      body: '`direction`, `amountIn` (POST).',
+    },
+    dependencies: {
+      env: ['PKN_USDT_PRICE', 'PKN_CHECKOUT_USDT_PRICE'],
+      services: ['GeckoTerminal'],
     },
   },
 ];

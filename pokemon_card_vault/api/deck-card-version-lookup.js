@@ -217,7 +217,7 @@ async function deckVersionRows({ input, dbQuery = marketplaceQuery }) {
       ) product_parsing on true
       left join lateral (
         select e.*
-        from public.cardtrader_pokemon_expansions e
+        from public.pokoin_pokemon_expansions e
         where e.name = versions.expansion_name
           or (blueprints.expansion_id is not null and e.expansion_id = blueprints.expansion_id)
         order by case when e.name = versions.expansion_name then 0 else 1 end

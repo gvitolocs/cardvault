@@ -1,0 +1,60 @@
+{
+  "outline": {
+    "r": 208,
+    "g": 203,
+    "b": 125
+  },
+  "thickness": {
+    "top": 7,
+    "bottom": 0,
+    "left": 11,
+    "right": 12
+  },
+  "labels": [
+    {
+      "id": 1,
+      "name": "1-weld",
+      "note": "old: paint AABB + weld washed yellow"
+    },
+    {
+      "id": 2,
+      "name": "2-round-only",
+      "note": "8× round, no white punch"
+    },
+    {
+      "id": 3,
+      "name": "3-pipeline",
+      "note": "new: diecut-only/studio-diecut punch white, keep rim",
+      "job": {
+        "action": "diecut-only",
+        "reason": "studio-diecut",
+        "family": "yellow",
+        "tMed": 11,
+        "overNumber": null
+      },
+      "thickness": {
+        "top": 7,
+        "bottom": 0,
+        "left": 11,
+        "right": 12
+      },
+      "punched": 11953
+    },
+    {
+      "id": 4,
+      "name": "4-crop-aabb",
+      "note": "crop to 317x443 then round",
+      "box": {
+        "left": 10,
+        "top": 0,
+        "width": 317,
+        "height": 443
+      }
+    },
+    {
+      "id": 5,
+      "name": "5-punch-fillcaps",
+      "note": "punch white, then fill caps with outline"
+    }
+  ]
+}

@@ -11,6 +11,7 @@ const {
     readLiveCardTraderListings,
   },
 } = require('./cardtrader-live-listings');
+const { decrementSellerOwnershipForSale } = require('./_user_card_collection');
 
 function cleanText(value, maxLength = 240) {
   return String(value || '').trim().slice(0, maxLength);
@@ -50,6 +51,9 @@ function orderPayload(orderId, data) {
     fulfillmentStatus: data.fulfillmentStatus || 'pending',
     fulfillmentMode: data.fulfillmentMode || 'physical',
     sellerUids: Array.isArray(data.sellerUids) ? data.sellerUids : [],
+    disputeStatus: data.disputeStatus || '',
+    shippedAt: timestampToIso(data.shippedAt),
+    escrowReleasedAt: timestampToIso(data.escrowReleasedAt),
     createdAt: timestampToIso(data.createdAt),
     updatedAt: timestampToIso(data.updatedAt),
     paidAt: timestampToIso(data.paidAt),
@@ -129,6 +133,37 @@ function normalizedItems(items) {
 
 function uniqueSellerUids(items) {
   return [...new Set(items.map((item) => item.sellerUid).filter(Boolean))];
+}
+
+function physicalUsesEscrow(fulfillmentMode) {
+  return cleanFulfillmentMode(fulfillmentMode) !== 'nft_only';
+}
+
+function sellerTotalsFromItems(items) {
+  const sellerTotals = new Map();
+  for (const item of items) {
+    sellerTotals.set(item.sellerUid, (sellerTotals.get(item.sellerUid) || 0) + itemTotalPkn(item));
+  }
+  return sellerTotals;
+}
+
+function createdAtMs(value) {
+  if (!value) return 0;
+  if (typeof value.toDate === 'function') return value.toDate().getTime();
+  if (typeof value.seconds === 'number') return value.seconds * 1000;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
+}
+
+const SHIP_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+function canAutoRefundNotShipped(order, now = Date.now()) {
+  if (!order || order.paymentStatus !== 'escrow') return false;
+  if (order.shippedAt || order.fulfillmentStatus === 'shipped' || order.fulfillmentStatus === 'delivered') {
+    return false;
+  }
+  const created = createdAtMs(order.createdAt);
+  return created > 0 && now - created >= SHIP_WINDOW_MS;
 }
 
 function collectionPayloadForItem({ uid, item, orderId, now }) {
@@ -491,7 +526,7 @@ async function verifyAndDecrementListings(items) {
             and seller_uid = $3
             and status = 'active'
             and quantity_available >= $2
-          returning card_id
+          returning card_id, source_listing_id, source, seller_uid
         `,
         [item.listingId, item.quantity, item.sellerUid],
       );
@@ -505,6 +540,9 @@ async function verifyAndDecrementListings(items) {
         listingId: item.listingId,
         quantity: item.quantity,
         cardId: row.card_id || item.card.id,
+        sellerUid: row.seller_uid || item.sellerUid,
+        sourceListingId: cleanText(row.source_listing_id || item.sourceListingId, 160),
+        source: cleanText(row.source || item.source, 80),
       });
     }
   } catch (error) {
@@ -538,6 +576,29 @@ async function verifyAndDecrementListings(items) {
   return decremented;
 }
 
+async function syncSellerOwnershipAfterPhysicalSale({ admin, firestore, decremented = [] }) {
+  const results = [];
+  for (const entry of decremented) {
+    if (!entry || entry.external) {
+      results.push({ ok: true, skipped: true, reason: 'external' });
+      continue;
+    }
+    const result = await decrementSellerOwnershipForSale({
+      firestore,
+      admin,
+      sellerUid: entry.sellerUid,
+      listingId: entry.listingId,
+      quantity: entry.quantity,
+      sourceListingId: entry.sourceListingId,
+    });
+    results.push({ listingId: entry.listingId, ...result });
+  }
+  return {
+    ok: results.every((row) => row.ok !== false),
+    items: results,
+  };
+}
+
 async function createPaidOrder({ admin, firestore, decoded, body }) {
   const items = normalizedItems(body?.items);
   if (items.length === 0) {
@@ -569,16 +630,14 @@ async function createPaidOrder({ admin, firestore, decoded, body }) {
     assertCardTraderCheckoutCanProceed(items, body, process.env);
   }
   await verifyCardTraderLiveItems(items);
-  await verifyAndDecrementListings(items);
+  const decremented = await verifyAndDecrementListings(items);
 
   const orderRef = firestore.collection('orders').doc();
   const buyerBalanceRef = firestore.collection('balances').doc(decoded.uid);
   const now = admin.firestore.FieldValue.serverTimestamp();
   const sellerUids = uniqueSellerUids(items);
-  const sellerTotals = new Map();
-  for (const item of items) {
-    sellerTotals.set(item.sellerUid, (sellerTotals.get(item.sellerUid) || 0) + item.totalPricePkn);
-  }
+  const sellerTotals = sellerTotalsFromItems(items);
+  const escrow = physicalUsesEscrow(fulfillmentMode);
 
   let orderData = null;
   try {
@@ -601,30 +660,32 @@ async function createPaidOrder({ admin, firestore, decoded, body }) {
       );
       transaction.set(firestore.collection('ledger_entries').doc(), {
         uid: decoded.uid,
-        type: 'marketplace_order_paid',
+        type: escrow ? 'marketplace_order_escrow' : 'marketplace_order_paid',
         amountPkn: -totalPkn,
         orderId: orderRef.id,
         createdAt: now,
       });
 
-      for (const [sellerUid, amountPkn] of sellerTotals.entries()) {
-        const sellerBalanceRef = firestore.collection('balances').doc(sellerUid);
-        transaction.set(
-          sellerBalanceRef,
-          {
-            availablePkn: admin.firestore.FieldValue.increment(amountPkn),
-            updatedAt: now,
-          },
-          { merge: true },
-        );
-        transaction.set(firestore.collection('ledger_entries').doc(), {
-          uid: sellerUid,
-          type: 'marketplace_sale_paid',
-          amountPkn,
-          orderId: orderRef.id,
-          buyerUid: decoded.uid,
-          createdAt: now,
-        });
+      if (!escrow) {
+        for (const [sellerUid, amountPkn] of sellerTotals.entries()) {
+          const sellerBalanceRef = firestore.collection('balances').doc(sellerUid);
+          transaction.set(
+            sellerBalanceRef,
+            {
+              availablePkn: admin.firestore.FieldValue.increment(amountPkn),
+              updatedAt: now,
+            },
+            { merge: true },
+          );
+          transaction.set(firestore.collection('ledger_entries').doc(), {
+            uid: sellerUid,
+            type: 'marketplace_sale_paid',
+            amountPkn,
+            orderId: orderRef.id,
+            buyerUid: decoded.uid,
+            createdAt: now,
+          });
+        }
       }
 
       orderData = {
@@ -636,11 +697,11 @@ async function createPaidOrder({ admin, firestore, decoded, body }) {
         taxPkn,
         shippingPkn,
         totalPkn,
-        status: 'paid',
-        paymentStatus: 'paid',
+        status: escrow ? 'escrow' : 'paid',
+        paymentStatus: escrow ? 'escrow' : 'paid',
         fulfillmentStatus: fulfillmentMode === 'nft_only'
           ? 'nft_ownership_recorded'
-          : 'awaiting_seller_confirmation',
+          : 'awaiting_shipment',
         fulfillmentMode,
         sellerUids,
         source: 'marketplace_checkout',
@@ -682,6 +743,20 @@ async function createPaidOrder({ admin, firestore, decoded, body }) {
       });
     }
     throw error;
+  }
+
+  // Physical sale: seller no longer owns the sold quantity. NFT-only checkout
+  // keeps NFT custody semantics unchanged (buyer collection write above).
+  let sellerOwnership = { ok: true, skipped: true, reason: 'nft_only' };
+  if (fulfillmentMode !== 'nft_only') {
+    sellerOwnership = await syncSellerOwnershipAfterPhysicalSale({
+      admin,
+      firestore,
+      decremented,
+    }).catch((error) => {
+      console.error('seller collection ownership decrement failed', error);
+      return { ok: false, error: error.message || 'ownership decrement failed' };
+    });
   }
 
   const notification = orderData.fulfillmentMode === 'nft_only'
@@ -740,6 +815,7 @@ async function createPaidOrder({ admin, firestore, decoded, body }) {
     order: orderPayload(orderRef.id, orderData),
     sellerNotification: notification,
     cardTraderPurchase,
+    sellerOwnership,
   };
 }
 
@@ -852,6 +928,141 @@ async function createNftShippingRequests({ admin, firestore, decoded, body }) {
   };
 }
 
+function buyerOwnsOrder(data, uid) {
+  return data.uid === uid || data.buyerUid === uid;
+}
+
+function sellerOnOrder(data, uid) {
+  return Array.isArray(data.sellerUids) && data.sellerUids.includes(uid);
+}
+
+async function loadOrderOrThrow(firestore, orderId) {
+  const orderRef = firestore.collection('orders').doc(orderId);
+  const doc = await orderRef.get();
+  if (!doc.exists) {
+    const error = new Error('Marketplace order was not found.');
+    error.statusCode = 404;
+    throw error;
+  }
+  return { orderRef, data: doc.data() || {} };
+}
+
+async function confirmDelivery({ admin, firestore, decoded, orderId }) {
+  const { orderRef, data } = await loadOrderOrThrow(firestore, orderId);
+  if (!buyerOwnsOrder(data, decoded.uid)) {
+    const error = new Error('You cannot confirm this order.');
+    error.statusCode = 403;
+    throw error;
+  }
+  if (data.paymentStatus !== 'escrow') {
+    const error = new Error('This order is not in escrow.');
+    error.statusCode = 400;
+    throw error;
+  }
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const sellerTotals = sellerTotalsFromItems(data.items || []);
+  await firestore.runTransaction(async (transaction) => {
+    for (const [sellerUid, amountPkn] of sellerTotals.entries()) {
+      transaction.set(
+        firestore.collection('balances').doc(sellerUid),
+        {
+          availablePkn: admin.firestore.FieldValue.increment(amountPkn),
+          updatedAt: now,
+        },
+        { merge: true },
+      );
+      transaction.set(firestore.collection('ledger_entries').doc(), {
+        uid: sellerUid,
+        type: 'marketplace_sale_paid',
+        amountPkn,
+        orderId,
+        buyerUid: decoded.uid,
+        createdAt: now,
+      });
+    }
+    transaction.set(orderRef, {
+      paymentStatus: 'released',
+      status: 'paid',
+      fulfillmentStatus: 'delivered',
+      escrowReleasedAt: now,
+      updatedAt: now,
+    }, { merge: true });
+  });
+  const next = await orderRef.get();
+  return { order: orderPayload(orderId, next.data() || data) };
+}
+
+async function markShipped({ admin, firestore, decoded, orderId }) {
+  const { orderRef, data } = await loadOrderOrThrow(firestore, orderId);
+  if (!sellerOnOrder(data, decoded.uid)) {
+    const error = new Error('You cannot mark this order shipped.');
+    error.statusCode = 403;
+    throw error;
+  }
+  if (data.paymentStatus !== 'escrow') {
+    const error = new Error('This order is not in escrow.');
+    error.statusCode = 400;
+    throw error;
+  }
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  await orderRef.set({
+    fulfillmentStatus: 'shipped',
+    shippedAt: now,
+    updatedAt: now,
+  }, { merge: true });
+  const next = await orderRef.get();
+  return { order: orderPayload(orderId, next.data() || data) };
+}
+
+async function reportProblem({ admin, firestore, decoded, orderId, reason, notes }) {
+  const { orderRef, data } = await loadOrderOrThrow(firestore, orderId);
+  if (!buyerOwnsOrder(data, decoded.uid)) {
+    const error = new Error('You cannot dispute this order.');
+    error.statusCode = 403;
+    throw error;
+  }
+  const why = cleanText(reason, 40) || 'not_as_described';
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  if (why === 'not_shipped' && canAutoRefundNotShipped(data)) {
+    const totalPkn = numberValue(data.totalPkn);
+    await firestore.runTransaction(async (transaction) => {
+      transaction.set(
+        firestore.collection('balances').doc(decoded.uid),
+        {
+          availablePkn: admin.firestore.FieldValue.increment(totalPkn),
+          updatedAt: now,
+        },
+        { merge: true },
+      );
+      transaction.set(firestore.collection('ledger_entries').doc(), {
+        uid: decoded.uid,
+        type: 'marketplace_order_refund',
+        amountPkn: totalPkn,
+        orderId,
+        createdAt: now,
+      });
+      transaction.set(orderRef, {
+        paymentStatus: 'refunded',
+        status: 'refunded',
+        disputeStatus: 'refunded_not_shipped',
+        disputeReason: why,
+        disputeNotes: cleanText(notes, 500),
+        fulfillmentStatus: 'cancelled_not_shipped',
+        updatedAt: now,
+      }, { merge: true });
+    });
+  } else {
+    await orderRef.set({
+      disputeStatus: 'open',
+      disputeReason: why,
+      disputeNotes: cleanText(notes, 500),
+      updatedAt: now,
+    }, { merge: true });
+  }
+  const next = await orderRef.get();
+  return { order: orderPayload(orderId, next.data() || data) };
+}
+
 module.exports = async function handler(req, res) {
   try {
     const decoded = await verifyBearerToken(req);
@@ -894,6 +1105,30 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true, ...result });
     }
 
+    if (req.method === 'POST' && (action === 'confirm-delivery' || action === 'mark-shipped' || action === 'report-problem')) {
+      const orderId = cleanOrderId(url.searchParams.get('orderId') || req.body?.orderId);
+      if (!orderId) {
+        return res.status(400).json({ error: 'Order id is required.' });
+      }
+      if (action === 'confirm-delivery') {
+        const result = await confirmDelivery({ admin, firestore, decoded, orderId });
+        return res.status(200).json({ ok: true, ...result });
+      }
+      if (action === 'mark-shipped') {
+        const result = await markShipped({ admin, firestore, decoded, orderId });
+        return res.status(200).json({ ok: true, ...result });
+      }
+      const result = await reportProblem({
+        admin,
+        firestore,
+        decoded,
+        orderId,
+        reason: req.body?.reason,
+        notes: req.body?.notes,
+      });
+      return res.status(200).json({ ok: true, ...result });
+    }
+
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ error: 'Method not allowed.' });
   } catch (error) {
@@ -919,10 +1154,14 @@ module.exports._test = {
   collectionPayloadForItem,
   createNftShippingRequests,
   createPaidOrder,
+  canAutoRefundNotShipped,
+  physicalUsesEscrow,
   isCardTraderLiveItem,
   normalizeItem,
   normalizedItems,
   orderPayload,
   shippingAddressFromBody,
   verifyCardTraderLiveItems,
+  syncSellerOwnershipAfterPhysicalSale,
+  verifyAndDecrementListings,
 };

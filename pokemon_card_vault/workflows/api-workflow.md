@@ -154,7 +154,7 @@ in `vercel.json`.
 - `GET|POST /api/social-autopost/hot-card`: protected hot-card social posting.
 - `POST /api/social-post-agent`: protected social copy generation.
 - `POST|OPTIONS /api/trainingai-card-classify`: classifier proxy.
-- `GET /healthz` and `GET /api/healthz`: Oracle API service health.
+- `GET /healthz` and `GET /api/healthz`: pipeline health (Postgres, Valkey, Meili, card-image CDN). HTTP 503 if any check fails.
 - `GET /api/__routes`: compact Oracle route index.
 - `GET /api/total-supply` and `GET /api/circulating-supply`: external Pokoin
   status proxies from `vercel.json`.
@@ -235,6 +235,7 @@ in `vercel.json`.
    contract coverage without creating broad brittle snapshots.
 11. Run `npm run api:docs` when manifest metadata changes.
 12. Update `docs/pokoin-api.md` or feature workflows when public behavior changes.
+    Search rank / `search_weight`: `docs/marketplace-search-ranking.md`.
 
 ## Validation
 

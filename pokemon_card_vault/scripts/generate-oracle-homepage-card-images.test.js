@@ -8,6 +8,12 @@ const script = fs.readFileSync(
   'utf8',
 );
 
+test('homepage generator sanitizes full rasters with the shared ingest recipe', () => {
+  assert.match(script, /sanitizeCardImage/);
+  assert.match(script, /sanitizeOptionsFromEnv/);
+  assert.match(script, /require\('\.\/lib\/sanitize-card-image'\)/);
+});
+
 test('homepage generator uses a fixed 240px width reference', () => {
   assert.match(script, /const HOMEPAGE_REFERENCE_WIDTH = 240;/);
   assert.doesNotMatch(script, /DEFAULT_BASELINE_WIDTH/);

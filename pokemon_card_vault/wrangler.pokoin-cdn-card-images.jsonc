@@ -10,10 +10,6 @@
     {
       "pattern": "www.pokoin.com/card-images/*",
       "zone_name": "pokoin.com"
-    },
-    {
-      "pattern": "cdn.pokoin.com/*",
-      "zone_name": "pokoin.com"
     }
   ],
   "r2_buckets": [
@@ -21,5 +17,9 @@
       "binding": "CARD_IMAGES",
       "bucket_name": "cardvault-images"
     }
-  ]
+  ],
+  "vars": {
+    "PI_CDN_ORIGIN": "https://cdn.pokoin.com",
+    "CACHE_EPOCH": "20260910-vv"
+  }
 }

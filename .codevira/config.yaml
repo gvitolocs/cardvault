@@ -1,8 +1,64 @@
-schema_version: 1
-project_name: cardvault
-created_at: '2026-05-27T18:59:01.262558+00:00'
-codevira_version: 3.0.0
-agents_md_max_kb: 5
-inject_max_decisions: 3
-inject_max_tokens: 600
-archive_after_days: 90
+project:
+  name: cardvault
+  language: javascript
+  watched_dirs:
+  - .
+  - PokemonCardRecognizer
+  - docs
+  - memory
+  - pokemon_card_vault
+  - report
+  - scripts
+  file_extensions:
+  - .cc
+  - .cjs
+  - .cmake
+  - .conf
+  - .cpp
+  - .css
+  - .dart
+  - .entitlements
+  - .example
+  - .gradle
+  - .h
+  - .html
+  - .index
+  - .java
+  - .js
+  - .json
+  - .jsonc
+  - .jsonl
+  - .key
+  - .kt
+  - .log
+  - .m
+  - .manifest
+  - .md
+  - .mdc
+  - .npy
+  - .pbxproj
+  - .plist
+  - .prisma
+  - .properties
+  - .pub
+  - .py
+  - .rc
+  - .rules
+  - .service
+  - .sh
+  - .sql
+  - .storyboard
+  - .swift
+  - .timer
+  - .toml
+  - .ts
+  - .txt
+  - .woff2
+  - .xcconfig
+  - .xcscheme
+  - .xcsettings
+  - .xcworkspacedata
+  - .xib
+  - .xml
+  - .yaml
+  collection_name: cardvault

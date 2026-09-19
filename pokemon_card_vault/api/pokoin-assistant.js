@@ -81,10 +81,15 @@ function setTestHelperOverrides(overrides) {
 
 const ADMIN_TO = process.env.POKOIN_ASSISTANT_EMAIL || 'pokoinpos@gmail.com';
 const ASSISTANT_FROM = process.env.POKOIN_ASSISTANT_FROM || 'Poko <poko@pokoin.com>';
-const DEFAULT_POKONTACT_SERVICE_URL = 'http://130.162.242.213:8787';
+const DEFAULT_POKONTACT_SERVICE_URL = 'http://10.0.0.170:8789/api/poko';
 const POKONTACT_SERVICE_URL = resolvePokontactServiceUrl(process.env);
-const POKONTACT_SERVICE_TOKEN = process.env.POKONTACT_SERVICE_TOKEN || '';
-const POKONTACT_SERVICE_TIMEOUT_MS = Number(process.env.POKONTACT_SERVICE_TIMEOUT_MS || 12000);
+const POKONTACT_SERVICE_TOKEN = String(
+  process.env.POKONTACT_SERVICE_TOKEN
+  || process.env.HERMES_POKO_API_TOKEN
+  || process.env.POKO_API_TOKEN
+  || ''
+).trim();
+const POKONTACT_SERVICE_TIMEOUT_MS = Number(process.env.POKONTACT_SERVICE_TIMEOUT_MS || 0);
 const POKO_EMOJI_REPLACEMENTS = new Map([
   ['🃏', '⭐'],
   ['🫧', '✨'],
@@ -208,7 +213,7 @@ function doubledCardId(value) {
 }
 
 function marketplaceCardPath(row, language = 'en') {
-  const doubledId = doubledCardId(row.card_id);
+  const publicId = String(row.card_id || '').trim();
   const cleanLanguage = slugPart(language) || 'en';
   const slug = [
     row.rarity || 'Card',
@@ -216,7 +221,9 @@ function marketplaceCardPath(row, language = 'en') {
     row.collector_number || row.card_number,
     row.set_name,
   ].map(slugPart).filter(Boolean).join('-');
-  return doubledId && slug ? `/marketplace/${cleanLanguage}/cards/${doubledId}/${slug}` : '';
+  return /^[0-9]+$/.test(publicId) && slug
+    ? `/marketplace/${cleanLanguage}/cards/${publicId}/${slug}`
+    : '';
 }
 
 function marketplaceLanguageFromPage(page) {
@@ -362,17 +369,6 @@ function pageContextForPrompt(pageContext = {}) {
   return lines.join('\n');
 }
 
-function cardIdFromDoubledPathSegment(value) {
-  const raw = String(value || '').trim();
-  if (!/^\d+$/.test(raw)) {
-    return '';
-  }
-  const numeric = BigInt(raw);
-  return numeric > 0 && numeric % BigInt(2) === BigInt(0)
-    ? String(numeric / BigInt(2))
-    : '';
-}
-
 function pageCardContext(page, pageContext = {}) {
   const activeCard = pageContext.activeCard || {};
   const explicitCardId = cleanText(pageContext.cardId || activeCard.cardId, 80);
@@ -391,7 +387,7 @@ function pageCardContext(page, pageContext = {}) {
     const marketplaceMatch = url.pathname.match(/\/marketplace\/[a-z]{2}\/cards\/([0-9]+)(?:\/|$)/i);
     if (marketplaceMatch) {
       return {
-        cardId: cardIdFromDoubledPathSegment(marketplaceMatch[1]) || marketplaceMatch[1],
+        cardId: marketplaceMatch[1],
         title: cleanText(pageContext.title, 180),
         setName: '',
         collectorNumber: '',
@@ -495,6 +491,24 @@ function parseCardQueryParts(card) {
   };
 }
 
+function cardNameMatchesHint(row, nameHint) {
+  const hint = String(nameHint || '').trim().toLowerCase();
+  if (!hint) {
+    return true;
+  }
+  const cardName = String(row?.card_name || '').trim().toLowerCase();
+  if (!cardName) {
+    return false;
+  }
+  const hintBase = hint.replace(/\s+(ex|v|vmax|vstar|gx)$/i, '').trim();
+  return cardName === hint
+    || cardName.startsWith(`${hint} `)
+    || cardName === hintBase
+    || cardName.startsWith(`${hintBase} `)
+    || hint === cardName
+    || hint.startsWith(`${cardName} `);
+}
+
 async function resolveCardQueryPath(card, language = 'en') {
   const { query, name, collectorNumber, cardId, setName, artist } = parseCardQueryParts(card);
   if (!cardId && (!query || !name)) {
@@ -502,32 +516,50 @@ async function resolveCardQueryPath(card, language = 'en') {
   }
   const { marketplaceQuery } = getMarketplaceDbHelper();
   if (cardId) {
-    const cardIdResult = await marketplaceQuery(
-      `
-        select
-          marketplace_search_candidates.card_id,
-          coalesce(
-            nullif(marketplace_search_candidates.display_name, ''),
-            nullif(marketplace_search_candidates.canonical_name, ''),
-            marketplace_search_candidates.name
-          ) as card_name,
-          marketplace_search_candidates.set_name,
-          marketplace_search_candidates.card_number as collector_number,
-          marketplace_search_candidates.rarity,
-          urls.canonical_path
-        from public.marketplace_search_candidates
-        left join public.marketplace_card_urls urls
-          on urls.card_id = marketplace_search_candidates.card_id
-        where marketplace_search_candidates.card_id::text = $1
-        order by case when urls.language = $2 then 0 else 1 end
-        limit 1
-      `,
-      [cardId, slugPart(language) || 'en'],
-    );
-    const row = cardIdResult.rows[0];
-    const path = row ? canonicalMarketplacePath(row, language) : '';
-    if (path) {
-      return path;
+    const lookupByCardId = async (id) => {
+      if (!id) {
+        return null;
+      }
+      const cardIdResult = await marketplaceQuery(
+        `
+          select
+            marketplace_search_candidates.card_id,
+            coalesce(
+              nullif(marketplace_search_candidates.display_name, ''),
+              nullif(marketplace_search_candidates.canonical_name, ''),
+              marketplace_search_candidates.name
+            ) as card_name,
+            marketplace_search_candidates.set_name,
+            marketplace_search_candidates.card_number as collector_number,
+            marketplace_search_candidates.rarity,
+            urls.canonical_path
+          from public.marketplace_search_candidates
+          left join public.marketplace_card_urls urls
+            on urls.card_id = marketplace_search_candidates.card_id
+          where marketplace_search_candidates.card_id::text = $1
+          order by case when urls.language = $2 then 0 else 1 end
+          limit 1
+        `,
+        [id, slugPart(language) || 'en'],
+      );
+      return cardIdResult.rows[0] || null;
+    };
+    const exact = await lookupByCardId(cardId);
+    if (exact && cardNameMatchesHint(exact, name)) {
+      const path = canonicalMarketplacePath(exact, language);
+      if (path) {
+        return path;
+      }
+    }
+    const doubled = doubledCardId(cardId);
+    if (doubled && doubled !== cardId) {
+      const doubledRow = await lookupByCardId(doubled);
+      if (doubledRow && cardNameMatchesHint(doubledRow, name)) {
+        const path = canonicalMarketplacePath(doubledRow, language);
+        if (path) {
+          return path;
+        }
+      }
     }
   }
   let result = await marketplaceQuery(
@@ -2754,7 +2786,7 @@ async function cardSuggestion({ page, message = '', chatRecord = [] } = {}) {
     {
       name: 'Magikarp',
       query: 'Magikarp 203/193',
-      cardId: '248856',
+      cardId: '497712',
       setName: 'Paldea Evolved',
       artist: 'Shinji Kanda',
       detail: 'a wild vertical waterfall scene where tiny Magikarp feels heroic instead of silly',
@@ -2762,7 +2794,7 @@ async function cardSuggestion({ page, message = '', chatRecord = [] } = {}) {
     {
       name: 'Dragonite V',
       query: 'Dragonite V 192/203',
-      cardId: '166430',
+      cardId: '332860',
       setName: 'Evolving Skies',
       artist: 'Atsushi Furusawa',
       detail: 'soft flying-postman energy, with Dragonite drifting above the sea like a friendly guardian',
@@ -2770,7 +2802,7 @@ async function cardSuggestion({ page, message = '', chatRecord = [] } = {}) {
     {
       name: 'Drowzee',
       query: 'Drowzee 210/198',
-      cardId: '241674',
+      cardId: '483348',
       setName: 'Scarlet & Violet',
       artist: 'Tomokazu Komiya',
       detail: 'a dreamy, strange city scene that feels hand-drawn and full of personality',
@@ -2778,7 +2810,7 @@ async function cardSuggestion({ page, message = '', chatRecord = [] } = {}) {
     {
       name: 'Mew ex',
       query: 'Mew ex 232/091',
-      cardId: '274416',
+      cardId: '548832',
       setName: 'Paldean Fates',
       artist: 'USGMEN',
       detail: 'a playful bubblegum-pink illustration packed with tiny cute details around Mew',
@@ -2786,7 +2818,7 @@ async function cardSuggestion({ page, message = '', chatRecord = [] } = {}) {
     {
       name: 'Poliwhirl',
       query: 'Poliwhirl 176/165',
-      cardId: '251432',
+      cardId: '502864',
       setName: 'Pokémon Card 151',
       artist: 'Gemi',
       detail: 'a quiet rainy-street mood, perfect if you like cozy illustration cards',
@@ -2916,7 +2948,9 @@ async function callPokontactService({ message, chatRecord, user, page, pageConte
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), POKONTACT_SERVICE_TIMEOUT_MS);
+  const timeout = POKONTACT_SERVICE_TIMEOUT_MS > 0
+    ? setTimeout(() => controller.abort(), POKONTACT_SERVICE_TIMEOUT_MS)
+    : null;
   try {
     const response = await fetch(`${POKONTACT_SERVICE_URL}/chat`, {
       method: 'POST',
@@ -2947,7 +2981,7 @@ async function callPokontactService({ message, chatRecord, user, page, pageConte
       intent: cleanText(payload.intent, 40) || classifyIntent(message),
       provider: cleanText(payload.provider, 80),
       model: cleanText(payload.model, 120),
-      source: cleanText(payload.source, 80) || 'peer2-service',
+      source: cleanText(payload.source, 80) || 'poko-peer1',
       actions: safeAssistantActions(payload.actions),
     };
   } finally {

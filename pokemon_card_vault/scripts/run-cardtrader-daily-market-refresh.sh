@@ -7,41 +7,32 @@ ENV_FILE="${CARDTRADER_DAILY_ENV_FILE:-$POKOINPOS_ROOT/deploy/env/peer4-postgres
 NODE_BIN="${NODE_BIN:-/usr/bin/env node}"
 
 MARKET_MAX_BLUEPRINTS="${CARDTRADER_MARKET_MAX_BLUEPRINTS:-100000}"
-MARKET_MAX_PRODUCTS="${CARDTRADER_MARKET_MAX_PRODUCTS:-1000000}"
-MARKET_REFRESH_BATCH_BLUEPRINTS="${CARDTRADER_MARKET_REFRESH_BATCH_BLUEPRINTS:-700}"
-MARKET_BLUEPRINT_CONCURRENCY="${CARDTRADER_MARKET_BLUEPRINT_CONCURRENCY:-1}"
-MARKET_REQUEST_DELAY_MS="${CARDTRADER_MARKET_REQUEST_DELAY_MS:-300}"
+MARKET_MAX_PRODUCTS="${CARDTRADER_MARKET_MAX_PRODUCTS:-20000000}"
+MARKET_MAX_EXPANSIONS="${CARDTRADER_MARKET_MAX_EXPANSIONS:-10000}"
+MARKET_REQUEST_DELAY_MS="${CARDTRADER_MARKET_REQUEST_DELAY_MS:-50}"
+MARKET_EXPANSION_CONCURRENCY="${CARDTRADER_MARKET_EXPANSION_CONCURRENCY:-4}"
+MARKET_PERSIST_CONCURRENCY="${CARDTRADER_MARKET_PERSIST_CONCURRENCY:-1}"
+MARKET_SHARD_COUNT="${CARDTRADER_MARKET_SHARD_COUNT:-1}"
+MARKET_SHARD_INDEX="${CARDTRADER_MARKET_SHARD_INDEX:-0}"
 MARKET_EXTRA_ARGS="${CARDTRADER_MARKET_EXTRA_ARGS:-}"
-
-CACHE_MAX_BLUEPRINTS="${CARDTRADER_LISTING_CACHE_MAX_BLUEPRINTS:-100000}"
-CACHE_REFRESH_BATCH_BLUEPRINTS="${CARDTRADER_LISTING_CACHE_REFRESH_BATCH_BLUEPRINTS:-700}"
-CACHE_BLUEPRINT_CONCURRENCY="${CARDTRADER_LISTING_CACHE_BLUEPRINT_CONCURRENCY:-1}"
-CACHE_REQUEST_DELAY_MS="${CARDTRADER_LISTING_CACHE_REQUEST_DELAY_MS:-500}"
-CACHE_PRODUCT_TYPE="${CARDTRADER_LISTING_CACHE_PRODUCT_TYPE:-card}"
-CACHE_EXTRA_ARGS="${CARDTRADER_LISTING_CACHE_EXTRA_ARGS:-}"
 
 cd "$ROOT_DIR"
 
-echo "[$(date -Is)] Starting CardTrader daily market listing import"
+echo "[$(date -Is)] Starting CardTrader daily expansion market import (complete book, parallel sets)"
 # shellcheck disable=SC2086
 $NODE_BIN scripts/refresh-cardtrader-market-listings.js \
   --env-file="$ENV_FILE" \
+  --by-expansion \
+  --complete-book \
+  --expansion-concurrency="$MARKET_EXPANSION_CONCURRENCY" \
+  --persist-concurrency="$MARKET_PERSIST_CONCURRENCY" \
+  --shard-count="$MARKET_SHARD_COUNT" \
+  --shard-index="$MARKET_SHARD_INDEX" \
+  --finalize \
   --max-blueprints="$MARKET_MAX_BLUEPRINTS" \
   --max-products="$MARKET_MAX_PRODUCTS" \
-  --refresh-batch-blueprints="$MARKET_REFRESH_BATCH_BLUEPRINTS" \
-  --blueprint-concurrency="$MARKET_BLUEPRINT_CONCURRENCY" \
+  --max-expansions="$MARKET_MAX_EXPANSIONS" \
   --request-delay-ms="$MARKET_REQUEST_DELAY_MS" \
   $MARKET_EXTRA_ARGS
 
-echo "[$(date -Is)] Starting CardTrader homepage listing cache refresh"
-# shellcheck disable=SC2086
-$NODE_BIN scripts/refresh-cardtrader-blueprint-listing-cache.js \
-  --env-file="$ENV_FILE" \
-  --max-blueprints="$CACHE_MAX_BLUEPRINTS" \
-  --refresh-batch-blueprints="$CACHE_REFRESH_BATCH_BLUEPRINTS" \
-  --blueprint-concurrency="$CACHE_BLUEPRINT_CONCURRENCY" \
-  --request-delay-ms="$CACHE_REQUEST_DELAY_MS" \
-  --product-type="$CACHE_PRODUCT_TYPE" \
-  $CACHE_EXTRA_ARGS
-
-echo "[$(date -Is)] Finished CardTrader daily market listing import and cache refresh"
+echo "[$(date -Is)] Finished CardTrader daily expansion market import"

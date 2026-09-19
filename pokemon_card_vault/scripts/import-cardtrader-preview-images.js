@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { PutObjectCommand, S3Client } = require('@aws-sdk/client-s3');
+const { prepareCatalogImage } = require('./lib/sanitize-card-image');
 
 function readEnv(filePath) {
   const values = {};
@@ -215,17 +216,19 @@ async function importRow({ client, env, bucket, cdnBase, row }) {
 
   const slug = slugify(row.name) || `card-${row.id}`;
   const downloadResult = await download(sourceUrl);
-  const preview = downloadResult.body;
-  const ext =
-    imageFormatFromBytes(preview) ||
-    extensionFromContentType(downloadResult.contentType) ||
-    'jpg';
+  const prepared = await prepareCatalogImage(
+    downloadResult.body,
+    imageFormatFromBytes(downloadResult.body) ||
+      extensionFromContentType(downloadResult.contentType) ||
+      'jpg',
+  );
+  const ext = prepared.ext;
   const key = `previews/${row.id}_${slug}.${ext}`;
   await client.send(
     new PutObjectCommand({
       Bucket: bucket,
       Key: key,
-      Body: preview,
+      Body: prepared.body,
       ContentType: contentTypeForExtension(ext),
       CacheControl: 'public, max-age=31536000, immutable',
     }),
@@ -237,7 +240,7 @@ async function importRow({ client, env, bucket, cdnBase, row }) {
     preview_image_url: previewImageUrl,
     preview_object_key: key,
   });
-  return { skipped: false, key, bytes: preview.length, sourceUrl };
+  return { skipped: false, key, bytes: prepared.body.length, sourceUrl };
 }
 
 async function main() {

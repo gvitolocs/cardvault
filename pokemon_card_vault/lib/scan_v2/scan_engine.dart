@@ -613,6 +613,6 @@ class ScanEngine {
         if (value.isNotEmpty) return value;
       }
     } catch (_) {}
-    return 'tcgplayer';
+    return 'ct_id';
   }
 }

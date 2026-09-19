@@ -87,36 +87,27 @@ especially `/marketplace`, `/card/:id`, seller listings, cart, and checkout.
 - `lib/utils/card_url.dart`
   - Generates canonical share/detail URLs as
     `/marketplace/{lang}/cards/{publicNumber}/{rarity}-{name}-{number}-{set}`.
-  - Canonical card slugs remain human-readable while the public number segment
-    makes the path globally unique. Example: Leafeon `316600` has public number
-    `633200` and becomes
-    `/marketplace/en/cards/633200/rare-leafeon-005-131-prismatic-evolutions`.
-  - Root links such as `/{blueprintId}/{slug}` are legacy-compatible and must
-    continue to resolve for pasted links and crawler unfurls.
+  - Our id is CardTrader `ct_id` × 2 (`pokoin_public_number`). Catalog `card.id`
+    is already that number; pass it straight into path builders. Use
+    `doubledCardId` only on a raw CLIP/CardTrader blueprint id. Full rules:
+    `docs/marketplace-public-ids.md`.
+  - Example: Espurr `ct_id` `110481` → our id `220962` →
+    `/marketplace/en/cards/220962/card-espurr-58-122-breakpoint`.
   - `legacyCardDetailSlug(...)`, `cardIdFromSlug(...)`, and public-number helpers
     exist for compatibility with old numeric links and canonical route parsing.
 - `lib/main.dart`
-  - Routes `/:cardId/:cardSlug` to normal card detail pages.
-  - Routes `/marketplace/:lang/cards/:cardPage/:cardSlug` and
-    `/marketplace/:lang/cards/:cardPage/:cardSlug/versions` to legacy card
-    detail/version pages, decoding `cardPage` as a public number only when the
-    slug segment is present.
-  - Routes `/marketplace/:lang/cards/:cardPage` and
-    `/marketplace/:lang/cards/:cardPage/versions` remain compatibility routes
-    for simple real ids and legacy numeric slugs.
+  - Digit-only `/:cardSlug` redirects to `/marketplace/{n}`.
+  - `/marketplace/:n` (digits) loads `CardDetailScreen` with **our id** `n`
+    (`card_id`, already `ct_id * 2`). Do not half the path number.
   - Keeps the legacy `/card/:id` detail route available.
-  - Intercepts digit-only root paths such as `/129834` by rendering
-    `CardDetailScreen(cardId: '129834')` directly; do not client-redirect these
-    links through `/marketplace/en/cards/:id`, because failed intermediate
-    resolution can bounce to `/`. The card detail resolver canonicalizes to the
-    public-number marketplace URL once the card payload is loaded.
 - `api/marketplace-card-seo.js`
   - Owns server-rendered Open Graph/Twitter metadata for crawler requests to
     canonical marketplace card URLs and legacy root card URLs.
-  - For canonical marketplace URLs, the first path segment after `cards` is a
-    public number and must be divided by 2 before Oracle lookup. Example:
-    `/marketplace/en/cards/248768/card-drifloon-lv-17-non-holo-promo-6-17-pop-series-6`
-    must resolve blueprint/card id `124384`, not `248768`.
+  - For canonical marketplace URLs, the first path segment after `cards` is
+    **our id** (`card_id`). Look up `marketplace_cards` by that number. `ct_id`
+    is `n / 2` and is only for CDN/blueprint joins. Example:
+    `/marketplace/en/cards/220962/card-espurr-58-122-breakpoint` is Espurr
+    `card_id=220962`, `ct_id=110481`.
   - Must emit absolute `og:image`, `og:url`, `twitter:image`, and
     `summary_large_image` tags from Oracle/R2 card image fields; Flutter client
     route updates are too late for Discord, Slack, Telegram, and Twitter unfurls.
@@ -170,12 +161,14 @@ especially `/marketplace`, `/card/:id`, seller listings, cart, and checkout.
     previous/next and version search. Do not parse heavy blueprint JSON in the
     client for navigation.
 - `public.marketplace_card_urls`
-  - Materialized canonical card URL rows keyed by `card_id`/blueprint id.
-  - Canonical paths use the public number plus a readable human slug:
-    `/marketplace/{lang}/cards/{publicNumber}/{rarity}-{name}-{number}-{set}`.
-  - The 2026-05-22 Oracle refresh regenerated `70,021` rows with `0`
-    duplicate canonical paths. Use `public.refresh_marketplace_card_urls()` for
-    targeted URL-table refreshes when a full projection refresh times out.
+  - Materialized canonical card URL rows keyed by **our id**
+    (`marketplace_cards.card_id` = CardTrader `ct_id` × 2). `ct_id` is the
+    scrape/CDN key. See `docs/marketplace-public-ids.md` and schema
+    `018_pokoin_card_id_ct_id.sql` (applied on pokoin-marketplace).
+  - Canonical paths:
+    `/marketplace/{lang}/cards/{ourId}/{rarity}-{name}-{number}-{set}`.
+  - Espurr `ct_id` `110481` → our id `220962`. Re-run
+    `refresh_marketplace_card_urls()` after catalog ingest.
 - `public.marketplace_blueprint_artists`
   - Separate artist/illustrator metadata table keyed by blueprint/card id.
   - Marketplace APIs may expose `artist` and `illustrator` as display-only
@@ -222,7 +215,7 @@ especially `/marketplace`, `/card/:id`, seller listings, cart, and checkout.
 - `public.marketplace_artist_debug_skips`
   - Operator-only queue skip log for the artist curation page. It is not artist
     metadata and should not be shown on public card pages.
-- `public.cardtrader_pokemon_expansions`
+- `public.pokoin_pokemon_expansions`
   - Stores expansion metadata and the R2-backed `symbol_image_url`.
   - Autocomplete/search preview rows should hydrate `expansion_symbol_url` from
     this Oracle table when a symbol exists. Supabase must not be treated as the
@@ -295,25 +288,22 @@ especially `/marketplace`, `/card/:id`, seller listings, cart, and checkout.
   panel during the route transition.
 - Generated card detail human slugs must use the normalized rarity plus readable
   card metadata after the raw numeric blueprint id path segment.
-- Share links and newly generated internal links must use root `/:id/:slug`
-  card URLs, not `/card/:id`, bare root short links, legacy numeric marketplace
-  slugs, or old no-id human-only paths. For Leafeon `316600`, use
-  `/316600/rare-leafeon-005-131-prismatic-evolutions`; for Fan Rotom `316698`,
-  use `/316698/common-fan-rotom-085-131-prismatic-evolutions`.
+- Share links and newly generated internal links must use public-number
+  marketplace URLs (or the root shortlink of that public number), not `/card/:id`,
+  not the raw leftover `ct_id` / Milo `id`. For Espurr leftover `110481`, use
+  `/220962` or `/marketplace/en/cards/220962/card-espurr-58-122-breakpoint`.
+  For Leafeon fixture `316600`, use public `633200`.
 - Human-slug resolution must work for search-preview product/deck rows as well
   as singles. Do not force `productType=card` during slug lookup. Since Oracle
   can classify some product-contained cards as `Fixed` while the preview URL may
   use the generic `card` prefix, exact slug matching may ignore only the leading
   classifier/rarity token after the server candidate set has been narrowed.
-- Legacy numeric marketplace URLs remain supported for compatibility:
-  `/marketplace/en/cards/316600-leafeon-005-131-prismatic-evolutions` and
-  `/marketplace/en/cards/316600` should load the card by id and canonicalize to
-  the current root `/:id/:slug` URL after resolution.
-- Root numeric short links are a narrow compatibility path. Only digit-only root
-  paths are intercepted (`/129834` -> direct `CardDetailScreen(cardId: '129834')`);
-  root paths containing letters, hyphens, or mixed id/name text such as
-  `/wallet`, `/forum`, `/leafeon`, or `/129834-leafeon` must continue through
-  normal app routing and must not be treated as card short links.
+- Legacy numeric marketplace URLs remain supported for compatibility. Even
+  `/marketplace/en/cards/{n}` without a slug is a **public** number when `n` is
+  even (`n/2` = internal). Odd `n` is a legacy raw CardTrader id.
+- Root numeric short links are digit-only (`/220962` → `/marketplace/220962`).
+  Paths containing letters or hyphens (`/wallet`, `/forum`, `/leafeon`) must
+  not be treated as card short links.
 - Homepage/search/card-detail/cart/versions top bars should stay consistent and
   fixed-height. Use the shared `MarketplaceTopBar` action layout and shared
   `marketplaceTopBarHeight` / `marketplaceTopBarColor` constants; do not put

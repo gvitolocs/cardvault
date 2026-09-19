@@ -82,6 +82,30 @@
       "destination": "https://cdn.pokoin.com/:path*"
     },
     {
+      "source": "/cardscan/identify",
+      "destination": "https://cardscan.pokoin.com/identify"
+    },
+    {
+      "source": "/cardscan/health",
+      "destination": "https://cardscan.pokoin.com/health"
+    },
+    {
+      "source": "/cardscan",
+      "destination": "/cardscan.html"
+    },
+    {
+      "source": "/cardscan/",
+      "destination": "/cardscan.html"
+    },
+    {
+      "source": "/scancard",
+      "destination": "/cardscan.html"
+    },
+    {
+      "source": "/scancard/",
+      "destination": "/cardscan.html"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

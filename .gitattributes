@@ -1,3 +1,9 @@
 
 # Codevira — deterministic id-collision merge for the decision log
 .codevira/decisions.jsonl merge=codevira-jsonl
+
+# systemd oneshot scripts fail with `set: pipefail: invalid option` under CRLF
+*.sh text eol=lf
+
+# Codevira — deterministic merges for generated memory
+AGENTS.md merge=codevira-agents

@@ -345,7 +345,7 @@ async function loadMarketplaceExpansions(pool, limit, options = {}) {
         e.code,
         coalesce(nullif(m.set_id, ''), '') as tcgdex_set_id,
 ${limitlessColumns}
-      from public.cardtrader_pokemon_expansions e
+      from public.pokoin_pokemon_expansions e
       left join public.marketplace_blueprint_tcg_metadata m
         on public.marketplace_search_normalize(m.set_name) = e.normalized_name
        and m.source = 'tcgdex'

@@ -20,6 +20,7 @@ test('marketplace expansions exposes full logo URL beside symbol URL', async () 
             symbol_image_url: 'https://cdn.pokoin.test/expansions/symbols/prismatic-evolutions.png',
             logo_image_url: 'https://cdn.pokoin.test/expansions/logos/prismatic-evolutions.png',
             card_count: 131,
+            nationality: 'western',
           },
         ],
       };
@@ -27,6 +28,7 @@ test('marketplace expansions exposes full logo URL beside symbol URL', async () 
   });
 
   assert.match(queries[0].sql, /logo_image_url/);
+  assert.match(queries[0].sql, /expansions\.nationality/);
   assert.deepEqual(rows[0], {
     name: 'Prismatic Evolutions',
     slug: 'prismatic-evolutions',
@@ -34,7 +36,22 @@ test('marketplace expansions exposes full logo URL beside symbol URL', async () 
     logoImageUrl: 'https://cdn.pokoin.test/expansions/logos/prismatic-evolutions.png',
     defaultSymbolUrl: 'https://cdn.pokoin.com/expansions/symbols/prismatic-evolutions.png',
     cardCount: 131,
+    nationality: 'western',
   });
+});
+
+test('marketplace expansions slug filter treats & as and', async () => {
+  const queries = [];
+  await rowsForExpansions({
+    slug: 'starter-set-ex-marnie-s-morpeko-and-grimmsnarl-ex',
+    limit: 1,
+    query: async (sql, values) => {
+      queries.push({ sql, values });
+      return { rows: [] };
+    },
+  });
+  assert.match(queries[0].sql, /replace\(versions\.expansion_name, '&', ' and '\)/);
+  assert.equal(queries[0].values[0], 'starter-set-ex-marnie-s-morpeko-and-grimmsnarl-ex');
 });
 
 test('marketplace expansion snapshot carries logo URL on card rows', async () => {
@@ -42,7 +59,7 @@ test('marketplace expansion snapshot carries logo URL on card rows', async () =>
     slug: 'prismatic-evolutions',
     limit: 10,
     query: async (sql) => {
-      if (/count\(\*\)::integer as card_count/.test(sql)) {
+      if (/catalog_card_count/.test(sql) || /as card_count/.test(sql)) {
         return {
           rows: [
             {

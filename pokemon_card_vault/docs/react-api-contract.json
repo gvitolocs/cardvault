@@ -1,0 +1,224 @@
+{
+  "version": "2026-09-05.6",
+  "title": "Pokoin marketplace client contract for React / Flutter / JS",
+  "hosts": {
+    "api": "https://api.pokoin.com",
+    "publicSite": "https://pokoin.com",
+    "cdn": "https://cdn.pokoin.com",
+    "rewriteNote": "https://pokoin.com/api/* rewrites to https://api.pokoin.com/api/*. Do not add Vercel serverless functions.",
+    "localDev": "npm run api:server  (server/oracle-api-server.js)"
+  },
+  "identity": {
+    "publicIdField": [
+      "id",
+      "card_id"
+    ],
+    "formula": "public_card_id = cardtrader_blueprint_id * 2",
+    "examples": {
+      "espurr": {
+        "card_id": "220962",
+        "ct_id": 110481
+      },
+      "magcargo": {
+        "card_id": "587148",
+        "ct_id": 293574
+      },
+      "dachsbun": {
+        "card_id": "598052",
+        "ct_id": 299026
+      },
+      "mewExSirPaldeanFates": {
+        "card_id": "548832",
+        "ct_id": 274416
+      },
+      "megaLucarioEx": {
+        "card_id": "703382",
+        "ct_id": 351691
+      }
+    },
+    "rules": [
+      "Path segments and cardId query params are always the public id.",
+      "Never divide a public id by 2 when calling the API.",
+      "Never multiply an id that already came from the API (that 4xs).",
+      "doubledCardId is only for raw leftover ct_id from Milo/CLIP (hit.id, hit.ct_id, blueprint_id).",
+      "Milo gallery identity is leftover ct_id (manifest identity=ct_id). Public card_id = ct_id * 2. TCGplayer product ids are not Milo ids.",
+      "ct_id may appear on JSON for joins/debug; never put it in the address bar."
+    ],
+    "canonicalPath": "/marketplace/{lang}/cards/{card_id}/{slug}",
+    "lookup": "GET /api/marketplace-card-url?cardId={publicId}",
+    "sql": "018_pokoin_card_id_ct_id.sql",
+    "decision": "Codevira D00000B"
+  },
+  "images": {
+    "r2KeyPrefix": "ct_id",
+    "doNotBuildFilenamesFromPublicId": true,
+    "fields": {
+      "imageUrl": "Full art (typically 330x460 baseline JPEG). Prefer this for grids and heroes.",
+      "previewImageUrl": "180px tile. Do not stretch as a hero. API may still return /previews/*.jpg.",
+      "homepageImageUrl": "Only use when it contains _homepage.webp. Often wrongly equals preview for new cards.",
+      "gridImageUrl": "React grid: always the full raster, never /previews/.",
+      "heroImageUrl": "React detail/hero: always the full raster.",
+      "tileImageUrl": "React compact tile: _homepage.webp when present, else full raster. Never preview JPEG."
+    },
+    "cdnWorker": "pokoin-cdn-card-images",
+    "r2Bucket": "cardvault-images",
+    "observability": "GET/POST /api/marketplace-image-log",
+    "decodeNote": "Flutter CanvasKit fails progressive JPEG and tiny VP8 preview webp. React <img> can decode those, but still must not use 180px previews as full-size art."
+  },
+  "availability": {
+    "serverOwnsFlag": true,
+    "fields": {
+      "isMarketAvailable": "boolean — show price vs Out of stock",
+      "inStock": "boolean — same value, HTML-friendly alias",
+      "stock": "int — native + eligible CardTrader quantity",
+      "hasCardTraderListing": "bool",
+      "cardtraderEligibleListingCount": "int",
+      "price": "number PKN ask when available"
+    },
+    "formula": "stock > 0 || hasCardTraderListing || cardtraderEligibleListingCount > 0",
+    "cheapestCacheJoin": "blueprint_id = ct_id OR pokoin_card_id = card_id::text. Never blueprint_id = public card_id.",
+    "emptyCacheIsData": "SV commons can be genuine OOS if cheapest_homepage_cache_blueprint has no row."
+  },
+  "search": {
+    "engine": "meili",
+    "host": "127.0.0.1:7700 on pokoin-marketplace only",
+    "indexes": [
+      "marketplace_cards",
+      "marketplace_name_tokens"
+    ],
+    "queryParam": "query",
+    "queryAlias": "q",
+    "notes": [
+      "GET /api/marketplace-suggest is Meili-only typeahead for pokoin-web (grouped printings, no SQL).",
+      "Meili English documents include name, expansion aliases, and card_number.",
+      "Search page hydrates identity and image only; listings stay on the card page.",
+      "POST /api/marketplace-autocomplete remains for Flutter until that client switches to suggest.",
+      "Do not put Meili on peer1."
+    ],
+    "params": {
+      "query": "Name / number string",
+      "limit": "Page size (search path caps ~100)",
+      "offset": "Meili offset",
+      "search_language": "Non-en stays legacy SQL",
+      "productType": "Facet",
+      "productSearchOnly": "1 = sealed products only"
+    },
+    "autocomplete": "POST /api/marketplace-autocomplete { search_term, result_limit } (Flutter)",
+    "suggest": "GET /api/marketplace-suggest?q= (pokoin-web popup)",
+    "fullSearch": "GET /api/marketplace-cards?query=",
+    "searchPage": "GET /api/marketplace-search-page?query="
+  },
+  "auth": {
+    "provider": "Firebase Auth",
+    "header": "Authorization: Bearer <Firebase ID token>",
+    "login": "POST /api/auth-login",
+    "logout": "Client-side Firebase signOut. No server logout.",
+    "extensionBridge": "GET /extension/auth-bridge"
+  },
+  "pageApis": {
+    "home": {
+      "path": "GET /api/marketplace-home-page",
+      "legacy": "GET /api/marketplace-home is the Flutter snapshot (CardTrader hydrate, often 30s+). React must not call it.",
+      "query": "recentCardIds optional comma-separated public ids; limit optional max 48",
+      "returns": "cards[], sections.{recentlySeenIds,bestSellerIds,featuredIds,newArrivalIds,spotlightIds}"
+    },
+    "suggest": {
+      "path": "GET /api/marketplace-suggest",
+      "query": "q, limit (default 20, max 24), search_language, print_language (all|western|japanese|chinese)",
+      "returns": "groups[] of { name, printings[{ id, set, number, rarity, image, href }] }"
+    },
+    "search": {
+      "path": "GET /api/marketplace-search-page",
+      "query": "query|q, limit, offset, productType, productSearchOnly, lang, includeFacets",
+      "returns": "cards[], facets.products[], count, hasMore, limit, offset. Identity hydrate only; no listing-cache join."
+    },
+    "card": {
+      "path": "GET /api/marketplace-card-page",
+      "query": "cardId required. lang, slug, includeSales, includeOffers, includeSameAs (default 0), liveOffers (default 0 = native listings only)",
+      "returns": "card, version (CLIP pokoin_version_sets key, also card.version), versionCount, versions[] (same-artwork printings), neighbors.{prev,next} (3 each, collector order, wraps), sameAs[], offers[], cheapest, sales[], artist, canonicalPath, seo"
+    },
+    "expansion": {
+      "path": "GET /api/marketplace-expansion-page",
+      "query": "expansionName or slug. productType default card. limit (default 200, max 400), offset. Omit both name and slug to list expansions.",
+      "returns": "expansion { name, slug, cardCount }, cards[], total, count, hasMore, limit, offset. cardCount/total is stored catalog_card_count (grid singles with art), not the page size and not TCGDex printedTotal.",
+      "cardCount": "Read public.marketplace_set_card_counts.catalog_card_count / pokoin_pokemon_expansions.catalog_card_count. Refresh: refresh_marketplace_set_catalog_counts(). Do not COUNT(*) on the request."
+    }
+  },
+  "silver": {
+    "cardtrader": "SPA opens leftover https://www.cardtrader.com/en/cards/{ct_id} with window.open noopener,noreferrer (no Pokoin referrer, not a Google cloak). Lookup fallback GET /api/cardtrader-redirect?id={publicId}&format=json. Sanji 818358 → 409179. Never send public ids to cardtrader.com.",
+    "cardmarket": "GET /api/cardmarket-redirect?id={publicId}&format=json. Pokemon: stored/product URL, else Singles search {name token} {collector} (dawn 129), not set name. OP: /en/OnePiece/Products/Search {name} {number}. RB: /en/Riftbound/Products/Search. Datacenter IPs often get Cloudflare 403 on cardmarket.com — the user browser opens the URL.",
+    "vinted": "SPA builds https://www.vinted.it/catalog?search_text=. Pokemon: {name} {collector hash} (Gumshoos 184 from 184/182), not name alone and not English set name (Vinted ANDs tokens). OP: One Piece Card Game {name} {number}. RB: Riftbound TCG {name} {number}."
+  },
+  "canonicalCardJson": {
+    "id": "548832",
+    "card_id": "548832",
+    "ct_id": 274416,
+    "name": "Mew ex",
+    "set": "Paldean Fates",
+    "number": "232/091",
+    "rarity": "Special Illustration Rare",
+    "itemKind": "single",
+    "productType": "card",
+    "canonicalPath": "/marketplace/en/cards/548832/card-mew-ex-special-illustration-rare-232-091-paldean-fates",
+    "imageUrl": "/card-images/{card_id}_….jpg",
+    "previewImageUrl": "/card-images/{card_id}_….jpg",
+    "gridImageUrl": "/card-images/{card_id}_….jpg",
+    "heroImageUrl": "/card-images/{card_id}_….jpg",
+    "isMarketAvailable": false,
+    "inStock": false,
+    "acceptBothCamelAndSnake": true
+  },
+  "forbiddenInReact": [
+    "Halve path ids or double catalog ids",
+    "Concatenate card.id + '_' + slug for CDN keys",
+    "Prefer /previews/*.webp or /previews/*.jpg because they are smaller",
+    "Use homepageImageUrl when it is a /previews/ URL",
+    "Recompute isMarketAvailable from partial fields",
+    "ILIKE search in the browser",
+    "Join listings on public id instead of ct_id",
+    "Guess slugs instead of canonicalPath",
+    "Hardcode leftover CardTrader ids (Mew 274416 is Shining Kabutops)",
+    "Trust client-calculated PKN for payments",
+    "Add Vercel serverless marketplace handlers",
+    "Send public card_id to cardtrader.com (use leftover ct_id via cardtrader-redirect)"
+  ],
+  "navigation": {
+    "contract": "GET /api/__contract",
+    "routes": "GET /api/__routes",
+    "routesGrouped": "GET /api/__routes?group=1",
+    "routesByFamily": "GET /api/__routes?family=page-bff",
+    "families": [
+      "page-bff",
+      "search",
+      "card",
+      "catalog",
+      "commerce",
+      "cardtrader",
+      "cardmarket",
+      "auth",
+      "payments",
+      "assistant",
+      "social",
+      "debug",
+      "other"
+    ],
+    "doNotMoveApiFiles": true,
+    "docs": [
+      "docs/react-api-architecture.md",
+      "docs/react-page-apis.md",
+      "docs/oracle-api-migration.md",
+      "docs/api-route-catalog.json"
+    ]
+  },
+  "bffGaps": [],
+  "stranglerOrder": [
+    "home",
+    "search",
+    "card-detail",
+    "expansion"
+  ],
+  "flutterNativeStays": true,
+  "doNotRewriteWholeFlutterRepo": true,
+  "routeCount": 83,
+  "flutterPathCount": 69
+}

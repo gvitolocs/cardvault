@@ -23,13 +23,13 @@ test('cheapest price lookup accepts card ids and canonical marketplace paths', (
       canonicalPath:
         '/marketplace/en/cards/548832/special-illustration-rare-mew-ex-232-091-paldean-fates',
     }),
-    ['274416', '274417', '316600', '497712'],
+    ['274416', '274417', '316600', '497712', '548832'],
   );
   assert.equal(
     cardIdFromCanonicalPath(
       'https://pokoin.com/marketplace/en/cards/548832/special-illustration-rare-mew-ex-232-091-paldean-fates?utm=extension',
     ),
-    '274416',
+    '548832',
   );
 });
 
@@ -146,6 +146,11 @@ test('readCheapestPrices uses homepage cache relation and structured lookup fiel
     assert.match(sql, /public\.marketplace_blueprint_price_summary/);
     assert.match(sql, /public\.cheapest_homepage_cache_blueprint/);
     assert.match(sql, /public\.marketplace_search_compact\(c\.name\)/);
+    assert.match(sql, /min\(ct_id\) as ct_id/);
+    assert.match(sql, /price_summary\.blueprint_id = candidate_ids\.ct_id/);
+    assert.match(sql, /cardtrader_cache\.blueprint_id = candidate_ids\.ct_id/);
+    assert.doesNotMatch(sql, /price_summary\.blueprint_id = candidate_ids\.card_id/);
+    assert.doesNotMatch(sql, /cardtrader_cache\.blueprint_id = candidate_ids\.card_id/);
     assert.deepEqual(values.slice(0, 5), [
       [],
       'Mew ex',

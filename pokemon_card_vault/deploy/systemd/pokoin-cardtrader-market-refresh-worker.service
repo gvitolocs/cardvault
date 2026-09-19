@@ -17,9 +17,8 @@ ExecStart=/usr/bin/docker run --rm --name pokoin-cardtrader-market-refresh-worke
   -e CARDTRADER_MARKET_LOG_FILE=/logs/worker.log \
   -e CARDTRADER_MARKET_MAX_BLUEPRINTS=100000 \
   -e CARDTRADER_MARKET_MAX_PRODUCTS=1000000 \
-  -e CARDTRADER_MARKET_REFRESH_BATCH_BLUEPRINTS=700 \
-  -e CARDTRADER_MARKET_BLUEPRINT_CONCURRENCY=1 \
-  -e CARDTRADER_MARKET_REQUEST_DELAY_MS=300 \
+  -e CARDTRADER_MARKET_MAX_EXPANSIONS=10000 \
+  -e CARDTRADER_MARKET_REQUEST_DELAY_MS=200 \
   -e CARDTRADER_MARKET_RUN_ONCE=1 \
   -v /home/ubuntu/pokoin-oracle-api/current:/app \
   -v /home/ubuntu/pokoin-oracle-api/.env:/app/.env:ro \

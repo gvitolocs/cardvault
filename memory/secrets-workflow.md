@@ -7,7 +7,7 @@ Never paste secret values into Codevira, Honcho, or git.
 
 | Project / role | What | Where (local Mac) | Production |
 |----------------|------|-------------------|------------|
-| **Pokoin app** | Stripe, DB, Oracle API, app tokens | `pokemon_card_vault/.env.local` | peer3 / server env |
+| **Pokoin app** | Stripe, DB, Oracle API, app tokens | `pokemon_card_vault/.env.local` (`MARKETPLACE_DATABASE_URL` host `130.61.251.250`) | `pokoin-oracle-api` env on **pi-home** (api.pokoin.com); marketplace VM is Postgres only (updated 2026-09-18) |
 | **Cursor + Honcho (Pokoin)** | `local-dev-key`, workspace `pokoin-cursor`, tunnel → peer1 | `cardvault/.env.honcho.local` | peer1 `:8000` (Docker) |
 | **Hermes / Flareon operator** | Telegram, Gmail OAuth, SSH, OpenAI/Codex, monitors | `~/Hermes/private/flareon/` | `/opt/hermes-flareon/secrets/` |
 | **Flareon ↔ Pokoin summary** | No secrets — bullets only | `memory/flareon-handoff.md` | `/opt/hermes-flareon/data/pokoin-handoff.md` |

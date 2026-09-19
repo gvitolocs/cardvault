@@ -135,15 +135,15 @@ reconstructing commands from chat history.
    than falling back to Vercel serverless APIs.
 
 1a. Production Oracle API facts:
-   - `api.pokoin.com` is the first-class production API origin.
-   - Peer3 SSH uses `ubuntu@141.147.62.244` and key files in
-     `~/pokoinpos/keys/peer3`; never print private key contents.
-   - If the local `peer3` SSH alias is unavailable, use explicit deploy env:
-     `ORACLE_API_SSH_TARGET=ubuntu@141.147.62.244` and `ORACLE_API_SSH_KEY`
-     pointing to the private key in `/Users/giuseppe/pokoinpos/keys` or the
-     repo-documented Oracle keys folder. Do not assume bare `peer3` resolves.
-   - The API runs on peer3 as Docker container `pokoin-oracle-api` on
-     `127.0.0.1:18080`, behind Caddy container `pokoin-api-caddy` on 80/443.
+   - `api.pokoin.com` is the first-class production API origin on
+     **pokoin-marketplace** (`130.61.251.250`). SSH host `pokoin-marketplace`.
+   - Handlers are `/api/...`. Bare `https://api.pokoin.com/` is the operator
+     landing page; `https://api.pokoin.com/marketplace-suggest` (no `/api`) 404s.
+   - Do **not** deploy with `npm run peer3:deploy` / `deploy-oracle-api-peer3.sh`
+     — those default to dead `141.147.62.244`.
+   - Ship files into `/home/ubuntu/pokoin-oracle-api/current/` then
+     `docker restart pokoin-oracle-api`. Caddy terminates TLS on 80/443 and
+     proxies to `127.0.0.1:18080`.
    - Use Vercel serverless fallback only when explicitly requested as an
      emergency rollback.
 
@@ -379,7 +379,7 @@ reconstructing commands from chat history.
    node scripts/import-tcgdex-expansion-logos.js --apply --limit=all
    ```
    This writes `expansions/symbols/<expansion-name>.png` to R2 and upserts
-   `public.cardtrader_pokemon_expansions`. The logo importer reads
+   `public.pokoin_pokemon_expansions`. The logo importer reads
    `marketplace_blueprint_tcg_metadata.set_logo_url`, writes
    `expansions/logos/<expansion-name>.<source-extension>`, and updates the
    expansion row's `logo_*` fields.

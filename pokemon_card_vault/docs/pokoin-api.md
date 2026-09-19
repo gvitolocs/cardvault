@@ -1,15 +1,32 @@
 # Pokoin API Documentation
 
+> **React / JS contract (canonical):** [`react-api-architecture.md`](./react-api-architecture.md)
+> Machine-readable: [`react-api-contract.json`](./react-api-contract.json) and live `GET /api/__contract`.
+> Production API host is **`https://api.pokoin.com`**. `https://pokoin.com/api/*` is a rewrite to that host.
+> Do not add Vercel serverless functions. Flutter stays Android/iOS; public web moves to React.
+
+
 Base URL:
 
 ```text
-https://pokoin.com
+https://api.pokoin.com
 ```
 
-Local development:
+Handlers are under `/api/...`. Opening `https://api.pokoin.com/` is the operator
+index. `https://api.pokoin.com/marketplace-suggest` (no `/api`) 404s with
+`API route not found`. Smoke: `GET /healthz` (Postgres + Valkey + Meili + CDN; 503 if any is down) and
+`GET /api/marketplace-suggest?q=pika`.
+
+Browser rewrite (same handlers):
 
 ```text
-http://localhost:3000
+https://pokoin.com/api/*
+```
+
+Local development (`npm run api:server`):
+
+```text
+http://127.0.0.1:18080
 ```
 
 ## Authentication
@@ -178,8 +195,10 @@ Response includes:
 }
 ```
 
-`artist` and `illustrator` are optional display-only attribution metadata from
-`marketplace_blueprint_artists`; they are not search/ranking signals.
+`artist` and `illustrator` are optional display-only attribution metadata.
+Authority is leftover-keyed `marketplace_blueprint_artists`. Card-page and
+search read the denormalized `marketplace_search_candidates.artist` column
+(public `card_id`). They are not search/ranking signals.
 
 Auth: none.
 
@@ -202,12 +221,11 @@ productSearchOnly: true/false
 ```
 
 Rows may include optional `artist` and `illustrator` display metadata when the
-blueprint has been enriched. These fields are not populated from search input
-and should not be used as rarity, variation, query, or ranking signals.
-Artist metadata comes from `marketplace_blueprint_artists`; non-primary
-fallback sources may only validate or fill artists whose `normalized_artist`
-already exists there, and unknown fallback artists must be reported rather than
-inserted.
+blueprint has been enriched. Search/card-page fill them from
+`marketplace_search_candidates.artist` (public `card_id` cache). Authority
+remains leftover-keyed `marketplace_blueprint_artists`. These fields are not
+populated from search input and should not be used as rarity, variation, query,
+or ranking signals.
 
 TCGdex structured card metadata is currently stored as DB-only enrichment in
 `marketplace_blueprint_tcg_metadata`; it is not exposed by this endpoint.
@@ -281,13 +299,17 @@ language: two-letter language code
 Rows may include optional `artist` and `illustrator` display metadata from the
 separate artist table.
 
-Canonical card detail/share URLs use
-`/marketplace/{lang}/cards/{blueprintId * 2}/{humanSlug}`. Example: Leafeon
-`316600` resolves to
-`/marketplace/en/cards/633200/rare-leafeon-005-131-prismatic-evolutions`.
-Legacy `/marketplace/{lang}/cards/{blueprintId}-{slug}`,
-`/marketplace/{lang}/cards/{blueprintId}`, and digit-only root short links still
-resolve and canonicalize after the card payload loads.
+Canonical card detail/share URLs use **our id** (`marketplace_cards.card_id`
+= CardTrader `ct_id` × 2). Full rules: `docs/marketplace-public-ids.md`.
+Example: Espurr `ct_id` `110481` is our id `220962` →
+`/marketplace/en/cards/220962/card-espurr-58-122-breakpoint`.
+
+`GET /api/marketplace-card-url?cardId=` takes **our id** (also matches leftover
+`ct_id`). Path numbers in `/{n}` and `/marketplace/en/cards/{n}/…` are our id.
+Shortlink responds `302` to `canonical_path`.
+
+Odd leftover CardTrader ids in the path still resolve via `ct_id`. Even path
+numbers are our id (Espurr `220962`, not `110481`). CDN filenames stay `{ct_id}_*`.
 
 Social preview crawlers are rewritten to `/api/marketplace-card-seo` for both
 canonical marketplace paths and legacy root paths such as
@@ -1036,17 +1058,17 @@ Response:
     }
   ],
   "meta": {
-    "source": "supabase_postgres",
+    "source": "meili",
     "model": "marketplace_card_name_tokens",
     "duration_ms": 12
   }
 }
 ```
 
-This endpoint reads only Supabase `marketplace_card_name_tokens`; it does not
+This endpoint reads Meili / Pi Postgres name tokens; it does not
 return full rows, `search_context`, context labels, prices, listings, analytics,
 or Oracle-hydrated card data. The default payload is intended to stay under 2KB.
-If the Supabase token table is unavailable, callers should treat an error or an
+If the name-token table is unavailable, callers should treat an error or an
 empty `predictions` list as "no token prediction" and continue with full search.
 
 Normalization follows the backend compact token model: apostrophes and curly
@@ -1065,12 +1087,12 @@ chunk event history, the boost is neutral (`0`) rather than borrowing English
 analytics; English is only used when the request language itself is cleaned to
 the default `en`.
 
-When `SUPABASE_NAME_INDEX_DATABASE_URL` or server-side `SUPABASE_DB_URL` is
-configured on the backend, autocomplete may use Supabase as a derived
-short-prefix card-name index for fast candidate IDs/labels. Supabase does not
+Live Pi API has **no** Supabase name index. Autocomplete is Meili plus Pi
+Postgres. Historical `SUPABASE_NAME_INDEX_*` env names in `searchbar-token-predict.js`
+are unused. A third-party index does not
 serve full card details, listings, prices, analytics, or user data; Oracle
 remains the source of truth and hydrates the returned marketplace rows. If the
-Supabase name index is absent or unhealthy, the endpoint falls back to the
+name-token index is absent or unhealthy, the endpoint falls back to the
 existing Oracle replica paths and briefly circuits the optional tier to avoid
 probing a missing table on every keypress.
 
@@ -1098,10 +1120,10 @@ Request:
 }
 ```
 
-`/api/searchbar-cards` uses the same optional Supabase name-index candidate tier
-as autocomplete. Supabase is only a derived ID/label fallback for broad name
+`/api/searchbar-cards` uses the same Meili / Pi candidate tier
+as autocomplete. There is no third-party ID/label fallback for broad name
 prefixes; Oracle remains authoritative for hydration and ranking, and Oracle
-replica paths are used when the Supabase tier is absent, empty, slow, or
+replica paths are used when a name-index tier is absent, empty, slow, or
 unhealthy.
 
 Response includes `rows`, `search_context`, and `meta`. `meta` may expose

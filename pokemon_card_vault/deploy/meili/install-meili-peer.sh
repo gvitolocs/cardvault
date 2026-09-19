@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-MEILI_VERSION="${MEILI_VERSION:-v1.10.3}"
+MEILI_VERSION="${MEILI_VERSION:-v1.53.1}"
 MEILI_USER="${MEILI_USER:-meili}"
 MEILI_GROUP="${MEILI_GROUP:-meili}"
 MEILI_INSTALL_DIR="${MEILI_INSTALL_DIR:-/opt/meilisearch}"
@@ -38,6 +38,11 @@ sudo chmod 600 "${MEILI_CONFIG_DIR}/meili.env"
 
 echo "[5/7] Installing systemd service"
 sudo cp deploy/meili/meilisearch.service "/etc/systemd/system/${SERVICE_NAME}.service"
+if [[ -f deploy/systemd/pokoin-meili-resident.service ]]; then
+  sudo apt-get install -y vmtouch
+  sudo cp deploy/systemd/pokoin-meili-resident.service /etc/systemd/system/
+  sudo systemctl enable pokoin-meili-resident.service
+fi
 sudo systemctl daemon-reload
 sudo systemctl enable "${SERVICE_NAME}"
 

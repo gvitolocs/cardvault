@@ -9,6 +9,7 @@ const { mergeRecentIntoHome, recentIdsFromUrl } = require('./_marketplace_home_r
 const { parseGameFromRequest, runWithGame, valkeyKey, isPokemonGame } = require('./_marketplace_game');
 const sql = require('./_marketplace_react_sql');
 const valkey = require('./_valkey');
+const { publicErrorBody, publicErrorStatus } = require('./_public_error');
 
 const SNAPSHOT_TTL_SEC = 20;
 const SNAPSHOT_KEY = 'home:react';
@@ -20,6 +21,7 @@ function emptySections() {
     featuredIds: [],
     newArrivalIds: [],
     spotlightIds: [],
+    topSoldIds: [],
   };
 }
 
@@ -28,6 +30,21 @@ async function defaultLoadHomeSnapshot({ limit = 36 } = {}) {
   const cached = await valkey.getJson(cacheKey);
   if (cached?.cards?.length) {
     return cached;
+  }
+  if (isPokemonGame()) {
+    try {
+      const { readRails, assembleHomeVector, HOME_RAILS } = require('./_marketplace_rails');
+      const rows = await readRails(HOME_RAILS.map((row) => row[0]));
+      if (rows.length) {
+        const fromRails = assembleHomeVector(rows);
+        if ((fromRails.cards || []).length) {
+          await valkey.setJson(cacheKey, fromRails, SNAPSHOT_TTL_SEC);
+          return fromRails;
+        }
+      }
+    } catch (_) {
+      /* newest/hot SQL fallback */
+    }
   }
   const newestCap = Math.min(limit, 24);
   const hotCap = Math.min(12, limit);
@@ -119,15 +136,17 @@ function createHandler(deps = {}) {
         }
 
         return jsonOk(res, {
+          ...snapshot,
           cards: snapshot.cards || [],
           game,
+          source: snapshot.source || undefined,
           sections: { ...emptySections(), ...(snapshot.sections || {}) },
         }, 'public, max-age=15, s-maxage=30, stale-while-revalidate=60');
       } catch (error) {
         console.error('marketplace-home-page failed', error);
-        return res.status(error.statusCode || 500).json({
-          error: error.message || 'Marketplace home page failed.',
-        });
+        return res.status(publicErrorStatus(error)).json(
+          publicErrorBody(error, 'Marketplace home page failed.'),
+        );
       }
     });
   };

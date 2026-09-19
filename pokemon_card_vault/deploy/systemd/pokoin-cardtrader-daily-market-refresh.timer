@@ -2,7 +2,7 @@
 Description=Run Pokoin CardTrader daily market refresh after overnight imports
 
 [Timer]
-OnCalendar=*-*-* 03:20:00
+OnCalendar=*-*-* 03:20:00 UTC
 Persistent=true
 Unit=pokoin-cardtrader-daily-market-refresh.service
 

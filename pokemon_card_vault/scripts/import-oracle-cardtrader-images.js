@@ -2,7 +2,29 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { GetObjectCommand, PutObjectCommand, S3Client } = require('@aws-sdk/client-s3');
 const { Pool } = require('pg');
-const sharp = require('sharp');
+const { prepareCatalogImage } = require('./lib/sanitize-card-image');
+const { backupExistingObject } = require('./lib/backup-r2-original');
+
+let sharpModule = null;
+function loadSharp() {
+  if (sharpModule === false) {
+    return null;
+  }
+  if (sharpModule) {
+    return sharpModule;
+  }
+  try {
+    sharpModule = require('sharp');
+    return sharpModule;
+  } catch {
+    sharpModule = false;
+    return null;
+  }
+}
+
+async function sanitizeForCatalog(body, ext) {
+  return prepareCatalogImage(body, ext, { sharp: loadSharp() });
+}
 
 const POKOINPOS_ROOT = process.env.POKOINPOS_ROOT || '/Users/giuseppe/pokoinpos';
 const DEFAULT_ORACLE_ENV_FILE = path.join(POKOINPOS_ROOT, 'deploy/env/peer4-postgres.env');
@@ -60,6 +82,14 @@ function normalizeCardTraderUrl(rawValue, { allowPreview }) {
   return `https://cardtrader.com/${rawUrl}`;
 }
 
+function deriveFullFromPreviewUrl(rawValue) {
+  const rawUrl = typeof rawValue === 'string' ? rawValue.trim() : '';
+  if (!rawUrl) {
+    return null;
+  }
+  return rawUrl.replace('/preview_', '/').replace('/show_', '/');
+}
+
 function fullImageUrls(row) {
   const image = row.blueprint?.image;
   const candidates = [
@@ -74,8 +104,13 @@ function fullImageUrls(row) {
   const fullCandidates = candidates
     .map((candidate) => normalizeCardTraderUrl(candidate, { allowPreview: false }))
     .filter(Boolean);
-  if (fullCandidates.length > 0) {
-    return [...new Set(fullCandidates)];
+  const derivedCandidates = candidates
+    .map((candidate) => deriveFullFromPreviewUrl(candidate))
+    .map((candidate) => normalizeCardTraderUrl(candidate, { allowPreview: false }))
+    .filter(Boolean);
+  const combined = [...new Set([...fullCandidates, ...derivedCandidates])];
+  if (combined.length > 0) {
+    return combined;
   }
   return [];
 }
@@ -177,6 +212,10 @@ async function download(sourceUrl, minBytes) {
 
 async function imageMetadata(body) {
   try {
+    const sharp = loadSharp();
+    if (!sharp) {
+      return { width: 0, height: 0, format: '' };
+    }
     const metadata = await sharp(body).metadata();
     return {
       width: Number(metadata.width || 0),
@@ -237,7 +276,9 @@ async function firstDownload(candidates, minBytes) {
   throw new Error(errors.join(' | ') || 'no candidates');
 }
 
-async function uploadObject(client, { bucket, key, body, ext }) {
+async function uploadObject(client, { bucket, key, body, ext, existingKey }) {
+  const backupKey = existingKey || key;
+  await backupExistingObject(client, { bucket, key: backupKey });
   await client.send(
     new PutObjectCommand({
       Bucket: bucket,
@@ -247,6 +288,15 @@ async function uploadObject(client, { bucket, key, body, ext }) {
       CacheControl: 'public, max-age=31536000, immutable',
     }),
   );
+}
+
+function writeLocalCopy(localDir, key, body) {
+  if (!localDir) {
+    return;
+  }
+  const dest = path.join(localDir, key);
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  fs.writeFileSync(dest, body);
 }
 
 async function fetchRows(pool, {
@@ -259,6 +309,8 @@ async function fetchRows(pool, {
   auditQuality,
   productType,
   sourceMismatchOnly,
+  expansionIds,
+  categoryId,
 }) {
   const values = [];
   const where = [];
@@ -269,6 +321,14 @@ async function fetchRows(pool, {
     values.push(ids);
     where.push(`id = any($${values.length}::bigint[])`);
   } else {
+    if (expansionIds.length > 0) {
+      values.push(expansionIds);
+      where.push(`expansion_id = any($${values.length}::int[])`);
+    }
+    if (categoryId > 0) {
+      values.push(categoryId);
+      where.push(`category_id = $${values.length}`);
+    }
     if (mode !== 'preview' && !forceFull && !auditQuality) {
       where.push(`(coalesce(cdn_image_url, '') = '' or image_url like 'https://cardtrader.com/%')`);
     }
@@ -356,7 +416,7 @@ async function updateOracleRows(pool, row, updates) {
         preview_image_url = coalesce($3, preview_image_url),
         homepage_image_url = coalesce($4, homepage_image_url),
         projected_at = now()
-      where card_id = $5
+      where ct_id = $5 or card_id = ($5::bigint * 2)
     `,
     [
       updates.image_url || null,
@@ -375,7 +435,7 @@ async function updateOracleRows(pool, row, updates) {
         preview_image_url = coalesce($3, preview_image_url),
         homepage_image_url = coalesce($4, homepage_image_url),
         projected_at = now()
-      where card_id = $5
+      where ct_id = $5 or card_id = ($5::bigint * 2)
     `,
     [
       updates.image_url || null,
@@ -394,7 +454,7 @@ async function updateOracleRows(pool, row, updates) {
         preview_image_url = coalesce($3, preview_image_url),
         homepage_image_url = coalesce($4, homepage_image_url),
         projected_at = now()
-      where card_id = $5
+      where ct_id = $5 or card_id = ($5::bigint * 2)
     `,
     [
       updates.image_url || null,
@@ -406,7 +466,7 @@ async function updateOracleRows(pool, row, updates) {
   );
 }
 
-async function importRow({ client, pool, bucket, cdnBase, row, mode }) {
+async function importRow({ client, pool, bucket, cdnBase, row, mode, localDir }) {
   const updates = {};
   const imported = [];
   const skipped = [];
@@ -424,12 +484,21 @@ async function importRow({ client, pool, bucket, cdnBase, row, mode }) {
       skipped.push('full:no-full-image');
     } else {
       const source = await firstDownload(fullUrls, 1024);
-      const ext =
+      const sourceExt =
         imageFormatFromBytes(source.body) ||
         extensionFromContentType(source.contentType) ||
         extensionFromUrl(source.sourceUrl);
+      const prepared = await sanitizeForCatalog(source.body, sourceExt);
+      const ext = prepared.ext;
       const key = objectKeyForRow(row, source.sourceUrl, ext);
-      await uploadObject(client, { bucket, key, body: source.body, ext });
+      await uploadObject(client, {
+        bucket,
+        key,
+        body: prepared.body,
+        ext,
+        existingKey: row.cdn_object_key,
+      });
+      writeLocalCopy(localDir, key, prepared.body);
       const url = `${cdnBase}/${key}`;
       updates.image_url = url;
       updates.cdn_image_url = url;
@@ -446,12 +515,21 @@ async function importRow({ client, pool, bucket, cdnBase, row, mode }) {
       String(row.preview_image_url).includes('cardtrader.com'))
   ) {
     const source = await firstDownload(previewImageUrls(row), 256);
-    const ext =
+    const sourceExt =
       imageFormatFromBytes(source.body) ||
       extensionFromContentType(source.contentType) ||
       extensionFromUrl(source.sourceUrl);
+    const prepared = await sanitizeForCatalog(source.body, sourceExt);
+    const ext = prepared.ext;
     const key = previewObjectKeyForRow(row, ext);
-    await uploadObject(client, { bucket, key, body: source.body, ext });
+    await uploadObject(client, {
+      bucket,
+      key,
+      body: prepared.body,
+      ext,
+      existingKey: row.preview_object_key,
+    });
+    writeLocalCopy(localDir, key, prepared.body);
     updates.preview_image_url = `${cdnBase}/${key}`;
     updates.preview_object_key = key;
     imported.push(`preview:${key}`);
@@ -527,6 +605,12 @@ async function main() {
     .split(',')
     .map((value) => value.trim())
     .filter((value) => /^\d+$/.test(value));
+  const expansionIds = String(env.ORACLE_IMAGE_EXPANSION_IDS || '')
+    .split(',')
+    .map((value) => Number(value.trim()))
+    .filter((value) => Number.isSafeInteger(value) && value > 0);
+  const categoryId = Number(env.ORACLE_IMAGE_CATEGORY_ID || 0);
+  const localDir = String(env.ORACLE_IMAGE_LOCAL_DIR || '').trim();
   let offset = Number(env.ORACLE_IMAGE_OFFSET || 0);
   let cursorId = Number(env.ORACLE_IMAGE_CURSOR_ID || 0);
   const useCursor = ids.length === 0 && cursorId >= 0;
@@ -562,6 +646,8 @@ async function main() {
         auditQuality,
         productType,
         sourceMismatchOnly,
+        expansionIds,
+        categoryId,
       });
       if (rows.length === 0) break;
 
@@ -582,7 +668,7 @@ async function main() {
               `repairing ${row.id}: ${decision.reason}; current=${decision.currentMetadata?.width || 0}x${decision.currentMetadata?.height || 0}; source=${decision.sourceMetadata?.width || 0}x${decision.sourceMetadata?.height || 0}`,
             );
           }
-          const result = await importRow({ client, pool, bucket, cdnBase, row, mode });
+          const result = await importRow({ client, pool, bucket, cdnBase, row, mode, localDir });
           if (result.imported.length > 0) {
             imported += 1;
             console.log(`imported ${row.id}: ${result.imported.join(', ')}`);

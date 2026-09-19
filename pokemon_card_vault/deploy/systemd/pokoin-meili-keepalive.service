@@ -1,0 +1,11 @@
+[Unit]
+Description=Pokoin Meilisearch keepalive (health + re-touch; lock is resident.service)
+After=meilisearch.service
+Requires=meilisearch.service
+
+[Service]
+Type=oneshot
+Nice=5
+TimeoutStartSec=20
+EnvironmentFile=-/etc/pokemon-card-vault/meili.env
+ExecStart=/usr/local/bin/pokoin-meili-keepalive.sh

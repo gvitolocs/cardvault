@@ -11,6 +11,8 @@ const {
   useMeiliSearchForLanguage,
 } = require('./_marketplace_search_engine');
 const { meiliMarketplaceCandidates } = require('./_meili_marketplace');
+const { canonicalPathForRow } = require('./_marketplace_canonical_path');
+const sql = require('./_marketplace_react_sql');
 
 const SEARCH_RPC_V2 = 'search_marketplace_blueprint_candidates_v2';
 const SEARCH_NAME_RPC = 'search_marketplace_blueprint_name_candidates';
@@ -304,6 +306,7 @@ function rowSummary(row) {
 const searchCandidateSelect = `
   select
     c.card_id,
+    c.ct_id,
     c.name,
     c.set_name,
     c.card_number,
@@ -316,8 +319,11 @@ const searchCandidateSelect = `
     c.image_url,
     c.cdn_image_url,
     c.preview_image_url,
+    c.homepage_image_url,
     c.card_palette,
     c.emoji,
+    c.artist,
+    c.illustrator,
     c.imported_at
 `;
 
@@ -462,7 +468,7 @@ async function searchNonNameExpansionWithDatabase(searchTerm, resultLimit, resul
             end
           )::real as token_score
         from normalized n
-        join public.cardtrader_pokemon_expansions e
+        join public.pokoin_pokemon_expansions e
           on e.normalized_name = n.q
           or e.compact_name = n.compact_q
           or (length(n.q) >= 2 and e.normalized_name like n.q || '%')
@@ -642,13 +648,78 @@ async function searchNonNameTrainerVariantWithDatabase(searchTerm, resultLimit, 
   return result.rows;
 }
 
-async function searchRowsByCardIdsWithDatabase(cardIds, query = marketplaceQuery) {
+function collectorNumberKey(value) {
+  const match = String(value || '').match(/(\d+)\s*\/\s*(\d+)/);
+  return match ? `${Number(match[1])}/${Number(match[2])}` : '';
+}
+
+function rankRowsByQueryCollectorNumber(rows, searchTerm) {
+  const wanted = collectorNumberKey(searchTerm);
+  if (!wanted || !Array.isArray(rows) || rows.length < 2) {
+    return rows;
+  }
+  return [...rows].sort((left, right) => {
+    const leftMatch = collectorNumberKey(left?.card_number) === wanted ? 0 : 1;
+    const rightMatch = collectorNumberKey(right?.card_number) === wanted ? 0 : 1;
+    return leftMatch - rightMatch;
+  });
+}
+
+async function searchRowsByCardIdsIdentity(cardIds, query = marketplaceQuery) {
   if (!cardIds.length) return [];
   const result = await query(
     `
       ${searchCandidateSelect},
         c.search_weight::real as search_rank
       from public.marketplace_search_candidates c
+      where c.card_id = any($1::bigint[])
+    `,
+    [cardIds],
+  );
+  return result.rows.map((row) => ({
+    ...row,
+    canonical_path: row.canonical_path || canonicalPathForRow(row),
+    canonicalPath: row.canonicalPath || canonicalPathForRow(row),
+  }));
+}
+
+async function searchRowsByCardIdsWithDatabase(cardIds, query = marketplaceQuery) {
+  if (!cardIds.length) return [];
+  const result = await query(
+    `
+      ${searchCandidateSelect},
+        c.search_weight::real as search_rank,
+        coalesce(cardtrader.eligible_quantity, cardtrader.eligible_listing_count, 0) as listed_quantity,
+        cardtrader.cheapest_price_pkn as lowest_price_pkn,
+        case
+          when cardtrader.provider = 'cardtrader'
+            then coalesce(cardtrader.eligible_listing_count, 0)
+          else 0
+        end as cardtrader_eligible_listing_count,
+        (cardtrader.provider = 'cardtrader' and coalesce(cardtrader.eligible_listing_count, 0) > 0) as has_cardtrader_listing,
+        case
+          when cardtrader.provider = 'cardtrader'
+            then coalesce(cardtrader.eligible_quantity, 0)
+          else 0
+        end as cardtrader_listed_quantity
+      from public.marketplace_search_candidates c
+      left join lateral (
+        select cardtrader_cache.*
+        from public.cheapest_homepage_cache_blueprint cardtrader_cache
+        where cardtrader_cache.provider in ('cardtrader', 'pokoin_native')
+          and cardtrader_cache.eligible_listing_count > 0
+          and cardtrader_cache.cheapest_price_pkn is not null
+          and (
+            cardtrader_cache.blueprint_id = c.ct_id
+            or cardtrader_cache.pokoin_card_id = c.card_id::text
+          )
+        order by
+          case when cardtrader_cache.blueprint_id = c.ct_id then 0 else 1 end,
+          cardtrader_cache.cheapest_price_pkn asc,
+          case when cardtrader_cache.provider = 'pokoin_native' then 0 else 1 end,
+          cardtrader_cache.eligible_listing_count desc
+        limit 1
+      ) cardtrader on true
       where c.card_id = any($1::bigint[])
       order by c.search_weight desc, c.name asc, c.card_number asc
     `,
@@ -1071,7 +1142,60 @@ async function rowsForSplitSearchTerm(
   }
 }
 
+/** Attach compact theme packs (`vt`) to search/typeahead rows so result →
+ * desk navigation can paint themed before the card-page payload lands.
+ * Failure-safe: hints must never break search. */
+async function attachThemePacks(rows, overlay = sql) {
+  if (!Array.isArray(rows) || !rows.length) {
+    return rows;
+  }
+  try {
+    const ids = [...new Set(rows.map((row) => String(row.card_id || row.id || '')).filter((id) => /^\d+$/.test(id)))];
+    const packs = await overlay.readCardThemePacks(ids);
+    if (!packs.size) {
+      return rows;
+    }
+    return rows.map((row) => {
+      const id = String(row.card_id || row.id || '');
+      const vt = packs.get(id);
+      return vt ? { ...row, vt } : row;
+    });
+  } catch (_) {
+    return rows;
+  }
+}
+
 async function rowsForSearchTerm(
+  searchTerm,
+  resultLimit,
+  resultOffset = 0,
+  searchLanguage = 'en',
+  debug = null,
+  previousContext = null,
+  options = {},
+) {
+  const loaded = await rowsForSearchTermBase(
+    searchTerm,
+    resultLimit,
+    resultOffset,
+    searchLanguage,
+    debug,
+    previousContext,
+    options,
+  );
+  if (options.withTotal === true) {
+    // withTotal contract: { rows, total } where total answers the SAME
+    // predicate as rows (Meili estimatedTotalHits for the candidates query,
+    // null when only the legacy SQL engine ran).
+    if (loaded && !Array.isArray(loaded)) {
+      return { rows: attachThemePacks(loaded.rows || []), total: Number(loaded.total) || 0 };
+    }
+    return { rows: attachThemePacks(Array.isArray(loaded) ? loaded : []), total: null };
+  }
+  return attachThemePacks(loaded);
+}
+
+async function rowsForSearchTermBase(
   searchTerm,
   resultLimit,
   resultOffset = 0,
@@ -1086,13 +1210,14 @@ async function rowsForSearchTerm(
       debug.searchPath = 'meili_en_candidates';
     }
     try {
-      const rows = await rowsForMeiliSearchTerm(
+      const loaded = await rowsForMeiliSearchTerm(
         searchTerm,
         resultLimit,
         resultOffset,
         searchLanguage,
         debug,
         previousContext,
+        options,
       );
       if (marketplaceSearchShadowEnabled()) {
         rowsForSplitSearchTerm(
@@ -1106,7 +1231,9 @@ async function rowsForSearchTerm(
           console.error('legacy shadow search failed', error?.message || error);
         });
       }
-      return rows;
+      return options.withTotal === true
+        ? { rows: loaded.rows, total: Number(loaded.total) || 0 }
+        : loaded.rows;
     } catch (error) {
       if (debug) {
         debug.searchPath = meiliOnly ? 'meili_en_unavailable' : 'meili_en_fallback_legacy';
@@ -1138,7 +1265,7 @@ async function rowsForSearchTerm(
         reason: 'language_gate_or_flag',
       };
     }
-    return [];
+    return options.withTotal === true ? { rows: [], total: 0 } : [];
   }
   if (debug) {
     debug.searchEngine = {
@@ -1165,31 +1292,44 @@ async function rowsForMeiliSearchTerm(
   searchLanguage = 'en',
   debug = null,
   previousContext = null,
+  options = {},
 ) {
   const pageSize = Math.min(Math.max(Math.trunc(Number(resultLimit) || 100), 1), 100);
   const pageOffset = Math.min(Math.max(Math.trunc(Number(resultOffset) || 0), 0), 10000);
-  const meiliCandidates = await meiliMarketplaceCandidates(
+  // Rows and total come from ONE candidates query (q + filters + match=all).
+  // The suggest hot pool is deliberately not reused here: it is a different
+  // universe (name/number search-on, relaxed strategy), so serving it as
+  // search rows would detach the result count from the result predicate.
+  const candidateLoad = await meiliMarketplaceCandidates(
     searchTerm,
     searchLanguage,
     pageSize,
     pageOffset,
+    { printLanguage: options.printLanguage || 'all' },
   );
+  const meiliCandidates = candidateLoad.hits;
   const ids = meiliCandidates.map((candidate) => String(candidate.card_id)).filter(Boolean);
-  const hydratedRows = await searchRowsByCardIdsWithDatabase(ids);
+  const lightHydrate = options.lightHydrate === true;
+  const hydratedRows = lightHydrate
+    ? await searchRowsByCardIdsIdentity(ids)
+    : await searchRowsByCardIdsWithDatabase(ids);
   const byId = new Map(hydratedRows.map((row) => [String(row.card_id), row]));
-  const merged = ids.map((id, index) => {
-    const row = byId.get(id);
-    if (!row) return null;
-    const meili = meiliCandidates[index];
-    return {
-      ...row,
-      search_rank: Number(meili?.meili_rank || 0),
-    };
-  }).filter(Boolean);
+  const merged = rankRowsByQueryCollectorNumber(
+    ids.map((id, index) => {
+      const row = byId.get(id);
+      if (!row) return null;
+      const meili = meiliCandidates[index];
+      return {
+        ...row,
+        search_rank: Number(meili?.meili_rank || 0),
+      };
+    }).filter(Boolean),
+    searchTerm,
+  ).slice(0, pageSize);
   if (debug) {
     debug.searchPath = 'meili_en_candidates';
     debug.tokenPlan = {
-      strategy: 'meili_en_candidates',
+      strategy: debug.searchPath,
       poolLimit: pageSize,
       candidateCount: meiliCandidates.length,
       hydratedCount: hydratedRows.length,
@@ -1197,6 +1337,7 @@ async function rowsForMeiliSearchTerm(
     };
     debug.searchEngine = {
       mode: 'meili',
+      strategy: 'all',
       poolLimit: pageSize,
       offset: pageOffset,
       candidateCount: meiliCandidates.length,
@@ -1207,7 +1348,7 @@ async function rowsForMeiliSearchTerm(
       debug.searchEngine.contextIgnored = true;
     }
   }
-  return merged;
+  return { rows: merged, total: Number(candidateLoad.estimatedTotalHits) || 0 };
 }
 
 module.exports = async function handler(req, res) {
@@ -1265,6 +1406,7 @@ module.exports = async function handler(req, res) {
 };
 
 module.exports.rowsForSearchTerm = rowsForSearchTerm;
+module.exports.attachThemePacks = attachThemePacks;
 module.exports.mergeSearchRows = mergeSearchRows;
 module.exports.rowsForSplitSearchTerm = rowsForSplitSearchTerm;
 module.exports.searchNameWithDatabase = searchNameWithDatabase;
@@ -1278,9 +1420,12 @@ module.exports.searchNonNameExpansionWithDatabase = searchNonNameExpansionWithDa
 module.exports.searchNonNameRarityWithDatabase = searchNonNameRarityWithDatabase;
 module.exports.searchNonNameTrainerVariantWithDatabase = searchNonNameTrainerVariantWithDatabase;
 module.exports.searchNonNameCategoryWithContext = searchNonNameCategoryWithContext;
+module.exports.collectorNumberKey = collectorNumberKey;
+module.exports.rankRowsByQueryCollectorNumber = rankRowsByQueryCollectorNumber;
 module.exports.buildNonNameContext = buildNonNameContext;
 module.exports.searchWithDatabase = searchWithDatabase;
 module.exports.rowsForMeiliSearchTerm = rowsForMeiliSearchTerm;
+module.exports.searchRowsByCardIdsIdentity = searchRowsByCardIdsIdentity;
 module.exports.cleanSearchTerm = cleanSearchTerm;
 module.exports.cleanLimit = cleanLimit;
 module.exports.cleanLanguage = cleanLanguage;

@@ -26,6 +26,30 @@ function getFirebaseAdmin() {
   return admin;
 }
 
+// Email/password identities are only "active" once the address is verified and
+// the signup is finalized (see verify-email-signup.js). Google and wallet
+// identities keep their existing eligibility semantics: sign_in_provider
+// 'google.com' and 'custom' (wallet custom tokens) are always allowed here, and
+// an unknown/missing provider is allowed so no other auth path can be locked
+// out by this guard.
+function passwordAccountRequiresVerification(decoded) {
+  const provider = decoded?.firebase?.sign_in_provider;
+  if (provider !== 'password') {
+    return false;
+  }
+  return decoded?.email_verified !== true && decoded?.pok_email_verified !== true;
+}
+
+function assertActivePasswordAccount(decoded, { requireVerified }) {
+  if (!requireVerified || !passwordAccountRequiresVerification(decoded)) {
+    return;
+  }
+  throw Object.assign(
+    new Error('Verify your email address to continue.'),
+    { statusCode: 403, code: 'auth/pokoin-email-not-verified' },
+  );
+}
+
 async function verifyBearerToken(req) {
   const token = bearerTokenFromRequest(req);
   if (!token) {
@@ -33,7 +57,12 @@ async function verifyBearerToken(req) {
     error.statusCode = 401;
     throw error;
   }
-  return getFirebaseAdmin().auth().verifyIdToken(token);
+  const decoded = await getFirebaseAdmin().auth().verifyIdToken(token);
+  // Off until the legacy-password-user backfill ran (scripts/backfill-password-email-verification.js).
+  assertActivePasswordAccount(decoded, {
+    requireVerified: process.env.POKOIN_REQUIRE_VERIFIED_PASSWORD === '1',
+  });
+  return decoded;
 }
 
 function requestHeader(req, name) {
@@ -68,9 +97,11 @@ function authErrorResponse(error, fallback = 'Pokoin authentication failed.') {
 }
 
 module.exports = {
+  assertActivePasswordAccount,
   authErrorResponse,
   bearerTokenFromRequest,
   getFirebaseAdmin,
+  passwordAccountRequiresVerification,
   requestHeader,
   verifyBearerToken,
 };

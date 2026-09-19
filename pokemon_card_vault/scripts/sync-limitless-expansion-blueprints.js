@@ -155,7 +155,7 @@ async function readMappings(pool, limit) {
         order by c.search_weight desc, c.imported_at desc nulls last, c.card_id asc
         limit 1
       ) versions on true
-      left join public.cardtrader_pokemon_expansions expansions
+      left join public.pokoin_pokemon_expansions expansions
         on expansions.name = versions.expansion_name
       order by versions.expansion_name asc, limitless_cards.set_code asc, limitless_cards.collector_number asc
       limit $1

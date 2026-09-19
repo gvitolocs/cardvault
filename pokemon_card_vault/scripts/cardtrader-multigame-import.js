@@ -111,10 +111,11 @@ function parseArgs(argv) {
     expansionIds: [],
     limit: Infinity,
     batchSize: 500,
-    concurrency: 6,
-    imageConcurrency: 4,
+    concurrency: 12,
+    imageConcurrency: 8,
     imageChunkSize: DEFAULT_IMAGE_CHUNK_SIZE,
     images: false,
+    backfillImages: false,
     refresh: false,
     syncSearch: false,
     discoverOnly: false,
@@ -131,8 +132,12 @@ function parseArgs(argv) {
       options.streamAll = true;
     } else if (arg === '--images') {
       options.images = true;
+    } else if (arg === '--backfill-images') {
+      options.backfillImages = true;
+      options.images = true;
     } else if (arg === '--no-images') {
       options.images = false;
+      options.backfillImages = false;
     } else if (arg === '--refresh') {
       options.refresh = true;
     } else if (arg === '--sync-search' || arg === '--sync-supabase') {
@@ -200,8 +205,8 @@ function parseArgs(argv) {
   if (!Number.isSafeInteger(options.imageChunkSize) || options.imageChunkSize < 1 || options.imageChunkSize > 500) {
     throw new Error('--image-chunk-size must be between 1 and 500.');
   }
-  if (!options.discoverOnly && !options.streamAll && options.expansionIds.length === 0) {
-    throw new Error('Use --stream-all, --expansion-ids, or --discover-only for a bounded multi-game import.');
+  if (!options.discoverOnly && !options.streamAll && !options.backfillImages && options.expansionIds.length === 0) {
+    throw new Error('Use --stream-all, --expansion-ids, --backfill-images, or --discover-only for a bounded multi-game import.');
   }
   return options;
 }
@@ -270,12 +275,20 @@ function qualifiedTable(target) {
 function createTargetPool(target, options) {
   const connectionString = process.env[target.databaseUrlEnv];
   if (!connectionString) return null;
+  // MARKETPLACE_DATABASE_SSL=0 (nezopt tunnel) or sslmode=disable in the URL:
+  // pass ssl:false — an ssl object, even {rejectUnauthorized:false}, forces SSL.
+  const sslOff =
+    process.env.MARKETPLACE_DATABASE_SSL === '0' ||
+    /sslmode=disable/i.test(connectionString) ||
+    process.env[`${target.databaseUrlEnv}_SSL`] === '0';
   return new Pool({
     connectionString,
-    max: Math.min(Math.max(2, options.concurrency), 20),
+    max: Math.min(Math.max(4, options.concurrency, options.imageConcurrency), 20),
     idleTimeoutMillis: 10_000,
     connectionTimeoutMillis: 10_000,
-    ssl: { rejectUnauthorized: process.env[`${target.databaseUrlEnv}_SSL_VERIFY`] === '1' },
+    ssl: sslOff
+      ? false
+      : { rejectUnauthorized: process.env[`${target.databaseUrlEnv}_SSL_VERIFY`] === '1' },
   });
 }
 
@@ -542,13 +555,76 @@ function chunkArray(values, size) {
   return chunks;
 }
 
+function missingCdnWhereSql() {
+  return `
+    cdn_image_url is null
+      and (
+        coalesce(image_url, '') <> ''
+        or coalesce(blueprint->>'image_url', '') <> ''
+        or coalesce(blueprint->'image'->>'url', '') <> ''
+        or coalesce(blueprint->'image'->'show'->>'url', '') <> ''
+      )
+  `;
+}
+
+async function loadRowsMissingCdn(pool, target, { limit, excludeIds = [] } = {}) {
+  const params = [];
+  let excludeSql = '';
+  if (excludeIds.length > 0) {
+    params.push(excludeIds);
+    excludeSql = `and not (id = any($${params.length}::bigint[]))`;
+  }
+  let limitSql = '';
+  if (limit) {
+    params.push(limit);
+    limitSql = `limit $${params.length}`;
+  }
+  const result = await pool.query(
+    `
+      select
+        id,
+        name,
+        version,
+        game_id,
+        category_id,
+        expansion_id,
+        image_url,
+        blueprint,
+        expansion
+      from ${qualifiedTable(target)}
+      where ${missingCdnWhereSql()}
+      ${excludeSql}
+      order by id
+      ${limitSql}
+    `,
+    params,
+  );
+  return result.rows;
+}
+
+function mergeImageRows(existingRows, extraRows) {
+  const merged = [...existingRows];
+  const seen = new Set(existingRows.map((row) => String(row.id)));
+  for (const row of extraRows) {
+    const id = String(row.id);
+    if (seen.has(id)) continue;
+    seen.add(id);
+    merged.push(row);
+  }
+  return merged;
+}
+
 function planImageJobs(ids, target, options) {
   if (!options.images) return { skipped: 'images flag not set' };
-  if (ids.length === 0) return { skipped: 'no newly imported ids' };
+  if (ids.length === 0) {
+    return { skipped: options.backfillImages ? 'no rows missing cdn_image_url' : 'no newly imported ids' };
+  }
   const chunks = chunkArray(ids, options.imageChunkSize || DEFAULT_IMAGE_CHUNK_SIZE);
   return {
     derivatives: ['full', 'preview', 'homepage'],
-    limitedTo: 'newly imported blueprint ids',
+    limitedTo: options.backfillImages || options.apply
+      ? 'newly imported ids and rows missing cdn_image_url'
+      : 'newly imported blueprint ids',
     target: {
       schema: target.schema,
       table: target.table,
@@ -562,9 +638,21 @@ function normalizeCardTraderUrl(rawValue, { allowPreview }) {
   const rawUrl = typeof rawValue === 'string' ? rawValue.trim() : '';
   if (!rawUrl || rawUrl.includes('/fallbacks/card_uploader/')) return null;
   if (!allowPreview && rawUrl.includes('/preview_')) return null;
-  if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) return rawUrl;
-  if (rawUrl.startsWith('/')) return `https://cardtrader.com${rawUrl}`;
-  return `https://cardtrader.com/${rawUrl}`;
+  if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
+    try {
+      const parsed = new URL(rawUrl);
+      if (parsed.hostname === 'cardtrader.com' || parsed.hostname === 'www.cardtrader.com') {
+        parsed.hostname = 'www.cardtrader.com';
+        parsed.protocol = 'https:';
+        return parsed.toString();
+      }
+    } catch {
+      return rawUrl;
+    }
+    return rawUrl;
+  }
+  if (rawUrl.startsWith('/')) return `https://www.cardtrader.com${rawUrl}`;
+  return `https://www.cardtrader.com/${rawUrl}`;
 }
 
 function fullImageUrls(row) {
@@ -628,17 +716,39 @@ function contentTypeForExtension(ext) {
 }
 
 async function downloadImage(sourceUrl, minBytes) {
-  const response = await fetch(sourceUrl, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (compatible; Pokoin multigame image importer)',
-      Accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-    },
-    signal: AbortSignal.timeout(60_000),
-  });
-  if (!response.ok) throw new Error(`download failed ${response.status}: ${sourceUrl}`);
-  const body = Buffer.from(await response.arrayBuffer());
-  if (body.length < minBytes) throw new Error(`download too small (${body.length} bytes): ${sourceUrl}`);
-  return { body, contentType: response.headers.get('content-type') || '' };
+  let lastError;
+  for (let attempt = 1; attempt <= 4; attempt += 1) {
+    try {
+      const response = await fetch(sourceUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+          Referer: 'https://www.cardtrader.com/',
+          Accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+        },
+        redirect: 'follow',
+        signal: AbortSignal.timeout(60_000),
+      });
+      if (response.status === 403 || response.status === 429) {
+        lastError = new Error(`download failed ${response.status}: ${sourceUrl}`);
+        await new Promise((resolve) => setTimeout(resolve, 200 * attempt * attempt));
+        continue;
+      }
+      if (!response.ok) throw new Error(`download failed ${response.status}: ${sourceUrl}`);
+      const body = Buffer.from(await response.arrayBuffer());
+      if (body.length < minBytes) throw new Error(`download too small (${body.length} bytes): ${sourceUrl}`);
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('text/html')) {
+        throw new Error(`download was html not image: ${sourceUrl}`);
+      }
+      return { body, contentType };
+    } catch (error) {
+      lastError = error;
+      if (attempt < 4) {
+        await new Promise((resolve) => setTimeout(resolve, 200 * attempt * attempt));
+      }
+    }
+  }
+  throw lastError;
 }
 
 async function firstImageDownload(candidates, minBytes) {
@@ -731,8 +841,12 @@ async function runGenericImagePipeline(pool, rows, target, options) {
       secretAccessKey: env.R2_SECRET_ACCESS_KEY,
     },
   });
-  const summary = { attempted: 0, imported: 0, failed: 0, samples: [] };
+  const summary = { attempted: 0, imported: 0, failed: 0, skipped: 0, samples: [] };
   await runWorkers(rows, options.imageConcurrency, async (row) => {
+    if (row.cdn_image_url) {
+      summary.skipped += 1;
+      return;
+    }
     summary.attempted += 1;
     try {
       const source = await firstImageDownload(fullImageUrls(row), 1024);
@@ -786,6 +900,9 @@ async function runGenericImagePipeline(pool, rows, target, options) {
         homepageKey: keys.homepageKey,
       });
       summary.imported += 1;
+      if (summary.imported % 25 === 0 || summary.imported + summary.failed === rows.length) {
+        console.error(`image-progress game=${target.game} imported=${summary.imported} failed=${summary.failed} attempted=${summary.attempted} page=${rows.length}`);
+      }
       if (summary.samples.length < 10) summary.samples.push({ id: row.id, fullKey: keys.fullKey });
     } catch (error) {
       summary.failed += 1;
@@ -815,6 +932,48 @@ function syncSearchTarget(target, options) {
   });
   if (result.status !== 0) throw new Error(`${target.syncCommand} failed with exit code ${result.status}`);
   return { ran: true };
+}
+
+function imagePageSize(options) {
+  return Math.max(options.imageConcurrency * 4, options.imageChunkSize || DEFAULT_IMAGE_CHUNK_SIZE, 32);
+}
+
+async function runPagedMissingCdnImages(pool, target, options) {
+  const excludeIds = [];
+  const processedIds = [];
+  const rolled = {
+    attempted: 0,
+    imported: 0,
+    failed: 0,
+    skipped: 0,
+    samples: [],
+    pages: 0,
+  };
+  const pageSize = imagePageSize(options);
+  while (true) {
+    const page = await loadRowsMissingCdn(pool, target, { limit: pageSize, excludeIds });
+    if (page.length === 0) break;
+    rolled.pages += 1;
+    processedIds.push(...page.map((row) => row.id));
+    const result = await runGenericImagePipeline(pool, page, target, options);
+    const pageSummary = result.summary || {};
+    rolled.attempted += pageSummary.attempted || 0;
+    rolled.imported += pageSummary.imported || 0;
+    rolled.failed += pageSummary.failed || 0;
+    rolled.skipped += pageSummary.skipped || 0;
+    for (const sample of pageSummary.samples || []) {
+      if (rolled.samples.length >= 10) break;
+      rolled.samples.push(sample);
+    }
+    excludeIds.push(...page.map((row) => row.id));
+  }
+  return {
+    ...planImageJobs(processedIds, target, options),
+    pages: rolled.pages,
+    pageSize,
+    imageConcurrency: options.imageConcurrency,
+    summary: rolled,
+  };
 }
 
 function createSummary(options, target, discovery) {
@@ -877,12 +1036,27 @@ async function processExpansion({ pool, target, options, discovery, expansion, a
   };
 }
 
+function stubDiscovery(target) {
+  return {
+    game: {
+      id: target.cardtraderGameId,
+      name: target.displayName || target.game,
+    },
+    categories: [],
+    selectedCategory: null,
+    expansions: [],
+  };
+}
+
 async function run(options, dependencies = {}) {
   loadEnv();
   const config = dependencies.config || loadConfig(options);
   const target = dependencies.target || resolveConfiguredTarget(options, config);
   const api = dependencies.api || { get: cardtraderGet };
-  const discovery = await discoverCardTraderTarget(target, api);
+  const skipExpansionFetch = options.backfillImages && !options.streamAll && options.expansionIds.length === 0;
+  const discovery = skipExpansionFetch
+    ? stubDiscovery(target)
+    : await discoverCardTraderTarget(target, api);
   const selectedExpansions = selectExpansions(discovery, options);
   const summary = createSummary(options, target, discovery);
   summary.cardtrader.selectedExpansionCount = selectedExpansions.length;
@@ -924,54 +1098,68 @@ async function run(options, dependencies = {}) {
       summary.schemaPlan = createRawTableSql(target);
     }
 
-    let processedExpansionCount = 0;
-    let fetchedRows = 0;
-    const importConcurrency = options.limit === Infinity ? options.concurrency : 1;
-    await runWorkers(selectedExpansions, importConcurrency, async (expansion) => {
-      if (options.limit !== Infinity && fetchedRows >= options.limit) return;
-      const rowLimit = options.limit === Infinity ? Infinity : options.limit - fetchedRows;
-      try {
-        const result = await processExpansion({
-          pool,
-          target,
-          options,
-          discovery,
-          expansion,
-          api,
-          rowLimit,
-        });
-        const acceptedRows = options.limit === Infinity
-          ? result.rows
-          : result.rows.slice(0, Math.max(0, options.limit - fetchedRows));
-        fetchedRows += acceptedRows.length;
-        summary.counts.fetched += acceptedRows.length;
-        summary.counts.existingRaw += result.existingCount;
-        summary.counts.missingRaw += result.missingRows.length;
-        summary.counts.inserted += result.inserted;
-        imageRows.push(...(options.apply ? result.insertedRows : result.missingRows));
-        addSamples(summary, result.missingRows);
-        processedExpansionCount += 1;
-        if (result.missingRows.length > 0 || processedExpansionCount === selectedExpansions.length) {
+    if (!skipExpansionFetch) {
+      let processedExpansionCount = 0;
+      let fetchedRows = 0;
+      const importConcurrency = options.limit === Infinity ? options.concurrency : 1;
+      await runWorkers(selectedExpansions, importConcurrency, async (expansion) => {
+        if (options.limit !== Infinity && fetchedRows >= options.limit) return;
+        const rowLimit = options.limit === Infinity ? Infinity : options.limit - fetchedRows;
+        try {
+          const result = await processExpansion({
+            pool,
+            target,
+            options,
+            discovery,
+            expansion,
+            api,
+            rowLimit,
+          });
+          const acceptedRows = options.limit === Infinity
+            ? result.rows
+            : result.rows.slice(0, Math.max(0, options.limit - fetchedRows));
+          fetchedRows += acceptedRows.length;
+          summary.counts.fetched += acceptedRows.length;
+          summary.counts.existingRaw += result.existingCount;
+          summary.counts.missingRaw += result.missingRows.length;
+          summary.counts.inserted += result.inserted;
+          if (!options.apply) {
+            imageRows.push(...result.missingRows);
+          }
+          addSamples(summary, result.missingRows);
+          processedExpansionCount += 1;
+          if (result.missingRows.length > 0 || processedExpansionCount === selectedExpansions.length) {
+            summary.expansionProgress.push({
+              expansion_id: expansion.id,
+              expansion_name: expansion.name,
+              fetched: result.rows.length,
+              existingRaw: result.existingCount,
+              missingRaw: result.missingRows.length,
+              inserted: result.inserted,
+            });
+          }
+        } catch (error) {
+          summary.counts.failedExpansions += 1;
           summary.expansionProgress.push({
             expansion_id: expansion.id,
             expansion_name: expansion.name,
-            fetched: result.rows.length,
-            existingRaw: result.existingCount,
-            missingRaw: result.missingRows.length,
-            inserted: result.inserted,
+            error: error.message,
           });
         }
-      } catch (error) {
-        summary.counts.failedExpansions += 1;
-        summary.expansionProgress.push({
-          expansion_id: expansion.id,
-          expansion_name: expansion.name,
-          error: error.message,
-        });
-      }
-    });
+      });
+    }
 
-    summary.imageResult = await runGenericImagePipeline(pool, imageRows, target, options);
+    if (options.images && options.apply) {
+      const paged = await runPagedMissingCdnImages(pool, target, options);
+      summary.counts.missingCdn = paged.summary?.attempted || 0;
+      summary.imageResult = paged;
+    } else if (options.images && options.backfillImages) {
+      const missingCdn = await loadRowsMissingCdn(pool, target);
+      summary.counts.missingCdn = missingCdn.length;
+      summary.imageResult = await runGenericImagePipeline(pool, missingCdn, target, options);
+    } else {
+      summary.imageResult = await runGenericImagePipeline(pool, imageRows, target, options);
+    }
     summary.refreshResult = await refreshTarget(pool, target, options);
     summary.syncSearchResult = syncSearchTarget(target, options);
     return summary;
@@ -1006,6 +1194,8 @@ module.exports = {
   existingIdSet,
   insertMissingSql,
   insertValues,
+  loadRowsMissingCdn,
+  mergeImageRows,
   matchCardTraderGame,
   normalizeName,
   objectKeysForRow,

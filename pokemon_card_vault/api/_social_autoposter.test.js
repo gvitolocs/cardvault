@@ -7,7 +7,7 @@ test('buildPostContent creates Pokoin copy with card URL and X length cap', () =
   const content = social.buildPostContent({
     hook: 'Hot on Pokoin:',
     card: {
-      cardId: '316600',
+      cardId: '633200',
       name: 'Leafeon',
       setName: 'Prismatic Evolutions',
       cardNumber: '005/131',
@@ -205,7 +205,7 @@ test('postToX supports OAuth 1.0a token pair for media and post signing', async 
 test('contentWithOptionalAgent uses social agent copy and preserves canonical URL', async () => {
   const fallbackContent = social.buildPostContent({
     card: {
-      cardId: '316600',
+      cardId: '633200',
       name: 'Leafeon',
       setName: 'Prismatic Evolutions',
       cardNumber: '005/131',
@@ -310,7 +310,7 @@ test('selectHotCard maps marketplace hot card rows', async () => {
     },
   });
 
-  assert.equal(card.cardId, '316600');
+  assert.equal(card.cardId, '633200');
   assert.equal(card.pricePkn, 4500);
   assert.equal(card.cardUrl, 'https://pokoin.com/marketplace/en/cards/633200/rare-leafeon-005-131-prismatic-evolutions');
 });

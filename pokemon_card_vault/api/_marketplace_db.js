@@ -1,6 +1,13 @@
 const { Pool } = require('pg');
+const {
+  currentGame,
+  databaseUrlForGame,
+  isPokemonGame,
+  normalizeGame,
+} = require('./_marketplace_game');
 
 let pool;
+const gamePools = new Map();
 let nameSearchPool;
 let variationSearchPools = [];
 let variationSearchPoolIndex = 0;
@@ -10,6 +17,8 @@ let readReplicaPoolIndex = 0;
 let readReplicaPoolKey = '';
 let assistantReadOnlyPool;
 let supabaseNameIndexPool;
+let writerPool;
+let writerPoolKey = '';
 let dimensionSearchPools = new Map();
 let dimensionSearchPoolKey = '';
 
@@ -27,6 +36,10 @@ function uniqueStrings(values) {
 
 function marketplaceDatabaseUrl() {
   return process.env.MARKETPLACE_DATABASE_URL || process.env.MARKETPLACE_PEER4_DATABASE_URL || '';
+}
+
+function marketplaceWriterDatabaseUrl() {
+  return process.env.MARKETPLACE_WRITER_DATABASE_URL || marketplaceDatabaseUrl();
 }
 
 function marketplaceAssistantReadOnlyDatabaseUrl() {
@@ -162,6 +175,7 @@ function createPool(
   poolMaxEnv,
   label,
   sslVerifyEnv = 'MARKETPLACE_DATABASE_SSL_VERIFY',
+  sslEnv = 'MARKETPLACE_DATABASE_SSL',
 ) {
   if (!connectionString) {
     const error = new Error('MARKETPLACE_DATABASE_URL is not configured.');
@@ -176,11 +190,13 @@ function createPool(
         ).replace(/[?&]$/, '');
   const createdPool = new Pool({
     connectionString: sanitizedConnectionString,
-    max: Number(process.env[poolMaxEnv] || process.env.MARKETPLACE_DATABASE_POOL_MAX || 2),
+    max: Number(process.env[poolMaxEnv] || process.env.MARKETPLACE_DATABASE_POOL_MAX || 4),
     idleTimeoutMillis: Number(process.env.MARKETPLACE_DATABASE_IDLE_MS || 10_000),
     connectionTimeoutMillis: Number(process.env.MARKETPLACE_DATABASE_CONNECT_MS || 8_000),
     application_name: process.env.MARKETPLACE_DATABASE_APPLICATION_NAME || applicationName(label),
-    ssl: { rejectUnauthorized: process.env[sslVerifyEnv] === '1' },
+    ssl: process.env[sslEnv] === '0'
+      ? false
+      : { rejectUnauthorized: process.env[sslVerifyEnv] === '1' },
   });
   createdPool.on('connect', (client) => {
     client.query('set jit = off').catch((error) => {
@@ -242,12 +258,54 @@ function getMarketplaceAssistantReadOnlyPool() {
   return assistantReadOnlyPool;
 }
 
-function getMarketplacePool() {
-  const connectionString = marketplaceDatabaseUrl();
-  if (!pool) {
-    pool = createPool(connectionString, 'MARKETPLACE_DATABASE_POOL_MAX', 'marketplace');
+function getMarketplaceWriterPool() {
+  const connectionString = marketplaceWriterDatabaseUrl();
+  if (connectionString === marketplaceDatabaseUrl()) {
+    return getMarketplacePool();
   }
-  return pool;
+  const poolKey = `${connectionString}\n${process.env.MARKETPLACE_WRITER_DATABASE_SSL || ''}`;
+  if (writerPoolKey !== poolKey) {
+    if (writerPool) {
+      writerPool.end().catch(() => {});
+    }
+    writerPool = createPool(
+      connectionString,
+      'MARKETPLACE_WRITER_DATABASE_POOL_MAX',
+      'marketplace-writer',
+      'MARKETPLACE_WRITER_DATABASE_SSL_VERIFY',
+      'MARKETPLACE_WRITER_DATABASE_SSL',
+    );
+    writerPoolKey = poolKey;
+  }
+  return writerPool;
+}
+
+function getMarketplacePool(game = currentGame()) {
+  const normalized = normalizeGame(game);
+  if (normalized === 'pokemon') {
+    const connectionString = marketplaceDatabaseUrl();
+    if (!pool) {
+      pool = createPool(connectionString, 'MARKETPLACE_DATABASE_POOL_MAX', 'marketplace');
+    }
+    return pool;
+  }
+  if (!gamePools.has(normalized)) {
+    const connectionString = databaseUrlForGame(normalized);
+    if (!connectionString) {
+      const error = new Error(`${normalized} marketplace database URL is not configured.`);
+      error.statusCode = 500;
+      throw error;
+    }
+    gamePools.set(
+      normalized,
+      createPool(
+        connectionString,
+        'MARKETPLACE_DATABASE_POOL_MAX',
+        `marketplace-${normalized}`,
+      ),
+    );
+  }
+  return gamePools.get(normalized);
 }
 
 function getMarketplaceNameSearchPool() {
@@ -422,7 +480,11 @@ function getMarketplacePrefixSearchClients() {
 }
 
 async function marketplaceQuery(text, values = []) {
-  return getMarketplacePool().query(text, values);
+  return getMarketplacePool(currentGame()).query(text, values);
+}
+
+async function marketplaceWriteQuery(text, values = []) {
+  return getMarketplaceWriterPool().query(text, values);
 }
 
 async function marketplaceNameSearchQuery(text, values = []) {
@@ -473,12 +535,14 @@ async function marketplaceDimensionSearchQuery(dimension, text, values = []) {
 
 module.exports = {
   getMarketplacePool,
+  getMarketplaceWriterPool,
   getMarketplaceNameSearchPool,
   getSupabaseNameIndexPool,
   getMarketplaceVariationSearchPool,
   getMarketplaceAnalyticsSearchPool,
   getMarketplaceAssistantReadOnlyPool,
   marketplaceDatabaseUrl,
+  marketplaceWriterDatabaseUrl,
   marketplaceAssistantReadOnlyDatabaseUrl,
   marketplaceAssistantReadOnlyConfigured,
   marketplaceNameSearchDatabaseUrl,
@@ -493,6 +557,7 @@ module.exports = {
   marketplaceNameSearchQuery,
   supabaseNameIndexQuery,
   marketplaceQuery,
+  marketplaceWriteQuery,
   marketplaceVariationSearchQuery,
   marketplaceAnalyticsSearchQuery,
   marketplaceAssistantReadOnlyQuery,
@@ -500,4 +565,8 @@ module.exports = {
   marketplaceDimensionSearchQuery,
   getMarketplacePrefixSearchClients,
   getMarketplaceDimensionSearchPool,
+  currentGame,
+  isPokemonGame,
+  normalizeGame,
+  databaseUrlForGame,
 };

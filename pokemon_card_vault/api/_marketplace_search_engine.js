@@ -24,7 +24,13 @@ function useMeiliSearch() {
 
 function useMeiliSearchForLanguage(searchLanguage) {
   const language = String(searchLanguage || '').trim().toLowerCase();
-  return useMeiliSearch() && language === 'en';
+  if (!useMeiliSearch()) {
+    return false;
+  }
+  if (!language || language === 'en') {
+    return true;
+  }
+  return /^[a-z]{2}(?:-[a-z]{2})?$/.test(language);
 }
 
 module.exports = {

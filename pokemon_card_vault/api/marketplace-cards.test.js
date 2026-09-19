@@ -24,8 +24,9 @@ test('marketplace cards CardTrader availability SQL exposes tile availability', 
 
   assert.match(joinSql, /public\.cheapest_homepage_cache_blueprint/);
   assert.match(joinSql, /left join lateral/);
-  assert.match(joinSql, /cardtrader_cache\.blueprint_id = candidate\.card_id/);
+  assert.match(joinSql, /cardtrader_cache\.blueprint_id = candidate\.ct_id/);
   assert.match(joinSql, /cardtrader_cache\.pokoin_card_id = candidate\.card_id::text/);
+  assert.doesNotMatch(joinSql, /cardtrader_cache\.blueprint_id = candidate\.card_id/);
   assert.match(joinSql, /cardtrader_cache\.provider in \('cardtrader', 'pokoin_native'\)/);
   assert.match(joinSql, /cardtrader_cache\.eligible_listing_count > 0/);
   assert.match(joinSql, /cardtrader_cache\.cheapest_price_pkn is not null/);
@@ -46,7 +47,7 @@ test('marketplace cards can read old cheapest cache table during rollout', () =>
   );
 
   assert.match(joinSql, /public\.cardtrader_blueprint_listing_cache/);
-  assert.match(joinSql, /cardtrader_cache\.blueprint_id = candidate\.card_id/);
+  assert.match(joinSql, /cardtrader_cache\.blueprint_id = candidate\.ct_id/);
 });
 
 test('marketplace cards resolves canonical cheapest homepage cache relation', async () => {
@@ -128,3 +129,11 @@ test('marketplace cards search clause uses selected Italian language', async () 
 
   assert.equal(capturedValues[1], 'it');
 });
+
+test('singles productType=card still uses Meili, not SQL AND-of-tokens', () => {
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, 'marketplace-cards.js'), 'utf8');
+  assert.match(src, /nameQuery &&\s*\n\s*!productSearchOnly &&/);
+  assert.doesNotMatch(src, /!typedProduct &&\s*\n\s*!productSearchOnly/);
+  assert.match(src, /row\.product_type \|\| ''\) === typedProduct/);
+});
+

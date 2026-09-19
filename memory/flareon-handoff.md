@@ -1,36 +1,14 @@
-# Flareon handoff — Pokoin / Cursor (summary only)
+# Flareon handoff (Pokoin / CardVault)
 
-Keep this file **short** (bullets, no code dumps). Flareon on peer1 reads
-`/opt/hermes-flareon/data/pokoin-handoff.md` after you run `scripts/sync-flareon-handoff-peer1.sh`.
-
-Last updated: 2026-05-28
-
-## What I am working on
-
-- **Pokoin / cardvault** — marketplace, Oracle API on peer3, Flutter web on pokoin.com
-- **Cursor repo root**: `/Users/giuseppe/cardvault` (Codevira + Honcho `pokoin-cursor`)
-
-## Recent Cursor topics (no code)
-
-- Honcho Cloud + Codevira memory setup for Pokoin (workspace `pokoin-cursor`, separate from full coding blobs in Hermes personal chat)
-- OpenAI subscription proxy for Cursor via peer1 tunnel `https://hermes-flareon-codex.loca.lt/v1` (`codex-as-api`)
-- Local Mac `codex-cursor-proxy` removed; peer1 tunnel only
-- Telegram voice / Flareon transcription uses ChatGPT OAuth on peer1 (not raw API key)
-- Pokoin English searchbar/autocomplete is now production Meilisearch-backed:
-  `api.pokoin.com` and `pokoin.com/api/*` use Meili for English, non-English
-  stays legacy. peer3 keeps a Meili SSH tunnel + delta-sync timer alive.
-
-## Current focus
-
-- Monitor Pokoin production Meili search health and ranking quality
-- Do **not** assume payment/wallet/auth changes unless explicitly in progress
-
-## Blockers / limits
-
-- ChatGPT Plus/Codex usage limits (`429 usage_limit_reached`) can block proxy chat until reset
-
-## What Flareon should **not** expect here
-
-- Full file contents or thousand-line diffs
-- Hermes operator secrets or Poko customer data
-- Detailed Codevira decision log (use handoff bullets only)
+- Focus: public web is moving to **React/Next.js**. New page APIs are live on `api.pokoin.com` after deploy: card-page, search-page, expansion-page, home `recentCardIds`.
+- Current Cursor work: catalog JPEG sanitizer. Gold leftover deskew now skips dark matte and fits all four sides (Charizard 713832 was 0° while the face sat −1.70°). Local preview remaining −0.06°. Still needs Giuseppe check then `?v=ct3`. Do not full-catalog rewrite.
+- Local CDN mirror: `/home/nez/Projects/pokoin/PokoinTest/index/cdn_images` (exact leftover R2 keys). Catalog jobs must write the same key there; do not scan by downloading cdn.pokoin.com.
+- Mac Cursor stop-hook that shut the machine down was **removed** (2026-08-30 morning).
+- Flutter web on pokoin.com was redeployed with full-size detail art; homepage New cards start at Mega Lucario ex. Homepage API is still ~30s.
+- Flutter web on pokoin.com stays laggy (no Hero, stretched preview JPEGs). Do not patch CanvasKit further; React should use `heroImageUrl` / `gridImageUrl` (full JPEG, never `/previews/`).
+- Docs: `pokemon_card_vault/docs/react-page-apis.md` and `GET /api/__contract`.
+- Catalog: Mega Evolution / Phantasmal Flames / Inferno X / Mega Brave / Mega Symphonia / MEGA Dream ex **singles are on cdn.pokoin.com** (2026-08-30 digest, 776 faces). Older sets still have ~24k CardTrader image URLs.
+- Local image copy: nezopt `/home/nez/Projects/pokoin/PokoinTest/index/cdn_images` (full leftover-key mirror). Dated digest `/home/nez/pokoincdn/cdn_images_digest/2026-08-30` is the Aug 30 Mega-set snapshot only.
+- Public image URLs use our id; leftover R2 keys stay `ct_id_`; Worker maps.
+- Do not run full `refresh_marketplace_cards_from_blueprints()` on live Postgres.
+- Infra (2026-09-18): public api.pokoin.com / cdn.pokoin.com / Meili / Valkey are on **pi-home** (Raspberry Pi). **Not peer3.** Oracle pokoin-marketplace is the CardTrader dump / Postgres **writer** only. Pi Postgres is a streaming replica — do not write dumps there. PokoinPoS seed on peer1 only.

@@ -20,6 +20,8 @@ test('product classifier bounds product tokens so Pokemon names are not products
   const sql = classifierBody();
 
   assert.match(sql, /when has_collector_number\s+then 'card'/);
+  assert.match(sql, /number ~ '\[0-9\]\{1,4\}\[a-z\]\?\/\[0-9\]\{1,4\}'/);
+  assert.match(sql, /bag\|shoulder bag\|backpack\)/);
   assert.match(sql, /\(\^|\[\^a-z0-9]\)\(tin\|tins\)\(\[\^a-z0-9]\|\$\)/);
   assert.match(sql, /\(\^|\[\^a-z0-9]\)\(premium collection\|special collection/);
   assert.doesNotMatch(sql, /name ~ 'booster\|pack'/);
@@ -34,7 +36,7 @@ test('product classifier keeps known false-positive names covered', () => {
   const boundedProductTokenChecks = [
     '(^|[^a-z0-9])(tin|tins)([^a-z0-9]|$)',
     '(^|[^a-z0-9])(premium collection|special collection',
-    '(^|[^a-z0-9])(theme deck|starter deck|battle deck|deck)([^a-z0-9]|$)',
+    '(^|[^a-z0-9])(theme decks?|starter decks?|battle decks?|decks?)([^a-z0-9]|$)',
   ];
 
   for (const name of ['Giratina', 'Victini', 'Dratini', 'Mantine', 'Tinkaton', 'Pincurchin']) {

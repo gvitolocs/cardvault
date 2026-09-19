@@ -128,14 +128,46 @@ function requireEnv(name) {
   return value;
 }
 
+function marketplaceSsl() {
+  if (process.env.MARKETPLACE_DATABASE_SSL_VERIFY === '1') {
+    return { rejectUnauthorized: true };
+  }
+  return false;
+}
+
 function createMarketplacePool() {
   return new Pool({
     connectionString: requireEnv('MARKETPLACE_DATABASE_URL'),
     max: 2,
     idleTimeoutMillis: 10_000,
     connectionTimeoutMillis: 10_000,
-    ssl: { rejectUnauthorized: process.env.MARKETPLACE_DATABASE_SSL_VERIFY === '1' },
+    ssl: marketplaceSsl(),
   });
+}
+
+async function blueprintWriteTable(pool) {
+  const result = await pool.query(`
+    select 1
+    from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public'
+      and c.relkind = 'r'
+      and c.relname = 'pokoin_pokemon_blueprints'
+    limit 1
+  `);
+  return result.rows[0] ? 'pokoin_pokemon_blueprints' : 'cardtrader_pokemon_blueprints';
+}
+
+async function searchCandidateIdColumn(pool) {
+  const result = await pool.query(`
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'marketplace_search_candidates'
+      and column_name = 'ct_id'
+    limit 1
+  `);
+  return result.rows[0] ? 'ct_id' : 'card_id';
 }
 
 async function sleep(ms) {
@@ -254,10 +286,15 @@ function mergeSamples(target, rows) {
   }
 }
 
-async function analyzeRows(pool, rows, { apply, batchSize, collectImages }) {
+async function analyzeRows(pool, rows, { apply, batchSize, collectImages, writeTable, candidateColumn }) {
   const ids = rows.map((row) => row.id);
   const rawExisting = await existingIdSet(pool, ids);
-  const candidateExisting = await existingIdSet(pool, ids, 'marketplace_search_candidates', 'card_id');
+  const candidateExisting = await existingIdSet(
+    pool,
+    ids,
+    'marketplace_search_candidates',
+    candidateColumn || 'card_id',
+  );
   const missingRows = rows.filter((row) => !rawExisting.has(String(row.id)));
   const existingRawMissingCandidate = rows.filter((row) =>
     rawExisting.has(String(row.id)) && !candidateExisting.has(String(row.id)));
@@ -265,7 +302,9 @@ async function analyzeRows(pool, rows, { apply, batchSize, collectImages }) {
   const imageNeeded = collectImages
     ? await imageNeededIdSet(pool, [...missingRows.map((row) => row.id), ...recoveryImageIds])
     : new Set();
-  const inserted = apply ? await insertMissingRows(pool, missingRows, batchSize) : 0;
+  const inserted = apply
+    ? await insertMissingRows(pool, missingRows, batchSize, writeTable || 'cardtrader_pokemon_blueprints')
+    : 0;
   const insertedIdSet = new Set(missingRows.map((row) => String(row.id)));
   const imageIds = rows
     .filter((row) => insertedIdSet.has(String(row.id)) || imageNeeded.has(String(row.id)))
@@ -378,7 +417,7 @@ async function imageNeededIdSet(pool, ids) {
   return new Set(result.rows.map((row) => row.id));
 }
 
-function insertMissingSql(rowCount) {
+function insertMissingSql(rowCount, tableName = 'cardtrader_pokemon_blueprints') {
   const placeholders = [];
   let parameter = 1;
   for (let rowIndex = 0; rowIndex < rowCount; rowIndex += 1) {
@@ -391,7 +430,7 @@ function insertMissingSql(rowCount) {
     placeholders.push(`(${row.join(', ')})`);
   }
   return `
-    insert into public.cardtrader_pokemon_blueprints (${BLUEPRINT_COLUMNS.join(', ')})
+    insert into public.${tableName} (${BLUEPRINT_COLUMNS.join(', ')})
     values ${placeholders.join(', ')}
     on conflict (id) do nothing
   `;
@@ -405,11 +444,11 @@ function insertValues(rows) {
   );
 }
 
-async function insertMissingRows(pool, rows, batchSize) {
+async function insertMissingRows(pool, rows, batchSize, tableName = 'cardtrader_pokemon_blueprints') {
   let inserted = 0;
   for (let offset = 0; offset < rows.length; offset += batchSize) {
     const batch = rows.slice(offset, offset + batchSize);
-    const result = await pool.query(insertMissingSql(batch.length), insertValues(batch));
+    const result = await pool.query(insertMissingSql(batch.length, tableName), insertValues(batch));
     inserted += result.rowCount;
   }
   return inserted;
@@ -492,6 +531,14 @@ async function refreshDerived(pool, apply) {
       fallback: 'Runs component refresh functions individually if optional helpers are unavailable.',
     };
   }
+  const allowFullProjection = process.env.POKOIN_ALLOW_FULL_PROJECTION_REFRESH === '1';
+  if (!allowFullProjection) {
+    return {
+      skipped: 'live_projection',
+      pokedexSort: refreshPokedexSort(),
+      note: 'refresh_marketplace_cards_from_blueprints() ALTER TABLEs and takes AccessExclusiveLock. Project new ct_ids only, then refresh_marketplace_set_catalog_counts(). Set POKOIN_ALLOW_FULL_PROJECTION_REFRESH=1 only in a maintenance window.',
+    };
+  }
   await pool.query('set statement_timeout = 0');
   await pool.query('set idle_in_transaction_session_timeout = 0');
   const helperCheck = await pool.query(`
@@ -501,9 +548,17 @@ async function refreshDerived(pool, apply) {
       to_regprocedure('public.refresh_marketplace_hot_blueprints()') is not null as has_hot_blueprints
   `);
   const helpers = helperCheck.rows[0] || {};
-  if (helpers.has_artist_counts && helpers.has_price_summary && helpers.has_hot_blueprints) {
+  if (
+    allowFullProjection &&
+    helpers.has_artist_counts &&
+    helpers.has_price_summary &&
+    helpers.has_hot_blueprints
+  ) {
     const result = await pool.query('select public.refresh_marketplace_oracle_projections() as result');
-    return result.rows[0]?.result || {};
+    return {
+      ...(result.rows[0]?.result || {}),
+      pokedexSort: refreshPokedexSort(),
+    };
   }
 
   const steps = [
@@ -526,7 +581,20 @@ async function refreshDerived(pool, apply) {
     const result = await pool.query(`select public.${functionName}() as count`);
     refreshed[key] = result.rows[0]?.count ?? null;
   }
+  if (apply) {
+    refreshed.pokedexSort = refreshPokedexSort();
+  }
   return refreshed;
+}
+
+function refreshPokedexSort() {
+  const webRoot = process.env.POKOIN_WEB_ROOT || '/home/nez/Projects/pokoin-web';
+  const script = path.join(webRoot, 'scripts/refresh-pokedex-sort.mjs');
+  if (!fs.existsSync(script)) {
+    return { skipped: 'refresh-pokedex-sort.mjs missing' };
+  }
+  runNodeScript([script, '--apply']);
+  return { ran: true };
 }
 
 function syncSupabase({ apply, languages, transport }) {
@@ -546,6 +614,8 @@ async function run(options) {
   loadEnv();
   const pool = createMarketplacePool();
   try {
+    options.writeTable = await blueprintWriteTable(pool);
+    options.candidateColumn = await searchCandidateIdColumn(pool);
     if (!options.input) {
       return await runStreaming(pool, options);
     }
@@ -564,6 +634,8 @@ async function run(options) {
       apply: options.apply,
       batchSize: options.batchSize,
       collectImages: options.images,
+      writeTable: options.writeTable,
+      candidateColumn: options.candidateColumn,
     });
     const imageResult = options.images
       ? runImagePipeline(analysis.imageIds, { apply: options.apply })
@@ -587,6 +659,8 @@ async function run(options) {
         expansionNames: source.expansions.map((expansion) => expansion.name),
         input: options.input || null,
         streaming: false,
+        writeTable: options.writeTable,
+        candidateColumn: options.candidateColumn,
       },
       counts: {
         fetched: rows.length,
@@ -620,6 +694,8 @@ async function runStreaming(pool, options) {
       expansionIds: expansions.map((expansion) => expansion.id),
       expansionNames: expansions.map((expansion) => expansion.name),
       input: null,
+      writeTable: options.writeTable,
+      candidateColumn: options.candidateColumn,
     },
   });
 
@@ -635,6 +711,8 @@ async function runStreaming(pool, options) {
       apply: options.apply,
       batchSize: options.batchSize,
       collectImages: options.images,
+      writeTable: options.writeTable,
+      candidateColumn: options.candidateColumn,
     });
 
     summary.counts.fetched += rows.length;

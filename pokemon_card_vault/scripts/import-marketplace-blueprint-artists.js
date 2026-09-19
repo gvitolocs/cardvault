@@ -67,6 +67,7 @@ function parseArgs(argv) {
     pokemonTcgDataDir: '',
     source: 'tcgdex',
     refreshExisting: false,
+    allowUnknownArtists: false,
     reportMissing: false,
     reportEligibleOnly: false,
     writeMissingReport: '',
@@ -105,6 +106,8 @@ function parseArgs(argv) {
       options.source = cleanText(value, 40).toLowerCase() || 'tcgdex';
     } else if (key === 'refresh-existing') {
       options.refreshExisting = true;
+    } else if (key === 'allow-unknown-artists') {
+      options.allowUnknownArtists = true;
     } else if (key === 'report-missing') {
       options.reportMissing = true;
     } else if (key === 'report-eligible-only') {
@@ -210,7 +213,9 @@ function createPoolFromEnv() {
   const connectionString = process.env.MARKETPLACE_DATABASE_URL ||
     process.env.MARKETPLACE_PEER4_DATABASE_URL ||
     '';
+  const sslOff = process.env.MARKETPLACE_DATABASE_SSL === '0';
   const sslVerify = process.env.MARKETPLACE_DATABASE_SSL_VERIFY === '1';
+  const ssl = sslOff ? false : { rejectUnauthorized: sslVerify };
   if (connectionString) {
     const sanitizedConnectionString = sslVerify
       ? connectionString
@@ -222,7 +227,7 @@ function createPoolFromEnv() {
       max: 4,
       idleTimeoutMillis: 10_000,
       connectionTimeoutMillis: 10_000,
-      ssl: { rejectUnauthorized: sslVerify },
+      ssl,
       application_name: 'marketplace-blueprint-artists-import',
     });
   }
@@ -245,7 +250,7 @@ function createPoolFromEnv() {
     max: 4,
     idleTimeoutMillis: 10_000,
     connectionTimeoutMillis: 10_000,
-    ssl: { rejectUnauthorized: sslVerify },
+    ssl,
     application_name: 'marketplace-blueprint-artists-import',
   });
 }
@@ -271,7 +276,7 @@ async function fetchBlueprintRows(pool, options, startId, limit) {
         coalesce(c.card_id, b.id) as card_id,
         coalesce(nullif(c.display_name, ''), nullif(c.name, ''), b.name) as name,
         coalesce(nullif(c.set_name, ''), nullif(b.expansion->>'name', ''), nullif(b.blueprint->>'expansion_name', '')) as set_name,
-        coalesce(nullif(b.expansion->>'code', ''), nullif(b.blueprint->>'expansion_code', ''), nullif(b.blueprint->>'set_code', '')) as expansion_code,
+        coalesce(nullif(expansions.official_id, ''), nullif(b.expansion->>'code', ''), nullif(b.blueprint->>'expansion_code', ''), nullif(b.blueprint->>'set_code', '')) as expansion_code,
         coalesce(nullif(c.card_number, ''), nullif(b.blueprint->>'number', ''), nullif(b.blueprint->>'collector_number', ''), nullif(b.blueprint->>'card_number', ''), b.version, '') as card_number,
         coalesce(nullif(c.rarity, ''), nullif(b.blueprint->>'rarity', ''), nullif(b.blueprint->>'collector_rarity', ''), '') as rarity,
         coalesce(nullif(c.item_kind, ''), 'single') as item_kind,
@@ -281,7 +286,9 @@ async function fetchBlueprintRows(pool, options, startId, limit) {
         b.version
       from public.cardtrader_pokemon_blueprints b
       left join public.marketplace_search_candidates c
-        on c.card_id = b.id
+        on c.ct_id = b.id
+      left join public.pokoin_pokemon_expansions expansions
+        on expansions.name = coalesce(nullif(c.set_name, ''), nullif(b.expansion->>'name', ''), nullif(b.blueprint->>'expansion_name', ''))
       left join public.marketplace_blueprint_artists artist
         on artist.blueprint_id = b.id
       where b.id > $1::bigint
@@ -315,7 +322,7 @@ async function fetchReportBlueprintRows(pool, options, startId, limit) {
         coalesce(c.card_id, b.id) as card_id,
         coalesce(nullif(c.display_name, ''), nullif(c.name, ''), b.name) as name,
         coalesce(nullif(c.set_name, ''), nullif(b.expansion->>'name', ''), nullif(b.blueprint->>'expansion_name', '')) as set_name,
-        coalesce(nullif(b.expansion->>'code', ''), nullif(b.blueprint->>'expansion_code', ''), nullif(b.blueprint->>'set_code', '')) as expansion_code,
+        coalesce(nullif(expansions.official_id, ''), nullif(b.expansion->>'code', ''), nullif(b.blueprint->>'expansion_code', ''), nullif(b.blueprint->>'set_code', '')) as expansion_code,
         coalesce(nullif(c.card_number, ''), nullif(b.blueprint->>'number', ''), nullif(b.blueprint->>'collector_number', ''), nullif(b.blueprint->>'card_number', ''), b.version, '') as card_number,
         coalesce(nullif(c.rarity, ''), nullif(b.blueprint->>'rarity', ''), nullif(b.blueprint->>'collector_rarity', ''), '') as rarity,
         coalesce(nullif(c.item_kind, ''), 'single') as item_kind,
@@ -326,7 +333,9 @@ async function fetchReportBlueprintRows(pool, options, startId, limit) {
         b.version
       from public.cardtrader_pokemon_blueprints b
       left join public.marketplace_search_candidates c
-        on c.card_id = b.id
+        on c.ct_id = b.id
+      left join public.pokoin_pokemon_expansions expansions
+        on expansions.name = coalesce(nullif(c.set_name, ''), nullif(b.expansion->>'name', ''), nullif(b.blueprint->>'expansion_name', ''))
       left join public.marketplace_blueprint_artists artist
         on artist.blueprint_id = b.id
       where b.id > $1::bigint
@@ -447,13 +456,27 @@ function buildSetIndex(sets) {
   return { byCompactName, byId };
 }
 
+function setNameCompacts(name) {
+  const compact = compactText(name);
+  const aliases = new Set([compact]);
+  if (compact.startsWith('svp')) aliases.add(`sv${compact.slice(3)}`);
+  if (compact.startsWith('sv') && !compact.startsWith('svp')) {
+    aliases.add(`svp${compact.slice(2)}`);
+  }
+  aliases.delete('');
+  return [...aliases];
+}
+
 function findSetMatch(row, setIndex) {
   const code = compactText(row.setCode);
   if (code && setIndex.byId.has(code)) {
     return { set: setIndex.byId.get(code), reason: 'set_code_exact' };
   }
   const compactName = compactText(row.setName);
-  const exact = setIndex.byCompactName.get(compactName) || [];
+  let exact = [];
+  for (const alias of setNameCompacts(row.setName)) {
+    exact = exact.concat(setIndex.byCompactName.get(alias) || []);
+  }
   if (exact.length === 1) return { set: exact[0], reason: 'set_name_exact' };
   if (exact.length > 1) {
     const codeMatch = exact.find((set) => code && compactText(set.id) === code);
@@ -502,8 +525,8 @@ function rarityScore(sourceRarity, candidateRarity) {
 }
 
 function scoreCandidate(row, detail, setReason) {
-  const collectorMatches = normalizeCollectorNumber(row.collectorNumber) ===
-    normalizeCollectorNumber(detail.localId);
+  const collectors = new Set(collectorNumberCandidates(row.collectorNumber));
+  const collectorMatches = collectors.has(normalizeCollectorNumber(detail.localId));
   const score = (
     (collectorMatches ? 0.44 : 0) +
     nameScore(row.name, detail.name) * 0.34 +
@@ -548,8 +571,8 @@ async function matchWithTcgdex(row, context) {
 
   const setDetail = await context.tcgdex.client.set(setMatch.set.id);
   const cards = Array.isArray(setDetail?.cards) ? setDetail.cards : [];
-  const collector = normalizeCollectorNumber(row.collectorNumber);
-  const candidates = cards.filter((card) => normalizeCollectorNumber(card.localId) === collector);
+  const collectors = new Set(collectorNumberCandidates(row.collectorNumber));
+  const candidates = cards.filter((card) => collectors.has(normalizeCollectorNumber(card.localId)));
   const candidateCards = candidates.length > 0
     ? candidates
     : cards.filter((card) => nameScore(row.name, card.name) >= 0.96).slice(0, 8);
@@ -653,8 +676,13 @@ function collectorNumberCandidates(value) {
   if (afterPipe) candidates.add(normalizeCollectorNumber(afterPipe));
   const slashMatch = text.match(/([0-9]+[A-Za-z]?)\s*\/\s*[0-9]+/);
   if (slashMatch) candidates.add(normalizeCollectorNumber(slashMatch[1]));
-  const simpleMatch = text.match(/\b([0-9]+[A-Za-z]?)\b/);
-  if (simpleMatch) candidates.add(normalizeCollectorNumber(simpleMatch[1]));
+  for (const item of [...candidates]) {
+    const prefixed = String(item).match(/^([A-Z]{2,8})(\d+[A-Z]?)$/);
+    if (prefixed) {
+      candidates.add(prefixed[2]);
+      candidates.add(normalizeCollectorNumber(prefixed[2]));
+    }
+  }
   return [...candidates].filter(Boolean);
 }
 
@@ -692,7 +720,7 @@ function loadPokemonTcgDataIndex(directory) {
   return { bySetNumber };
 }
 
-function matchWithPokemonTcgData(row, index, knownArtists = new Set()) {
+function matchWithPokemonTcgData(row, index, knownArtists = new Set(), options = {}) {
   if (!index) return { status: 'not_found', source: 'pokemon_tcg_data', reason: 'dataset_not_configured' };
   const setNames = [row.setName, row.setCode].map((value) => cleanText(value)).filter(Boolean);
   const numbers = collectorNumberCandidates(row.collectorNumber);
@@ -719,7 +747,7 @@ function matchWithPokemonTcgData(row, index, knownArtists = new Set()) {
   if (!best || best.confidence < 0.78) return { status: 'not_found', source: 'pokemon_tcg_data', reason: 'low_confidence' };
   const artist = cleanText(best.card.artist || best.card.illustrator, 180);
   const normalizedArtist = normalizeArtist(artist);
-  if (!knownArtists.has(normalizedArtist)) {
+  if (!options.allowUnknownArtists && !knownArtists.has(normalizedArtist)) {
     return {
       status: 'not_found',
       source: 'pokemon_tcg_data',
@@ -763,7 +791,7 @@ async function matchArtist(row, context) {
   for (const source of sources) {
     const result = source === 'tcgdex'
       ? await matchWithTcgdex(row, context)
-      : matchWithPokemonTcgData(row, context.pokemonTcgData, context.knownArtists);
+      : matchWithPokemonTcgData(row, context.pokemonTcgData, context.knownArtists, context.options);
     if (result.status === 'matched') return result;
     if (result.status === 'ambiguous') return result;
     lastResult = result;
@@ -830,10 +858,37 @@ async function upsertArtistRows(pool, rows, batchSize) {
   let upserted = 0;
   for (let offset = 0; offset < rows.length; offset += batchSize) {
     const batch = rows.slice(offset, offset + batchSize);
-    await pool.query(upsertArtistsSql(batch.length), upsertValues(batch));
+  await pool.query(upsertArtistsSql(batch.length), upsertValues(batch));
     upserted += batch.length;
   }
-  await pool.query('select public.refresh_marketplace_artist_card_counts()');
+  try {
+    await pool.query('select public.refresh_marketplace_artist_card_counts()');
+  } catch (error) {
+    if (!String(error.message || '').includes('refresh_marketplace_artist_card_counts')) {
+      throw error;
+    }
+    await pool.query(`
+      update public.marketplace_blueprint_artists artist
+      set artist_card_count = coalesce(counts.card_count, 0),
+        updated_at = now()
+      from (
+        select artist.normalized_artist, count(*)::integer as card_count
+        from public.marketplace_blueprint_artists artist
+        join public.marketplace_card_versions versions
+          on versions.blueprint_id = artist.blueprint_id
+        where coalesce(artist.normalized_artist, '') <> ''
+          and versions.product_type = 'card'
+          and coalesce(
+            versions.preview_image_url,
+            versions.homepage_image_url,
+            versions.cdn_image_url,
+            versions.image_url
+          ) is not null
+        group by artist.normalized_artist
+      ) counts
+      where artist.normalized_artist = counts.normalized_artist
+    `);
+  }
   return upserted;
 }
 
@@ -867,14 +922,16 @@ async function fetchArtistCoverage(pool) {
         coalesce(c.card_id, b.id) as card_id,
         coalesce(nullif(c.display_name, ''), nullif(c.name, ''), b.name) as name,
         coalesce(nullif(c.set_name, ''), nullif(b.expansion->>'name', ''), nullif(b.blueprint->>'expansion_name', '')) as set_name,
-        coalesce(nullif(b.expansion->>'code', ''), nullif(b.blueprint->>'expansion_code', ''), nullif(b.blueprint->>'set_code', '')) as expansion_code,
+        coalesce(nullif(expansions.official_id, ''), nullif(b.expansion->>'code', ''), nullif(b.blueprint->>'expansion_code', ''), nullif(b.blueprint->>'set_code', '')) as expansion_code,
         coalesce(nullif(c.card_number, ''), nullif(b.blueprint->>'number', ''), nullif(b.blueprint->>'collector_number', ''), nullif(b.blueprint->>'card_number', ''), b.version, '') as card_number,
         coalesce(nullif(c.item_kind, ''), 'single') as item_kind,
         coalesce(nullif(c.product_type, ''), 'card') as product_type,
         artist.blueprint_id as artist_blueprint_id
       from public.cardtrader_pokemon_blueprints b
       left join public.marketplace_search_candidates c
-        on c.card_id = b.id
+        on c.ct_id = b.id
+      left join public.pokoin_pokemon_expansions expansions
+        on expansions.name = coalesce(nullif(c.set_name, ''), nullif(b.expansion->>'name', ''), nullif(b.blueprint->>'expansion_name', ''))
       left join public.marketplace_blueprint_artists artist
         on artist.blueprint_id = b.id
     )
@@ -1196,6 +1253,7 @@ async function main() {
         language: options.language,
         source: options.source,
         refreshExisting: options.refreshExisting,
+        allowUnknownArtists: options.allowUnknownArtists,
       },
       ...result,
     };
@@ -1221,6 +1279,7 @@ if (require.main === module) {
 module.exports = {
   bestCandidate,
   buildSetIndex,
+  collectorNumberCandidates,
   findSetMatch,
   matchWithPokemonTcgData,
   nameScore,

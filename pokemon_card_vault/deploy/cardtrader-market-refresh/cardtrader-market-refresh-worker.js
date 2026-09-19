@@ -6,9 +6,8 @@ const path = require('node:path');
 
 const DEFAULT_MAX_BLUEPRINTS = 100_000;
 const DEFAULT_MAX_PRODUCTS = 1_000_000;
-const DEFAULT_BATCH_BLUEPRINTS = 700;
-const DEFAULT_BLUEPRINT_CONCURRENCY = 1;
-const DEFAULT_REQUEST_DELAY_MS = 300;
+const DEFAULT_MAX_EXPANSIONS = 10_000;
+const DEFAULT_REQUEST_DELAY_MS = 200;
 const DEFAULT_FAILURE_BACKOFF_MS = 60_000;
 const DEFAULT_MAX_FAILURE_BACKOFF_MS = 60 * 60_000;
 const DEFAULT_CYCLE_SLEEP_MS = 24 * 60 * 60_000;
@@ -151,7 +150,9 @@ async function main() {
     tokenKeyStatus,
   } = require(path.join(projectDir, 'scripts/refresh-cardtrader-market-listings.js'));
   const {
-    readBlueprintIdsFromOracle,
+    finalizeDailyRefresh,
+    readCatalogExpansionsFromOracle,
+    readUngroupedBlueprintIdsFromOracle,
     runRefresh,
   } = require(path.join(projectDir, 'api/_cardtrader_daily_listings_refresh.js'));
   const {
@@ -167,33 +168,39 @@ async function main() {
 
   const maxBlueprints = envInteger(['CARDTRADER_MARKET_MAX_BLUEPRINTS'], DEFAULT_MAX_BLUEPRINTS, 1, DEFAULT_MAX_BLUEPRINTS);
   const maxProducts = envInteger(['CARDTRADER_MARKET_MAX_PRODUCTS'], DEFAULT_MAX_PRODUCTS, 1, DEFAULT_MAX_PRODUCTS);
-  const batchBlueprints = envInteger(['CARDTRADER_MARKET_REFRESH_BATCH_BLUEPRINTS'], DEFAULT_BATCH_BLUEPRINTS, 1, 10_000);
-  const blueprintConcurrency = envInteger(['CARDTRADER_MARKET_BLUEPRINT_CONCURRENCY'], DEFAULT_BLUEPRINT_CONCURRENCY, 1, 50);
+  const maxExpansions = envInteger(['CARDTRADER_MARKET_MAX_EXPANSIONS'], DEFAULT_MAX_EXPANSIONS, 1, DEFAULT_MAX_EXPANSIONS);
   const requestDelayMs = envInteger(['CARDTRADER_MARKET_REQUEST_DELAY_MS'], DEFAULT_REQUEST_DELAY_MS, 0, 10_000);
   const cycleSleepMs = envInteger(['CARDTRADER_MARKET_CYCLE_SLEEP_MS'], DEFAULT_CYCLE_SLEEP_MS, 0, 7 * DEFAULT_CYCLE_SLEEP_MS);
   const failureBackoffMs = envInteger(['CARDTRADER_MARKET_FAILURE_BACKOFF_MS'], DEFAULT_FAILURE_BACKOFF_MS, 1_000, DEFAULT_MAX_FAILURE_BACKOFF_MS);
   const maxFailureBackoffMs = envInteger(['CARDTRADER_MARKET_MAX_FAILURE_BACKOFF_MS'], DEFAULT_MAX_FAILURE_BACKOFF_MS, failureBackoffMs, 24 * 60 * 60_000);
-  const configuredStartOffset = envInteger(['RESUME_OFFSET', 'START_OFFSET', 'CARDTRADER_MARKET_START_OFFSET'], 0, 0, maxBlueprints);
-  const configuredFetchedProducts = envInteger(['COMMITTED_PRODUCTS', 'CARDTRADER_MARKET_COMMITTED_PRODUCTS'], 0, 0, maxProducts);
   const runOnce = envBoolean(['CARDTRADER_MARKET_RUN_ONCE'], false);
 
-  log('Started CardTrader market refresh worker', {
+  log('Started CardTrader expansion market refresh worker', {
     projectDir,
     stateFile,
     envFilesLoaded: loadedEnvFiles.length,
     tokenKey: tokenKeyStatus(),
+    mode: 'expansion',
     maxBlueprints,
     maxProducts,
-    batchBlueprints,
-    blueprintConcurrency,
+    maxExpansions,
     requestDelayMs,
     cycleSleepMs,
-    configuredStartOffset,
     runOnce,
   });
 
   let consecutiveFailures = 0;
   let state = readJsonFile(stateFile);
+  if (state.mode !== 'expansion') {
+    state = {
+      mode: 'expansion',
+      nextExpansionIndex: 0,
+      cycleFetchedProducts: 0,
+      ungroupedDone: false,
+      finalized: false,
+    };
+    writeJsonFile(stateFile, state);
+  }
 
   process.once('SIGTERM', () => {
     log('Received SIGTERM; exiting after current operation');
@@ -206,36 +213,43 @@ async function main() {
 
   while (process.exitCode == null) {
     try {
-      const blueprintIds = await readBlueprintIdsFromOracle(maxBlueprints);
-      const totalBlueprints = blueprintIds.length;
-      const stateHasOffset = Number.isSafeInteger(Number(state.nextOffset));
-      let offset = stateHasOffset ? Number(state.nextOffset) : configuredStartOffset;
-      let cycleFetchedProducts = stateHasOffset
+      const expansions = (await readCatalogExpansionsFromOracle()).slice(0, maxExpansions);
+      const totalExpansions = expansions.length;
+      const stateHasIndex = Number.isSafeInteger(Number(state.nextExpansionIndex));
+      let expansionIndex = stateHasIndex ? Number(state.nextExpansionIndex) : 0;
+      let cycleFetchedProducts = stateHasIndex
         ? cleanInteger(state.cycleFetchedProducts, 0, 0, maxProducts)
-        : configuredFetchedProducts;
+        : 0;
+      let ungroupedDone = state.ungroupedDone === true;
+      let finalized = state.finalized === true;
 
-      if (offset >= totalBlueprints || cycleFetchedProducts >= maxProducts) {
+      if (
+        expansionIndex >= totalExpansions &&
+        ungroupedDone &&
+        finalized
+      ) {
         const completedAt = nowIso();
-        log('Completed CardTrader market refresh cycle', {
-          totalBlueprints,
-          nextOffset: 0,
+        log('Completed CardTrader expansion market refresh cycle', {
+          totalExpansions,
           cycleFetchedProducts,
           sleepingMs: cycleSleepMs,
         });
         state = {
+          mode: 'expansion',
           status: runOnce ? 'completed' : 'sleeping',
-          nextOffset: 0,
+          nextExpansionIndex: 0,
           cycleFetchedProducts: 0,
+          ungroupedDone: false,
+          finalized: false,
           lastCompletedAt: completedAt,
-          totalBlueprints,
-          maxBlueprints,
+          totalExpansions,
+          maxExpansions,
           maxProducts,
-          batchBlueprints,
         };
         writeJsonFile(stateFile, state);
         if (runOnce) {
-          log('Exiting after completed CardTrader market refresh cycle', {
-            totalBlueprints,
+          log('Exiting after completed CardTrader expansion market refresh cycle', {
+            totalExpansions,
             completedAt,
           });
           break;
@@ -244,74 +258,120 @@ async function main() {
         continue;
       }
 
-      const batchIds = blueprintIds.slice(offset, offset + batchBlueprints);
-      const batchStart = offset;
-      const batchEnd = offset + batchIds.length;
-      const batchIndex = Math.floor(batchStart / batchBlueprints) + 1;
-      const totalBatches = Math.ceil(totalBlueprints / batchBlueprints);
-      const startedAt = Date.now();
-      state = {
-        ...state,
-        status: 'running',
-        nextOffset: batchStart,
-        cycleFetchedProducts,
-        batchIndex,
-        totalBatches,
-        batchBlueprints: batchIds.length,
-        totalBlueprints,
-        maxBlueprints,
-        maxProducts,
-        startedBatchAt: nowIso(),
-      };
-      writeJsonFile(stateFile, state);
+      if (expansionIndex < totalExpansions) {
+        const expansion = expansions[expansionIndex];
+        const startedAt = Date.now();
+        state = {
+          ...state,
+          mode: 'expansion',
+          status: 'running',
+          nextExpansionIndex: expansionIndex,
+          cycleFetchedProducts,
+          expansionId: expansion.expansionId,
+          catalogBlueprints: expansion.blueprintIds.length,
+          totalExpansions,
+          maxExpansions,
+          maxProducts,
+          startedBatchAt: nowIso(),
+        };
+        writeJsonFile(stateFile, state);
 
-      log('Starting CardTrader market refresh batch', {
-        batchIndex,
-        totalBatches,
-        offset: batchStart,
-        batchEnd,
-        batchBlueprints: batchIds.length,
-        remainingProductLimit: maxProducts - cycleFetchedProducts,
-      });
+        log('Starting CardTrader expansion refresh', {
+          expansionIndex: expansionIndex + 1,
+          totalExpansions,
+          expansionId: expansion.expansionId,
+          catalogBlueprints: expansion.blueprintIds.length,
+          remainingProductLimit: maxProducts - cycleFetchedProducts,
+        });
 
-      const result = await runRefresh({
-        dryRun: false,
-        archiveMissing: true,
-        maxBlueprints: batchIds.length,
-        maxProducts: maxProducts - cycleFetchedProducts,
-        refreshBatchBlueprints: batchBlueprints,
-        blueprintConcurrency,
-        requestDelayMs,
-        blueprintIds: batchIds.join(','),
-        onProgress: (progress) => log('CardTrader market refresh progress', progress),
-      });
+        const result = await runRefresh({
+          dryRun: false,
+          archiveMissing: false,
+          completeBook: true,
+          finalize: false,
+          maxBlueprints,
+          maxProducts: maxProducts - cycleFetchedProducts,
+          requestDelayMs,
+          expansionId: expansion.expansionId,
+          expansionIds: String(expansion.expansionId),
+          catalogBlueprintIds: expansion.blueprintIds,
+          onProgress: (progress) => log('CardTrader market refresh progress', progress),
+        });
 
-      cycleFetchedProducts += cleanInteger(result && result.fetchedProducts, 0, 0, maxProducts);
-      consecutiveFailures = 0;
-      state = {
-        status: 'running',
-        nextOffset: batchEnd,
-        cycleFetchedProducts,
-        lastCommittedOffset: batchStart,
-        lastCommittedBatchIndex: batchIndex,
-        lastCommittedAt: nowIso(),
-        lastBatchDurationMs: Date.now() - startedAt,
-        totalBlueprints,
-        maxBlueprints,
-        maxProducts,
-        batchBlueprints,
-        result,
-      };
-      writeJsonFile(stateFile, state);
+        cycleFetchedProducts += cleanInteger(result && result.fetchedProducts, 0, 0, maxProducts);
+        consecutiveFailures = 0;
+        state = {
+          mode: 'expansion',
+          status: 'running',
+          nextExpansionIndex: expansionIndex + 1,
+          cycleFetchedProducts,
+          ungroupedDone: false,
+          finalized: false,
+          lastCommittedExpansionId: expansion.expansionId,
+          lastCommittedExpansionIndex: expansionIndex,
+          lastCommittedAt: nowIso(),
+          lastBatchDurationMs: Date.now() - startedAt,
+          totalExpansions,
+          maxExpansions,
+          maxProducts,
+          result,
+        };
+        writeJsonFile(stateFile, state);
 
-      log('Finished CardTrader market refresh batch', {
-        batchIndex,
-        totalBatches,
-        offset: batchStart,
-        nextOffset: batchEnd,
-        durationMs: Date.now() - startedAt,
-        result,
-      });
+        log('Finished CardTrader expansion refresh', {
+          expansionIndex: expansionIndex + 1,
+          totalExpansions,
+          expansionId: expansion.expansionId,
+          durationMs: Date.now() - startedAt,
+          result,
+        });
+        continue;
+      }
+
+      if (!ungroupedDone) {
+        const ungroupedIds = await readUngroupedBlueprintIdsFromOracle(Math.min(maxBlueprints, 5_000));
+        if (ungroupedIds.length > 0) {
+          log('Starting CardTrader ungrouped blueprint refresh', {
+            blueprintCount: ungroupedIds.length,
+          });
+          const result = await runRefresh({
+            dryRun: false,
+            archiveMissing: true,
+            finalize: false,
+            byBlueprint: true,
+            maxBlueprints: ungroupedIds.length,
+            maxProducts: maxProducts - cycleFetchedProducts,
+            requestDelayMs,
+            blueprintIds: ungroupedIds.join(','),
+            onProgress: (progress) => log('CardTrader market refresh progress', progress),
+          });
+          cycleFetchedProducts += cleanInteger(result && result.fetchedProducts, 0, 0, maxProducts);
+          log('Finished CardTrader ungrouped blueprint refresh', { result });
+        }
+        ungroupedDone = true;
+        state = {
+          ...state,
+          mode: 'expansion',
+          ungroupedDone: true,
+          cycleFetchedProducts,
+        };
+        writeJsonFile(stateFile, state);
+        continue;
+      }
+
+      if (!finalized) {
+        log('Finalizing CardTrader daily market refresh');
+        const finalizedResult = await finalizeDailyRefresh();
+        state = {
+          ...state,
+          mode: 'expansion',
+          finalized: true,
+          finalizedResult,
+          lastFinalizedAt: nowIso(),
+        };
+        writeJsonFile(stateFile, state);
+        log('Finalized CardTrader daily market refresh', finalizedResult);
+      }
     } catch (error) {
       consecutiveFailures += 1;
       const backoffMs = Math.min(

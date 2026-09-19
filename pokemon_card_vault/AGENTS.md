@@ -16,6 +16,23 @@ If the site or `/marketplace` shows Vercel `404: NOT_FOUND`, follow:
 
 `workflows/card-market-page-workflow.md`
 
+Our marketplace id is **our id** (`docs/marketplace-public-ids.md`):
+`marketplace_cards.card_id` = old CardTrader blueprint × 2. We do not use `ct_id`
+in URLs, API, Flutter, or image URLs. Never × 2 a catalog `card.id` or a Fast
+Milo/TCGplayer id. pokoin-marketplace has 018 applied. Codevira D00000B.
+
+## Multi-game CardTrader dump (One Piece / Riftbound)
+
+Qwen: follow these two files. Do not print secrets.
+
+- `workflows/cardtrader-multigame-marketplaces-workflow.md` (importer flags)
+- `/home/nez/secrets/docs/CARDTRADER_MULTIGAME_DUMP.md` (hosts, WARP netns, 403)
+
+Isolated DBs only (`pokoin_one_piece`, `pokoin_riftbound`). Never write into
+Pokemon `public.cardtrader_pokemon_blueprints`. Frankfurt image hosts are
+Cloudflare-403; use netns `igvpn` (nezopt) or `ctvpn` (peer1 WARP). Full
+multithread (`--image-concurrency` 12–16, both games in parallel).
+
 ## Crypto swap / bridge
 
 `workflows/swap_bridge-workflow.md`

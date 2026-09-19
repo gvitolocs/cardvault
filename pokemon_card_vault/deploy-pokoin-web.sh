@@ -93,6 +93,15 @@ fi
 
 flutter build web --release --pwa-strategy=none "${FLUTTER_DEFINES[@]}"
 
+# Vercel serves filesystem index.html at `/` before rewrites. Put the
+# static landing on index.html and keep the Flutter shell at app.html.
+if [[ ! -f "$ROOT_DIR/build/web/home.html" ]]; then
+  echo "ERROR: static landing home.html missing from Flutter web output." >&2
+  exit 1
+fi
+cp "$ROOT_DIR/build/web/index.html" "$ROOT_DIR/build/web/app.html"
+cp "$ROOT_DIR/build/web/home.html" "$ROOT_DIR/build/web/index.html"
+
 if [[ "$USE_ORACLE_API_MODE" == "1" ]]; then
   rm -rf "$ROOT_DIR/build/web/api" "$ROOT_DIR/build/web/server"
   if [[ -d "$ROOT_DIR/web/api" ]]; then
@@ -104,8 +113,11 @@ else
 rm -rf "$ROOT_DIR/build/web/api"
 mkdir -p "$ROOT_DIR/build/web/api"
 mkdir -p "$ROOT_DIR/build/web/server"
-for helper in _artist_display _bitcoin_payout _cardtrader_client _cardtrader_crypto _cardtrader_daily_listings_refresh _cardtrader_integration _crypto_pkn_purchase _email _firebase _firebase_roles _marketplace_card_emoji _marketplace_card_rarity _marketplace_cart_analytics _marketplace_db _marketplace_sale_notifications _marketplace_search_engine _marketplace_watchlist_analytics _meili_client _meili_marketplace _native_pkn _pending_signup _pkn_checkout_pricing _pkn_purchase _r2 _search_debug_auth _searchbar_session _seller_comment_filter _slug _social_autoposter _supabase _username _wpkn_exchange _wpkn_pkn_market_quote; do
+for helper in _artist_display _bitcoin_payout _cardtrader_client _cardtrader_crypto _cardtrader_daily_listings_refresh _cardtrader_integration _crypto_pkn_purchase _email _firebase _firebase_roles _marketplace_canonical_path _marketplace_card_emoji _marketplace_card_rarity _marketplace_cart_analytics _marketplace_db _marketplace_react_card _marketplace_row _marketplace_sale_notifications _marketplace_search_engine _marketplace_watchlist_analytics _meili_client _meili_document _meili_marketplace _meili_suggest _native_pkn _pending_signup _pkn_checkout_pricing _pkn_purchase _r2 _search_debug_auth _searchbar_session _seller_comment_filter _slug _social_autoposter _supabase _username _wpkn_exchange _wpkn_pkn_market_quote; do
   cp "$ROOT_DIR/api/${helper}.js" "$ROOT_DIR/build/web/server/${helper}.js"
+done
+for colocated_helper in _meili_document _meili_suggest _marketplace_react_card _marketplace_row _marketplace_canonical_path; do
+  cp "$ROOT_DIR/api/${colocated_helper}.js" "$ROOT_DIR/build/web/api/${colocated_helper}.js"
 done
 for endpoint in \
   auth-login \
@@ -140,6 +152,7 @@ for endpoint in \
   marketplace-card-versions \
   marketplace-card-seo \
   marketplace-card-sales \
+  marketplace-card-last-median \
   marketplace-card-shortlink \
   marketplace-card-url \
   marketplace-cart \
@@ -155,10 +168,17 @@ for endpoint in \
   marketplace-expansion-symbols \
   marketplace-expansions \
   marketplace-autocomplete \
+  marketplace-suggest \
+  marketplace-home-page \
+  marketplace-search-page \
+  marketplace-card-page \
+  marketplace-expansion-page \
   marketplace-hot-blueprints \
+  marketplace-image-log \
   marketplace-home \
   marketplace-search-candidates \
   marketplace-watchlist \
+  marketplace-recents \
   marketplace-orders \
   searchbar-cancel \
   searchbar-cards \
@@ -186,10 +206,11 @@ for endpoint in \
   wallet-link-complete \
   wallet-link-session \
   wpkn-exchange \
-  wpkn-pkn-quote; do
+  wpkn-pkn-quote
+do
   cp "$ROOT_DIR/api/${endpoint}.js" "$ROOT_DIR/build/web/api/${endpoint}.js"
 done
-for marketplace_endpoint in cardmarket-redirect cardmarket-scrape-observation cardtrader-blueprint-listings cardtrader-clean-listings cardtrader-connect cardtrader-daily-listings-refresh cardtrader-disconnect cardtrader-import-dry-run cardtrader-live-listings cardtrader-status deck-card-version-lookup extension-card-search flutter-debug-logs limitless-expansion-blueprints marketplace-artist-cards marketplace-artist-suggestions marketplace-autocomplete marketplace-blueprint-price marketplace-card-cheapest-price marketplace-card-sales marketplace-card-seo marketplace-card-shortlink marketplace-card-url marketplace-card-versions marketplace-cart marketplace-cards marketplace-cardmarket-guess-review marketplace-competitive marketplace-debug-cardtrader-blueprints marketplace-debug-artists marketplace-debug-events marketplace-debug-refinement marketplace-event marketplace-listings marketplace-orders marketplace-expansion-symbols marketplace-expansions marketplace-hot-blueprints marketplace-home marketplace-search-candidates marketplace-watchlist searchbar-cards searchbar-token-predict user-current-page; do
+for marketplace_endpoint in cardmarket-redirect cardmarket-scrape-observation cardtrader-blueprint-listings cardtrader-clean-listings cardtrader-connect cardtrader-daily-listings-refresh cardtrader-disconnect cardtrader-import-dry-run cardtrader-live-listings cardtrader-status deck-card-version-lookup extension-card-search flutter-debug-logs limitless-expansion-blueprints marketplace-artist-cards marketplace-artist-suggestions marketplace-autocomplete marketplace-suggest marketplace-home-page marketplace-search-page marketplace-card-page marketplace-expansion-page marketplace-blueprint-price marketplace-card-cheapest-price marketplace-card-sales marketplace-card-last-median marketplace-card-seo marketplace-card-shortlink marketplace-card-url marketplace-card-versions marketplace-cart marketplace-cards marketplace-cardmarket-guess-review marketplace-competitive marketplace-debug-cardtrader-blueprints marketplace-debug-artists marketplace-debug-events marketplace-debug-refinement marketplace-event marketplace-listings marketplace-orders marketplace-expansion-symbols marketplace-expansions marketplace-hot-blueprints marketplace-home marketplace-image-log marketplace-search-candidates marketplace-watchlist marketplace-recents searchbar-cards searchbar-token-predict user-current-page; do
   sed -i.bak "s|require('./_marketplace_db')|require('../server/_marketplace_db')|" \
     "$ROOT_DIR/build/web/api/${marketplace_endpoint}.js"
   sed -i.bak 's|require("./_marketplace_db")|require("../server/_marketplace_db")|' \
@@ -233,6 +254,14 @@ for marketplace_endpoint in cardmarket-redirect cardmarket-scrape-observation ca
   sed -i.bak "s|require('./_slug')|require('../server/_slug')|" \
     "$ROOT_DIR/build/web/api/${marketplace_endpoint}.js"
   sed -i.bak 's|require("./_slug")|require("../server/_slug")|' \
+    "$ROOT_DIR/build/web/api/${marketplace_endpoint}.js"
+  sed -i.bak "s|require('./_marketplace_canonical_path')|require('../server/_marketplace_canonical_path')|" \
+    "$ROOT_DIR/build/web/api/${marketplace_endpoint}.js"
+  sed -i.bak 's|require("./_marketplace_canonical_path")|require("../server/_marketplace_canonical_path")|' \
+    "$ROOT_DIR/build/web/api/${marketplace_endpoint}.js"
+  sed -i.bak "s|require('./_marketplace_row')|require('../server/_marketplace_row')|" \
+    "$ROOT_DIR/build/web/api/${marketplace_endpoint}.js"
+  sed -i.bak 's|require("./_marketplace_row")|require("../server/_marketplace_row")|' \
     "$ROOT_DIR/build/web/api/${marketplace_endpoint}.js"
   sed -i.bak "s|require('./_firebase')|require('../server/_firebase')|" \
     "$ROOT_DIR/build/web/api/${marketplace_endpoint}.js"

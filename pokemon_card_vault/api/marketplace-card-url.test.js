@@ -11,22 +11,22 @@ const {
   slugsEquivalent,
 } = require('./marketplace-card-url')._test;
 
-test('canonical URL lookup keeps direct root card id only', () => {
+test('canonical URL lookup uses our id from the path, plus ct_id', () => {
   assert.deepEqual(
-    candidateCardIdsForLookup({ path: '/497536/some-slug' }),
-    ['497536'],
+    candidateCardIdsForLookup({ path: '/220962/some-slug' }),
+    ['220962', '110481'],
   );
 });
 
 test('canonical URL lookup keeps normal direct cardId queries direct', async () => {
   const lookup = await canonicalCardUrlForLookup({
-    cardId: '316600',
+    cardId: '633200',
   }, async (sql, values) => {
     assert.match(sql, /marketplace_card_urls/);
-    assert.deepEqual(values, [[316600], 'en', '']);
+    assert.deepEqual(values, [[633200], 'en', '']);
     return {
       rows: [{
-        card_id: '316600',
+        card_id: '633200',
         language: 'en',
         canonical_path:
           '/marketplace/en/cards/633200/card-leafeon-005-131-prismatic-evolutions',
@@ -35,7 +35,7 @@ test('canonical URL lookup keeps normal direct cardId queries direct', async () 
   });
 
   assert.deepEqual(lookup, {
-    cardId: '316600',
+    cardId: '633200',
     language: 'en',
     canonicalPath:
       '/marketplace/en/cards/633200/card-leafeon-005-131-prismatic-evolutions',
@@ -43,15 +43,16 @@ test('canonical URL lookup keeps normal direct cardId queries direct', async () 
   });
 });
 
-test('canonical URL lookup uses legacy override for colliding Drifloon public number', async () => {
+test('canonical URL lookup treats 248768 as Drifloon our id', async () => {
   const lookup = await canonicalCardUrlForLookup({
     cardId: '248768',
   }, async (sql, values) => {
     assert.match(sql, /marketplace_card_urls/);
-    assert.deepEqual(values, [[124384], 'en', '']);
+    assert.deepEqual(values, [[248768, 124384], 'en', '']);
     return {
       rows: [{
-        card_id: '124384',
+        card_id: '248768',
+        ct_id: '124384',
         language: 'en',
         canonical_path:
           '/marketplace/en/cards/248768/uncommon-drifloon-lv-17-non-holo-promo-6-17-pop-series-6',
@@ -60,7 +61,7 @@ test('canonical URL lookup uses legacy override for colliding Drifloon public nu
   });
 
   assert.deepEqual(lookup, {
-    cardId: '124384',
+    cardId: '248768',
     language: 'en',
     canonicalPath:
       '/marketplace/en/cards/248768/uncommon-drifloon-lv-17-non-holo-promo-6-17-pop-series-6',
@@ -68,12 +69,19 @@ test('canonical URL lookup uses legacy override for colliding Drifloon public nu
   });
 });
 
-test('canonical URL lookup decodes public number for canonical marketplace path', () => {
+test('canonical URL lookup keeps our id on /marketplace/{ourId} short path', () => {
+  assert.deepEqual(
+    candidateCardIdsForLookup({ path: '/marketplace/220962' }),
+    ['220962', '110481'],
+  );
+});
+
+test('canonical URL lookup uses our id from canonical marketplace path', () => {
   assert.deepEqual(
     candidateCardIdsForLookup({
-      path: '/marketplace/en/cards/497536/card-drifloon-6-17-pop-series-6',
+      path: '/marketplace/en/cards/220962/card-espurr-58-122-breakpoint',
     }),
-    ['248768'],
+    ['220962', '110481'],
   );
 });
 
@@ -111,42 +119,43 @@ test('canonical URL slug matcher folds Pokémon accent legacy route', () => {
 
 test('canonical URL lookup returns stored database canonical path', async () => {
   const lookup = await canonicalCardUrlForLookup({
-    path: '/marketplace/en/cards/497536/card-drifloon-6-17-pop-series-6',
+    path: '/marketplace/en/cards/220962/card-espurr-58-122-breakpoint',
   }, async (sql, values) => {
     assert.match(sql, /marketplace_card_urls/);
-    assert.deepEqual(values, [[248768], 'en', '497536']);
+    assert.deepEqual(values, [[220962, 110481], 'en', '220962']);
     return {
       rows: [{
-        card_id: '248768',
+        card_id: '220962',
         language: 'en',
-        canonical_path: '/marketplace/en/cards/497536/db-backed-drifloon',
+        canonical_path: '/marketplace/en/cards/220962/card-espurr-58-122-breakpoint',
+        public_number: '220962',
       }],
     };
   });
 
   assert.deepEqual(lookup, {
-    cardId: '248768',
+    cardId: '220962',
     language: 'en',
-    canonicalPath: '/marketplace/en/cards/497536/db-backed-drifloon',
-    publicNumber: '497536',
+    canonicalPath: '/marketplace/en/cards/220962/card-espurr-58-122-breakpoint',
+    publicNumber: '220962',
   });
 });
 
-test('canonical URL lookup prefers decoded id when stale public number collides', async () => {
+test('canonical URL lookup prefers the path our-id when rows collide', async () => {
   const lookup = await canonicalCardUrlForLookup({
     path: '/marketplace/en/cards/502864/card-poliwhirl-176-165-pok-mon-card-151',
   }, async (sql, values) => {
     assert.match(sql, /marketplace_card_urls/);
-    assert.deepEqual(values, [[251432], 'en', '502864']);
+    assert.deepEqual(values, [[502864, 251432], 'en', '502864']);
     return {
       rows: [
         {
-          card_id: '502864',
+          card_id: '1005728',
           language: 'en',
           canonical_path: '/marketplace/en/cards/1005728/card-some-other-card',
         },
         {
-          card_id: '251432',
+          card_id: '502864',
           language: 'en',
           canonical_path:
             '/marketplace/en/cards/502864/card-poliwhirl-176-165-pokemon-card-151',
@@ -156,7 +165,7 @@ test('canonical URL lookup prefers decoded id when stale public number collides'
   });
 
   assert.deepEqual(lookup, {
-    cardId: '251432',
+    cardId: '502864',
     language: 'en',
     canonicalPath:
       '/marketplace/en/cards/502864/card-poliwhirl-176-165-pokemon-card-151',
@@ -164,7 +173,7 @@ test('canonical URL lookup prefers decoded id when stale public number collides'
   });
 });
 
-test('canonical URL lookup returns Cresselia DB path without rarity slug', async () => {
+test('canonical URL lookup still finds leftover odd ct_id queries', async () => {
   const lookup = await canonicalCardUrlForLookup({
     cardId: '122739',
     language: 'en',
@@ -173,7 +182,8 @@ test('canonical URL lookup returns Cresselia DB path without rarity slug', async
     assert.deepEqual(values, [[122739], 'en', '']);
     return {
       rows: [{
-        card_id: '122739',
+        card_id: '245478',
+        ct_id: '122739',
         language: 'en',
         canonical_path:
           '/marketplace/en/cards/245478/card-cresselia-lv-43-2-100-majestic-dawn',
@@ -182,7 +192,7 @@ test('canonical URL lookup returns Cresselia DB path without rarity slug', async
   });
 
   assert.deepEqual(lookup, {
-    cardId: '122739',
+    cardId: '245478',
     language: 'en',
     canonicalPath:
       '/marketplace/en/cards/245478/card-cresselia-lv-43-2-100-majestic-dawn',
@@ -190,16 +200,16 @@ test('canonical URL lookup returns Cresselia DB path without rarity slug', async
   });
 });
 
-test('canonical URL lookup resolves Cresselia public number route to DB path', async () => {
+test('canonical URL lookup resolves Cresselia our-id route to DB path', async () => {
   const lookup = await canonicalCardUrlForLookup({
     path:
       '/marketplace/en/cards/245478/card-cresselia-lv-43-holo-rare-2-100-majestic-dawn',
   }, async (sql, values) => {
     assert.match(sql, /marketplace_card_urls/);
-    assert.deepEqual(values, [[122739], 'en', '245478']);
+    assert.deepEqual(values, [[245478, 122739], 'en', '245478']);
     return {
       rows: [{
-        card_id: '122739',
+        card_id: '245478',
         language: 'en',
         canonical_path:
           '/marketplace/en/cards/245478/card-cresselia-lv-43-2-100-majestic-dawn',
@@ -208,11 +218,37 @@ test('canonical URL lookup resolves Cresselia public number route to DB path', a
   });
 
   assert.deepEqual(lookup, {
-    cardId: '122739',
+    cardId: '245478',
     language: 'en',
     canonicalPath:
       '/marketplace/en/cards/245478/card-cresselia-lv-43-2-100-majestic-dawn',
     publicNumber: '245478',
+  });
+});
+
+test('canonical URL lookup resolves /marketplace/{ourId} without doubling again', async () => {
+  const lookup = await canonicalCardUrlForLookup({
+    path: '/marketplace/220962',
+  }, async (sql, values) => {
+    assert.match(sql, /public_number/);
+    assert.deepEqual(values, [[220962, 110481], 'en', '220962']);
+    return {
+      rows: [{
+        card_id: '220962',
+        language: 'en',
+        canonical_path:
+          '/marketplace/en/cards/220962/card-espurr-58-122-breakpoint',
+        public_number: '220962',
+      }],
+    };
+  });
+
+  assert.deepEqual(lookup, {
+    cardId: '220962',
+    language: 'en',
+    canonicalPath:
+      '/marketplace/en/cards/220962/card-espurr-58-122-breakpoint',
+    publicNumber: '220962',
   });
 });
 
@@ -221,9 +257,9 @@ test('canonical URL handler responds with canonicalPath JSON', async () => {
   const handler = createHandler({
     query: async () => ({
       rows: [{
-        card_id: '248768',
+        card_id: '220962',
         language: 'en',
-        canonical_path: '/marketplace/en/cards/497536/db-backed-drifloon',
+        canonical_path: '/marketplace/en/cards/220962/card-espurr-58-122-breakpoint',
       }],
     }),
   });
@@ -247,15 +283,15 @@ test('canonical URL handler responds with canonicalPath JSON', async () => {
 
   await handler({
     method: 'GET',
-    url: '/api/marketplace-card-url?path=%2Fmarketplace%2Fen%2Fcards%2F497536%2Fcard-drifloon-6-17-pop-series-6',
+    url: '/api/marketplace-card-url?path=%2Fmarketplace%2Fen%2Fcards%2F220962%2Fcard-espurr-58-122-breakpoint',
     headers: { host: 'pokoin.com' },
   }, res);
 
   assert.equal(res.statusCode, 200);
   assert.equal(
     res.body.canonicalPath,
-    '/marketplace/en/cards/497536/db-backed-drifloon',
+    '/marketplace/en/cards/220962/card-espurr-58-122-breakpoint',
   );
-  assert.equal(res.body.publicNumber, '497536');
+  assert.equal(res.body.publicNumber, '220962');
   assert.match(headers['cache-control'], /s-maxage=300/);
 });

@@ -104,3 +104,29 @@ test('CardTrader cart guard blocks non-empty cart before purchase', async () => 
     () => _test.assertCardTraderCartIsEmpty('token', { getCart: async () => ({ items: [] }) }),
   );
 });
+
+test('physical checkout uses escrow; NFT-only does not', () => {
+  const { _test } = loadMarketplaceOrdersWithStubs();
+  assert.equal(_test.physicalUsesEscrow('physical'), true);
+  assert.equal(_test.physicalUsesEscrow('nft_only'), false);
+});
+
+test('not-shipped refund waits 7 days and only while PKN is still in escrow', () => {
+  const { _test } = loadMarketplaceOrdersWithStubs();
+  const now = Date.parse('2026-09-17T00:00:00.000Z');
+  assert.equal(_test.canAutoRefundNotShipped({
+    paymentStatus: 'escrow',
+    fulfillmentStatus: 'awaiting_shipment',
+    createdAt: '2026-09-10T00:00:00.000Z',
+  }, now), true);
+  assert.equal(_test.canAutoRefundNotShipped({
+    paymentStatus: 'escrow',
+    fulfillmentStatus: 'awaiting_shipment',
+    createdAt: '2026-09-16T00:00:00.000Z',
+  }, now), false);
+  assert.equal(_test.canAutoRefundNotShipped({
+    paymentStatus: 'escrow',
+    shippedAt: '2026-09-11T00:00:00.000Z',
+    createdAt: '2026-09-10T00:00:00.000Z',
+  }, now), false);
+});

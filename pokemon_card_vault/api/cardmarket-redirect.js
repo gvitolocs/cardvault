@@ -1,4 +1,10 @@
 const { marketplaceQuery } = require("./_marketplace_db");
+const { catalogIdsForAnyGame, cleanMarketplaceId } = require("./_marketplace_leftover");
+const {
+  parseGameFromRequest,
+  runWithGame,
+  currentGame,
+} = require("./_marketplace_game");
 
 const KNOWN_CARDMARKET_SET_CODES = new Map([
   ["Call of Legends", "CL"],
@@ -179,8 +185,7 @@ const KNOWN_NAME_ONLY_TRAINER_EXPANSIONS = new Set([
 ]);
 
 function cleanBlueprintId(value) {
-  const id = String(value || "").trim();
-  return /^\d{1,12}$/.test(id) ? id : "";
+  return cleanMarketplaceId(value);
 }
 
 function slugPart(value) {
@@ -291,9 +296,23 @@ function likelyNameOnlyCardmarketSlug(row) {
   return false;
 }
 
-function cardmarketSearchFallbackUrl(row, locale) {
-  const searchString = cardNameSearchString(row.name);
+function cardmarketGamePath(game) {
+  if (game === "one_piece") return "OnePiece";
+  if (game === "riftbound") return "Riftbound";
+  return "Pokemon";
+}
+
+function cardmarketSearchFallbackUrl(row, locale, game = "pokemon") {
+  const searchString = cardmarketSearchString(row, game);
   const targetLocale = /^[a-z]{2}$/.test(locale) ? locale : "en";
+  const gamePath = cardmarketGamePath(game);
+  if (game !== "pokemon") {
+    const url = new URL(
+      `https://www.cardmarket.com/${targetLocale}/${gamePath}/Products/Search`,
+    );
+    url.searchParams.set("searchString", searchString);
+    return url.toString();
+  }
   const url = new URL(
     `https://www.cardmarket.com/${targetLocale}/Pokemon/Products/Singles`,
   );
@@ -304,6 +323,34 @@ function cardmarketSearchFallbackUrl(row, locale) {
   url.searchParams.set("idRarity", "0");
   url.searchParams.set("perSite", "30");
   return url.toString();
+}
+
+/** Left of `/` after a rarity pipe. `Illustration Rare | 184/182` → `184`. */
+function collectorHash(number) {
+  let text = String(number || "").trim();
+  const pipe = text.indexOf("|");
+  if (pipe > 0) {
+    const right = text.slice(pipe + 1).trim();
+    if (right) text = right;
+  }
+  if (!text) return "";
+  return text.split("/")[0].trim();
+}
+
+/**
+ * Same fields as Silver VT: name + collector, not set name and not 184/182.
+ * Pokemon keeps the existing first-token name (`dawn 129`).
+ */
+function cardmarketSearchString(row, game = "pokemon") {
+  const number = collectorHash(
+    row?.expansion_number || row?.card_number || row?.number || "",
+  );
+  if (game === "pokemon") {
+    const name = cardNameSearchString(row?.name);
+    return [name, number].filter(Boolean).join(" ");
+  }
+  const name = String(row?.name || "").trim();
+  return [name, number].filter(Boolean).join(" ");
 }
 
 function cardNameSearchString(name) {
@@ -414,7 +461,7 @@ async function rowForBlueprint(id) {
         join target
           on target.expansion_name = versions.expansion_name
          and target.name = versions.name
-        where versions.product_type = 'card'
+        where versions.product_type in ('card', 'jumbo')
       )
       select
         ranked.card_id,
@@ -431,7 +478,7 @@ async function rowForBlueprint(id) {
         expansions.code as expansion_code,
         cards.card_type
       from ranked
-      left join public.cardtrader_pokemon_expansions expansions
+      left join public.pokoin_pokemon_expansions expansions
         on expansions.name = ranked.expansion_name
       left join public.marketplace_cards cards
         on cards.card_id = ranked.card_id
@@ -488,7 +535,7 @@ async function rowForBlueprint(id) {
         join target
           on target.expansion_name = versions.expansion_name
          and target.name = versions.name
-        where versions.product_type = 'card'
+        where versions.product_type in ('card', 'jumbo')
       )
       select
         ranked.card_id,
@@ -505,7 +552,7 @@ async function rowForBlueprint(id) {
         expansions.code as expansion_code,
         cards.card_type
       from ranked
-      left join public.cardtrader_pokemon_expansions expansions
+      left join public.pokoin_pokemon_expansions expansions
         on expansions.name = ranked.expansion_name
       left join public.marketplace_cards cards
         on cards.card_id = ranked.card_id
@@ -575,13 +622,22 @@ module.exports = async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed." });
   }
 
+  const game = parseGameFromRequest(req);
+  return runWithGame(game, async () => {
   try {
     const requestUrl = new URL(
       req.url,
       `https://${req.headers.host || "pokoin.com"}`,
     );
-    const id = cleanBlueprintId(requestUrl.searchParams.get("id"));
-    if (!id) {
+    const id = cleanBlueprintId(
+      requestUrl.searchParams.get("id") || requestUrl.searchParams.get("cardId"),
+    );
+    const hinted = cleanBlueprintId(
+      requestUrl.searchParams.get("blueprintId") ||
+        requestUrl.searchParams.get("ct_id") ||
+        requestUrl.searchParams.get("ctId"),
+    );
+    if (!id && !hinted) {
       return res
         .status(400)
         .json({ error: "Missing or invalid blueprint id." });
@@ -590,11 +646,43 @@ module.exports = async function handler(req, res) {
     const requestedLocale = requestUrl.searchParams.get("locale") || "";
     const locale = /^[a-z]{2}$/.test(requestedLocale) ? requestedLocale : "en";
     const wantsJson = requestUrl.searchParams.get("format") === "json";
-    const row = await rowForBlueprint(id);
+    let resolved = null;
+    try {
+      resolved = await catalogIdsForAnyGame(id || hinted);
+    } catch (error) {
+      if (error.code !== "42P01") throw error;
+    }
+    const activeGame = resolved?.game || currentGame();
+    const pokemonCatalog = activeGame === "pokemon";
+    const leftover =
+      hinted && hinted !== id ? hinted : resolved?.ctId || "";
+    const publicId = resolved?.cardId || id || "";
+    let row = null;
+    try {
+      row = publicId ? await rowForBlueprint(publicId) : null;
+      if (!row && leftover && leftover !== publicId) {
+        row = await rowForBlueprint(leftover);
+      }
+    } catch (error) {
+      if (error.code !== "42P01") throw error;
+    }
+    if (!row && resolved?.name) {
+      row = {
+        card_id: leftover || publicId,
+        name: resolved.name,
+        expansion_name: resolved.setName,
+        expansion_number: resolved.cardNumber,
+      };
+    } else if (row && !row.expansion_number && resolved?.cardNumber) {
+      row = { ...row, expansion_number: resolved.cardNumber };
+    }
     if (!row) {
       return res.status(404).json({ error: "Blueprint not found." });
     }
-    const storedUrl = await storedUrlForBlueprint(id, locale);
+    const storedKey = leftover || resolved?.ctId || id;
+    const storedUrl = pokemonCatalog
+      ? await storedUrlForBlueprint(storedKey, locale)
+      : "";
     if (isMisprintRow(row)) {
       res.setHeader("Cache-Control", "no-store");
       return res.status(409).json({
@@ -605,9 +693,13 @@ module.exports = async function handler(req, res) {
     }
     let target = storedUrl;
     if (!target) {
-      target = canGenerateDirectProductUrl(row)
-        ? candidateUrls(row, locale)[0]
-        : cardmarketSearchFallbackUrl(row, locale);
+      if (!pokemonCatalog) {
+        target = cardmarketSearchFallbackUrl(row, locale, activeGame);
+      } else {
+        target = canGenerateDirectProductUrl(row)
+          ? candidateUrls(row, locale)[0]
+          : cardmarketSearchFallbackUrl(row, locale, activeGame);
+      }
     }
     if (!target) {
       return res
@@ -629,11 +721,12 @@ module.exports = async function handler(req, res) {
       error: error.message || "Cardmarket redirect failed.",
     });
   }
+  });
 };
 
 module.exports.candidateUrls = candidateUrls;
 module.exports.cardmarketSearchFallbackUrl = cardmarketSearchFallbackUrl;
+module.exports.cardmarketSearchString = cardmarketSearchString;
 module.exports.canGenerateDirectProductUrl = canGenerateDirectProductUrl;
-
-module.exports.candidateUrls = candidateUrls;
+module.exports.cardmarketGamePath = cardmarketGamePath;
 module.exports.cleanBlueprintId = cleanBlueprintId;

@@ -66,6 +66,8 @@ const {
   cacheControlForRequest,
   isSearchCanceled,
   setCorsHeaders,
+  hydrateCanonicalPathsForRows,
+  attachCanonicalPath,
 } = require('./marketplace-autocomplete');
 const { mergeSearchRows } = require('./marketplace-search-candidates');
 const {
@@ -4189,4 +4191,43 @@ test('pokemon name prefixes beat expansion and set-name pool noise', () => {
   );
 
   assert.equal(results[0].name, 'Miraidon');
+});
+
+test('autocomplete hydrates doubled-id canonical paths when marketplace_card_urls is empty', async () => {
+  const rows = [
+    {
+      card_id: '220962',
+      name: 'Espurr',
+      set_name: 'BREAKpoint',
+      card_number: '58/122',
+      rarity: 'Reverse Holo',
+    },
+  ];
+  const hydrated = await hydrateCanonicalPathsForRows(rows, async () => ({ rows: [] }));
+  assert.equal(
+    hydrated[0].canonical_path,
+    '/marketplace/en/cards/220962/reverse-holo-espurr-58-122-breakpoint',
+  );
+  assert.equal(hydrated[0].canonicalPath, hydrated[0].canonical_path);
+});
+
+test('autocomplete keeps stored marketplace canonical path and publicizes leftover odd ct ids', () => {
+  const stored = attachCanonicalPath({
+    card_id: '110481',
+    name: 'Espurr',
+    canonical_path: '/marketplace/en/cards/220962/db-backed-espurr',
+  });
+  assert.equal(stored.canonical_path, '/marketplace/en/cards/220962/db-backed-espurr');
+
+  const synthesized = attachCanonicalPath({
+    card_id: '299053',
+    name: 'Dachsbun ex',
+    set_name: 'Stellar Crown',
+    card_number: 'Special Illustration Rare | 169/142',
+    rarity: 'Special Illustration Rare',
+  });
+  assert.equal(
+    synthesized.canonical_path,
+    '/marketplace/en/cards/598106/special-illustration-rare-dachsbun-ex-special-illustration-rare-169-142-stellar-crown',
+  );
 });

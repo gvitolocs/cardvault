@@ -68,15 +68,20 @@ function cleanNumericId(value) {
 }
 
 function canonicalCardPath(card = {}) {
-  const cardId = cleanNumericId(card.cardId || card.card_id || card.id || card.blueprintId || card.blueprint_id);
+  const catalogId = cleanNumericId(card.cardId || card.card_id || card.id);
+  const blueprintId = cleanNumericId(card.blueprintId || card.blueprint_id);
+  const cardId = catalogId
+    || (blueprintId ? String(Number(blueprintId) * 2) : '');
   if (!cardId) return '';
+  const numericId = Number(cardId);
+  const ourId = numericId % 2 === 1 ? numericId * 2 : numericId;
   const slug = [
     card.rarity || 'Card',
     card.name || card.cardName || card.title,
     card.collectorNumber || card.collector_number || card.cardNumber || card.card_number,
     card.setName || card.set_name || card.expansionName || card.expansion_name,
   ].map(slugPart).filter(Boolean).join('-');
-  return slug ? `/marketplace/en/cards/${Number(cardId) * 2}/${slug}` : '';
+  return slug ? `/marketplace/en/cards/${ourId}/${slug}` : '';
 }
 
 function publicCardUrl(card = {}, env = process.env) {
@@ -475,9 +480,16 @@ function cleanLimit(value, fallback = 12) {
 }
 
 function mapCardRow(row = {}) {
+  const catalogId = cleanNumericId(row.card_id);
+  const ctId = cleanNumericId(row.ct_id || row.blueprint_id);
+  const ourId = catalogId
+    ? (Number(catalogId) % 2 === 1 ? String(Number(catalogId) * 2) : catalogId)
+    : (ctId ? String(Number(ctId) * 2) : '');
   const card = {
-    cardId: String(row.card_id || row.blueprint_id || ''),
-    blueprintId: String(row.blueprint_id || row.card_id || ''),
+    cardId: ourId,
+    blueprintId: ctId || (catalogId && Number(catalogId) % 2 === 0
+      ? String(Number(catalogId) / 2)
+      : catalogId || ''),
     name: row.name || row.card_name || '',
     setName: row.set_name || row.expansion_name || '',
     cardNumber: row.card_number || row.collector_number || row.expansion_number || '',
@@ -535,10 +547,10 @@ async function fetchCardById(cardId, query = marketplaceQuery) {
         price.listed_quantity
       from public.marketplace_search_candidates c
       left join public.marketplace_blueprint_artists artist
-        on artist.blueprint_id = c.card_id
+        on artist.card_id = c.card_id
       left join public.marketplace_blueprint_price_summary price
-        on price.blueprint_id = c.card_id
-      where c.card_id = $1::bigint
+        on price.blueprint_id = coalesce(c.ct_id, c.card_id)
+      where c.card_id = $1::bigint or c.ct_id = $1::bigint
       limit 1
     `,
     [cleanId],
@@ -586,7 +598,8 @@ async function selectHotCard(options = {}) {
         price.listed_quantity
       from hot
       left join public.marketplace_search_candidates c
-        on c.card_id = hot.blueprint_id
+        on c.ct_id = hot.blueprint_id
+        or c.card_id = hot.blueprint_id * 2
       left join public.marketplace_blueprint_artists artist
         on artist.blueprint_id = hot.blueprint_id
       left join public.marketplace_blueprint_price_summary price

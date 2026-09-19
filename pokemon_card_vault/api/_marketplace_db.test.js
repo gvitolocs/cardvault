@@ -5,6 +5,7 @@ const {
   assertReadOnlySql,
   configuredMarketplaceReadReplicaDatabaseUrls,
   marketplaceDatabaseUrl,
+  marketplaceWriterDatabaseUrl,
   marketplaceAssistantReadOnlyConfigured,
   marketplaceAssistantReadOnlyDatabaseUrl,
   marketplaceAnalyticsSearchDatabaseUrls,
@@ -15,6 +16,28 @@ const {
   supabaseNameIndexConfigured,
   supabaseNameIndexDatabaseUrl,
 } = require('./_marketplace_db');
+
+test('writer database env prefers MARKETPLACE_WRITER_DATABASE_URL', () => {
+  const original = {
+    writer: process.env.MARKETPLACE_WRITER_DATABASE_URL,
+    primary: process.env.MARKETPLACE_DATABASE_URL,
+  };
+  try {
+    process.env.MARKETPLACE_DATABASE_URL = 'postgres://replica.example/db';
+    delete process.env.MARKETPLACE_WRITER_DATABASE_URL;
+    assert.equal(marketplaceWriterDatabaseUrl(), 'postgres://replica.example/db');
+    process.env.MARKETPLACE_WRITER_DATABASE_URL = 'postgres://writer.example/db';
+    assert.equal(marketplaceWriterDatabaseUrl(), 'postgres://writer.example/db');
+  } finally {
+    for (const [key, value] of Object.entries({
+      MARKETPLACE_WRITER_DATABASE_URL: original.writer,
+      MARKETPLACE_DATABASE_URL: original.primary,
+    })) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+});
 
 test('assistant read-only database env prefers explicit read-only URL', () => {
   const original = {

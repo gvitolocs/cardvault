@@ -21,6 +21,8 @@ const {
   supabaseNameIndexConfigured,
   supabaseNameIndexQuery,
 } = require('./_marketplace_db');
+const { canonicalPathForRow } = require('./_marketplace_canonical_path');
+const { normalizeMarketplaceRow } = require('./_marketplace_row');
 const { authorizeSearchDebugRequest } = require('./_search_debug_auth');
 const { requestHeader, verifyBearerToken } = require('./_firebase');
 const {
@@ -5833,6 +5835,19 @@ function dedupeRows(rows) {
   return result;
 }
 
+function attachCanonicalPath(row, lookupPath = '') {
+  const stored = String(
+    row.canonical_path || row.canonicalPath || lookupPath || '',
+  ).trim();
+  const path = canonicalPathForRow({
+    ...row,
+    canonical_path: stored,
+    canonicalPath: stored,
+  });
+  const withPath = path ? { ...row, canonical_path: path, canonicalPath: path } : row;
+  return normalizeMarketplaceRow(withPath);
+}
+
 async function hydrateCanonicalPathsForRows(rows, query = marketplaceQuery) {
   const sourceRows = Array.isArray(rows) ? rows : [];
   const missingIds = [...new Set(sourceRows
@@ -5840,36 +5855,32 @@ async function hydrateCanonicalPathsForRows(rows, query = marketplaceQuery) {
     .map((row) => Number(row.card_id || row.id || 0))
     .filter((id) => Number.isSafeInteger(id) && id > 0))];
   if (missingIds.length === 0) {
-    return sourceRows.map((row) => {
-      const path = String(row.canonical_path || row.canonicalPath || '').trim();
-      return path ? { ...row, canonical_path: path, canonicalPath: path } : row;
-    });
+    return sourceRows.map((row) => attachCanonicalPath(row));
   }
+  let pathById = new Map();
   try {
     const result = await query(
       `
         select card_id, canonical_path
         from public.marketplace_card_urls
-        where card_id = any($1::bigint[])
+        where (card_id = any($1::bigint[]) or ct_id = any($1::bigint[]))
           and language = 'en'
       `,
       [missingIds],
     );
-    const pathById = new Map(
-      result.rows.map((row) => [
+    pathById = new Map(
+      (result.rows || []).map((row) => [
         String(row.card_id || ''),
         String(row.canonical_path || '').trim(),
       ]),
     );
-    return sourceRows.map((row) => {
-      const existing = String(row.canonical_path || row.canonicalPath || '').trim();
-      const path = existing || pathById.get(String(row.card_id || row.id || '')) || '';
-      return path ? { ...row, canonical_path: path, canonicalPath: path } : row;
-    });
   } catch (error) {
     console.error('autocomplete canonical path hydration failed', error);
-    return sourceRows;
   }
+  return sourceRows.map((row) => {
+    const lookup = pathById.get(String(row.card_id || row.id || '')) || '';
+    return attachCanonicalPath(row, lookup);
+  });
 }
 
 async function hydrateProjectedRarityForRows(rows, query = marketplaceQuery) {
@@ -5941,7 +5952,7 @@ async function hydrateExpansionSymbolsForRows(rows, query = marketplaceQuery) {
         select
           name,
           min(symbol_image_url) as expansion_symbol_url
-        from public.cardtrader_pokemon_expansions
+        from public.pokoin_pokemon_expansions
         where name = any($1::text[])
           and coalesce(symbol_image_url, '') <> ''
         group by name
@@ -6777,7 +6788,7 @@ module.exports = async function handler(req, res) {
       const rankStarted = Date.now();
       const previewLimit = Math.min(resultLimit, AUTOCOMPLETE_PREVIEW_ROW_LIMIT);
       const ranked = (await hydrateExpansionSymbolsForRows(poolRows.slice(0, previewLimit)))
-        .map(withCardEmojiFields);
+        .map((row) => withCardEmojiFields(normalizeMarketplaceRow(row)));
       const rankDurationMs = Date.now() - rankStarted;
       const durationMs = Date.now() - started;
       const searchContext = buildSearchContext('', searchLanguage, poolRows, 'hot_analytics_pool', null, poolLimit);
@@ -6854,7 +6865,7 @@ module.exports = async function handler(req, res) {
       const rankedEntries = rankAutocompleteEntries(rows, searchTerm, previewLimit, analyticsBoosts);
       const ranked = (await hydrateExpansionSymbolsForRows(
         rankedEntries.map((entry) => entry.row),
-      )).map(withCardEmojiFields);
+      )).map((row) => withCardEmojiFields(normalizeMarketplaceRow(row)));
       const durationMs = Date.now() - started;
       res.setHeader('Cache-Control', cacheControlForRequest(req, 'public, max-age=5, s-maxage=30'));
       res.setHeader('Server-Timing', `autocomplete-name;dur=${durationMs}`);
@@ -6944,7 +6955,7 @@ module.exports = async function handler(req, res) {
     );
     const ranked = (await hydrateExpansionSymbolsForRows(
       rankedEntries.map((entry) => entry.row).slice(0, AUTOCOMPLETE_PREVIEW_ROW_LIMIT),
-    )).map(withCardEmojiFields);
+    )).map((row) => withCardEmojiFields(normalizeMarketplaceRow(row)));
     const rankDurationMs = Date.now() - rankStarted;
     const durationMs = Date.now() - started;
     const contextStrategy = candidateDebug?.tokenPlan?.strategy || 'ranked_pool';
@@ -7123,3 +7134,5 @@ module.exports.scoreExplanation = scoreExplanation;
 module.exports.scoreRow = scoreRow;
 module.exports.cacheControlForRequest = cacheControlForRequest;
 module.exports.setCorsHeaders = setCorsHeaders;
+module.exports.hydrateCanonicalPathsForRows = hydrateCanonicalPathsForRows;
+module.exports.attachCanonicalPath = attachCanonicalPath;

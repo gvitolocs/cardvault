@@ -12,15 +12,20 @@ Poko to a least-privilege read-only credential.
 
 ## Join Keys And URL Rules
 
-- `card_id` and `blueprint_id` refer to the same marketplace/Pokoin blueprint id
-  in marketplace card tables. Some tables keep `card_id` as text
-  (`marketplace_user_listings.card_id`) and must cast only after numeric checks.
-- Marketplace public card page ids are doubled blueprint ids:
-  `publicPageId = card_id * 2`. Internal queries should join by `card_id` /
-  `blueprint_id`, then use `marketplace_card_urls.canonical_path`.
-- `marketplace_card_urls.card_id` joins to
-  `marketplace_search_candidates.card_id` and stores the canonical internal card
-  path. Poko should navigate only to safe internal paths from this table.
+See `docs/marketplace-public-ids.md`. Three namespaces:
+
+- **Our id / URL:** `marketplace_cards.card_id` = leftover `ct_id` × 2.
+  Path numbers in `/{n}` and `/marketplace/en/cards/{n}/…` are this value.
+  Example Espurr `220962`.
+- **CardTrader leftover (`ct_id`) / Milo `id` / CDN:** same leftover blueprint.
+  CDN filenames `cdn.pokoin.com/{ct_id}_…`. Scan gallery manifests
+  `"identity": "ct_id"`. Join blueprints, listings, and image keys on
+  `ct_id` / `blueprint_id`, not our id. Public desk is this × 2. **Not**
+  a TCGplayer product id.
+
+- Navigate with `marketplace_card_urls.canonical_path` (path uses our id).
+  Refresh with `public.refresh_marketplace_card_urls()`. Some listing tables
+  still store CardTrader ids as text; cast only after numeric checks.
 - Limitless deck cards map to marketplace cards through
   `limitless_marketplace_expansion_blueprints.blueprint_id`, `set_code`,
   `collector_number`, and normalized card names.
@@ -31,7 +36,7 @@ Poko to a least-privilege read-only credential.
   cards/products. Internal table name is provider-specific; Poko must not mention
   the provider name to users. Key: `id`. Contains names, expansion JSON, image/CDN fields,
   editable properties, card palette, emoji, and raw blueprint data.
-- `cardtrader_pokemon_expansions`: marketplace expansion source rows used for set
+- `pokoin_pokemon_expansions`: marketplace expansion source rows used for set
   browsing and projection. Do not expose the provider name in chat.
 - `marketplace_cards`: projected marketplace card rows used by app search/browse
   surfaces before the richer candidate/version projections.
@@ -55,9 +60,13 @@ Poko to a least-privilege read-only credential.
 
 ## Card Enrichment Tables
 
-- `marketplace_blueprint_artists`: artist/illustrator authority keyed by
-  `blueprint_id`/generated `card_id`. Use `artist`, `illustrator`, and
-  `normalized_artist` for display and artist-themed recommendations.
+- `marketplace_blueprint_artists`: artist/illustrator authority keyed by leftover
+  `blueprint_id` (generated `card_id` = leftover × 2). Use `artist`,
+  `illustrator`, and `normalized_artist` for display and artist-themed
+  recommendations. Writers (OCR / io / CLIP) insert here only.
+- `marketplace_search_candidates.artist` / `illustrator`: display cache of that
+  credit, keyed by public `card_id`. Card-page and search read these columns.
+  Do not put artist into `search_text` or ranking.
 - `marketplace_artist_profiles`: artist profile text/images keyed by
   `normalized_artist`. Use for public artist context, not as a ranking source
   unless explicitly needed.

@@ -3,11 +3,14 @@ const test = require('node:test');
 
 const {
   artistCardsForSlug,
+  artistCoverTier,
   artistProfileFromRow,
   artistSummaries,
+  leftoverArtistImage,
   lookupAliasesForArtistName,
   normalizeArtistLookupName,
   normalizeArtistSlug,
+  pickArtistCover,
   slugAliasesForArtistSlug,
   projectedRaritySql,
 } = require('./marketplace-artist-cards');
@@ -45,6 +48,7 @@ test('artist endpoint keeps Pikachu Project slug aliases compatible', async () =
   const payload = await artistCardsForSlug({
     artistSlug: 'pikachu-project',
     limit: 5,
+    overlayCheapest: async (rows) => rows,
     query: async (sql, values) => {
       queries.push({ sql, values });
       return {
@@ -93,6 +97,7 @@ test('artist endpoint resolves Tomokazu Komiya slug without aliases', async () =
   const payload = await artistCardsForSlug({
     artistSlug: 'tomokazu-komiya',
     limit: 300,
+    overlayCheapest: async (rows) => rows,
     query: async (sql, values) => {
       queries.push({ sql, values });
       return {
@@ -117,6 +122,11 @@ test('artist endpoint resolves Tomokazu Komiya slug without aliases', async () =
   });
 
   assert.deepEqual(queries[0].values, [['tomokazu-komiya'], 300]);
+  assert.match(queries[0].sql, /marketplace_leftover_art_layouts/);
+  assert.match(queries[0].sql, /pokoin_version_sets/);
+  assert.match(queries[0].sql, /nullif\(candidates\.version, ''\) as version/);
+  assert.match(queries[0].sql, /candidates\.pokedex_sort/);
+  assert.match(queries[0].sql, /order by\s+candidates\.pokedex_sort asc nulls last/i);
   assert.equal(payload.artist.name, 'Tomokazu Komiya');
   assert.equal(payload.artist.normalizedArtist, 'tomokazu komiya');
   assert.equal(payload.artist.slug, 'tomokazu-komiya');
@@ -124,11 +134,77 @@ test('artist endpoint resolves Tomokazu Komiya slug without aliases', async () =
   assert.equal(payload.cards[0].artist, 'Tomokazu Komiya');
 });
 
+test('artist cards overlay listed PKN from cheapest_homepage_cache_blueprint', async () => {
+  const payload = await artistCardsForSlug({
+    artistSlug: 'tomokazu-komiya',
+    limit: 5,
+    overlayCheapest: async (rows) => rows.map((row) => (
+      String(row.card_id) === '522236'
+        ? { ...row, lowest_price_pkn: 226, listed_quantity: 103, has_cardtrader_listing: true }
+        : row
+    )),
+    query: async () => ({
+      rows: [
+        {
+          card_id: '522236',
+          name: 'Gastly',
+          expansion_name: '151',
+          expansion_number: '092/165',
+          blueprint_id: '261118',
+          artist: 'Tomokazu Komiya',
+          illustrator: 'Tomokazu Komiya',
+          normalized_artist: 'tomokazu komiya',
+          artist_slug: 'tomokazu-komiya',
+          artist_card_count: 250,
+          total_artist_card_count: 250,
+        },
+      ],
+    }),
+  });
+
+  assert.equal(payload.cards[0].lowest_price_pkn, 226);
+  assert.equal(payload.cards[0].has_cardtrader_listing, true);
+});
+
+test('artist cards include expansion nationality for print chips', async () => {
+  const queries = [];
+  const payload = await artistCardsForSlug({
+    artistSlug: 'sui',
+    limit: 5,
+    overlayCheapest: async (rows) => rows,
+    query: async (sql, values) => {
+      queries.push({ sql, values });
+      return {
+        rows: [
+          {
+            card_id: '1',
+            name: 'Jolteon',
+            expansion_name: '151',
+            expansion_number: '051/165',
+            nationality: 'western',
+            artist: 'sui',
+            illustrator: 'sui',
+            normalized_artist: 'sui',
+            artist_slug: 'sui',
+            artist_card_count: 2,
+            total_artist_card_count: 2,
+          },
+        ],
+      };
+    },
+  });
+
+  assert.match(queries[0].sql, /expansions\.nationality/);
+  assert.match(queries[0].sql, /min\(nationality\) as nationality/);
+  assert.equal(payload.cards[0].nationality, 'western');
+});
+
 test('artist card lookup filters by normalized artist slug and preserves card rows', async () => {
   const queries = [];
   const payload = await artistCardsForSlug({
     artistSlug: 'Raita Kazama',
     limit: 5,
+    overlayCheapest: async (rows) => rows,
     query: async (sql, values) => {
       queries.push({ sql, values });
       return {
@@ -183,6 +259,11 @@ test('artist card lookup filters by normalized artist slug and preserves card ro
   assert.match(queries[0].sql, /marketplace_card_urls urls/);
   assert.match(queries[0].sql, /urls\.canonical_path/);
   assert.match(queries[0].sql, /total_artist_card_count/);
+  assert.match(queries[0].sql, /blueprints\.id = versions\.ct_id/);
+  assert.match(queries[0].sql, /tcg_metadata\.card_id = versions\.card_id/);
+  assert.match(queries[0].sql, /tcg_metadata\.blueprint_id = versions\.ct_id/);
+  assert.doesNotMatch(queries[0].sql, /blueprints\.id = versions\.card_id/);
+  assert.doesNotMatch(queries[0].sql, /tcg_metadata\.blueprint_id = versions\.card_id/);
   assert.deepEqual(queries[0].values, [['raita-kazama'], 5]);
   assert.deepEqual(payload.artist, {
     name: 'Raita Kazama',
@@ -230,6 +311,7 @@ test('artist card lookup resolves Narumi Sato canonical slug', async () => {
   const payload = await artistCardsForSlug({
     artistSlug: 'narumi-sato',
     limit: 10,
+    overlayCheapest: async (rows) => rows,
     query: async (sql, values) => {
       queries.push({ sql, values });
       return {
@@ -272,6 +354,7 @@ test('artist card lookup projects illustration rarity from collector labels', as
   const payload = await artistCardsForSlug({
     artistSlug: 'Mitsuhiro Arita',
     limit: 5,
+    overlayCheapest: async (rows) => rows,
     query: async (sql, values) => {
       assert.match(sql, /split_part/);
       assert.match(sql, /as rarity/);
@@ -402,6 +485,7 @@ test('artist summaries expose visible artist card counts', async () => {
             artist_card_count: 0,
             visible_card_count: 213,
             image_url: 'https://cdn.pokoin.test/raita.webp',
+            cover_name: 'Pikachu',
           },
         ],
       };
@@ -412,6 +496,14 @@ test('artist summaries expose visible artist card counts', async () => {
   assert.match(queries[0].sql, /visible_card_count/);
   assert.match(queries[0].sql, /greatest\(/);
   assert.match(queries[0].sql, /marketplace_card_versions/);
+  assert.match(queries[0].sql, /cover_tier/);
+  assert.match(queries[0].sql, /\^pikachu/);
+  assert.match(queries[0].sql, /bulbasaur\|charmander\|squirtle/);
+  assert.match(queries[0].sql, /\^eevee/);
+  assert.match(queries[0].sql, /cheapest_homepage_cache_blueprint/);
+  assert.match(queries[0].sql, /cdn_image_url/);
+  assert.match(queries[0].sql, /marketplace_leftover_art_shades/);
+  assert.doesNotMatch(queries[0].sql, /preview_image_url/);
   assert.deepEqual(queries[0].values, [10]);
   assert.deepEqual(payload, [
     {
@@ -421,7 +513,44 @@ test('artist summaries expose visible artist card counts', async () => {
       slug: 'raita-kazama',
       cardCount: 213,
       imageUrl: 'https://cdn.pokoin.test/raita.webp',
+      coverName: 'Pikachu',
+      artShade: '',
       profileImageUrl: '',
     },
   ]);
+});
+
+test('illustrator cover prefers Pikachu, then a gen 1 starter, then Eevee, then listed PKN', () => {
+  assert.equal(artistCoverTier('Pikachu ex'), 1);
+  assert.equal(artistCoverTier('Charmander'), 2);
+  assert.equal(artistCoverTier('Eevee V'), 3);
+  assert.equal(artistCoverTier('Weedle'), 4);
+  assert.equal(leftoverArtistImage({
+    preview_image_url: 'https://cdn.pokoin.com/previews/111238_bill.jpg',
+    cdn_image_url: 'https://cdn.pokoin.com/111238_bill.jpg',
+  }), 'https://cdn.pokoin.com/111238_bill.jpg');
+  assert.equal(leftoverArtistImage({
+    image_url: 'https://cdn.pokoin.com/previews/321844_fezandipiti.jpg',
+  }), '');
+
+  const cover = pickArtistCover([
+    { name: 'Weedle', lowest_price_pkn: 9000, cdn_image_url: 'https://cdn.pokoin.test/weedle.jpg' },
+    { name: 'Charmander', lowest_price_pkn: 400, cdn_image_url: 'https://cdn.pokoin.test/charmander.jpg' },
+    { name: 'Pikachu', lowest_price_pkn: 222, cdn_image_url: 'https://cdn.pokoin.test/pika.jpg' },
+    { name: 'Eevee', lowest_price_pkn: 800, cdn_image_url: 'https://cdn.pokoin.test/eevee.jpg' },
+  ]);
+  assert.equal(cover.name, 'Pikachu');
+
+  const starter = pickArtistCover([
+    { name: 'Weedle', lowest_price_pkn: 9000, cdn_image_url: 'https://cdn.pokoin.test/weedle.jpg' },
+    { name: 'Squirtle', lowest_price_pkn: 300, cdn_image_url: 'https://cdn.pokoin.test/squirtle.jpg' },
+    { name: 'Eevee', lowest_price_pkn: 800, cdn_image_url: 'https://cdn.pokoin.test/eevee.jpg' },
+  ]);
+  assert.equal(starter.name, 'Squirtle');
+
+  const expensive = pickArtistCover([
+    { name: 'Weedle', lowest_price_pkn: 200, cdn_image_url: 'https://cdn.pokoin.test/weedle.jpg' },
+    { name: 'Charizard', lowest_price_pkn: 10500, cdn_image_url: 'https://cdn.pokoin.test/zard.jpg' },
+  ]);
+  assert.equal(expensive.name, 'Charizard');
 });

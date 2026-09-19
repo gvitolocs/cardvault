@@ -1,5 +1,6 @@
 const { marketplaceQuery } = require('./_marketplace_db');
 const { withCardEmojiFields } = require('./_marketplace_card_emoji');
+const { expansionSlugSql } = require('./_marketplace_react_sql');
 
 function cleanLimit(value, fallback = 1000) {
   const limit = Number(value);
@@ -47,7 +48,7 @@ async function rowsForExpansions({ slug, limit, query = marketplaceQuery }) {
   const normalizedSlug = cleanText(slug);
   if (normalizedSlug) {
     values.push(normalizedSlug);
-    where += ` and lower(regexp_replace(versions.expansion_name, '[^a-zA-Z0-9]+', '-', 'g')) = $${values.length}`;
+    where += ` and ${expansionSlugSql('versions.expansion_name')} = $${values.length}`;
   }
   values.push(cleanLimit(limit));
 
@@ -73,10 +74,17 @@ async function rowsForExpansions({ slug, limit, query = marketplaceQuery }) {
         representative_cards.expansion_name as name,
         min(expansions.symbol_image_url) as symbol_image_url,
         min(expansions.logo_image_url) as logo_image_url,
-        count(*)::integer as card_count
+        coalesce(
+          nullif(min(expansions.catalog_card_count), 0),
+          nullif(min(set_counts.catalog_card_count), 0),
+          0
+        )::integer as card_count,
+        min(expansions.nationality) as nationality
       from representative_cards
-      left join public.cardtrader_pokemon_expansions expansions
+      left join public.pokoin_pokemon_expansions expansions
         on expansions.name = representative_cards.expansion_name
+      left join public.marketplace_set_card_counts set_counts
+        on set_counts.set_name = representative_cards.expansion_name
       group by representative_cards.expansion_name
       order by representative_cards.expansion_name asc
       limit $${values.length}
@@ -96,6 +104,7 @@ async function rowsForExpansions({ slug, limit, query = marketplaceQuery }) {
         ? `https://cdn.pokoin.com/expansions/symbols/${resolvedSlug}.png`
         : '',
       cardCount: Number(row.card_count || 0),
+      nationality: String(row.nationality || '').trim().toLowerCase(),
     };
   });
 }
@@ -143,7 +152,7 @@ async function snapshotForExpansion({ slug, limit, query = marketplaceQuery }) {
         expansions.symbol_image_url as expansion_symbol_url,
         expansions.logo_image_url as expansion_logo_url
       from representative_cards
-      left join public.cardtrader_pokemon_expansions expansions
+      left join public.pokoin_pokemon_expansions expansions
         on expansions.name = representative_cards.expansion_name
       left join public.marketplace_card_urls urls
         on urls.card_id = representative_cards.card_id

@@ -1,0 +1,11 @@
+[Unit]
+Description=Keep Pokoin Meilisearch ready (no cold warmup)
+
+[Timer]
+OnBootSec=20s
+OnUnitActiveSec=30s
+AccuracySec=5s
+Unit=pokoin-meili-keepalive.service
+
+[Install]
+WantedBy=timers.target

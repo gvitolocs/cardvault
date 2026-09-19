@@ -3,8 +3,7 @@ const { slugParts } = require('./_slug');
 const { cardIdFromDoubledId } = require('./marketplace-card-versions');
 
 const LEGACY_URL_ID_CARD_ID_OVERRIDES = {
-  // This public number was shipped for Drifloon before the direct-id lookup fix;
-  // it now collides with a different real card id (Nacli).
+  // Our id 248768 is Drifloon (ct_id 124384 * 2).
   248768: '124384',
 };
 
@@ -98,21 +97,47 @@ function parseMarketplaceCardPath(value) {
   };
 }
 
-function candidateCardIdsForLookup({ cardId, cardSlug, path, doubledCardId, urlCardId } = {}) {
+function parseMarketplacePublicShortPath(value) {
+  const text = String(value || '').trim();
+  if (!text) {
+    return '';
+  }
+  let pathname = text;
+  try {
+    pathname = new URL(text, 'https://pokoin.com').pathname;
+  } catch (_) {
+    pathname = text.split(/[?#]/)[0];
+  }
+  const match = pathname.match(/^\/marketplace\/(\d+)\/?$/i);
+  return match ? cleanCardId(match[1]) : '';
+}
+
+function pathPublicNumberFromLookup({ path, doubledCardId, urlCardId } = {}) {
   const marketplacePath = parseMarketplaceCardPath(path);
-  const cleanDirectCardId = cleanCardId(cardId);
-  const legacyOverride = LEGACY_URL_ID_CARD_ID_OVERRIDES[cleanDirectCardId];
-  const explicitDoubledId =
+  return (
     cleanCardId(doubledCardId) ||
     cleanCardId(urlCardId) ||
-    marketplacePath.doubledCardId;
-  const decodedDoubledId = (explicitDoubledId && (marketplacePath.cardSlug || doubledCardId || urlCardId))
-    ? cardIdFromDoubledId(explicitDoubledId)
-    : '';
-  const routeCardId = legacyOverride || cleanDirectCardId || decodedDoubledId || parseRootCardPath(path).cardId;
+    marketplacePath.doubledCardId ||
+    parseMarketplacePublicShortPath(path) ||
+    parseRootCardPath(path).cardId
+  );
+}
+
+function candidateCardIdsForLookup({ cardId, cardSlug, path, doubledCardId, urlCardId } = {}) {
+  const cleanDirectCardId = cleanCardId(cardId);
+  const pathOurId = pathPublicNumberFromLookup({
+    path,
+    doubledCardId,
+    urlCardId,
+  });
+  const ctFromPath = pathOurId ? cardIdFromDoubledId(pathOurId) : '';
+  const legacyOverride = LEGACY_URL_ID_CARD_ID_OVERRIDES[cleanDirectCardId]
+    || LEGACY_URL_ID_CARD_ID_OVERRIDES[pathOurId];
   const candidates = [];
-  if (routeCardId) {
-    candidates.push(routeCardId);
+  for (const id of [pathOurId, cleanDirectCardId, ctFromPath, legacyOverride]) {
+    if (id) {
+      candidates.push(id);
+    }
   }
   return [...new Set(candidates)];
 }
@@ -136,23 +161,28 @@ async function canonicalCardUrlForLookup(
   const requestedSlug =
     String(cardSlug || parseMarketplaceCardPath(path).cardSlug || parseRootCardPath(path).cardSlug || '').trim();
   const numericCandidateIds = candidateIds.map((id) => Number(id));
-  const requestedUrlId = cleanCardId(
-    doubledCardId || urlCardId || parseMarketplaceCardPath(path).doubledCardId,
-  );
+  const requestedUrlId = pathPublicNumberFromLookup({
+    path,
+    doubledCardId,
+    urlCardId,
+  });
   const decodedRequestedUrlId = cardIdFromDoubledId(requestedUrlId);
   const result = await query(
     `
-      select card_id, language, canonical_path
+      select card_id, language, canonical_path, public_number
       from public.marketplace_card_urls
       where (
           card_id = any($1::bigint[])
-          or ($3::text <> '' and canonical_path like '%/cards/' || $3::text || '/%')
+          or ct_id = any($1::bigint[])
+          or (nullif($3::text, '') is not null and public_number = $3::bigint)
+          or (nullif($3::text, '') is not null and canonical_path like '%/cards/' || $3::text || '/%')
         )
         and language = $2
       order by
         case
-          when $3::text <> '' and canonical_path like '%/cards/' || $3::text || '/%' then 0
-          else 1
+          when nullif($3::text, '') is not null and public_number = $3::bigint then 0
+          when $3::text <> '' and canonical_path like '%/cards/' || $3::text || '/%' then 1
+          else 2
         end,
         array_position($1::bigint[], card_id)
     `,
@@ -171,7 +201,13 @@ async function canonicalCardUrlForLookup(
       decodedRequestedUrlId &&
       !slugsEquivalent(requestedSlug, pathMatchedSlug)
     ) {
-      const rowByDecodedId = result.rows.find((row) => String(row.card_id || '') === decodedRequestedUrlId);
+      const rowByDecodedId = result.rows.find((row) => {
+        const rowCardId = String(row.card_id || '');
+        const rowCtId = String(row.ct_id || '');
+        return rowCardId === decodedRequestedUrlId
+          || rowCtId === decodedRequestedUrlId
+          || rowCardId === requestedUrlId;
+      });
       if (rowByDecodedId && cleanCanonicalPath(rowByDecodedId.canonical_path)) {
         return {
           cardId: String(rowByDecodedId.card_id),
@@ -188,11 +224,16 @@ async function canonicalCardUrlForLookup(
       publicNumber: publicNumberFromCanonicalPath(pathMatchedRow.canonical_path),
     };
   }
-  const rowById = new Map(
-    result.rows
-      .filter((row) => cleanCanonicalPath(row.canonical_path))
-      .map((row) => [String(row.card_id || ''), row]),
-  );
+  const rowById = new Map();
+  for (const row of result.rows) {
+    if (!cleanCanonicalPath(row.canonical_path)) {
+      continue;
+    }
+    rowById.set(String(row.card_id || ''), row);
+    if (row.ct_id) {
+      rowById.set(String(row.ct_id), row);
+    }
+  }
   for (const id of candidateIds) {
     const row = rowById.get(id);
     if (row) {
@@ -203,6 +244,15 @@ async function canonicalCardUrlForLookup(
         publicNumber: publicNumberFromCanonicalPath(row.canonical_path),
       };
     }
+  }
+  const first = result.rows.find((row) => cleanCanonicalPath(row.canonical_path));
+  if (first) {
+    return {
+      cardId: String(first.card_id),
+      language: first.language || cleanLang,
+      canonicalPath: cleanCanonicalPath(first.canonical_path),
+      publicNumber: publicNumberFromCanonicalPath(first.canonical_path),
+    };
   }
   return null;
 }
@@ -254,6 +304,7 @@ module.exports._test = {
   createHandler,
   canonicalSlugFromPath,
   parseMarketplaceCardPath,
+  parseMarketplacePublicShortPath,
   publicNumberFromCanonicalPath,
   parseRootCardPath,
   slugsEquivalent,

@@ -13,12 +13,17 @@ const deployHelpers = [
   '_email',
   '_firebase',
   '_firebase_roles',
+  '_marketplace_canonical_path',
   '_marketplace_card_emoji',
   '_marketplace_card_rarity',
   '_marketplace_db',
+  '_marketplace_row',
   '_marketplace_search_engine',
   '_meili_client',
+  '_meili_document',
   '_meili_marketplace',
+  '_meili_suggest',
+  '_marketplace_react_card',
   '_native_pkn',
   '_pending_signup',
   '_pkn_checkout_pricing',
@@ -207,7 +212,11 @@ test('marketplace autocomplete resolves Supabase helper in deploy-pokoin-web out
         .replaceAll("require('./_search_debug_auth')", "require('../server/_search_debug_auth')")
         .replaceAll('require("./_search_debug_auth")', 'require("../server/_search_debug_auth")')
         .replaceAll("require('./_searchbar_session')", "require('../server/_searchbar_session')")
-        .replaceAll('require("./_searchbar_session")', 'require("../server/_searchbar_session")');
+        .replaceAll('require("./_searchbar_session")', 'require("../server/_searchbar_session")')
+        .replaceAll("require('./_marketplace_canonical_path')", "require('../server/_marketplace_canonical_path')")
+        .replaceAll('require("./_marketplace_canonical_path")', 'require("../server/_marketplace_canonical_path")')
+        .replaceAll("require('./_marketplace_row')", "require('../server/_marketplace_row')")
+        .replaceAll('require("./_marketplace_row")', 'require("../server/_marketplace_row")');
       fs.writeFileSync(target, source);
     }
 
@@ -321,6 +330,7 @@ test('critical marketplace and assistant APIs are deploy-packaged manifest route
     ['/api/marketplace-autocomplete', 'marketplace-autocomplete.js'],
     ['/api/marketplace-blueprint-price', 'marketplace-blueprint-price.js'],
     ['/api/marketplace-card-cheapest-price', 'marketplace-card-cheapest-price.js'],
+    ['/api/marketplace-card-last-median', 'marketplace-card-last-median.js'],
     ['/api/marketplace-card-url', 'marketplace-card-url.js'],
     ['/api/marketplace-cart', 'marketplace-cart.js'],
     ['/api/marketplace-home', 'marketplace-home.js'],
@@ -328,6 +338,7 @@ test('critical marketplace and assistant APIs are deploy-packaged manifest route
     ['/api/marketplace-orders', 'marketplace-orders.js'],
     ['/api/marketplace-search-candidates', 'marketplace-search-candidates.js'],
     ['/api/marketplace-watchlist', 'marketplace-watchlist.js'],
+    ['/api/marketplace-recents', 'marketplace-recents.js'],
     ['/api/pokoin-assistant', 'pokoin-assistant.js'],
     ['/api/user-current-page', 'user-current-page.js'],
   ]) {

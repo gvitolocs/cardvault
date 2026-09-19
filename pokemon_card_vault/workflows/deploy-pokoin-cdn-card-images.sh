@@ -6,6 +6,7 @@ cd "${ROOT_DIR}"
 
 wrangler deploy --config wrangler.pokoin-cdn-card-images.jsonc
 
-echo "Worker route deployed."
-echo "Verify https://pokoin.com/card-images/<object-key> returns x-pokoin-cdn-worker: r2-card-images."
-echo "The legacy cdn.pokoin.com route is still configured, but app image URLs should use same-origin /card-images paths."
+echo "Worker route deployed for pokoin.com/card-images/*."
+echo "cdn.pokoin.com is the Pi tunnel origin (not this worker)."
+echo "Verify a leftover JPEG returns image/jpeg, not homepage webp:"
+echo "  curl -sI https://pokoin.com/card-images/167006_rapidash.jpg"

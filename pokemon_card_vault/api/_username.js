@@ -232,6 +232,7 @@ async function claimExactUsername({
 }
 
 module.exports = {
+  assignUniqueUsername,
   baseUsernameFrom,
   claimExactUsername,
   ensureUniqueUsername,

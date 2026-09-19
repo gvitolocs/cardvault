@@ -5,6 +5,7 @@ const {
   bestCandidate,
   buildSetIndex,
   findSetMatch,
+  collectorNumberCandidates,
   matchWithPokemonTcgData,
   nameScore,
   normalizeArtist,
@@ -49,6 +50,23 @@ test('collector normalization matches local and slash numbers', () => {
   assert.equal(normalizeCollectorNumber('Special Illustration Rare | 232/091'), '232');
   assert.equal(normalizeCollectorNumber(' 005 / 131 '), '5');
   assert.equal(normalizeCollectorNumber('SVP 101'), 'SVP101');
+  assert.deepEqual(
+    collectorNumberCandidates('Illustration Contest 2024 | SVP 214').sort(),
+    ['214', 'SVP214'].sort(),
+  );
+  assert.deepEqual(
+    collectorNumberCandidates('MEP 063').sort(),
+    ['063', '63', 'MEP063'].sort(),
+  );
+});
+
+test('SV Black Star Promos matches TCGdex SVP Black Star Promos', () => {
+  const index = buildSetIndex([
+    { id: 'svp', name: 'SVP Black Star Promos' },
+    { id: 'swsh3', name: 'Darkness Ablaze' },
+  ]);
+  const match = findSetMatch({ setName: 'SV Black Star Promos', setCode: '' }, index);
+  assert.equal(match.set.id, 'svp');
 });
 
 test('set matching prefers exact normalized set names', () => {
@@ -107,6 +125,34 @@ test('pokemon tcg data fallback accepts only known artist names', () => {
   assert.equal(result.status, 'matched');
   assert.equal(result.normalizedArtist, 'aky cg works');
   assert.equal(result.matchReason.includes('local_dataset'), true);
+});
+
+test('pokemon tcg data can seed unknown artists when rebuilding the table', () => {
+  const result = matchWithPokemonTcgData(
+    {
+      blueprintId: '274416',
+      name: 'Mew ex',
+      setName: 'Paldean Fates',
+      collectorNumber: '232/091',
+      rarity: 'Special Illustration Rare',
+    },
+    {
+      bySetNumber: new Map([
+        ['paldeanfates:232', [{
+          id: 'sv4pt5-232',
+          name: 'Mew ex',
+          number: '232',
+          rarity: 'Special Illustration Rare',
+          artist: 'aky CG Works',
+          set: { name: 'Paldean Fates' },
+        }]],
+      ]),
+    },
+    new Set(),
+    { allowUnknownArtists: true },
+  );
+  assert.equal(result.status, 'matched');
+  assert.equal(result.normalizedArtist, 'aky cg works');
 });
 
 test('pokemon tcg data fallback reports unknown artists instead of inserting them', () => {

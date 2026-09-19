@@ -12,6 +12,7 @@ Supabase marketplace objects.
 ## Current Architecture
 
 - Oracle Postgres is the source of truth for marketplace/catalog/search data.
+- **Live host:** OCI VM **pokoin-marketplace** (`130.61.251.250`). SSH: `ssh pokoin-marketplace`. Do not use `honcho-personal`.
 - Production writes go to the peer4 marketplace Postgres primary.
 - Peer3 is the hot-standby fallback, synchronized from peer4 through PostgreSQL
   physical WAL streaming, and is used for card-name search reads.
@@ -42,7 +43,7 @@ Supabase marketplace objects.
 ## Oracle Runtime Tables
 
 - `public.cardtrader_pokemon_blueprints`
-- `public.cardtrader_pokemon_expansions`
+- `public.pokoin_pokemon_expansions`
 - `public.marketplace_cards`
 - `public.marketplace_card_versions`
 - `public.marketplace_search_candidates`
@@ -1391,7 +1392,12 @@ NODE
 ```
 
 Canonical marketplace URLs are refreshed by
-`public.refresh_marketplace_oracle_projections()` after
+`public.refresh_marketplace_card_urls()`. On pokoin-marketplace, **our id** is
+`marketplace_cards.card_id` = CardTrader `ct_id` × 2 (018 applied). Canonical
+paths use that `card_id` directly. `ct_id` is only the scrape/CDN/CLIP key.
+See `docs/marketplace-public-ids.md`.
+
+`public.refresh_marketplace_oracle_projections()` also calls that function after
 `marketplace_search_candidates` is rebuilt. Targeted URL-only refresh and
 verification:
 
@@ -1516,122 +1522,149 @@ sync.
 ### CardTrader Delta Catalog Import
 
 Use the delta importer when CardTrader has released new Pokemon blueprints and a
-full catalog copy would be too broad. The script compares CardTrader blueprint
-IDs against Oracle `public.cardtrader_pokemon_blueprints`, inserts only missing
-raw blueprint rows, and can then call the existing image/projection/Supabase
-refresh steps. It is dry-run by default.
+full catalog copy would be too broad. Live path (2026-09-12, 30th Celebration JP
+`412376` / public `824752`):
 
-Dry-run a focused import from a downloaded CardTrader JSONL file:
+1. **Raw dump** into Oracle `public.pokoin_pokemon_blueprints`
+   (`cardtrader_pokemon_blueprints` is a view). Writer is
+   `pokoin-marketplace` (`130.61.251.250`). The Pi replica is read-only.
+2. **Targeted projection** of the new `ct_id`s into `marketplace_cards`,
+   `marketplace_search_candidates`, `marketplace_card_versions`, and
+   `marketplace_card_urls`. Then `refresh_marketplace_set_catalog_counts()`.
+3. **Leftover JPEGs** on Pi CDN (`/srv/pokoin/card-images/objects/{ct_id}_{slug}.jpg`)
+   plus `_homepage.webp` encoded on nezopt. Not a silent R2 50k rewrite.
+4. **CLIP** same-art groups on the RX 7900 XTX, applied to **nezopt 15T**
+   (`pokoin-marketplace-postgres-15t`). Leftover ingest runs this for the
+   expansion. Do not `INSERT` version sets on the Pi Postgres replica.
+
+nezopt cannot open `130.61.251.250:5432` (security list). Tunnel first:
 
 ```bash
-node scripts/cardtrader-delta-import.js \
-  --input=data/cardtrader/pokemon-blueprints.jsonl \
-  --expansion-ids=4611,4639 \
-  --limit=all
+ssh -f -N -o ExitOnForwardFailure=yes -L 15432:127.0.0.1:5432 pokoin-marketplace
+# rewrite MARKETPLACE_DATABASE_URL host to 127.0.0.1:15432 without printing it
 ```
 
-Or fetch a bounded delta directly from CardTrader by expansion:
+The importer is dry-run by default. Fetch one expansion from CardTrader:
 
 ```bash
+cd pokemon_card_vault
 node scripts/cardtrader-delta-import.js \
-  --expansion-ids=4611,4639 \
+  --expansion-names="30th Celebration JP" \
   --limit=all \
   --sleep-ms=100
 ```
 
-For a full remote delta without writing a local JSONL snapshot, stream CardTrader
-expansions page-by-page from the API:
+`--expansion-ids=` works the same. Prefer the exact expansion name so
+`30th Celebration JP` does not also match western `30th Celebration`.
 
-```bash
-node scripts/cardtrader-delta-import.js \
-  --stream-all \
-  --limit=all \
-  --sleep-ms=100
-```
-
-CardTrader's available catalog endpoint for this workflow is
-`/api/v2/blueprints/export?expansion_id=<id>`. It returns full blueprint rows for
-one expansion, not an IDs-only feed. Streaming mode therefore avoids a local full
-snapshot and compares IDs expansion-by-expansion against Oracle, but it still
-reads the remote Pokemon catalog expansion-by-expansion.
-
-Useful focus targets for the current Mega Darkrai check:
-
-- `4611` / `Abyss Eye`
-- `4639` / `Pitch Black`
-- `--expansion-names="Abyss Eye,Pitch Black"` may be used instead of IDs after
-  reviewing the resolved names in the dry-run output.
+CardTrader's catalog endpoint is `/api/v2/blueprints/export?expansion_id=<id>`.
+It returns full blueprint rows for one expansion, not an IDs-only feed.
 
 Review the dry-run output before mutating:
 
 - `counts.fetched`: rows returned from the bounded source.
 - `counts.existingRaw`: CardTrader IDs already present in Oracle raw rows.
 - `counts.missingRaw`: raw blueprint rows that would be inserted.
-- `missingSamples`: representative IDs/names/images to confirm the source is
-  the expected expansion and not sealed products.
+- `missingSamples` / `imageIds`: confirm the requested blueprint (for example
+  `412376` Pikachu `10/30 Stamp | 026/103`) is in the missing set.
 - `existingRawMissingSearchCandidate`: rows already in raw storage but missing
-  derived search candidates, which usually means projections need refresh.
+  derived search candidates.
 
-Apply only after the dry-run looks correct:
+Apply **raw rows only**. Do **not** pass `--images`, `--refresh`, or
+`--sync-supabase` on live:
 
 ```bash
 node scripts/cardtrader-delta-import.js \
   --apply \
+  --expansion-names="30th Celebration JP" \
+  --limit=all \
+  --sleep-ms=100
+```
+
+`--refresh` still calls `refresh_marketplace_cards_from_blueprints()`, which
+`ALTER TABLE`s and takes `AccessExclusiveLock` on `marketplace_cards` and
+`pokoin_pokemon_blueprints` (same class of outage as the 2026-08-29 wrapper).
+Incident 2026-09-12: a component `--refresh` locked the shop for ~12 minutes
+until `pg_cancel_backend`. Require `POKOIN_ALLOW_FULL_PROJECTION_REFRESH=1`
+only for a planned maintenance window.
+
+After `--apply`, project **only the new ids / expansion** (no `ALTER TABLE`,
+`ON CONFLICT DO NOTHING`). Then:
+
+```sql
+select public.refresh_marketplace_set_catalog_counts();
+```
+
+Public card id is leftover `ct_id * 2` (Pokemon). Example: `412376` → `824752`.
+
+Leftover scans (nezopt, Pillow from `ai-toolkit/venv`, never crop on the Pi):
+
+```bash
+cd /home/nez/Projects/pokoin-web
+POKOIN_INGEST_EXPANSION='30th Celebration JP' \
+  /home/nez/Projects/ai-toolkit/venv/bin/python scripts/ingest-missing-product-images.py
+rsync -a /tmp/pokoin-product-images/ /home/nez/mnt/mybook/pokoin-pi-card-images/objects/
+```
+
+Ingest pulls CardTrader **full** / `show` (never `preview_`), writes
+`{ct_id}_{name-slug}.jpg` + `_homepage.webp`, rsyncs to Pi objects, HUPs
+`pokoin-card-images`. Set `cdn_image_url` /
+`homepage_image_url` on the new Oracle rows to `https://cdn.pokoin.com/{key}`.
+SPA `CardTile` stays the full leftover 63:88 JPEG. CSS `--tcg-corner` clips
+die-cut corners; do not convert the live leftover tree to sanitizer PNGs.
+
+`--images` (R2 `import-oracle-cardtrader-images.js`) is the old three-tier
+path. Skip it unless you are explicitly rewriting a named key in R2.
+
+CLIP (after leftovers exist on the 15T replica). Leftover ingest runs this
+for `POKOIN_INGEST_EXPANSION`. Manual:
+
+```bash
+cd /home/nez/Projects/pokoin-web
+scripts/match-imported-version-sets.sh --expansion "30th Celebration JP"
+# or one desk:
+scripts/match-imported-version-sets.sh --ids 790994
+```
+
+That re-clusters the **name buckets** (Charizard reprints join 30th JP),
+then applies `pokoin_version_sets` on **nezopt 15T**. Do not `INSERT` on the
+Pi Postgres replica. Map: `docs/VERSIONS.md` in pokoin-web.
+
+Verify:
+
+- `GET /api/marketplace-card-page?cardId=<public_id>`
+- Desk `https://pokoin.com/marketplace/en/cards/<public_id>/…`
+- Set desk `https://pokoin.com/marketplace/sets/<slug>` (no `/en/` in the path)
+- `https://cdn.pokoin.com/{ct_id}_{slug}.jpg` (`x-pokoin-cdn-origin: pi-local`)
+
+If the API source lacks the requested singles, do not fabricate rows in Oracle.
+Record the missing CardTrader expansion/blueprint IDs and wait for CardTrader.
+
+Dry-run a focused import from a downloaded CardTrader JSONL file (optional):
+
+```bash
+node scripts/cardtrader-delta-import.js \
   --input=data/cardtrader/pokemon-blueprints.jsonl \
-  --expansion-ids=4611,4639 \
+  --expansion-ids=4678 \
   --limit=all
 ```
 
-To also generate the three image tiers and refresh search data in the same
-bounded or streaming run, include the optional flags:
+For a full remote delta without writing a local JSONL snapshot (maintenance only):
 
 ```bash
 node scripts/cardtrader-delta-import.js \
-  --apply \
-  --input=data/cardtrader/pokemon-blueprints.jsonl \
-  --expansion-ids=4611,4639 \
-  --limit=all \
-  --images \
-  --refresh \
-  --sync-supabase \
-  --languages=en \
-  --supabase-transport=rest
-```
-
-Streaming apply equivalent:
-
-```bash
-node scripts/cardtrader-delta-import.js \
-  --apply \
   --stream-all \
   --limit=all \
-  --images \
-  --refresh \
-  --sync-supabase \
-  --languages=en \
-  --supabase-transport=rest
+  --sleep-ms=100
 ```
 
-`--images` runs the established image scripts only for newly inserted IDs:
-
-```bash
-ORACLE_IMAGE_IDS=<new_ids> node scripts/import-oracle-cardtrader-images.js
-node scripts/generate-oracle-homepage-card-images.js --apply --ids=<new_ids> --limit=all
-```
-
-The image phase requires the existing R2/CDN environment
-`CLOUDFLARE_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`,
-`POKOIN_CARD_IMAGES_BUCKET`, and `POKOIN_CARD_CDN_BASE_URL` when configured.
-It should not be replaced with ad hoc object writes. If those credentials are
-missing, run the dry-run/import only and stop before image mutation.
-
-The refresh phase normally calls
-`public.refresh_marketplace_oracle_projections()` with statement timeouts
-disabled for the session. If optional helper functions referenced by that
-wrapper are absent on the target database, the importer falls back to the
-established component refreshes in order: cards from blueprints, card versions,
-search candidates, card URLs, token search index, and name ngrams. Any skipped
-optional helpers are reported in the JSON output.
+The optional `--refresh` flag is a **no-op on live** unless
+`POKOIN_ALLOW_FULL_PROJECTION_REFRESH=1`. Even the component functions
+(`refresh_marketplace_cards_from_blueprints` and friends) still `ALTER TABLE`
+and take `AccessExclusiveLock`. Incident 2026-08-29 was the wrapper
+`refresh_marketplace_oracle_projections()` (74 minutes). Incident 2026-09-12
+was `--refresh` component path (~12 minutes) during the 30th Celebration JP
+delta. Project new ids only; then `refresh_marketplace_set_catalog_counts()`.
 
 After any apply, verify the target cards and derived projections:
 
@@ -2243,14 +2276,19 @@ source value through the read models so Flutter and APIs read the same
 database-backed symbols.
 
 Artist/illustrator credits live in the separate additive table
-`public.marketplace_blueprint_artists`, keyed by `blueprint_id`/`card_id`. Do
-not add artist columns to `cardtrader_pokemon_blueprints`, do not mutate
-blueprint JSON to store artists, and do not feed artist names into
-`marketplace_search_candidates.search_text`, token dimensions, ngrams, rarity
-parsing, or ranking. Artist metadata is display attribution only, not
-search/ranking intent. Marketplace APIs may left-join this table to expose
-`artist` and `illustrator` as display metadata, and artist collection endpoints
-may query it by `normalized_artist` for grouping.
+`public.marketplace_blueprint_artists`, keyed by leftover `blueprint_id`
+(CardTrader / JPEG `ct_id`). Generated `card_id` is leftover × 2. OCR, io,
+and CLIP still write that table only. Do not add artist columns to
+`cardtrader_pokemon_blueprints`, do not mutate blueprint JSON to store artists,
+and do not feed artist names into `marketplace_search_candidates.search_text`,
+token dimensions, ngrams, rarity parsing, or ranking.
+
+`marketplace_search_candidates.artist` / `illustrator` is a **display cache**
+(like `emoji`), keyed by public `card_id`, filled by trigger 073. Card-page,
+search, and home hot paths read `c.artist`. Do not leftover-join
+`artists.blueprint_id = candidates.card_id`. Artist collection endpoints still
+query leftover `normalized_artist` / `versions.blueprint_id = artist.blueprint_id`.
+Map: pokoin-web `docs/ARTISTS.md`.
 
 Do not fix card palette or emoji exceptions only in Flutter. Persist name/type
 rules through `marketplace_seed_cards_name_type()` and name emoji rules through
@@ -2275,7 +2313,8 @@ Fields:
 
 - `blueprint_id`: primary key and foreign key to
   `public.cardtrader_pokemon_blueprints(id)`.
-- `card_id`: generated alias of `blueprint_id` for card-oriented joins.
+- `card_id`: generated `blueprint_id * 2` (Pokoin public id). Display joins
+  use this. Do not treat it as leftover `ct_id`.
 - `artist` and `illustrator`: display attribution strings. They usually match
   because the current source exposes illustrator credits.
 - `normalized_artist`: lowercase normalized lookup key for grouping same-artist
@@ -2288,6 +2327,13 @@ Fields:
 
 Required rules:
 
+- Writer is nezopt 15T (`pokoin-marketplace-postgres-15t`). Do not write the
+  Pi replica. WAL carries rows. Map: pokoin-web `docs/ARTISTS.md`.
+- OCR / pokemontcg.io / CLIP still INSERT leftover `blueprint_id` only.
+  `marketplace_search_candidates.artist` is a public-`card_id` display cache
+  (schema 073). Never join `artists.blueprint_id = candidates.card_id`.
+- CLIP `marketplace_copy_same_art_artists` donor join is
+  `artist.card_id = c.card_id`. INSERT PK stays leftover `c.ct_id`.
 - Apply the schema to peer4 primary only:
   `node scripts/oracle-marketplace-migrate.js schema`.
 - Do not write directly to peer3, peer2, or peer1. Physical WAL replication must

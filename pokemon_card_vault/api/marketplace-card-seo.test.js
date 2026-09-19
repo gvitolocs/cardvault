@@ -10,13 +10,13 @@ const {
   publicCardImageUrl,
 } = require('./marketplace-card-seo');
 
-test('marketplace SEO route decodes public number card paths', () => {
+test('marketplace SEO route uses our id from card paths', () => {
   const url = new URL(
     'https://pokoin.com/api/marketplace-card-seo?language=en&cardPath=779904/card-fennekin-011-086-chaos-rising',
   );
 
   assert.deepEqual(parseCardRoute(url), {
-    cardId: '389952',
+    cardId: '779904',
     cardSlug: 'card-fennekin-011-086-chaos-rising',
     decodedFromDoubledId: true,
   });
@@ -28,7 +28,7 @@ test('marketplace SEO cardPath wins over Vercel injected route params', () => {
   );
 
   assert.deepEqual(parseCardRoute(url), {
-    cardId: '124384',
+    cardId: '248768',
     cardSlug: 'card-drifloon-lv-17-non-holo-promo-6-17-pop-series-6',
     decodedFromDoubledId: true,
   });
@@ -67,9 +67,9 @@ test('marketplace SEO route parses legacy root card URL sample', () => {
   });
 });
 
-test('marketplace SEO canonical path uses public-number marketplace URL', () => {
+test('marketplace SEO canonical path uses our id', () => {
   const row = {
-    card_id: '389952',
+    card_id: '779904',
     name: 'Fennekin',
     expansion_number: '011/086',
     expansion_name: 'Chaos Rising',
@@ -89,7 +89,7 @@ test('marketplace SEO canonical path uses public-number marketplace URL', () => 
 test('marketplace SEO canonical path folds Pokémon accents', () => {
   assert.equal(
     canonicalPathForCard({
-      card_id: '251432',
+      card_id: '502864',
       name: 'Poliwhirl',
       expansion_number: '176/165',
       expansion_name: 'Pokémon Card 151',
@@ -101,7 +101,7 @@ test('marketplace SEO canonical path folds Pokémon accents', () => {
 
 test('marketplace SEO canonical path does not invent collector number from id', () => {
   const row = {
-    card_id: '139056',
+    card_id: '278112',
     name: 'Super Rod',
     expansion_number: '',
     expansion_name: 'Gold, Silver, to a New World...',
@@ -174,7 +174,7 @@ test('marketplace SEO HTML canonicalizes legacy root previews to public-number U
   const html = htmlForCard(
     { headers: { host: 'pokoin.com' } },
     {
-      card_id: '124384',
+      card_id: '248768',
       name: 'Drifloon Lv.17',
       expansion_number: '6/17',
       expansion_name: 'POP Series 6',
@@ -182,7 +182,7 @@ test('marketplace SEO HTML canonicalizes legacy root previews to public-number U
       cdn_image_url: 'https://cdn.pokoin.com/124384_drifloon-lv-17.jpg',
     },
     canonicalPathForCard({
-      card_id: '124384',
+      card_id: '248768',
       name: 'Drifloon Lv.17',
       expansion_number: '6/17',
       expansion_name: 'POP Series 6',
@@ -195,14 +195,14 @@ test('marketplace SEO HTML canonicalizes legacy root previews to public-number U
   assert.doesNotMatch(html, /https:\/\/pokoin\.com\/124384\//);
 });
 
-test('marketplace SEO preview decodes public number after direct lookup misses', async () => {
+test('marketplace SEO preview looks up our id from the path', async () => {
   const { rowsForCardPreview } = require('./marketplace-card-seo');
   const calls = [];
   const fetchRowsForVersions = async (args) => {
     calls.push(args);
-    if (args.cardId === '137799') {
+    if (args.cardId === '275598') {
       return [{
-        card_id: '137799',
+        card_id: '275598',
         name: 'Exeggutor',
         expansion_name: 'Emerald Break',
         expansion_number: '002/078',
@@ -218,7 +218,7 @@ test('marketplace SEO preview decodes public number after direct lookup misses',
     cardSlug: 'card-exeggutor-2-078-emerald-break',
   }, fetchRowsForVersions);
 
-  assert.equal(rows[0].card_id, '137799');
+  assert.equal(rows[0].card_id, '275598');
   assert.deepEqual(
     calls.map((call) => ({
       cardId: call.cardId,
@@ -227,14 +227,6 @@ test('marketplace SEO preview decodes public number after direct lookup misses',
     [
       {
         cardId: '275598',
-        cardSlug: 'card-exeggutor-2-078-emerald-break',
-      },
-      {
-        cardId: '275598',
-        cardSlug: undefined,
-      },
-      {
-        cardId: '137799',
         cardSlug: 'card-exeggutor-2-078-emerald-break',
       },
     ],

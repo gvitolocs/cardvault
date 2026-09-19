@@ -1,9 +1,12 @@
 # Oracle API Migration And Route Reference
 
-This document tracks the first version of moving Pokoin backend API routes from
-many Vercel serverless functions into one long-running Node service suitable for
-Oracle/peer3. It is generated from `server/api-route-manifest.js` so the route
+This document is generated from `server/api-route-manifest.js` so the route
 list stays tied to the standalone server configuration.
+
+**Canonical React/JS contract:** `docs/react-api-architecture.md` and live
+`GET /api/__contract`. Production host is `pokoin-marketplace` (`130.61.251.250`),
+Docker `pokoin-oracle-api`, Caddy `https://api.pokoin.com`. The old Always Free
+peer3 (`141.147.62.244`) is dead — do not deploy there.
 
 ## Architecture
 
@@ -17,13 +20,11 @@ list stays tied to the standalone server configuration.
 - `/api/stripe-webhook` is treated as a raw-body route and is not JSON parsed
   before the existing Stripe signature code reads the request stream.
 
-## peer3 Discovery
+## Host Discovery
 
-`web/bootstrap-peers.json` contains `oracle-peer-3` / `pokoin-vm3` at
-`141.147.62.244` for the Pokoin peer network. Local SSH config also resolves
-`peer3`, but no repository script previously deployed this API service there.
-The new deployment script uses `ORACLE_API_SSH_TARGET` with a default of
-`peer3`; it does not include or assume credentials.
+Live API VM is **pokoin-marketplace** (`130.61.251.250`), SSH host
+`pokoin-marketplace`. Bind-mount: `/home/ubuntu/pokoin-oracle-api/current`.
+Do not use `deploy-oracle-api-peer3.sh` against dead `141.147.62.244`.
 
 ## Running Locally
 
@@ -66,21 +67,23 @@ or `USE_ORACLE_API=1` is set. In that mode the web build must not copy
 `/api/*` to the Oracle API service. Avoid the checked-in Vercel serverless
 fallback unless explicitly requested for an emergency rollback.
 
-Do not run the production Vercel deploy until `https://api.pokoin.com` is
-healthy. A broken API origin would make production `/api/*` routes fail.
+Do not run the production Vercel deploy until `https://api.pokoin.com/healthz`
+is healthy. A broken API origin would make production `/api/*` routes fail.
+Handlers live under `/api/...`. `https://api.pokoin.com/` is the operator
+landing page. `https://api.pokoin.com/marketplace-suggest` (no `/api`) 404s.
 
 ## Production Deployment Commands
 
-The Oracle/peer3 backend service should be exposed at `api.pokoin.com`.
-For production keep the workflow simple: `pokoin.com` serves only the Vercel
-Flutter frontend, and every `/api/*` request rewrites to `api.pokoin.com`.
+Live API is Docker `pokoin-oracle-api` on **pokoin-marketplace**
+(`130.61.251.250`), Caddy TLS on `api.pokoin.com`. `pokoin.com` is Vercel;
+every `/api/*` request rewrites here.
 
 Before switching production, verify the backend directly:
 
 ```bash
-curl -fsS https://api.pokoin.com/marketplace >/dev/null
 curl -fsS https://api.pokoin.com/healthz
 curl -fsS https://api.pokoin.com/api/__routes
+curl -fsS 'https://api.pokoin.com/api/marketplace-suggest?q=pika&limit=4'
 ```
 
 Deploy production with no bundled Vercel functions only after those origin
@@ -101,53 +104,41 @@ curl -fsS https://pokoin.com/api/healthz
 curl -fsS https://pokoin.com/api/__routes
 ```
 
-DNS target: `api.pokoin.com` should point at Oracle peer3 `141.147.62.244`
-through the configured reverse proxy/TLS layer. `pokoin.com` should point at
-Vercel for the frontend.
+DNS target: `api.pokoin.com` → `130.61.251.250` (pokoin-marketplace Caddy).
+Do **not** point DNS or deploys at dead peer3 `141.147.62.244`.
+`pokoin.com` should point at Vercel for the frontend.
 
 Backend landing page:
 
 ```text
+https://api.pokoin.com/
 https://api.pokoin.com/marketplace
 ```
 
-Package only:
+Ship handler/server files into the existing bind-mount, then restart the
+running container (do not `docker rm` / recreate; do not `npm run peer3:deploy`):
 
 ```bash
-npm run peer3:bundle
+rsync -av api/*.js server/*.js \
+  pokoin-marketplace:/home/ubuntu/pokoin-oracle-api/current/
+ssh pokoin-marketplace 'docker restart pokoin-oracle-api'
 ```
 
-Upload to peer3 without starting:
+If `api.pokoin.com` is reachable at DNS but HTTP/S times out, check Caddy on
+**pokoin-marketplace** before deploying production:
 
 ```bash
-ORACLE_API_SSH_TARGET=peer3 npm run peer3:deploy -- --no-restart
+sudo ss -ltnp | grep -E ':(80|443|18080)\\b'
+sudo systemctl status caddy --no-pager
+curl -fsS http://127.0.0.1:18080/healthz
 ```
 
-Upload and restart with PM2 if available, otherwise `nohup`:
-
-```bash
-ORACLE_API_SSH_TARGET=peer3 \
-ORACLE_API_REMOTE_DIR=/opt/pokoin/oracle-api \
-ORACLE_API_PORT=8080 \
-npm run peer3:deploy
-```
-
-If `api.pokoin.com` is reachable at DNS but HTTP/S times out, check peer3's
-firewall and reverse proxy before deploying production:
-
-```bash
-sudo ss -ltnp | grep -E ':(80|443|8080)\\b'
-sudo systemctl status nginx --no-pager || true
-sudo systemctl status caddy --no-pager || true
-curl -fsS http://127.0.0.1:8080/healthz
-```
-
-OCI peer3 ingress must allow public TCP `80` and `443` to the VM. The API
+OCI ingress must allow public TCP `80` and `443` to the VM. The API
 container should stay bound to `127.0.0.1:18080` behind Caddy; avoid exposing
 the internal API port publicly unless it is an intentional temporary diagnostic.
 
-The script deliberately does not copy `.env.local`; provide production
-environment variables through the host supervisor or service env file.
+The rsync deliberately does not copy `.env.local`; production env stays in the
+existing Docker env-file on the host.
 
 ## CardTrader Live And Snapshot Routes
 
@@ -208,6 +199,138 @@ Vercel compatibility rewrite are available.
 
 ## API Routes
 
+Grouped by family (`server/api-route-families.js`). Filter live with
+`GET /api/__routes?group=1` or `GET /api/__routes?family=page-bff`.
+Do not move `api/*.js` into subfolders — the server maps `/api/foo` to
+`api/foo.js`.
+
+### React page BFFs (`page-bff`, 5)
+
+- `GET|OPTIONS` `/api/marketplace-card-page` — React BFF: one card-detail payload (card, versions, offers, cheapest, artist, canonicalPath).
+- `GET|OPTIONS` `/api/marketplace-expansion-page` — React BFF: expansion metadata plus paginated singles for a set browse page.
+- `GET|OPTIONS` `/api/marketplace-home-page` — React BFF: fast home carousels (newest English sets + hot blueprints). No CardTrader hydrate.
+- `GET|OPTIONS` `/api/marketplace-portfolio` — React BFF: Pokoin catalog + native PKN overlay (Portfolio / Explore). No CardTrader leftover images. No USD.
+- `GET|OPTIONS` `/api/marketplace-search-page` — React BFF: Meili/SQL search results with pagination and product facets.
+
+### Search (`search`, 9)
+
+- `POST|OPTIONS` `/api/extension-card-search` — Search marketplace cards from browser-extension scraped card fields.
+- `GET` `/api/marketplace-artist-suggestions` — Return marketplace artist suggestion rows for artist pages and admin review.
+- `GET|OPTIONS` `/api/marketplace-suggest` — Meili-only typeahead for pokoin-web: grouped printings, no SQL listing hydrate.
+- `POST|OPTIONS` `/api/marketplace-autocomplete` — Return ranked marketplace autocomplete/search suggestions with optional debug metadata.
+- `GET` `/api/marketplace-cards` — Return searchable marketplace card and product rows.
+- `POST` `/api/marketplace-search-candidates` — Return split/search candidate rows for marketplace search diagnostics and clients.
+- `GET|POST` `/api/searchbar-cancel` — Mark a searchbar session as cancelled for in-process search cancellation checks.
+- `GET|POST` `/api/searchbar-cards` — Stable wrapper around marketplace autocomplete ranking for searchbar experiments and clients.
+- `GET|POST|OPTIONS` `/api/searchbar-token-predict` — Return lightweight card-name token predictions for active typed fragments.
+
+### Card identity (`card`, 6)
+
+- `GET|OPTIONS` `/api/marketplace-card-cheapest-price` — Return the homepage-backed cheapest marketplace price for a card, including CardTrader cache availability.
+- `GET` `/api/marketplace-card-seo` — Return server-rendered HTML metadata for marketplace card social previews.
+- `GET` `/api/marketplace-card-sales` — Return recent paid sale history for a marketplace card from Firestore orders.
+- `GET|HEAD` `/api/marketplace-card-shortlink` — Redirect our-id short links to canonical marketplace card URLs (our id = CardTrader ct_id * 2).
+- `GET|HEAD` `/api/marketplace-card-url` — Return stored canonical_path. cardId is our marketplace id (ct_id * 2); path numbers are the same our-id.
+- `GET` `/api/marketplace-card-versions` — Return card detail/version rows for marketplace card pages.
+
+### Catalog / sets (`catalog`, 6)
+
+- `GET` `/api/limitless-expansion-blueprints` — Return Limitless expansion-to-Pokoin blueprint mapping rows.
+- `GET` `/api/marketplace-artist-cards` — Return artist profile data and marketplace cards grouped by illustrator/artist attribution.
+- `GET|POST` `/api/marketplace-expansion-symbols` — Read or update marketplace expansion symbol metadata.
+- `GET` `/api/marketplace-expansions` — Return marketplace expansion list or detail snapshots.
+- `GET` `/api/marketplace-competitive` — Return Limitless-backed competitive deck metagame, deck detail, tournament, standings, and pairings data for the marketplace competitive page.
+- `GET` `/api/marketplace-hot-blueprints` — Return hot marketplace blueprint rows and rolling interaction counts.
+
+### Listings / cart / orders (`commerce`, 5)
+
+- `POST` `/api/marketplace-cart` — Record marketplace cart add/remove analytics with optional verified user context.
+- `POST` `/api/marketplace-event` — Record public marketplace interaction/search events and refresh hot-card aggregates opportunistically.
+- `GET|POST|PATCH` `/api/marketplace-listings` — Read public active listings and create/update/decrement authenticated seller listings.
+- `POST` `/api/marketplace-orders` — Create paid marketplace orders, decrement listings, credit sellers, and send seller notifications.
+- `POST` `/api/marketplace-watchlist` — Record marketplace watchlist add/remove analytics with optional verified user context.
+
+### CardTrader (`cardtrader`, 10)
+
+- `GET|OPTIONS` `/api/cardtrader-blueprint-listings` — Return historical/daily CardTrader marketplace listing snapshots for one blueprint/card ID from Oracle.
+- `GET|OPTIONS` `/api/cardtrader-live-listings` — Return live on-demand CardTrader marketplace listings for one blueprint/card ID without persisting results.
+- `POST` `/api/cardtrader-clean-listings` — Deactivate CardTrader-linked listings owned by the authenticated seller.
+- `POST|DELETE` `/api/cardtrader-connect` — Connect, replace, or disconnect an authenticated seller CardTrader token.
+- `GET|POST` `/api/cardtrader-daily-listings-refresh` — Manual/admin diagnostic trigger for global CardTrader marketplace listing snapshots; scheduled ingestion is owned by the Oracle/peer4 host script.
+- `POST` `/api/cardtrader-disconnect` — Disconnect the authenticated seller CardTrader integration.
+- `POST` `/api/cardtrader-import-dry-run` — Read the authenticated seller CardTrader export and return a redacted import summary without writing inventory.
+- `GET` `/api/cardtrader-redirect` — Redirect a public card id or leftover ct_id to the CardTrader leftover blueprint page.
+- `GET` `/api/cardtrader-status` — Return safe CardTrader integration status for the authenticated seller.
+- `GET|POST` `/api/marketplace-debug-cardtrader-blueprints` — Inspect and enqueue protected CardTrader blueprint debug/import work.
+
+### Cardmarket (`cardmarket`, 3)
+
+- `GET` `/api/cardmarket-redirect` — Resolve a marketplace blueprint to a Cardmarket product/search URL and redirect, or return JSON when requested.
+- `POST|OPTIONS` `/api/cardmarket-scrape-observation` — Record Cardmarket scrape/association observations used by marketplace import review tooling.
+- `GET` `/api/marketplace-cardmarket-guess-review` — Return protected Cardmarket guess review data for search/debug operators.
+
+### Auth (`auth`, 3)
+
+- `POST|OPTIONS` `/api/auth-login` — Validate the current Firebase bearer token and return safe auth metadata.
+- `POST` `/api/cache-google-profile-picture` — Download the authenticated user Google avatar, optimize it, and store it in R2.
+- `GET|POST` `/api/user-current-page` — Store or read the current internal Pokoin page for an assistant browser session.
+
+### PKN / Stripe (`payments`, 8)
+
+- `POST` `/api/create-pkn-checkout-session` — Create or reconcile a Stripe Checkout session for buying PKN account balance.
+- `GET|POST` `/api/crypto-pkn-purchase/:action` — Quote, request, and check crypto-to-PKN purchase flows.
+- `GET|POST` `/api/crypto-pkn-sale/:action` — Quote, request, and check PKN-to-crypto sale flows.
+- `POST|OPTIONS` `/api/earn-pkn` — Receive Earn PKN sharding inquiries and email the completed form to Pokoin contact.
+- `POST` `/api/stripe-webhook` — Handle Stripe Checkout webhooks and credit completed PKN purchases.
+- `POST` `/api/top-up-account-balance` — Verify a native PKN funding transaction and credit authenticated site balance.
+- `GET|POST` `/api/wpkn-exchange/:action` — Quote, request, and check native PKN/wPKN exchange flows.
+- `GET|POST` `/api/wpkn-pkn-quote` — Return a public wPKN/PKN market quote from GeckoTerminal plus the configured PKN USD price.
+
+### Assistant (`assistant`, 2)
+
+- `POST` `/api/pokoin-assistant` — Answer Pokontact assistant chat requests with marketplace grounding and optional service handoff.
+- `POST|OPTIONS` `/api/trainingai-card-classify` — Proxy card image classification requests to the Pokoin TrainingAI Oracle classifier or Hugging Face Space fallback.
+
+### Social (`social`, 3)
+
+- `POST` `/api/social-autopost` — Post supplied Pokoin social copy or card payloads to configured Telegram and X channels, optionally using the dedicated peer2 social copy agent.
+- `GET|POST` `/api/social-autopost/hot-card` — Select a hot Pokoin marketplace card and post it to configured social channels, optionally using the dedicated peer2 social copy agent.
+- `POST` `/api/social-post-agent` — Generate Telegram and X copy through the dedicated peer2 social agent without posting to providers.
+
+### Debug / ops (`debug`, 5)
+
+- `GET|POST` `/api/flutter-debug-logs` — Record and read protected Flutter client debug logs.
+- `GET|POST` `/api/marketplace-debug-artists` — Inspect and update marketplace artist enrichment/debug classification data.
+- `GET` `/api/marketplace-debug-events` — Return marketplace event analytics debug data.
+- `GET|POST` `/api/marketplace-debug-refinement` — Inspect and update marketplace search refinement/debug data.
+- `GET|POST|OPTIONS` `/api/marketplace-image-log` — Ring-buffer exact marketplace image URLs served or failed during navigation.
+
+### Other (`other`, 21)
+
+- `GET|POST|OPTIONS` `/api/deck-card-version-lookup` — Return ranked marketplace card versions for structured decklist card fields.
+- `GET` `/api/forum` — Read forum categories, topic lists, or a single topic with posts.
+- `POST` `/api/forum-create-post` — Create an authenticated forum reply.
+- `POST` `/api/forum-create-topic` — Create an authenticated forum topic.
+- `POST` `/api/forum-upload-media` — Optimize forum image media and store it in R2.
+- `GET|OPTIONS` `/api/marketplace-blueprint-price` — Return the public PKN floor price for a marketplace blueprint/card ID.
+- `GET` `/api/marketplace-home` — Return marketplace home snapshot and carousel sections.
+- `POST` `/api/register-email` — Start email/password signup by storing pending signup data and sending verification mail.
+- `POST` `/api/remove-profile-picture` — Remove the authenticated user custom profile picture and delete old R2 object when present.
+- `POST` `/api/request-pkn-withdraw` — Withdraw PKN from site balance to a linked native PKN address.
+- `GET|POST` `/api/search-recipient-emails` — Search usernames for transfers, ensure a username, or update the authenticated user username.
+- `POST` `/api/signup-notification` — Send signup notification email for the authenticated user once.
+- `POST` `/api/transfer-account-balance` — Transfer PKN site balance from the authenticated user to another Pokoin account.
+- `POST` `/api/unlock-silver` — Unlock Silver status/features for the authenticated account.
+- `POST` `/api/upload-profile-picture` — Optimize an uploaded profile picture and store it in R2.
+- `POST` `/api/verify-email-signup` — Verify a pending email signup token, create/claim the Firebase user, and send welcome/notification emails.
+- `POST` `/api/wallet-auth/nonce` — Create a nonce challenge for wallet sign-in.
+- `POST` `/api/wallet-auth/verify` — Verify a signed wallet nonce and sign in/create the corresponding Firebase user.
+- `POST` `/api/wallet-link` — Link a wallet to the authenticated Firebase account.
+- `POST` `/api/wallet-link/complete` — Complete a wallet-link session from a signed wallet payload.
+- `POST` `/api/wallet-link/session` — Create a wallet-link session for an authenticated Firebase account.
+
+## API Routes (full)
+
 ### /api/auth-login
 
 - File: `api/auth-login.js`
@@ -240,7 +363,7 @@ Vercel compatibility rewrite are available.
 - Auth: Public.
 - Migration status: Hosted by `server/oracle-api-server.js`; Vercel fallback remains available until the proxy rewrite is enabled.
 - Required query/body/path params:
-- query: `id` required blueprint ID, `locale` optional two-letter locale, `format=json` optional.
+- query: `id` public card_id or leftover ct_id, optional `blueprintId` leftover, `locale` optional two-letter locale, `format=json` optional, `game` for One Piece / Riftbound.
 - Notable env vars: `MARKETPLACE_DATABASE_URL`
 - External dependencies: Oracle/Postgres marketplace DB
 
@@ -345,13 +468,13 @@ Vercel compatibility rewrite are available.
 
 - File: `api/cardtrader-redirect.js`
 - Methods: `GET`
-- Purpose: Redirect a CardTrader blueprint ID to CardTrader.
+- Purpose: Redirect a public card id or leftover ct_id to the CardTrader leftover blueprint page.
 - Auth: Public.
 - Migration status: Hosted by `server/oracle-api-server.js`; Vercel fallback remains available until the proxy rewrite is enabled.
 - Required query/body/path params:
-- query: `id` required numeric CardTrader blueprint ID.
-- Notable env vars: None documented.
-- External dependencies: CardTrader website
+- query: `id` public card_id (ct_id × 2) or leftover ct_id. Optional `blueprintId` leftover. `game` for One Piece / Riftbound. `format=json` returns `{ url, ct_id }`.
+- Notable env vars: `MARKETPLACE_DATABASE_URL`, `ONE_PIECE_MARKETPLACE_DATABASE_URL`, `RIFTBOUND_MARKETPLACE_DATABASE_URL`
+- External dependencies: Oracle/Postgres marketplace DB, CardTrader website
 
 ### /api/cardtrader-status
 
@@ -539,6 +662,18 @@ Vercel compatibility rewrite are available.
 - Notable env vars: `MARKETPLACE_DATABASE_URL`
 - External dependencies: Oracle/Postgres marketplace DB
 
+### /api/marketplace-suggest
+
+- File: `api/marketplace-suggest.js`
+- Methods: `GET`, `OPTIONS`
+- Purpose: Meili-only typeahead for pokoin-web: grouped printings, no SQL listing hydrate.
+- Auth: Public.
+- Migration status: Hosted by `server/oracle-api-server.js`; Vercel fallback remains available until the proxy rewrite is enabled.
+- Required query/body/path params:
+- query: `q` or `query`; `limit` max groups (default 12, max 24); `lang` / `search_language` (EN Meili only).
+- Notable env vars: `MEILI_HOST`, `MEILI_API_KEY`, `MEILI_MARKETPLACE_INDEX`, `MARKETPLACE_SEARCH_ENGINE`
+- External dependencies: Meilisearch on pokoin-marketplace localhost :7700
+
 ### /api/marketplace-autocomplete
 
 - File: `api/marketplace-autocomplete.js`
@@ -575,6 +710,18 @@ Vercel compatibility rewrite are available.
 - Notable env vars: `MARKETPLACE_DATABASE_URL`, `PKN_CHECKOUT_USDT_PRICE`
 - External dependencies: Oracle/Postgres marketplace DB
 
+### /api/marketplace-card-page
+
+- File: `api/marketplace-card-page.js`
+- Methods: `GET`, `OPTIONS`
+- Purpose: React BFF: one card-detail payload (card, versions, offers, cheapest, artist, canonicalPath).
+- Auth: Public.
+- Migration status: Hosted by `server/oracle-api-server.js`; Vercel fallback remains available until the proxy rewrite is enabled.
+- Required query/body/path params:
+- query: `cardId` required (public id). `lang`, `slug`, `includeSales`, `includeOffers`, `includeSameAs` (off by default), `liveOffers` optional.
+- Notable env vars: `MARKETPLACE_DATABASE_URL`
+- External dependencies: Oracle/Postgres marketplace DB, optional Firebase for sales
+
 ### /api/marketplace-card-seo
 
 - File: `api/marketplace-card-seo.js`
@@ -603,11 +750,11 @@ Vercel compatibility rewrite are available.
 
 - File: `api/marketplace-card-shortlink.js`
 - Methods: `GET`, `HEAD`
-- Purpose: Redirect numeric root short links to canonical marketplace card URLs.
+- Purpose: Redirect our-id short links to canonical marketplace card URLs (our id = CardTrader ct_id * 2).
 - Auth: Public.
 - Migration status: Hosted by `server/oracle-api-server.js`; Vercel fallback remains available until the proxy rewrite is enabled.
 - Required query/body/path params:
-- query: `cardId` required via rewrite or query string.
+- query: `cardId` is our marketplace id (ct_id * 2) or leftover ct_id; `path` is `/marketplace/220962` or `/220962/slug`. See docs/marketplace-public-ids.md.
 - Notable env vars: `MARKETPLACE_DATABASE_URL`
 - External dependencies: Oracle/Postgres marketplace DB
 
@@ -615,11 +762,11 @@ Vercel compatibility rewrite are available.
 
 - File: `api/marketplace-card-url.js`
 - Methods: `GET`, `HEAD`
-- Purpose: Return the stored canonical marketplace card URL for a card id or legacy root path.
+- Purpose: Return stored canonical_path. cardId is our marketplace id (ct_id * 2); path numbers are the same our-id.
 - Auth: Public.
 - Migration status: Hosted by `server/oracle-api-server.js`; Vercel fallback remains available until the proxy rewrite is enabled.
 - Required query/body/path params:
-- query: `cardId` or `path` required; `language` optional.
+- query: `cardId` (our id, or leftover ct_id) or `path` (our-id URL); `language` optional. See docs/marketplace-public-ids.md.
 - Notable env vars: `MARKETPLACE_DATABASE_URL`
 - External dependencies: Oracle/Postgres marketplace DB
 
@@ -722,6 +869,19 @@ Vercel compatibility rewrite are available.
 - Notable env vars: `MARKETPLACE_DATABASE_URL`, `MARKETPLACE_ADMIN_EMAILS`, `MARKETPLACE_DEBUG_EMAILS`, `FIREBASE_*`
 - External dependencies: Oracle/Postgres marketplace DB, Firebase Admin
 
+### /api/marketplace-image-log
+
+- File: `api/marketplace-image-log.js`
+- Methods: `GET`, `POST`, `OPTIONS`
+- Purpose: Ring-buffer exact marketplace image URLs served or failed during navigation.
+- Auth: Public; POST is IP rate-limited. GET returns the in-memory buffer.
+- Migration status: Hosted by `server/oracle-api-server.js`; Vercel fallback remains available until the proxy rewrite is enabled.
+- Required query/body/path params:
+- query: GET `limit` (max 250).
+- body: POST `url` required-ish; optional `cardId`, `ctId`, `source`, `status`, `error`, `route`.
+- Notable env vars: None documented.
+- External dependencies: in-memory ring on pokoin-oracle-api
+
 ### /api/marketplace-event
 
 - File: `api/marketplace-event.js`
@@ -747,6 +907,18 @@ Vercel compatibility rewrite are available.
 - Notable env vars: `MARKETPLACE_DATABASE_URL`, `MARKETPLACE_ADMIN_EMAILS`, `MARKETPLACE_DEBUG_EMAILS`, `FIREBASE_*`
 - External dependencies: Oracle/Postgres marketplace DB, Firebase Admin
 
+### /api/marketplace-expansion-page
+
+- File: `api/marketplace-expansion-page.js`
+- Methods: `GET`, `OPTIONS`
+- Purpose: React BFF: expansion metadata plus paginated singles for a set browse page.
+- Auth: Public.
+- Migration status: Hosted by `server/oracle-api-server.js`; Vercel fallback remains available until the proxy rewrite is enabled.
+- Required query/body/path params:
+- query: `expansionName` or `slug`; `productType` default card; `limit` and `offset` optional. Omit both name and slug to list expansions.
+- Notable env vars: `MARKETPLACE_DATABASE_URL`
+- External dependencies: Oracle/Postgres marketplace DB
+
 ### /api/marketplace-expansions
 
 - File: `api/marketplace-expansions.js`
@@ -767,7 +939,19 @@ Vercel compatibility rewrite are available.
 - Auth: Public.
 - Migration status: Hosted by `server/oracle-api-server.js`; Vercel fallback remains available until the proxy rewrite is enabled.
 - Required query/body/path params:
-- query: No required query parameters.
+- query: `recentCardIds` optional comma-separated public ids; returned as sections.recentlySeenIds / spotlightIds.
+- Notable env vars: `MARKETPLACE_DATABASE_URL`
+- External dependencies: Oracle/Postgres marketplace DB
+
+### /api/marketplace-home-page
+
+- File: `api/marketplace-home-page.js`
+- Methods: `GET`, `OPTIONS`
+- Purpose: React BFF: fast home carousels (newest English sets + hot blueprints). No CardTrader hydrate.
+- Auth: Public.
+- Migration status: Hosted by `server/oracle-api-server.js`; Vercel fallback remains available until the proxy rewrite is enabled.
+- Required query/body/path params:
+- query: `recentCardIds` optional comma-separated public ids; `limit` optional (max 48).
 - Notable env vars: `MARKETPLACE_DATABASE_URL`
 - External dependencies: Oracle/Postgres marketplace DB
 
@@ -803,10 +987,22 @@ Vercel compatibility rewrite are available.
 - Auth: Public for active listing reads; writes and seller-owned reads require Firebase bearer token. Reserve listings require reserve role.
 - Migration status: Hosted by `server/oracle-api-server.js`; Vercel fallback remains available until the proxy rewrite is enabled.
 - Required query/body/path params:
-- query: `cardId`, `sellerUid`, `sellerUsername`, `id`, `action`, and `limit` supported.
+- query: `cardId`, `sellerUid`, `sellerUsername`, `id`, `action`, and `limit` supported. `nativeOnly=1` (or `live=0`) skips live CardTrader merge on public card reads.
 - body: Create/update listing fields such as `cardId`, seller display fields, condition, language, `pricePkn`, quantity, and source flags.
 - Notable env vars: `MARKETPLACE_DATABASE_URL`, `FIREBASE_*`
 - External dependencies: Oracle/Postgres marketplace DB, Firebase Admin
+
+### /api/marketplace-portfolio
+
+- File: `api/marketplace-portfolio.js`
+- Methods: `GET`, `OPTIONS`
+- Purpose: React BFF: Pokoin catalog + native PKN overlay (Portfolio / Explore). No CardTrader leftover images. No USD.
+- Auth: Public.
+- Migration status: Hosted by `server/oracle-api-server.js`; Vercel fallback remains available until the proxy rewrite is enabled.
+- Required query/body/path params:
+- query: `id` / `cardId` optional public card id or leftover ct_id; `limit` optional (Pokemon max 500, satellite max 2500); `game` for One Piece / Riftbound.
+- Notable env vars: `MARKETPLACE_DATABASE_URL`
+- External dependencies: Oracle/Postgres marketplace DB
 
 ### /api/marketplace-orders
 
@@ -820,6 +1016,18 @@ Vercel compatibility rewrite are available.
 - body: `items`, `subtotalPkn`, and `totalPkn` for checkout; notification payload for notify-sellers.
 - Notable env vars: `MARKETPLACE_DATABASE_URL`, `FIREBASE_*`, `RESEND_API_KEY`
 - External dependencies: Oracle/Postgres marketplace DB, Firebase Admin, email provider
+
+### /api/marketplace-search-page
+
+- File: `api/marketplace-search-page.js`
+- Methods: `GET`, `OPTIONS`
+- Purpose: React BFF: Meili/SQL search results with pagination and product facets.
+- Auth: Public.
+- Migration status: Hosted by `server/oracle-api-server.js`; Vercel fallback remains available until the proxy rewrite is enabled.
+- Required query/body/path params:
+- query: `query` or `q`; `limit`, `offset`, `productType`, `productSearchOnly`, `lang`, `includeFacets`.
+- Notable env vars: `MARKETPLACE_DATABASE_URL`, `MEILI_HOST`, `MEILI_API_KEY`
+- External dependencies: Oracle/Postgres marketplace DB, Meilisearch
 
 ### /api/marketplace-search-candidates
 
@@ -1165,4 +1373,17 @@ Vercel compatibility rewrite are available.
 - query: `requestId` optional for status.
 - Notable env vars: `FIREBASE_*`, `POKOIN_RPC_URL`, `POKOIN_RESERVE_ADDRESS`, `POKOIN_RESERVE_PRIVATE_KEY`
 - External dependencies: Firebase Admin, Pokoin RPC, BSC/Pancake helpers
+
+### /api/wpkn-pkn-quote
+
+- File: `api/wpkn-pkn-quote.js`
+- Methods: `GET`, `POST`
+- Purpose: Return a public wPKN/PKN market quote from GeckoTerminal plus the configured PKN USD price.
+- Auth: Public.
+- Migration status: Hosted by `server/oracle-api-server.js`; Vercel fallback remains available until the proxy rewrite is enabled.
+- Required query/body/path params:
+- query: `direction`, `amountIn`.
+- body: `direction`, `amountIn` (POST).
+- Notable env vars: `PKN_USDT_PRICE`, `PKN_CHECKOUT_USDT_PRICE`
+- External dependencies: GeckoTerminal
 

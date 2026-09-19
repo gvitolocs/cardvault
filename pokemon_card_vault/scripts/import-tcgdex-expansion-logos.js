@@ -263,7 +263,7 @@ async function fetchLogoRows(pool, options) {
         logo_sources.set_logo_url,
         logo_sources.metadata_rows
       from logo_sources
-      join public.cardtrader_pokemon_expansions expansions
+      join public.pokoin_pokemon_expansions expansions
         on expansions.name = logo_sources.expansion_name
       ${expansionWhere}
       group by
@@ -297,7 +297,7 @@ async function fetchLogoRows(pool, options) {
 async function updateExpansionLogo(pool, row) {
   await pool.query(
     `
-      update public.cardtrader_pokemon_expansions
+      update public.pokoin_pokemon_expansions
       set
         logo_image_url = $2,
         logo_object_key = $3,
@@ -352,7 +352,7 @@ async function verifyLogos(pool) {
       count(*) filter (where coalesce(logo_image_url, '') <> '')::integer as rows_with_logo,
       count(*)::integer as expansion_rows,
       max(logo_imported_at) as latest_logo_imported_at
-    from public.cardtrader_pokemon_expansions
+    from public.pokoin_pokemon_expansions
   `);
   return result.rows[0] || {};
 }
@@ -369,7 +369,7 @@ async function main() {
     const result = await importLogos({ pool, r2Client, options });
     const output = {
       mode: options.apply ? 'apply' : 'dry-run',
-      target: 'public.cardtrader_pokemon_expansions.logo_image_url',
+      target: 'public.pokoin_pokemon_expansions.logo_image_url',
       cdnPath: 'expansions/logos/<slug>.<ext>',
       options: {
         limit: options.limit === Infinity ? 'all' : options.limit,

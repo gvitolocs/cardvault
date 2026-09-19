@@ -22,7 +22,10 @@ function cleanUserUid(value) {
 function watchlistAnalyticsJoin(candidateAlias = 'c', analyticsAlias = 'watchlist_analytics') {
   return `
     left join public.marketplace_card_watchlist_analytics ${analyticsAlias}
-      on ${analyticsAlias}.blueprint_id = ${candidateAlias}.card_id
+      on (
+        ${analyticsAlias}.blueprint_id = ${candidateAlias}.ct_id
+        or ${analyticsAlias}.blueprint_id = ${candidateAlias}.card_id
+      )
   `;
 }
 

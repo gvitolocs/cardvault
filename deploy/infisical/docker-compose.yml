@@ -1,0 +1,69 @@
+# Infisical OSS on oracle-peer1 (pokoin-peer1).
+# Bound to loopback only. CardTrader ingest stays on pokoin-marketplace (peer2).
+# Do not put Infisical credentials in this file.
+
+services:
+  backend:
+    container_name: pokoin-infisical
+    image: infisical/infisical:v0.165.13
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      TELEMETRY_ENABLED: "false"
+      STANDALONE_MODE: "false"
+      NODE_OPTIONS: "--max-old-space-size=450"
+    ports:
+      - "127.0.0.1:8088:8080"
+    mem_limit: 700m
+    memswap_limit: 1400m
+    networks:
+      - infisical
+
+  redis:
+    container_name: pokoin-infisical-redis
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "64mb", "--maxmemory-policy", "noeviction"]
+    mem_limit: 96m
+    networks:
+      - infisical
+    volumes:
+      - infisical_redis:/data
+
+  db:
+    container_name: pokoin-infisical-db
+    image: postgres:14-alpine
+    restart: unless-stopped
+    env_file: .env
+    command:
+      - postgres
+      - -c
+      - shared_buffers=64MB
+      - -c
+      - max_connections=50
+      - -c
+      - work_mem=4MB
+    mem_limit: 256m
+    memswap_limit: 512m
+    volumes:
+      - infisical_pg:/var/lib/postgresql/data
+    networks:
+      - infisical
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+
+volumes:
+  infisical_pg:
+  infisical_redis:
+
+networks:
+  infisical:

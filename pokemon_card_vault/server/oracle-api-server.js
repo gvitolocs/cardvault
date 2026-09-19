@@ -2,8 +2,12 @@ const http = require('http');
 const { Readable } = require('stream');
 const path = require('path');
 
+const { CLIENT_CONTRACT } = require('../api/_client_contract');
 const { routeDefinitions } = require('./api-route-manifest');
+const { FAMILIES, familyForPath, groupRoutes } = require('./api-route-families');
 const { observeApiRequest } = require('../api/_api_observability');
+const { pipelineHealth } = require('../api/_pipeline_health');
+const { sanitizePublicJson } = require('../api/_public_error');
 
 const API_DIR = path.join(__dirname, '..', 'api');
 const DEFAULT_HOST = process.env.ORACLE_API_HOST || '0.0.0.0';
@@ -152,10 +156,12 @@ function decorateResponse(res) {
     return res;
   };
   res.json = function json(payload) {
+    const sanitized = sanitizePublicJson(res.statusCode || 200, payload);
+    res.statusCode = sanitized.statusCode;
     if (!res.headersSent && !res.getHeader('Content-Type')) {
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
     }
-    return res.end(JSON.stringify(payload));
+    return res.end(JSON.stringify(sanitized.payload));
   };
   res.send = function send(payload) {
     if (Buffer.isBuffer(payload)) {
@@ -181,9 +187,10 @@ function decorateResponse(res) {
 
 function sendJson(res, statusCode, payload) {
   if (res.writableEnded) return;
-  res.statusCode = statusCode;
+  const sanitized = sanitizePublicJson(statusCode, payload);
+  res.statusCode = sanitized.statusCode;
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  res.end(JSON.stringify(payload));
+  res.end(JSON.stringify(sanitized.payload));
 }
 
 function sendHtml(res, statusCode, html) {
@@ -194,38 +201,48 @@ function sendHtml(res, statusCode, html) {
   res.end(html);
 }
 
-function stagingMarketplaceHtml(host = 'newapi.pokoin.com') {
-  const safeHost = String(host || 'newapi.pokoin.com').replace(/[<>"'&]/g, '');
+function stagingMarketplaceHtml(host = 'api.pokoin.com') {
+  const safeHost = String(host || 'api.pokoin.com').replace(/[<>"'&]/g, '');
   return `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Pokoin Oracle API Staging</title>
+  <title>Pokoin Oracle API</title>
   <style>
     body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 2rem; line-height: 1.5; color: #172033; }
     main { max-width: 860px; }
     code, pre { background: #f5f7fb; border-radius: 6px; padding: 0.15rem 0.35rem; }
     a { color: #2457c5; }
-    .badge { display: inline-block; background: #fff3cd; border: 1px solid #ffe08a; border-radius: 999px; padding: 0.2rem 0.65rem; font-size: 0.9rem; }
+    .badge { display: inline-block; background: #e8f0ff; border: 1px solid #b7c9f4; border-radius: 999px; padding: 0.2rem 0.65rem; font-size: 0.9rem; }
   </style>
 </head>
 <body>
   <main>
-    <p class="badge">Oracle API staging</p>
-    <h1>Pokoin Oracle API staging endpoint</h1>
-    <p>This host is for testing the standalone Node API service before any production traffic is switched. It does not serve the Flutter marketplace app.</p>
+    <p class="badge">Oracle API</p>
+    <h1>Pokoin Oracle API</h1>
+    <p>This host serves JSON under <code>/api/…</code>. It does not serve the marketplace SPA (that is <code>https://pokoin.com</code>). Omitting <code>/api</code> returns <code>{"error":"API route not found."}</code>.</p>
     <h2>Useful checks</h2>
     <ul>
-      <li><a href="/healthz">/healthz</a> - service health</li>
-      <li><a href="/api/__routes">/api/__routes</a> - compact route index</li>
-      <li><a href="/api/marketplace-home">/api/marketplace-home</a> - read-only marketplace API example</li>
-      <li><a href="/api/marketplace-blueprint-price?blueprintId=274416">/api/marketplace-blueprint-price?blueprintId=274416</a> - read-only price lookup example</li>
+      <li><a href="/healthz">/healthz</a> - pipeline health (postgres, valkey, meili, cdn)</li>
+      <li><a href="/api/__contract">/api/__contract</a> - React/JS client contract</li>
+      <li><a href="/api/__routes">/api/__routes</a> - routes with family tags</li>
+      <li><a href="/api/__routes?group=1">/api/__routes?group=1</a> - same list grouped by family</li>
+      <li><a href="/api/marketplace-suggest?q=pika&amp;limit=8">/api/marketplace-suggest?q=pika</a> - pokoin-web typeahead (Meili)</li>
+      <li><a href="/api/marketplace-search-page?query=pika&amp;limit=3">/api/marketplace-search-page?query=pika</a> - search page BFF</li>
+      <li><a href="/api/marketplace-expansion-page?slug=white-flare&amp;limit=1">/api/marketplace-expansion-page?slug=white-flare</a> - set desk (<code>expansion.cardCount</code> is stored catalog size)</li>
+      <li><a href="/api/marketplace-blueprint-price?blueprintId=274416">/api/marketplace-blueprint-price?blueprintId=274416</a> - read-only price lookup</li>
+    </ul>
+    <h2>Families</h2>
+    <p>Do not reorganize <code>api/*.js</code>. Navigate by family on <code>GET /api/__routes?group=1</code>.</p>
+    <ul>
+      ${FAMILIES.map((row) => `<li><code>${row.id}</code> — ${row.title}</li>`).join('\n      ')}
     </ul>
     <h2>Example</h2>
     <pre>curl https://${safeHost}/healthz
-curl https://${safeHost}/api/__routes</pre>
-    <p>Production <code>https://pokoin.com</code> remains separate until the Vercel proxy is explicitly changed.</p>
+curl https://${safeHost}/api/__routes
+curl 'https://${safeHost}/api/marketplace-suggest?q=pika&limit=8'</pre>
+    <p>Public site: <a href="https://pokoin.com/marketplace">https://pokoin.com/marketplace</a></p>
   </main>
 </body>
 </html>`;
@@ -273,28 +290,48 @@ function createOracleApiServer() {
       const { pathname } = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
 
       if (pathname === '/healthz' || pathname === '/api/healthz') {
-        sendJson(res, 200, {
-          ok: true,
-          service: 'pokoin-oracle-api',
+        const health = await pipelineHealth();
+        sendJson(res, health.ok ? 200 : 503, {
+          ...health,
           routes: routeDefinitions.length,
         });
         return;
       }
 
-      if (pathname === '/marketplace') {
-        sendHtml(res, 200, stagingMarketplaceHtml(req.headers.host || 'newapi.pokoin.com'));
+      if (pathname === '/' || pathname === '/marketplace') {
+        sendHtml(res, 200, stagingMarketplaceHtml(req.headers.host || 'api.pokoin.com'));
         return;
       }
 
       if (pathname === '/api/__routes') {
-        sendJson(res, 200, {
-          routes: routeDefinitions.map(({ path: routePath, methods, file, purpose }) => ({
+        const requestUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+        const familyFilter = String(requestUrl.searchParams.get('family') || '').trim();
+        const routes = routeDefinitions
+          .map(({ path: routePath, methods, file, purpose }) => ({
             path: routePath,
             methods,
             file,
             purpose,
-          })),
+            family: familyForPath(routePath),
+          }))
+          .filter((route) => !familyFilter || route.family === familyFilter);
+        if (requestUrl.searchParams.get('group') === '1' || requestUrl.searchParams.get('grouped') === '1') {
+          sendJson(res, 200, {
+            count: routes.length,
+            families: groupRoutes(routes),
+          });
+          return;
+        }
+        sendJson(res, 200, {
+          count: routes.length,
+          families: FAMILIES,
+          routes,
         });
+        return;
+      }
+
+      if (pathname === '/api/__contract') {
+        sendJson(res, 200, CLIENT_CONTRACT);
         return;
       }
 
@@ -326,7 +363,8 @@ function startServer({
 } = {}) {
   const server = createOracleApiServer();
   server.listen(port, host, () => {
-    console.log(`pokoin-oracle-api listening on http://${host}:${port}`);
+    const service = process.env.POKOIN_API_SERVICE_NAME || 'pokoin-oracle-api';
+    console.log(`${service} listening on http://${host}:${port}`);
   });
   return server;
 }

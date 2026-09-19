@@ -8,7 +8,10 @@ function loadMarketplaceListingsWithStubs(stubs) {
   delete require.cache[target];
   Module._load = function load(request, parent, isMain) {
     if (request === './_marketplace_db') {
-      return { marketplaceQuery: stubs.marketplaceQuery };
+      return {
+        marketplaceQuery: stubs.marketplaceQuery,
+        marketplaceWriteQuery: stubs.marketplaceWriteQuery || stubs.marketplaceQuery,
+      };
     }
     if (request === './_firebase') {
       return {
@@ -127,6 +130,94 @@ function validCreateBody(overrides = {}) {
 test('marketplace listings reads public seller inventory by username', async () => {
   const queries = [];
   const handler = loadMarketplaceListingsWithStubs({
+    getFirebaseAdmin: () => {
+      throw new Error('Firebase should not run when listings already have the seller.');
+    },
+    verifyBearerToken: async () => {
+      throw new Error('Public username inventory should not require auth.');
+    },
+    requireReserveAccess: async () => {},
+    marketplaceQuery: async (sql, values) => {
+      queries.push({ sql: String(sql), values });
+      assert.doesNotMatch(String(sql), /cardtrader_blueprint_listing_cache/);
+      if (String(sql).includes('lower(btrim(seller_name))')) {
+        return { rows: [{ seller_uid: 'seller-uid' }] };
+      }
+      if (String(sql).includes('marketplace_card_urls')) {
+        return {
+          rows: [{
+            card_id: '316600',
+            canonical_path:
+              '/marketplace/en/cards/633200/rare-leafeon-005-131-prismatic-evolutions',
+            public_number: '633200',
+          }],
+        };
+      }
+      return { rows: [listingRow({ card_id: '316600', seller_name: 'Seller Name' })] };
+    },
+  });
+  const res = responseRecorder();
+
+  await handler({
+    method: 'GET',
+    url: '/api/marketplace-listings?sellerUsername=SellerName',
+    headers: { host: 'pokoin.test' },
+  }, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.listings.length, 1);
+  assert.equal(res.body.listings[0].sellerName, 'Seller Name');
+  assert.equal(res.body.listings[0].sellerDisplayName, 'Seller Name');
+  assert.equal(queries.length, 3);
+  assert.match(queries[0].sql, /lower\(btrim\(seller_name\)\)/);
+  assert.deepEqual(queries[1].values.slice(0, 2), ['seller-uid', 500]);
+  assert.match(queries[1].sql, /seller_uid = \$1/);
+  assert.match(queries[1].sql, /status = 'active'/);
+  assert.match(queries[1].sql, /quantity_available > 0/);
+  assert.match(queries[2].sql, /marketplace_card_urls/);
+});
+
+test('marketplace listings finds a seller by listing name when Firebase username is missing', async () => {
+  const queries = [];
+  const handler = loadMarketplaceListingsWithStubs({
+    getFirebaseAdmin: () => {
+      throw new Error('Firebase should not run when listings already have the seller.');
+    },
+    verifyBearerToken: async () => {
+      throw new Error('Public username inventory should not require auth.');
+    },
+    requireReserveAccess: async () => {},
+    marketplaceQuery: async (sql, values) => {
+      queries.push({ sql: String(sql), values });
+      if (String(sql).includes('lower(btrim(seller_name))')) {
+        assert.equal(values[0], 'vitologiuseppe17');
+        return { rows: [{ seller_uid: 'seller-uid' }] };
+      }
+      if (String(sql).includes('marketplace_card_urls')) {
+        return { rows: [] };
+      }
+      return { rows: [listingRow({ seller_name: 'vitologiuseppe17', card_id: '316600' })] };
+    },
+  });
+  const res = responseRecorder();
+
+  await handler({
+    method: 'GET',
+    url: '/api/marketplace-listings?sellerUsername=vitologiuseppe17&nativeOnly=1',
+    headers: { host: 'pokoin.test' },
+  }, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.listings.length, 1);
+  assert.equal(res.body.listings[0].sellerUsername, 'vitologiuseppe17');
+  assert.match(queries[0].sql, /lower\(btrim\(seller_name\)\)/);
+  assert.match(queries[1].sql, /seller_uid = \$1/);
+  assert.equal(queries[1].values[0], 'seller-uid');
+});
+
+test('marketplace listings falls back to Firebase username when no listing name matches', async () => {
+  const queries = [];
+  const handler = loadMarketplaceListingsWithStubs({
     getFirebaseAdmin: () => ({
       firestore: () => ({
         collection: (name) => {
@@ -154,38 +245,28 @@ test('marketplace listings reads public seller inventory by username', async () 
     requireReserveAccess: async () => {},
     marketplaceQuery: async (sql, values) => {
       queries.push({ sql: String(sql), values });
-      assert.doesNotMatch(String(sql), /cardtrader_blueprint_listing_cache/);
-      if (String(sql).includes('marketplace_card_urls')) {
-        return {
-          rows: [{
-            card_id: '316600',
-            canonical_path:
-              '/marketplace/en/cards/633200/rare-leafeon-005-131-prismatic-evolutions',
-            public_number: '633200',
-          }],
-        };
+      if (String(sql).includes('lower(btrim(seller_name))')) {
+        return { rows: [] };
       }
-      return { rows: [listingRow({ card_id: '316600' })] };
+      if (String(sql).includes('marketplace_card_urls')) {
+        return { rows: [] };
+      }
+      return { rows: [listingRow({ seller_name: 'Seller Name', card_id: '316600' })] };
     },
   });
   const res = responseRecorder();
 
   await handler({
     method: 'GET',
-    url: '/api/marketplace-listings?sellerUsername=SellerName',
+    url: '/api/marketplace-listings?sellerUsername=SellerName&nativeOnly=1',
     headers: { host: 'pokoin.test' },
   }, res);
 
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.listings.length, 1);
-  assert.equal(res.body.listings[0].sellerName, 'Seller Name');
-  assert.equal(res.body.listings[0].sellerDisplayName, 'Seller Name');
-  assert.equal(queries.length, 2);
-  assert.deepEqual(queries[0].values.slice(0, 2), ['seller-uid', 500]);
-  assert.match(queries[0].sql, /seller_uid = \$1/);
-  assert.match(queries[0].sql, /status = 'active'/);
-  assert.match(queries[0].sql, /quantity_available > 0/);
-  assert.match(queries[1].sql, /marketplace_card_urls/);
+  assert.match(queries[0].sql, /lower\(btrim\(seller_name\)\)/);
+  assert.match(queries[1].sql, /seller_uid = \$1/);
+  assert.equal(queries[1].values[0], 'seller-uid');
 });
 
 test('marketplace listing rows include canonical card detail path', () => {
@@ -287,6 +368,41 @@ test('marketplace listings merges live CardTrader rows on card pages as pknreser
   assert.equal(res.body.listings[0].sourceMetadata.liveCardTraderApiUsed, undefined);
   assert.equal(queries.length, 1);
   assert.doesNotMatch(queries.map((query) => query.sql).join('\n'), /cardtrader_blueprint_listing_cache/);
+});
+
+test('marketplace listings nativeOnly=1 skips live CardTrader', async () => {
+  let liveCalls = 0;
+  const handler = loadMarketplaceListingsWithStubs({
+    getFirebaseAdmin: () => ({
+      firestore: () => ({
+        collection: () => ({
+          doc: () => ({
+            get: async () => ({ data: () => ({}) }),
+          }),
+        }),
+      }),
+    }),
+    verifyBearerToken: async () => {
+      throw new Error('Public card listing read should not require auth.');
+    },
+    requireReserveAccess: async () => {},
+    readLiveCardTraderListings: async () => {
+      liveCalls += 1;
+      return { listings: [{ externalListingId: 'should-not-run', displayPricePkn: 1, quantity: 1 }] };
+    },
+    marketplaceQuery: async () => ({ rows: [listingRow({ price_pkn: 1200 })] }),
+  });
+  const res = responseRecorder();
+  await handler({
+    method: 'GET',
+    url: '/api/marketplace-listings?cardId=card-1&nativeOnly=1',
+    headers: { host: 'pokoin.test' },
+  }, res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.headers['Cache-Control'], 'private, no-store');
+  assert.equal(liveCalls, 0);
+  assert.equal(res.body.listings.length, 1);
+  assert.equal(res.body.listings[0].source, 'pokoin_user_listing');
 });
 
 test('marketplace listings hides promotional seller comments in public output', async () => {
@@ -407,6 +523,18 @@ test('marketplace listing row emits current seller display name separately', () 
 
   assert.equal(row.sellerName, 'Giuseppe');
   assert.equal(row.sellerDisplayName, 'Giuseppe');
+  assert.equal(row.sellerUsername, 'giuseppe');
+});
+
+test('native listing username ignores a pknreserve profile username', () => {
+  const { _test } = loadMarketplaceListingsWithStubs({});
+  const row = _test.listingRow(listingRow({
+    seller_name: 'vitologiuseppe17',
+    profile_username: 'pknreserve',
+    profile_display_name: 'vitologiuseppe17',
+  }));
+  assert.equal(row.sellerName, 'vitologiuseppe17');
+  assert.equal(row.sellerUsername, 'vitologiuseppe17');
 });
 
 test('marketplace listings rejects reserve create without reserve role', async () => {

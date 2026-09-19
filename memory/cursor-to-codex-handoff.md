@@ -6,7 +6,7 @@
 - CardVault is now the flagship consumer layer for Pokoin: Pokemon card marketplace UX, card analytics/search, competitive (Limitless-style) data views, pricing pipelines (CardTrader/native cache), wallet/scan/explorer pages, and payment/sharding related flows.
 - Current production shape:
   - Web/app entrypoints on `https://pokoin.com` (+ subdomain aliases such as `explorer.pokoin.com`)
-  - Oracle-hosted API origin on `https://api.pokoin.com` (not serverless-first)
+  - Pi-hosted API origin on `https://api.pokoin.com` (not serverless-first; Oracle is CardTrader dump Postgres)
 
 ## 2) Current architecture and important folders
 - `pokemon_card_vault/`
@@ -23,7 +23,7 @@
 
 ## 3) Current active work / priorities
 - Ongoing Pokoin marketplace + Oracle API evolution in `pokemon_card_vault/` (large in-progress working tree).
-- Preserve production architecture: frontend on Vercel, APIs on Oracle (`api.pokoin.com`), avoid accidental serverless fallback.
+- Preserve production architecture: frontend on Vercel, public APIs on pi-home (`api.pokoin.com`), Oracle `pokoin-marketplace` for CardTrader dump Postgres, avoid accidental serverless fallback.
 - Local developer setup work in progress around Codex/Cursor proxy startup and reliability.
 
 ## 4) Important locked decisions and do-not-revert rules
@@ -58,6 +58,7 @@ Also from project rules:
    - `memory/current-state.md`
    - `memory/architecture.md`
    - `memory/decisions.md`
+   - `memory/obsidian-documentation.md` — **how to write Pokoin Obsidian notes**
    - `pokemon_card_vault/workflows/README.md`
 2. Check repo state:
    - `git status -sb` at `cardvault/` and scope target changes carefully.
@@ -67,6 +68,10 @@ Also from project rules:
 4. For memory continuity:
    - Use Codevira decisions as authoritative for locked constraints.
    - Use Honcho carefully until workspace mapping is corrected.
+5. For knowledge-graph docs (atomic notes / MOCs / Events):
+   - Canonical vault is **only** `/home/nes/Obsidian/Pokoin` on **pi-cursor** (not this git repo).
+   - Follow `memory/obsidian-documentation.md` end-to-end.
+   - Coworker download (Oracle peer1): `https://rpc.pokoin.com/codex-obsidian/<token>/pokoin-codex-obsidian-pack.zip` — token in `~/.config/pokoin/codex-obsidian-token`; republish with `scripts/publish-codex-obsidian-pack.sh`.
 
 ## 8) Honcho memory summary relevant to this repo
 - Requested workspace (`pokoin-cursor`) is **not present** in currently accessible Honcho workspaces.

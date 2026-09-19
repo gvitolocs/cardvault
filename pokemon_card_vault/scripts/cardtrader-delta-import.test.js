@@ -11,14 +11,13 @@ const {
   uniqueRecords,
 } = require('./cardtrader-delta-import');
 
-test('parseArgs defaults to dry-run bounded delta', () => {
-  const options = parseArgs(['--expansion-ids=4611,4639']);
+test('parseArgs keeps --refresh opt-in so live apply can skip exclusive projection', () => {
+  const options = parseArgs(['--apply', '--expansion-names=30th Celebration JP']);
 
-  assert.equal(options.apply, false);
-  assert.deepEqual(options.expansionIds, [4611, 4639]);
-  assert.equal(options.images, false);
+  assert.equal(options.apply, true);
   assert.equal(options.refresh, false);
-  assert.equal(options.syncSupabase, false);
+  assert.equal(options.images, false);
+  assert.deepEqual(options.expansionNames, ['30th Celebration JP']);
 });
 
 test('parseArgs supports full streaming API mode', () => {
@@ -98,6 +97,12 @@ test('insert SQL only inserts missing raw blueprint rows', () => {
   assert.match(sql, /on conflict \(id\) do nothing/);
   assert.doesNotMatch(sql.toLowerCase(), /truncate|delete from/);
   assert.doesNotMatch(sql, /marketplace_cards|marketplace_search_candidates/);
+});
+
+test('insert SQL can target pokoin_pokemon_blueprints after 018', () => {
+  const sql = insertMissingSql(1, 'pokoin_pokemon_blueprints');
+  assert.match(sql, /insert into public\.pokoin_pokemon_blueprints/);
+  assert.match(sql, /on conflict \(id\) do nothing/);
 });
 
 test('insertValues serializes json columns', () => {

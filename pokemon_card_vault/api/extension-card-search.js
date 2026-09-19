@@ -171,7 +171,7 @@ function doubledCardId(value) {
 
 function marketplacePathForRow(row, language = 'en') {
   const cardId = String(row.card_id || row.id || '');
-  const doubledId = doubledCardId(cardId);
+  const publicId = String(cardId || "").trim();
   const cleanLanguage = slugPart(language) || 'en';
   const cleanSlugPart = (part) => {
     const slug = slugPart(part);
@@ -183,8 +183,8 @@ function marketplacePathForRow(row, language = 'en') {
     cleanCollectorNumberForSlug(row.card_number),
     row.set_name,
   ].map(cleanSlugPart).filter(Boolean).join('-');
-  if (!doubledId || !slug) return '';
-  return `/marketplace/${cleanLanguage}/cards/${doubledId}/${slug}`;
+  if (!/^[0-9]+$/.test(publicId) || !slug) return '';
+  return `/marketplace/${cleanLanguage}/cards/${publicId}/${slug}`;
 }
 
 function matchFromEntry(entry, language = 'en') {

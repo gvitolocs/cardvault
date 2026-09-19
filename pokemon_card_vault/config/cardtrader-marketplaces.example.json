@@ -47,8 +47,25 @@
       "schema": "marketplace_one_piece",
       "table": "cardtrader_blueprints",
       "cdnKeyPrefix": "one-piece/",
-      "refreshSql": "",
-      "syncCommand": ""
+      "cardCategoryIds": [192, 255],
+      "rarityKeys": ["onepiece_rarity"],
+      "refreshSql": "select public.refresh_multigame_marketplace_projections('marketplace_one_piece', array[192,255], array['onepiece_rarity'])",
+      "syncCommand": "",
+      "notes": "Public card_id = ct_id * 2. Projections in public.marketplace_search_candidates / marketplace_card_urls."
+    },
+    "riftbound": {
+      "displayName": "Riftbound | League of Legends",
+      "slug": "riftbound",
+      "cardtraderGameId": 22,
+      "databaseUrlEnv": "RIFTBOUND_MARKETPLACE_DATABASE_URL",
+      "schema": "marketplace_riftbound",
+      "table": "cardtrader_blueprints",
+      "cdnKeyPrefix": "riftbound/",
+      "cardCategoryIds": [258],
+      "rarityKeys": ["riftbound_rarity"],
+      "refreshSql": "select public.refresh_multigame_marketplace_projections('marketplace_riftbound', array[258], array['riftbound_rarity'])",
+      "syncCommand": "",
+      "notes": "Public card_id = ct_id * 2. Projections in public.marketplace_search_candidates / marketplace_card_urls."
     },
     "lorcana": {
       "displayName": "Disney Lorcana",

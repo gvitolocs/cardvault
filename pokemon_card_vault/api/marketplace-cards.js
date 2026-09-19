@@ -10,7 +10,9 @@ const {
   cartHolderCountColumn,
 } = require('./_marketplace_cart_analytics');
 const { withCardEmojiFields } = require('./_marketplace_card_emoji');
+const { normalizeMarketplaceRow } = require('./_marketplace_row');
 const { projectedRaritySql } = require('./_marketplace_card_rarity');
+const { recordCardsImages } = require('./_marketplace_image_log');
 
 const CHEAPEST_HOMEPAGE_CACHE_RELATIONS = new Set([
   'public.cheapest_homepage_cache_blueprint',
@@ -141,10 +143,9 @@ function cardTraderAvailabilityJoin(
   candidateAlias = 'c',
   relation = 'public.cheapest_homepage_cache_blueprint',
 ) {
-  const candidateIdColumn = candidateAlias === 'versions'
-    ? `${candidateAlias}.card_id`
-    : `${candidateAlias}.card_id`;
   const cacheRelation = cleanCheapestHomepageCacheRelation(relation);
+  const cardIdColumn = `${candidateAlias}.card_id`;
+  const ctIdColumn = `${candidateAlias}.ct_id`;
   return `
     left join lateral (
       select cardtrader_cache.*
@@ -153,11 +154,11 @@ function cardTraderAvailabilityJoin(
         and cardtrader_cache.eligible_listing_count > 0
         and cardtrader_cache.cheapest_price_pkn is not null
         and (
-          cardtrader_cache.blueprint_id = ${candidateIdColumn}
-          or cardtrader_cache.pokoin_card_id = ${candidateIdColumn}::text
+          cardtrader_cache.blueprint_id = ${ctIdColumn}
+          or cardtrader_cache.pokoin_card_id = ${cardIdColumn}::text
         )
       order by
-        case when cardtrader_cache.blueprint_id = ${candidateIdColumn} then 0 else 1 end,
+        case when cardtrader_cache.blueprint_id = ${ctIdColumn} then 0 else 1 end,
         cardtrader_cache.cheapest_price_pkn asc,
         case when cardtrader_cache.provider = 'pokoin_native' then 0 else 1 end,
         cardtrader_cache.eligible_listing_count desc,
@@ -177,11 +178,17 @@ function hasStructuredNameNumberQuery(query) {
 function productTypeClause(productType, productSearchOnly, values) {
   const normalized = cleanText(productType, 60);
   if (normalized) {
+    // Exact subtype filter (productType=card singles, productType=jumbo on the
+    // Products page). Search tabs never split card vs jumbo: jumbo is a
+    // subtype inside Product.
     values.push(normalized);
     return ` and marketplace_search_candidates.product_type = $${values.length}`;
   }
   if (productSearchOnly) {
-    return " and marketplace_search_candidates.item_kind = 'product'";
+    // Product search universe: sealed products plus the jumbo subtype (083).
+    // Jumbos stay item_kind 'single', so item_kind alone would drop them.
+    return " and (marketplace_search_candidates.item_kind = 'product'"
+      + " or marketplace_search_candidates.product_type = 'jumbo')";
   }
   return '';
 }
@@ -259,7 +266,7 @@ async function fallbackRowsForStructuredCards({ query, limit, searchLanguage }) 
         c.preview_image_url, c.set_name, ${raritySql} as rarity, c.card_type,
         coalesce(nullif(c.card_number, ''), ranked.card_number) as card_number,
         c.product_variant, false as is_holo, false as is_foil, c.item_kind, c.product_type,
-        c.trainer_name, artist.artist, artist.illustrator,
+        c.trainer_name, c.artist, c.illustrator,
         c.card_palette, c.emoji, c.imported_at,
         ${watchlistCountColumn('watchlist_analytics')},
         ${cartHolderCountColumn('cart_analytics')},
@@ -269,39 +276,79 @@ async function fallbackRowsForStructuredCards({ query, limit, searchLanguage }) 
         unnest($1::bigint[], $3::text[]) with ordinality as ranked(card_id, card_number, ordinality)
       join public.marketplace_search_candidates c on c.card_id = ranked.card_id
       left join public.cardtrader_pokemon_blueprints blueprints
-        on blueprints.id = c.card_id
+        on blueprints.id = coalesce(c.ct_id, c.card_id)
       left join public.marketplace_blueprint_tcg_metadata tcg_metadata
-        on tcg_metadata.blueprint_id = c.card_id
+        on tcg_metadata.card_id = c.card_id
+        or tcg_metadata.blueprint_id = coalesce(c.ct_id, c.card_id)
       left join public.marketplace_blueprint_price_summary price_summary
-        on price_summary.blueprint_id = c.card_id
+        on price_summary.blueprint_id = coalesce(c.ct_id, c.card_id)
       ${cardTraderAvailabilityJoin('c', cheapestCacheRelation)}
       ${watchlistAnalyticsJoin('c', 'watchlist_analytics')}
       ${cartAnalyticsJoin('c', 'cart_analytics')}
-      left join public.marketplace_blueprint_artists artist
-        on artist.blueprint_id = c.card_id
       order by ranked.ordinality
     `,
     [ids, String(process.env.PKN_CHECKOUT_USDT_PRICE || 0.005), rankedRows.map((row) => String(row.card_number || ''))],
   );
-  return result.rows.map(({ ordinality, ...row }) => withCardEmojiFields(row));
+  return result.rows.map(({ ordinality, ...row }) => withCardEmojiFields(normalizeMarketplaceRow(row)));
 }
 
-async function rowsForCards({ query, limit, offset = 0, productType, productSearchOnly, searchLanguage }) {
+async function rowsForCards({
+  query,
+  limit,
+  offset = 0,
+  productType,
+  productSearchOnly,
+  searchLanguage,
+  printLanguage = 'all',
+  lightHydrate = false,
+  withTotal = false,
+}) {
   const nameQuery = cleanText(query);
   const typedProduct = cleanText(productType, 60);
   const language = cleanLanguage(searchLanguage);
+  const { cleanPrintLanguage, effectivePrintBucket, printLangMatchesBucket } = require('./_print_bucket');
+  const print = cleanPrintLanguage(printLanguage);
+  // Singles tab sends productType=card. That used to skip Meili and run
+  // ILIKE AND-of-tokens, so "View all 51" for Shuppet Lv.17 painted 2 rows.
   if (
     nameQuery &&
-    !typedProduct &&
     !productSearchOnly &&
+    // The jumbo subtype browse (Products page, productType=jumbo) bypasses the
+    // Meili window: jumbos do not rank in the top text hits for a name, and
+    // that page must list every one of them.
+    typedProduct !== 'jumbo' &&
     useMeiliSearchForLanguage(language)
   ) {
-    return rowsForSearchTerm(
+    const loaded = await rowsForSearchTerm(
       nameQuery,
       cleanSearchPageLimit(limit),
       cleanOffset(offset),
       language,
+      null,
+      null,
+      {
+        lightHydrate: lightHydrate === true,
+        printLanguage: print,
+        withTotal: withTotal === true,
+      },
     );
+    const payloadRows = withTotal === true && loaded && !Array.isArray(loaded)
+      ? loaded.rows
+      : loaded;
+    const meiliTotal = withTotal === true && loaded && !Array.isArray(loaded)
+      ? loaded.total
+      : null;
+    let next = payloadRows;
+    if (typedProduct) {
+      next = next.filter((row) => String(row.product_type || '') === typedProduct);
+    }
+    if (print !== 'all') {
+      next = next.filter((row) => printLangMatchesBucket(print, effectivePrintBucket(row)));
+    }
+    if (withTotal === true) {
+      return { rows: next, total: Number.isFinite(meiliTotal) ? meiliTotal : null };
+    }
+    return next;
   }
   const values = [];
   const raritySql = projectedRaritySql({
@@ -323,6 +370,7 @@ async function rowsForCards({ query, limit, offset = 0, productType, productSear
         select set_config('app.pkn_usdt_price', $${values.length}::text, true)
       )
       select
+        ${withTotal === true ? 'count(*) over () as total_count,' : ''}
         marketplace_search_candidates.card_id,
         marketplace_search_candidates.name,
         marketplace_search_candidates.product_variant as version,
@@ -330,6 +378,14 @@ async function rowsForCards({ query, limit, offset = 0, productType, productSear
         marketplace_search_candidates.cdn_image_url,
         marketplace_search_candidates.preview_image_url,
         marketplace_search_candidates.set_name,
+        (
+          select e.nationality
+          from public.pokoin_pokemon_expansions e
+          where e.name = marketplace_search_candidates.set_name
+             or e.normalized_name = public.marketplace_search_normalize(marketplace_search_candidates.set_name)
+          order by case when e.name = marketplace_search_candidates.set_name then 0 else 1 end
+          limit 1
+        ) as nationality,
         ${raritySql} as rarity,
         marketplace_search_candidates.card_type,
         marketplace_search_candidates.card_number,
@@ -339,8 +395,8 @@ async function rowsForCards({ query, limit, offset = 0, productType, productSear
         marketplace_search_candidates.item_kind,
         marketplace_search_candidates.product_type,
         marketplace_search_candidates.trainer_name,
-        artist.artist,
-        artist.illustrator,
+        marketplace_search_candidates.artist,
+        marketplace_search_candidates.illustrator,
         marketplace_search_candidates.card_palette,
         marketplace_search_candidates.emoji,
         marketplace_search_candidates.imported_at,
@@ -350,16 +406,15 @@ async function rowsForCards({ query, limit, offset = 0, productType, productSear
       from settings,
         public.marketplace_search_candidates
       left join public.cardtrader_pokemon_blueprints blueprints
-        on blueprints.id = marketplace_search_candidates.card_id
+        on blueprints.id = coalesce(marketplace_search_candidates.ct_id, marketplace_search_candidates.card_id)
       left join public.marketplace_blueprint_tcg_metadata tcg_metadata
-        on tcg_metadata.blueprint_id = marketplace_search_candidates.card_id
+        on tcg_metadata.card_id = marketplace_search_candidates.card_id
+        or tcg_metadata.blueprint_id = coalesce(marketplace_search_candidates.ct_id, marketplace_search_candidates.card_id)
       left join public.marketplace_blueprint_price_summary price_summary
-        on price_summary.blueprint_id = marketplace_search_candidates.card_id
+        on price_summary.blueprint_id = coalesce(marketplace_search_candidates.ct_id, marketplace_search_candidates.card_id)
       ${cardTraderAvailabilityJoin('marketplace_search_candidates', cheapestCacheRelation)}
       ${watchlistAnalyticsJoin('marketplace_search_candidates', 'watchlist_analytics')}
       ${cartAnalyticsJoin('marketplace_search_candidates', 'cart_analytics')}
-      left join public.marketplace_blueprint_artists artist
-        on artist.blueprint_id = marketplace_search_candidates.card_id
       ${where}
       order by marketplace_search_candidates.search_weight desc,
         marketplace_search_candidates.imported_at desc nulls last,
@@ -373,9 +428,26 @@ async function rowsForCards({ query, limit, offset = 0, productType, productSear
     cleanText(productType, 60) ||
     productSearchOnly
   ) {
-    return result.rows.map(withCardEmojiFields);
+    const firstRowCount = result.rows.length ? Number(result.rows[0].total_count) : null;
+    let rows = result.rows.map(({ total_count, ...row }) => withCardEmojiFields(normalizeMarketplaceRow(row)));
+    if (print !== 'all') {
+      rows = rows.filter((row) => printLangMatchesBucket(print, effectivePrintBucket(row)));
+    }
+    if (withTotal === true) {
+      // Same-WHERE exact count: the window function evaluates before LIMIT,
+      // so total answers the identical predicate as the rows — no second query.
+      return { rows, total: Number.isFinite(firstRowCount) ? firstRowCount : null };
+    }
+    return rows;
   }
-  return fallbackRowsForStructuredCards({ query, limit, searchLanguage });
+  const fallback = await fallbackRowsForStructuredCards({ query, limit, searchLanguage });
+  const fallbackRows = print === 'all'
+    ? fallback
+    : fallback.filter((row) => printLangMatchesBucket(print, effectivePrintBucket(row)));
+  if (withTotal === true) {
+    return { rows: fallbackRows, total: null };
+  }
+  return fallbackRows;
 }
 
 async function productFacetRows({ query, searchLanguage, dbQuery = marketplaceQuery }) {
@@ -428,7 +500,7 @@ module.exports = async function handler(req, res) {
     const url = new URL(req.url, `https://${req.headers.host || 'pokoin.com'}`);
     if (url.searchParams.get('facets') === 'products') {
       const products = await productFacetRows({
-        query: url.searchParams.get('query'),
+        query: url.searchParams.get('query') || url.searchParams.get('q'),
         searchLanguage: url.searchParams.get('search_language') ||
           url.searchParams.get('lang') ||
           url.searchParams.get('language'),
@@ -437,7 +509,7 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ products });
     }
     const rows = await rowsForCards({
-      query: url.searchParams.get('query'),
+      query: url.searchParams.get('query') || url.searchParams.get('q'),
       limit: url.searchParams.get('limit'),
       offset: url.searchParams.get('offset'),
       productType: url.searchParams.get('productType'),
@@ -446,8 +518,13 @@ module.exports = async function handler(req, res) {
         url.searchParams.get('lang') ||
         url.searchParams.get('language'),
     });
+    const payload = Array.isArray(rows) ? rows.map(normalizeMarketplaceRow) : rows;
+    recordCardsImages(payload, {
+      query: url.searchParams.get('query') || url.searchParams.get('q') || '',
+      route: url.pathname + url.search,
+    });
     res.setHeader('Cache-Control', 'public, max-age=20, s-maxage=120');
-    return res.status(200).json(rows);
+    return res.status(200).json(payload);
   } catch (error) {
     console.error('marketplace-cards failed', error);
     return res.status(error.statusCode || 500).json({

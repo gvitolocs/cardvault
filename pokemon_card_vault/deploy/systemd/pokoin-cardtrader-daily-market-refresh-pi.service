@@ -1,0 +1,14 @@
+[Unit]
+Description=Pokoin CardTrader daily market refresh (Pi writer)
+After=network-online.target docker.service pokoin-marketplace-postgres-replica.service
+Wants=network-online.target docker.service
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/srv/pokoin/cardtrader-refresh/current
+ExecStart=/usr/bin/flock -n /run/lock/pokoin-cardtrader-daily.lock /srv/pokoin/cardtrader-refresh/run-cardtrader-daily-market-refresh-pi.sh
+Nice=10
+TimeoutStartSec=12h
+NoNewPrivileges=true
+PrivateTmp=true

@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 const { routeDefinitions } = require('../server/api-route-manifest');
+const { familyForPath, groupRoutes } = require('../server/api-route-families');
 
 const repoRoot = path.join(__dirname, '..');
 const outputPath = path.join(repoRoot, 'docs', 'oracle-api-migration.md');
@@ -34,10 +35,13 @@ ${paramsText(route.params)}
 
 const content = `# Oracle API Migration And Route Reference
 
-This document tracks the first version of moving Pokoin backend API routes from
-many Vercel serverless functions into one long-running Node service suitable for
-Oracle/peer3. It is generated from \`server/api-route-manifest.js\` so the route
+This document is generated from \`server/api-route-manifest.js\` so the route
 list stays tied to the standalone server configuration.
+
+**Canonical React/JS contract:** \`docs/react-api-architecture.md\` and live
+\`GET /api/__contract\`. Production host is \`pokoin-marketplace\` (\`130.61.251.250\`),
+Docker \`pokoin-oracle-api\`, Caddy \`https://api.pokoin.com\`. The old Always Free
+peer3 (\`141.147.62.244\`) is dead — do not deploy there.
 
 ## Architecture
 
@@ -51,13 +55,11 @@ list stays tied to the standalone server configuration.
 - \`/api/stripe-webhook\` is treated as a raw-body route and is not JSON parsed
   before the existing Stripe signature code reads the request stream.
 
-## peer3 Discovery
+## Host Discovery
 
-\`web/bootstrap-peers.json\` contains \`oracle-peer-3\` / \`pokoin-vm3\` at
-\`141.147.62.244\` for the Pokoin peer network. Local SSH config also resolves
-\`peer3\`, but no repository script previously deployed this API service there.
-The new deployment script uses \`ORACLE_API_SSH_TARGET\` with a default of
-\`peer3\`; it does not include or assume credentials.
+Live API VM is **pokoin-marketplace** (\`130.61.251.250\`), SSH host
+\`pokoin-marketplace\`. Bind-mount: \`/home/ubuntu/pokoin-oracle-api/current\`.
+Do not use \`deploy-oracle-api-peer3.sh\` against dead \`141.147.62.244\`.
 
 ## Running Locally
 
@@ -100,21 +102,23 @@ or \`USE_ORACLE_API=1\` is set. In that mode the web build must not copy
 \`/api/*\` to the Oracle API service. Avoid the checked-in Vercel serverless
 fallback unless explicitly requested for an emergency rollback.
 
-Do not run the production Vercel deploy until \`https://api.pokoin.com\` is
-healthy. A broken API origin would make production \`/api/*\` routes fail.
+Do not run the production Vercel deploy until \`https://api.pokoin.com/healthz\`
+is healthy. A broken API origin would make production \`/api/*\` routes fail.
+Handlers live under \`/api/...\`. \`https://api.pokoin.com/\` is the operator
+landing page. \`https://api.pokoin.com/marketplace-suggest\` (no \`/api\`) 404s.
 
 ## Production Deployment Commands
 
-The Oracle/peer3 backend service should be exposed at \`api.pokoin.com\`.
-For production keep the workflow simple: \`pokoin.com\` serves only the Vercel
-Flutter frontend, and every \`/api/*\` request rewrites to \`api.pokoin.com\`.
+Live API is Docker \`pokoin-oracle-api\` on **pokoin-marketplace**
+(\`130.61.251.250\`), Caddy TLS on \`api.pokoin.com\`. \`pokoin.com\` is Vercel;
+every \`/api/*\` request rewrites here.
 
 Before switching production, verify the backend directly:
 
 \`\`\`bash
-curl -fsS https://api.pokoin.com/marketplace >/dev/null
 curl -fsS https://api.pokoin.com/healthz
 curl -fsS https://api.pokoin.com/api/__routes
+curl -fsS 'https://api.pokoin.com/api/marketplace-suggest?q=pika&limit=4'
 \`\`\`
 
 Deploy production with no bundled Vercel functions only after those origin
@@ -135,53 +139,41 @@ curl -fsS https://pokoin.com/api/healthz
 curl -fsS https://pokoin.com/api/__routes
 \`\`\`
 
-DNS target: \`api.pokoin.com\` should point at Oracle peer3 \`141.147.62.244\`
-through the configured reverse proxy/TLS layer. \`pokoin.com\` should point at
-Vercel for the frontend.
+DNS target: \`api.pokoin.com\` → \`130.61.251.250\` (pokoin-marketplace Caddy).
+Do **not** point DNS or deploys at dead peer3 \`141.147.62.244\`.
+\`pokoin.com\` should point at Vercel for the frontend.
 
 Backend landing page:
 
 \`\`\`text
+https://api.pokoin.com/
 https://api.pokoin.com/marketplace
 \`\`\`
 
-Package only:
+Ship handler/server files into the existing bind-mount, then restart the
+running container (do not \`docker rm\` / recreate; do not \`npm run peer3:deploy\`):
 
 \`\`\`bash
-npm run peer3:bundle
+rsync -av api/*.js server/*.js \\
+  pokoin-marketplace:/home/ubuntu/pokoin-oracle-api/current/
+ssh pokoin-marketplace 'docker restart pokoin-oracle-api'
 \`\`\`
 
-Upload to peer3 without starting:
+If \`api.pokoin.com\` is reachable at DNS but HTTP/S times out, check Caddy on
+**pokoin-marketplace** before deploying production:
 
 \`\`\`bash
-ORACLE_API_SSH_TARGET=peer3 npm run peer3:deploy -- --no-restart
+sudo ss -ltnp | grep -E ':(80|443|18080)\\\\b'
+sudo systemctl status caddy --no-pager
+curl -fsS http://127.0.0.1:18080/healthz
 \`\`\`
 
-Upload and restart with PM2 if available, otherwise \`nohup\`:
-
-\`\`\`bash
-ORACLE_API_SSH_TARGET=peer3 \\
-ORACLE_API_REMOTE_DIR=/opt/pokoin/oracle-api \\
-ORACLE_API_PORT=8080 \\
-npm run peer3:deploy
-\`\`\`
-
-If \`api.pokoin.com\` is reachable at DNS but HTTP/S times out, check peer3's
-firewall and reverse proxy before deploying production:
-
-\`\`\`bash
-sudo ss -ltnp | grep -E ':(80|443|8080)\\\\b'
-sudo systemctl status nginx --no-pager || true
-sudo systemctl status caddy --no-pager || true
-curl -fsS http://127.0.0.1:8080/healthz
-\`\`\`
-
-OCI peer3 ingress must allow public TCP \`80\` and \`443\` to the VM. The API
+OCI ingress must allow public TCP \`80\` and \`443\` to the VM. The API
 container should stay bound to \`127.0.0.1:18080\` behind Caddy; avoid exposing
 the internal API port publicly unless it is an intentional temporary diagnostic.
 
-The script deliberately does not copy \`.env.local\`; provide production
-environment variables through the host supervisor or service env file.
+The rsync deliberately does not copy \`.env.local\`; production env stays in the
+existing Docker env-file on the host.
 
 ## CardTrader Live And Snapshot Routes
 
@@ -242,8 +234,32 @@ Vercel compatibility rewrite are available.
 
 ## API Routes
 
+Grouped by family (\`server/api-route-families.js\`). Filter live with
+\`GET /api/__routes?group=1\` or \`GET /api/__routes?family=page-bff\`.
+Do not move \`api/*.js\` into subfolders — the server maps \`/api/foo\` to
+\`api/foo.js\`.
+
+${groupRoutes(routeDefinitions.map((route) => ({ ...route, family: familyForPath(route.path) }))).map((family) => `### ${family.title} (\`${family.id}\`, ${family.routes.length})
+
+${family.routes.map((route) => `- \`${route.methods.join('|')}\` \`${route.path}\` — ${route.purpose}`).join('\n')}`).join('\n\n')}
+
+## API Routes (full)
+
 ${routeDefinitions.map(routeSection).join('\n')}
 `;
 
 fs.writeFileSync(outputPath, content);
 console.log(`Wrote ${path.relative(repoRoot, outputPath)} with ${routeDefinitions.length} routes.`);
+
+const catalogPath = path.join(repoRoot, 'docs', 'api-route-catalog.json');
+const catalog = routeDefinitions.map((route) => ({
+  ...route,
+  family: familyForPath(route.path),
+}));
+fs.writeFileSync(catalogPath, `${JSON.stringify(catalog, null, 2)}\n`);
+console.log(`Wrote ${path.relative(repoRoot, catalogPath)}.`);
+
+const { CLIENT_CONTRACT } = require('../api/_client_contract');
+const contractPath = path.join(repoRoot, 'docs', 'react-api-contract.json');
+fs.writeFileSync(contractPath, `${JSON.stringify(CLIENT_CONTRACT, null, 2)}\n`);
+console.log(`Wrote ${path.relative(repoRoot, contractPath)} version ${CLIENT_CONTRACT.version}.`);

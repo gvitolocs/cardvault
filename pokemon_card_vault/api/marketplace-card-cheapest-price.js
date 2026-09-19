@@ -1,5 +1,4 @@
 const { marketplaceQuery } = require('./_marketplace_db');
-const { cardIdFromDoubledId } = require('./marketplace-card-versions');
 const {
   cardTraderAvailabilityJoin,
   cheapestHomepageCacheRelationName,
@@ -74,7 +73,7 @@ function cardIdFromCanonicalPath(value) {
   const pathname = pathnameFromValue(value);
   const marketplaceMatch = pathname.match(/^\/marketplace\/[a-z]{2}(?:-[a-z]{2})?\/cards\/(\d+)(?:\/|$)/i);
   if (marketplaceMatch) {
-    return cardIdFromDoubledId(marketplaceMatch[1]);
+    return cleanCardId(marketplaceMatch[1]);
   }
   const rootMatch = pathname.match(/^\/(\d+)(?:\/|$)/);
   return rootMatch ? cleanCardId(rootMatch[1]) : '';
@@ -194,12 +193,18 @@ async function readCheapestPrices(input = {}, query = marketplaceQuery) {
   const result = await query(
     `
       with explicit_ids as (
-        select requested.card_id, requested.ordinality::bigint
+        select
+          requested.card_id,
+          requested.ordinality::bigint as ordinality,
+          c.ct_id
         from unnest($1::bigint[]) with ordinality as requested(card_id, ordinality)
+        left join public.marketplace_search_candidates c
+          on c.card_id = requested.card_id
       ),
       structured_ids as (
         select
           c.card_id,
+          c.ct_id,
           (100000 + row_number() over (
             order by
               case
@@ -241,11 +246,14 @@ async function readCheapestPrices(input = {}, query = marketplaceQuery) {
         limit $6
       ),
       candidate_ids as (
-        select card_id, min(ordinality) as ordinality
+        select
+          card_id,
+          min(ct_id) as ct_id,
+          min(ordinality) as ordinality
         from (
-          select * from explicit_ids
+          select card_id, ct_id, ordinality from explicit_ids
           union all
-          select * from structured_ids
+          select card_id, ct_id, ordinality from structured_ids
         ) candidates
         group by card_id
       )
@@ -254,14 +262,7 @@ async function readCheapestPrices(input = {}, query = marketplaceQuery) {
         candidate_ids.ordinality,
         coalesce(c.name, '') as name,
         coalesce(c.set_name, '') as set_name,
-        coalesce(
-          nullif(c.card_number, ''),
-          nullif(blueprints.version, ''),
-          nullif(blueprints.blueprint->>'number', ''),
-          nullif(blueprints.blueprint->>'collector_number', ''),
-          nullif(blueprints.blueprint->>'card_number', ''),
-          ''
-        ) as card_number,
+        coalesce(nullif(c.card_number, ''), '') as card_number,
         coalesce(urls.language, $5::text) as language,
         coalesce(urls.canonical_path, '') as canonical_path,
         coalesce(substring(urls.canonical_path from '/cards/([0-9]+)(?:/|$)'), '') as public_number,
@@ -282,13 +283,11 @@ async function readCheapestPrices(input = {}, query = marketplaceQuery) {
       from candidate_ids
       left join public.marketplace_search_candidates c
         on c.card_id = candidate_ids.card_id
-      left join public.cardtrader_pokemon_blueprints blueprints
-        on blueprints.id = candidate_ids.card_id
       left join public.marketplace_card_urls urls
         on urls.card_id = candidate_ids.card_id
         and urls.language = $5::text
       left join public.marketplace_blueprint_price_summary price_summary
-        on price_summary.blueprint_id = candidate_ids.card_id
+        on price_summary.blueprint_id = candidate_ids.ct_id
       left join lateral (
         select listing.id
         from (
@@ -380,6 +379,7 @@ function createHandler({ query = marketplaceQuery } = {}) {
 }
 
 module.exports = createHandler();
+module.exports.readCheapestPrices = readCheapestPrices;
 
 module.exports._test = {
   cardIdFromCanonicalPath,

@@ -1,49 +1,200 @@
 schema_version: 1
-generated_at: '2026-05-28T09:58:13.672063+00:00'
-total_decisions: 5
-active_decisions: 5
+generated_at: '2026-09-16T11:11:25.882200+00:00'
+total_decisions: 31
+active_decisions: 24
 tags:
+  api:
+  - D00000C
+  backup:
+  - D000009
+  card-url:
+  - D00000B
+  cardtrader:
+  - D00000M
+  - D00000O
+  - D00000R
   cardvault:
   - D000001
+  catalog:
+  - D000009
+  cdn:
+  - D00000B
+  - D00000E
+  - D00000F
+  - D00000G
+  - D00000H
+  - D00000I
+  - D00000J
+  - D00000N
+  - D00000P
+  - D00000Q
+  - D00000R
+  - D00000S
+  deskew:
+  - D00000S
+  do-not-revert:
+  - D00000O
+  - D00000U
+  dp:
+  - D00000N
+  errors:
+  - D00000V
   flareon:
   - D000002
   - D000003
+  full-art:
+  - D00000F
+  gold:
+  - D00000P
+  - D00000R
   hermes:
   - D000002
   honcho:
   - D000001
+  - D00000B
+  local:
+  - D00000Q
+  marketplace:
+  - D00000B
+  - D00000C
+  - D00000G
+  - D00000H
+  - D00000I
+  - D00000J
+  - D00000M
+  - D00000N
+  - D00000O
+  - D00000P
+  - D00000Q
+  - D00000R
+  - D00000S
+  meili:
+  - D00000T
   memory:
   - D000003
+  nezopt:
+  - D00000K
+  oracle:
+  - D000006
+  - D000009
+  - D00000K
+  - D00000U
+  pi:
+  - D00000T
+  - D00000U
+  - D00000V
+  pokemontcg:
+  - D00000H
+  - D00000J
+  - D00000P
   pokoin:
   - D000003
-  - D000004
-  - D000005
+  - D000006
+  - D00000T
+  - D00000U
+  - D00000V
+  postgres:
+  - D000009
+  - D00000K
+  - D00000U
+  prices:
+  - D00000M
+  pricing:
+  - D00000O
+  production:
+  - D00000T
+  qwen:
+  - D00000J
+  r2:
+  - D00000E
+  react:
+  - D00000C
+  sanitize:
+  - D00000E
+  - D00000F
+  - D00000G
+  - D00000H
+  - D00000I
+  - D00000N
+  - D00000P
+  - D00000R
+  - D00000S
+  search:
+  - D00000T
   secrets:
   - D000001
   - D000002
-  - D000004
+  - D000006
+  - D00000K
   security:
-  - D000004
-  meili:
-  - D000005
-  production:
-  - D000005
-  search:
-  - D000005
+  - D000006
+  sold:
+  - D00000M
+  strangler:
+  - D00000C
+  topology:
+  - D00000U
+  uptime:
+  - D00000V
 files:
   .env.honcho.local:
   - D000001
+  docs/API.md:
+  - D00000V
   docs/flareon-secrets.md:
   - D000002
+  memory/architecture.md:
+  - D00000U
   memory/flareon-handoff.md:
   - D000003
+  pokemon_card_vault/.env.example:
+  - D00000K
   pokemon_card_vault/.env.local:
-  - D000004
+  - D000006
+  pokemon_card_vault/api/_cardtrader_daily_listings_refresh.js:
+  - D00000M
+  - D00000O
+  pokemon_card_vault/docs/card-border-rebuild-pass.md:
+  - D00000F
+  - D00000H
+  pokemon_card_vault/docs/marketplace-public-ids.md:
+  - D00000B
+  pokemon_card_vault/docs/react-page-apis.md:
+  - D00000C
+  pokemon_card_vault/scripts/compare-expansion-samples.js:
+  - D00000J
+  pokemon_card_vault/scripts/lib/backup-r2-original.js:
+  - D00000E
+  pokemon_card_vault/scripts/lib/local-cdn.js:
+  - D00000Q
+  pokemon_card_vault/scripts/lib/sanitize-card-image.js:
+  - D00000G
+  - D00000I
+  - D00000N
+  - D00000P
+  - D00000R
+  - D00000S
   pokemon_card_vault/workflows/meilisearch-peer-workflow.md:
-  - D000005
+  - D000009
+  - D00000T
 do_not_revert_ids:
 - D000001
 - D000002
 - D000003
-- D000004
-- D000005
+- D000006
+- D00000B
+- D00000C
+- D00000E
+- D00000G
+- D00000H
+- D00000I
+- D00000M
+- D00000N
+- D00000O
+- D00000P
+- D00000Q
+- D00000R
+- D00000S
+- D00000T
+- D00000U
+- D00000V

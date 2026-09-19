@@ -3,41 +3,13 @@ const { slugPart } = require('./_slug');
 const {
   canonicalCardUrlForLookup,
 } = require('./marketplace-card-url');
-
-function cleanCardId(value) {
-  const id = Number(String(value || '').trim());
-  return Number.isSafeInteger(id) && id > 0 ? id : 0;
-}
-
-function cleanCollectorNumber(value, cardId) {
-  const text = String(value || '')
-    .trim()
-    .replace(/^#+\s*/, '');
-  if (!text || text === String(cardId || '').trim()) {
-    return '';
-  }
-  return text;
-}
-
-function canonicalSlugForRow(row = {}) {
-  const parts = [
-    String(row.rarity || '').trim() || 'Card',
-    row.display_name || row.canonical_name || row.name,
-    cleanCollectorNumber(row.card_number, row.card_id),
-    row.set_name,
-  ];
-  return parts.map(slugPart).filter(Boolean).join('-');
-}
-
-function canonicalPathForRow(row = {}) {
-  const storedPath = String(row.canonical_path || row.canonicalPath || '').trim();
-  if (storedPath.startsWith('/marketplace/') && storedPath.includes('/cards/')) {
-    return storedPath;
-  }
-  const cleanId = cleanCardId(row.card_id);
-  const slug = canonicalSlugForRow(row);
-  return cleanId && slug ? `/marketplace/en/cards/${cleanId * 2}/${slug}` : '';
-}
+const {
+  cleanCardId,
+  publicCardIdForRow,
+  cleanCollectorNumber,
+  canonicalSlugForRow,
+  canonicalPathForRow,
+} = require('./_marketplace_canonical_path');
 
 function rootPathIdWithSlug(value) {
   let pathname = String(value || '').trim();
@@ -75,8 +47,9 @@ async function canonicalPathForCardId(cardId, query = marketplaceQuery) {
         card_number,
         rarity
       from public.marketplace_card_urls
-      where card_id = $1::bigint
+      where (card_id = $1::bigint or public_number = $1::bigint or ct_id = $1::bigint)
         and language = 'en'
+      order by (card_id = $1::bigint) desc
       limit 1
     `,
     [cleanId],
@@ -141,12 +114,16 @@ function createHandler({ query = marketplaceQuery } = {}) {
 
 module.exports = createHandler();
 
+module.exports.canonicalPathForRow = canonicalPathForRow;
+module.exports.canonicalSlugForRow = canonicalSlugForRow;
+
 module.exports._test = {
   canonicalPathForCardId,
   canonicalPathForShortlinkPath,
   canonicalPathForRow,
   canonicalSlugForRow,
   cleanCardId,
+  publicCardIdForRow,
   slugPart,
   cleanCollectorNumber,
   createHandler,

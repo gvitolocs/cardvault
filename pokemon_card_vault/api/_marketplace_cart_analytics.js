@@ -34,7 +34,10 @@ function holderKeyFor({ userUid = '', anonymousId = '' } = {}) {
 function cartAnalyticsJoin(candidateAlias = 'c', analyticsAlias = 'cart_analytics') {
   return `
     left join public.marketplace_card_cart_analytics ${analyticsAlias}
-      on ${analyticsAlias}.blueprint_id = ${candidateAlias}.card_id
+      on (
+        ${analyticsAlias}.blueprint_id = ${candidateAlias}.ct_id
+        or ${analyticsAlias}.blueprint_id = ${candidateAlias}.card_id
+      )
   `;
 }
 

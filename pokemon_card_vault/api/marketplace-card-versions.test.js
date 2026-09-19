@@ -37,6 +37,8 @@ test('card versions fallback row uses canonical homepage cheapest cache', async 
   assert.match(captured[1].sql, /cardtrader_eligible_listing_count/);
   assert.doesNotMatch(captured[1].sql, /price_summary\.lowest_ask_pkn as lowest_price_pkn/);
   assert.doesNotMatch(captured[1].sql, /cardtrader_market_listing_snapshots/);
+  assert.match(captured[1].sql, /artist\.card_id = candidates\.card_id/);
+  assert.doesNotMatch(captured[1].sql, /artist\.blueprint_id = coalesce/);
 });
 
 test('deck card lookup ranks Dreepy TWM 128 before Fusion Strike', () => {
@@ -123,20 +125,20 @@ test('card versions search clause uses selected Italian language', async () => {
   assert.equal(searchCall.values[1], 'it');
 });
 
-test('route resolver only decodes public number when a slug is present', () => {
+test('route resolver keeps our id from the path number', () => {
   assert.deepEqual(
     resolveCardRoute({
       doubledCardId: '633200',
       cardSlug: 'rare-leafeon-005-131-prismatic-evolutions',
     }),
     {
-      cardId: '316600',
+      cardId: '633200',
       cardSlug: 'rare-leafeon-005-131-prismatic-evolutions',
     },
   );
   assert.deepEqual(
-    resolveCardRoute({ cardId: '316600', cardSlug: '' }),
-    { cardId: '316600', cardSlug: '' },
+    resolveCardRoute({ cardId: '633200', cardSlug: '' }),
+    { cardId: '633200', cardSlug: '' },
   );
 });
 
@@ -228,6 +230,11 @@ test('card versions payload preserves database emoji', async () => {
     dbQuery: async (sql, values) => {
       assert.match(sql, /marketplace_blueprint_tcg_metadata tcg_metadata/);
       assert.match(sql, /sourceCard,rarity/);
+      assert.match(sql, /union all/);
+      assert.match(sql, /c\.ct_id = \$\d+::bigint/);
+      assert.doesNotMatch(sql, /or versions\.ct_id =/);
+      assert.match(sql, /blueprints\.id = versions\.ct_id/);
+      assert.doesNotMatch(sql, /blueprints\.id = coalesce\(versions\.ct_id, versions\.card_id\)/);
       assert.deepEqual(values, [111409, 10]);
       return {
         rows: [

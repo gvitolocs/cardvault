@@ -231,7 +231,7 @@ function listAssetSymbols(assetRoot) {
 
 async function upsertExpansion(env, row) {
   const response = await fetch(
-    `${env.SUPABASE_URL.replace(/\/$/, '')}/rest/v1/cardtrader_pokemon_expansions`,
+    `${env.SUPABASE_URL.replace(/\/$/, '')}/rest/v1/pokoin_pokemon_expansions`,
     {
       method: 'POST',
       headers: {

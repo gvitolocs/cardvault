@@ -263,7 +263,7 @@ That job reads `symbol.png` from `https://github.com/1niceroli/ptcg-assets`,
 maps CardTrader expansion codes such as `bs`, `ju`, `blw`, `ssh`, and `svi` to
 asset folder codes such as `base1`, `base2`, `bw1`, `swsh1`, and `sv1`, uploads
 to R2 under `expansions/symbols/<expansion-name>.png`, and should upsert Oracle
-`public.cardtrader_pokemon_expansions` after the cutover.
+`public.pokoin_pokemon_expansions` after the cutover.
 
 The first production symbol run uploaded 182 symbols. Direct HTTP checks against
 `https://cdn.pokoin.com/...` returned `403` from this machine for both new symbol

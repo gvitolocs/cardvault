@@ -8,6 +8,10 @@ const {
 } = require('@aws-sdk/client-s3');
 const { Pool } = require('pg');
 const sharp = require('sharp');
+const {
+  sanitizeCardImage,
+  sanitizeOptionsFromEnv,
+} = require('./lib/sanitize-card-image');
 
 const HOMEPAGE_REFERENCE_WIDTH = 240;
 const DEFAULT_HOMEPAGE_QUALITY = 82;
@@ -240,7 +244,11 @@ async function updateHomepage(pool, row, homepageUrl, homepageKey) {
     'marketplace_search_candidates',
   ]) {
     await pool.query(
-      `update public.${table} set homepage_image_url = $1, projected_at = now() where card_id = $2`,
+      // ct_id is leftover. Public card_id is leftover * 2. Never `card_id = leftover`
+      // — Kirlia ct_id 241930 is also Pikachu's public id, and that collision
+      // painted Kirlia's homepage webp onto the Pikachu tile.
+      `update public.${table} set homepage_image_url = $1, projected_at = now()
+       where ct_id = $2 or card_id = ($2::bigint * 2)`,
       [homepageUrl, row.id],
     );
   }
@@ -364,7 +372,13 @@ async function verifyCoverage(pool) {
 }
 
 async function buildHomepageImage(fullBody, referenceWidth, quality) {
-  return sharp(fullBody)
+  // Shared ingest recipe: 3.175 mm circular crescents only. Already-rounded
+  // leftovers must not fringe-punch silver TRAINER / nameplate (Air Balloon).
+  const sanitized = await sanitizeCardImage(fullBody, {
+    ...sanitizeOptionsFromEnv(process.env),
+    sharp,
+  });
+  return sharp(sanitized.body)
     .rotate()
     .resize({
       width: referenceWidth,

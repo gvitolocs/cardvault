@@ -294,12 +294,7 @@ begin
             on scope.blueprint_id = coalesce(incoming.blueprint_id, incoming.cardtrader_blueprint_id)
           where incoming.external_listing_id = h.external_listing_id
         )
-        or (
-          -- A residual left by reconcile_cardtrader_seller_stack_continuity has
-          -- already had its successor units credited; the surviving quantity is
-          -- a genuine partial sale and must not be retracted wholesale here.
-          not (h.archive_metadata ? 'continuityQuantity')
-          and exists (
+        or exists (
           select 1
           from cardtrader_market_listing_refresh_rows incoming
           join cardtrader_market_listing_refresh_scope scope
@@ -314,7 +309,7 @@ begin
                 is not distinct from public.cardtrader_listing_is_first_edition(coalesce(incoming.properties, '{}'::jsonb), false)
             and public.cardtrader_listing_is_graded(coalesce(h.raw_metadata, '{}'::jsonb), coalesce(h.properties, '{}'::jsonb))
                 is not distinct from public.cardtrader_listing_is_graded(coalesce(incoming.raw_metadata, '{}'::jsonb), coalesce(incoming.properties, '{}'::jsonb))
-        ))
+        )
       )
     on conflict (history_id) do nothing;
 
@@ -780,22 +775,6 @@ begin
   select coalesce(jsonb_agg(scope.blueprint_id), '[]'::jsonb)
   from cardtrader_market_listing_refresh_scope scope
   into v_cache_scope_blueprint_ids;
-
-  -- A complete, valid refresh can prove continuity for the previous
-  -- observation. Partial or sanity-frozen books must not retract sales.
-  if v_can_archive
-     and not exists (
-       select 1
-       from cardtrader_refresh_sanity sanity
-       where sanity.suspicious
-     ) then
-    perform public.reconcile_cardtrader_seller_stack_continuity(
-      v_provider,
-      v_window_from,
-      v_removed_day,
-      v_cache_scope_blueprint_ids
-    );
-  end if;
 
   -- Homepage cache is rebuilt once in finalize_cardtrader_daily_market_refresh.
   -- Per-expansion cache refresh is too expensive for 800+ expansions.

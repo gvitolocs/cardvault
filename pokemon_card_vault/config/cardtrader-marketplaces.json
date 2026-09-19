@@ -1,0 +1,126 @@
+{
+  "version": 1,
+  "notes": [
+    "No secrets. Database URLs live in environment variables.",
+    "Pokemon stays pokoin_marketplace on the Pi public API. These games ingest to nezopt 15T."
+  ],
+  "games": {
+    "magic": {
+      "displayName": "Magic: the Gathering",
+      "slug": "magic",
+      "cardtraderGameId": 1,
+      "databaseUrlEnv": "MAGIC_MARKETPLACE_DATABASE_URL",
+      "schema": "marketplace_magic",
+      "table": "cardtrader_blueprints",
+      "cdnKeyPrefix": "magic/"
+    },
+    "yugioh": {
+      "displayName": "Yu-Gi-Oh!",
+      "slug": "yugioh",
+      "cardtraderGameId": 4,
+      "databaseUrlEnv": "YUGIOH_MARKETPLACE_DATABASE_URL",
+      "schema": "marketplace_yugioh",
+      "table": "cardtrader_blueprints",
+      "cdnKeyPrefix": "yugioh/"
+    },
+    "flesh_and_blood": {
+      "displayName": "Flesh and Blood",
+      "slug": "flesh-and-blood",
+      "cardtraderGameId": 6,
+      "databaseUrlEnv": "FLESH_AND_BLOOD_MARKETPLACE_DATABASE_URL",
+      "schema": "marketplace_flesh_and_blood",
+      "table": "cardtrader_blueprints",
+      "cdnKeyPrefix": "flesh-and-blood/"
+    },
+    "digimon": {
+      "displayName": "Digimon",
+      "slug": "digimon",
+      "cardtraderGameId": 8,
+      "databaseUrlEnv": "DIGIMON_MARKETPLACE_DATABASE_URL",
+      "schema": "marketplace_digimon",
+      "table": "cardtrader_blueprints",
+      "cdnKeyPrefix": "digimon/"
+    },
+    "dragon_ball_super": {
+      "displayName": "Dragon Ball Super",
+      "slug": "dragon-ball-super",
+      "cardtraderGameId": 9,
+      "databaseUrlEnv": "DRAGON_BALL_SUPER_MARKETPLACE_DATABASE_URL",
+      "schema": "marketplace_dragon_ball_super",
+      "table": "cardtrader_blueprints",
+      "cdnKeyPrefix": "dragon-ball-super/"
+    },
+    "vanguard": {
+      "displayName": "Cardfight!! Vanguard",
+      "slug": "vanguard",
+      "cardtraderGameId": 10,
+      "databaseUrlEnv": "VANGUARD_MARKETPLACE_DATABASE_URL",
+      "schema": "marketplace_vanguard",
+      "table": "cardtrader_blueprints",
+      "cdnKeyPrefix": "vanguard/"
+    },
+    "one_piece": {
+      "displayName": "One Piece",
+      "slug": "one-piece",
+      "cardtraderGameId": 15,
+      "databaseUrlEnv": "ONE_PIECE_MARKETPLACE_DATABASE_URL",
+      "schema": "marketplace_one_piece",
+      "table": "cardtrader_blueprints",
+      "cdnKeyPrefix": "one-piece/"
+    },
+    "lorcana": {
+      "displayName": "Disney Lorcana",
+      "slug": "lorcana",
+      "cardtraderGameId": 18,
+      "databaseUrlEnv": "LORCANA_MARKETPLACE_DATABASE_URL",
+      "schema": "marketplace_lorcana",
+      "table": "cardtrader_blueprints",
+      "cdnKeyPrefix": "lorcana/"
+    },
+    "star_wars": {
+      "displayName": "Star Wars Unlimited",
+      "slug": "star-wars",
+      "cardtraderGameId": 20,
+      "databaseUrlEnv": "STAR_WARS_MARKETPLACE_DATABASE_URL",
+      "schema": "marketplace_star_wars",
+      "table": "cardtrader_blueprints",
+      "cdnKeyPrefix": "star-wars/"
+    },
+    "union_arena": {
+      "displayName": "Union Arena",
+      "slug": "union-arena",
+      "cardtraderGameId": 21,
+      "databaseUrlEnv": "UNION_ARENA_MARKETPLACE_DATABASE_URL",
+      "schema": "marketplace_union_arena",
+      "table": "cardtrader_blueprints",
+      "cdnKeyPrefix": "union-arena/"
+    },
+    "riftbound": {
+      "displayName": "Riftbound | League of Legends",
+      "slug": "riftbound",
+      "cardtraderGameId": 22,
+      "databaseUrlEnv": "RIFTBOUND_MARKETPLACE_DATABASE_URL",
+      "schema": "marketplace_riftbound",
+      "table": "cardtrader_blueprints",
+      "cdnKeyPrefix": "riftbound/"
+    },
+    "gundam": {
+      "displayName": "Gundam",
+      "slug": "gundam",
+      "cardtraderGameId": 23,
+      "databaseUrlEnv": "GUNDAM_MARKETPLACE_DATABASE_URL",
+      "schema": "marketplace_gundam",
+      "table": "cardtrader_blueprints",
+      "cdnKeyPrefix": "gundam/"
+    },
+    "sorcery": {
+      "displayName": "Sorcery: Contested Realm",
+      "slug": "sorcery",
+      "cardtraderGameId": 24,
+      "databaseUrlEnv": "SORCERY_MARKETPLACE_DATABASE_URL",
+      "schema": "marketplace_sorcery",
+      "table": "cardtrader_blueprints",
+      "cdnKeyPrefix": "sorcery/"
+    }
+  }
+}

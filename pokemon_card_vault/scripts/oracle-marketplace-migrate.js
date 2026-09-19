@@ -11,7 +11,7 @@ loadLocalEnv();
 
 const SOURCE_TABLES = [
   'cardtrader_pokemon_blueprints',
-  'cardtrader_pokemon_expansions',
+  'pokoin_pokemon_expansions',
   'marketplace_trainers',
   'marketplace_card_events',
 ];

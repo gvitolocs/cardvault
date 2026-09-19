@@ -1,0 +1,19 @@
+[Unit]
+Description=Pin Pokoin Meilisearch LMDB pages in RAM (no cold mmap warmup)
+After=meilisearch.service
+Requires=meilisearch.service
+
+[Service]
+Type=simple
+# Foreground lock. -d would daemonize and systemd would think the unit exited.
+ExecStart=/usr/bin/vmtouch -l -v /var/lib/meilisearch/data.ms
+Restart=always
+RestartSec=5
+Nice=10
+LimitMEMLOCK=infinity
+# Unlock before killing Postgres/API if the micro is desperate.
+OOMScoreAdjust=200
+MemoryMax=400M
+
+[Install]
+WantedBy=multi-user.target

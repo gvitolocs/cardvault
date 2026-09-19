@@ -61,12 +61,48 @@ async function main() {
     await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
     try {
       const health = await request({ server, method: 'GET', path: '/healthz' });
-      assert.equal(health.statusCode, 200, 'healthz should return 200');
-      assert.match(health.body, /pokoin-oracle-api/);
+      assert.ok([200, 503].includes(health.statusCode), 'healthz should return 200 or 503');
+      const healthJson = JSON.parse(health.body);
+      assert.equal(healthJson.service, 'pokoin-oracle-api');
+      assert.equal(healthJson.ok, health.statusCode === 200);
+      assert.equal(typeof healthJson.checks.postgres.ok, 'boolean');
+      assert.equal(typeof healthJson.checks.valkey.ok, 'boolean');
+      assert.equal(typeof healthJson.checks.meili.ok, 'boolean');
+      assert.equal(typeof healthJson.checks.cdn.ok, 'boolean');
+      if (health.statusCode === 503) {
+        assert.equal(healthJson.checks.postgres.ok, false);
+      }
+
+      const contract = await request({ server, method: 'GET', path: '/api/__contract' });
+      assert.equal(contract.statusCode, 200, '__contract should return 200');
+      const contractJson = JSON.parse(contract.body);
+      assert.equal(contractJson.hosts.api, 'https://api.pokoin.com');
+      assert.equal(contractJson.identity.decision, 'Codevira D00000B');
+      assert.equal(contractJson.images.r2KeyPrefix, 'ct_id');
+      assert.equal(contractJson.availability.serverOwnsFlag, true);
+      assert.equal(contractJson.navigation.routesGrouped, 'GET /api/__routes?group=1');
+
+      const routes = await request({ server, method: 'GET', path: '/api/__routes' });
+      assert.equal(routes.statusCode, 200, '__routes should return 200');
+      const routesJson = JSON.parse(routes.body);
+      assert.ok(Array.isArray(routesJson.routes), '__routes.routes should be an array');
+      const expansion = routesJson.routes.find((row) => row.path === '/api/marketplace-expansion-page');
+      assert.equal(expansion.family, 'page-bff');
+
+      const grouped = await request({ server, method: 'GET', path: '/api/__routes?group=1' });
+      assert.equal(grouped.statusCode, 200, '__routes?group=1 should return 200');
+      const groupedJson = JSON.parse(grouped.body);
+      assert.ok(Array.isArray(groupedJson.families));
+      assert.ok(groupedJson.families.some((row) => row.id === 'page-bff' && row.routes.length));
+
+      const root = await request({ server, method: 'GET', path: '/' });
+      assert.equal(root.statusCode, 200, 'API origin / should return the operator landing page, not 404');
+      assert.match(root.body, /Pokoin Oracle API/);
+      assert.match(root.body, /marketplace-suggest/);
 
       const marketplace = await request({ server, method: 'GET', path: '/marketplace' });
-      assert.equal(marketplace.statusCode, 200, 'marketplace staging page should return 200');
-      assert.match(marketplace.body, /Oracle API staging endpoint/);
+      assert.equal(marketplace.statusCode, 200, 'marketplace landing page should return 200');
+      assert.match(marketplace.body, /Pokoin Oracle API/);
 
       const missing = await request({ server, method: 'GET', path: '/api/not-a-route' });
       assert.equal(missing.statusCode, 404, 'missing route should return 404');

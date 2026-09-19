@@ -1,0 +1,14 @@
+---
+description: Marketplace Oracle VM SSH host is pokoin-marketplace
+alwaysApply: true
+---
+
+# pokoin-marketplace SSH
+
+The Oracle VM that runs marketplace Postgres and `api.pokoin.com` is named **pokoin-marketplace** (`130.61.251.250`, user `ubuntu`).
+
+SSH: `ssh pokoin-marketplace`
+
+Do not call that machine honcho, honcho-personal, or oracle-honcho. Those were leftover SSH aliases and are removed.
+
+Honcho still means the Honcho MCP / AES / DSH memory stack, not this VM.

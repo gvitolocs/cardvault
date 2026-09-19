@@ -1,8 +1,9 @@
 import '../models/pokemon_card.dart';
 import 'card_url.dart';
 
-/// Fast Milo / YOLO identity is TCGplayer. Marketplace URLs use **our id**
-/// (`ct_id * 2`). Never treat a scan Fast `id` as a CardVault `card.id`.
+/// Milo / YOLO identity is leftover `ct_id` (gallery manifest `identity: ct_id`).
+/// Marketplace URLs use **our id** (`ct_id * 2`). Do not treat Milo `id` as a
+/// TCGplayer product id. Catalog `card.id` is already public — do not × 2 it.
 class CardScanHit {
   const CardScanHit({
     required this.tcgplayerId,
@@ -13,6 +14,7 @@ class CardScanHit {
     this.cardtraderBlueprintId = '',
   });
 
+  /// Only a real TCGplayer product id when the payload sends one. Milo `id` is not this.
   final String tcgplayerId;
   final String name;
   final String collectorNumber;
@@ -21,8 +23,12 @@ class CardScanHit {
   final String cardtraderBlueprintId;
 
   factory CardScanHit.fromJson(Map<String, dynamic> json) {
+    final leftover =
+        '${json['ct_id'] ?? json['ctId'] ?? json['blueprint_id'] ?? json['blueprintId'] ?? json['id'] ?? ''}'
+            .trim();
     return CardScanHit(
-      tcgplayerId: '${json['id'] ?? json['tcgplayerId'] ?? ''}'.trim(),
+      tcgplayerId:
+          '${json['tcgplayerId'] ?? json['tcgplayer_id'] ?? ''}'.trim(),
       name: '${json['name'] ?? ''}'.trim(),
       collectorNumber:
           '${json['collector_number'] ?? json['collectorNumber'] ?? ''}'.trim(),
@@ -31,8 +37,7 @@ class CardScanHit {
       score: (json['score'] is num)
           ? (json['score'] as num).toDouble()
           : double.tryParse('${json['score'] ?? ''}') ?? 0,
-      cardtraderBlueprintId:
-          '${json['blueprint_id'] ?? json['blueprintId'] ?? ''}'.trim(),
+      cardtraderBlueprintId: leftover,
     );
   }
 }

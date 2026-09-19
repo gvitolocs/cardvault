@@ -204,7 +204,7 @@ model cardtrader_pokemon_blueprints {
   @@index([name(ops: raw("gin_trgm_ops"))], map: "cardtrader_pokemon_blueprints_name_trgm_idx", type: Gin)
 }
 
-model cardtrader_pokemon_expansions {
+model pokoin_pokemon_expansions {
   expansion_id       Int?
   game_id            Int       @default(5)
   code               String?
@@ -222,9 +222,9 @@ model cardtrader_pokemon_expansions {
   logo_object_key    String?
   logo_imported_at   DateTime? @db.Timestamptz(6)
 
-  @@index([compact_name(ops: raw("gin_trgm_ops"))], map: "cardtrader_pokemon_expansions_compact_trgm_idx", type: Gin)
+  @@index([compact_name(ops: raw("gin_trgm_ops"))], map: "pokoin_pokemon_expansions_compact_trgm_idx", type: Gin)
   @@index([expansion_id])
-  @@index([normalized_name(ops: raw("gin_trgm_ops"))], map: "cardtrader_pokemon_expansions_normalized_trgm_idx", type: Gin)
+  @@index([normalized_name(ops: raw("gin_trgm_ops"))], map: "pokoin_pokemon_expansions_normalized_trgm_idx", type: Gin)
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.

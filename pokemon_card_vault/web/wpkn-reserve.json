@@ -2,7 +2,7 @@
   "asset": "wPKN",
   "assetName": "Wrapped PKN",
   "nativeAsset": "PKN",
-  "backingModel": "Native PKN reserve allocation caps wPKN supply; this is not a fixed 1:1 market exchange rate",
+  "backingModel": "Native PKN reserve allocation caps wPKN supply",
   "reservedNativeAmount": "2000000",
   "reservedNativeDecimals": 18,
   "nativeChain": {
@@ -13,8 +13,7 @@
   },
   "nativeTreasury": {
     "address": "0x74466c3a204429b22ce8558f3f18f3c59f67fcb3",
-    "reservedAmount": "2000000",
-    "note": "This address currently holds more than the reserved amount; only 2,000,000 PKN are allocated to wPKN backing."
+    "reservedAmount": "2000000"
   },
   "wrappedChain": {
     "name": "BNB Smart Chain",
@@ -55,5 +54,5 @@
     "If native PKN is released from reserve, the matching wPKN must be burned by holders or through market operations before reserve accounting is reduced."
   ],
   "status": "live",
-  "lastUpdated": "2026-05-15"
+  "lastUpdated": "2026-08-30"
 }

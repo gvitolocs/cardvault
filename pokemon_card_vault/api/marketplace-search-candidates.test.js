@@ -7,7 +7,10 @@ const {
   searchNonNameWithDatabase,
   searchVariationReplicaNonNameWithDatabase,
   rowsForSearchTerm,
+  searchRowsByCardIdsIdentity,
   searchTerms,
+  collectorNumberKey,
+  rankRowsByQueryCollectorNumber,
 } = require('./marketplace-search-candidates');
 
 function row({ id, name, set = 'Test Set', number = '001/100', rarity = 'Card', rank = 0 }) {
@@ -41,7 +44,7 @@ function categoryQueryMock(fixtures) {
     if (/marketplace_card_variations/.test(sql)) {
       return { rows: fixtures.variation?.[token] || [] };
     }
-    if (/cardtrader_pokemon_expansions|marketplace_expansion_aliases/.test(sql)) {
+    if (/pokoin_pokemon_expansions|marketplace_expansion_aliases/.test(sql)) {
       return { rows: fixtures.expansion?.[token] || [] };
     }
     if (/marketplace_rarities/.test(sql)) {
@@ -382,4 +385,82 @@ test('variation replica timeout opens primary fallback path', async () => {
       process.env.MARKETPLACE_VARIATION_SEARCH_CIRCUIT_MS = originalCircuit;
     }
   }
+});
+
+test('rankRowsByQueryCollectorNumber prefers the matching set number', () => {
+  assert.equal(collectorNumberKey('Illustration Rare | 210/198'), '210/198');
+  const ranked = rankRowsByQueryCollectorNumber([
+    { card_id: '220438', name: 'Drowzee', card_number: '74a/147' },
+    { card_id: '483348', name: 'Drowzee', card_number: 'Illustration Rare | 210/198' },
+  ], 'Drowzee 210/198');
+  assert.equal(ranked[0].card_id, '483348');
+});
+
+test('identity hydrate skips cheapest listing cache', async () => {
+  let sql = '';
+  const rows = await searchRowsByCardIdsIdentity(['220962'], async (queryText, values) => {
+    sql = queryText;
+    assert.deepEqual(values, [['220962']]);
+    return {
+      rows: [{
+        card_id: '220962',
+        name: 'Espurr',
+        card_number: '42/146',
+        set_name: 'XY',
+      }],
+    };
+  });
+  assert.equal(rows.length, 1);
+  assert.doesNotMatch(sql, /cheapest_homepage_cache_blueprint/);
+  assert.match(sql, /marketplace_search_candidates/);
+});
+
+test('Meili search page requests pageSize hits, not a numbered over-fetch', async () => {
+  const originalEngine = process.env.MARKETPLACE_SEARCH_ENGINE;
+  const originalHost = process.env.MEILI_HOST;
+  const originalFetch = global.fetch;
+  let capturedLimit = null;
+  try {
+    process.env.MARKETPLACE_SEARCH_ENGINE = 'meili';
+    process.env.MEILI_HOST = 'http://meili.test';
+    global.fetch = async (_url, options) => {
+      const body = JSON.parse(options.body);
+      capturedLimit = body.limit;
+      return {
+        ok: true,
+        text: async () => JSON.stringify({ hits: [] }),
+      };
+    };
+    await rowsForSearchTerm('Drowzee 210/198', 24, 0, 'en', {}, null, { lightHydrate: true });
+    assert.equal(capturedLimit, 24);
+  } finally {
+    if (originalEngine === undefined) delete process.env.MARKETPLACE_SEARCH_ENGINE;
+    else process.env.MARKETPLACE_SEARCH_ENGINE = originalEngine;
+    if (originalHost === undefined) delete process.env.MEILI_HOST;
+    else process.env.MEILI_HOST = originalHost;
+    global.fetch = originalFetch;
+  }
+});
+
+test('attachThemePacks adds vt and never fails search', async () => {
+  process.env.MEILI_HOST = '';
+  const { attachThemePacks } = require('./marketplace-search-candidates');
+  const PACKED = 'v1'
+    + '1c0705' + '2c1512' + '3d211c' + '8a3a28' + '7a463a' + '452a24' + '8a3f2c';
+  const rows = [
+    { card_id: 251820, name: 'Torchic' },
+    { card_id: 251822, name: 'Mudkip' },
+  ];
+  const packs = new Map([['251820', PACKED]]);
+  const themed = await attachThemePacks(rows, { readCardThemePacks: async () => packs });
+  assert.equal(themed[0].vt, PACKED);
+  assert.equal(themed[1].vt, undefined);
+  // Lookup failure returns the rows untouched.
+  const safe = await attachThemePacks(rows, {
+    readCardThemePacks: async () => {
+      throw new Error('db down');
+    },
+  });
+  assert.deepEqual(safe, rows);
+  assert.deepEqual(await attachThemePacks([], { readCardThemePacks: async () => packs }), []);
 });

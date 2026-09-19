@@ -115,7 +115,8 @@ function canonicalPathForCard(row = {}) {
   if (!Number.isSafeInteger(numericId) || numericId <= 0 || !slug) {
     return '';
   }
-  return `/marketplace/${DEFAULT_LANGUAGE}/cards/${numericId * 2}/${slug}`;
+  const ourId = numericId % 2 === 1 ? numericId * 2 : numericId;
+  return `/marketplace/${DEFAULT_LANGUAGE}/cards/${ourId}/${slug}`;
 }
 
 function cardTitle(row) {

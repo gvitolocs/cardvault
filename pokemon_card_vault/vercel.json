@@ -667,6 +667,22 @@
       "destination": "/api/marketplace-home.js"
     },
     {
+      "source": "/api/marketplace-home-page",
+      "destination": "/api/marketplace-home-page.js"
+    },
+    {
+      "source": "/api/marketplace-search-page",
+      "destination": "/api/marketplace-search-page.js"
+    },
+    {
+      "source": "/api/marketplace-card-page",
+      "destination": "/api/marketplace-card-page.js"
+    },
+    {
+      "source": "/api/marketplace-expansion-page",
+      "destination": "/api/marketplace-expansion-page.js"
+    },
+    {
       "source": "/api/marketplace-cards",
       "destination": "/api/marketplace-cards.js"
     },
@@ -685,6 +701,10 @@
     {
       "source": "/api/marketplace-hot-blueprints",
       "destination": "/api/marketplace-hot-blueprints.js"
+    },
+    {
+      "source": "/api/marketplace-image-log",
+      "destination": "/api/marketplace-image-log.js"
     },
     {
       "source": "/api/marketplace-artist-cards",
@@ -731,6 +751,10 @@
       "destination": "/api/marketplace-card-sales.js"
     },
     {
+      "source": "/api/marketplace-card-last-median",
+      "destination": "/api/marketplace-card-last-median.js"
+    },
+    {
       "source": "/api/marketplace-card-url",
       "destination": "/api/marketplace-card-url.js"
     },
@@ -755,6 +779,10 @@
       "destination": "/api/marketplace-autocomplete.js"
     },
     {
+      "source": "/api/marketplace-suggest",
+      "destination": "/api/marketplace-suggest.js"
+    },
+    {
       "source": "/api/searchbar-cards",
       "destination": "/api/searchbar-cards.js"
     },
@@ -773,6 +801,10 @@
     {
       "source": "/api/marketplace-watchlist",
       "destination": "/api/marketplace-watchlist.js"
+    },
+    {
+      "source": "/api/marketplace-recents",
+      "destination": "/api/marketplace-recents.js"
     },
     {
       "source": "/api/marketplace-expansion-symbols",

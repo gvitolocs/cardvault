@@ -247,6 +247,7 @@ test('dry-run comparison plans only missing rows and new image jobs', async () =
 
 test('apply comparison inserts missing rows and images only inserted ids', async () => {
   const queries = [];
+  let missingCdnLoads = 0;
   const pool = {
     async query(sql, values) {
       queries.push({ sql, values });
@@ -255,6 +256,20 @@ test('apply comparison inserts missing rows and images only inserted ids', async
       }
       if (/insert into "marketplace_magic"\."cardtrader_blueprints"/.test(sql)) {
         return { rowCount: 1, rows: [{ id: '2' }] };
+      }
+      if (/cdn_image_url is null/.test(sql)) {
+        missingCdnLoads += 1;
+        if (missingCdnLoads === 1) {
+          return {
+            rows: [{
+              id: 2,
+              name: 'Missing',
+              image_url: null,
+              blueprint: { id: 2, name: 'Missing' },
+            }],
+          };
+        }
+        return { rows: [] };
       }
       throw new Error(`unexpected query: ${sql}`);
     },
@@ -292,7 +307,68 @@ test('apply comparison inserts missing rows and images only inserted ids', async
 
   assert.equal(result.counts.inserted, 1);
   assert.deepEqual(result.imageResult.chunks, [{ ids: [2] }]);
-  assert.equal(queries.length, 2);
+  assert.equal(result.imageResult.summary.attempted, 1);
+  assert.ok(missingCdnLoads >= 2);
+});
+
+test('parseArgs accepts --backfill-images without expansion fetch', () => {
+  const options = parseArgs([
+    '--game=one_piece',
+    '--backfill-images',
+    '--cardtrader-game-id=15',
+  ]);
+  assert.equal(options.backfillImages, true);
+  assert.equal(options.images, true);
+  assert.equal(options.streamAll, false);
+});
+
+test('backfill-images plans rows missing cdn without expansion export', async () => {
+  const queries = [];
+  const pool = {
+    async query(sql) {
+      queries.push(sql);
+      if (/cdn_image_url is null/.test(sql)) {
+        return {
+          rows: [{
+            id: 9,
+            name: 'Zoro',
+            image_url: 'https://cardtrader.com/uploads/blueprints/image.jpg',
+            blueprint: {
+              image: { url: 'https://cardtrader.com/uploads/blueprints/image.jpg' },
+            },
+          }],
+        };
+      }
+      throw new Error(`unexpected query: ${sql}`);
+    },
+  };
+  const result = await run(
+    parseArgs([
+      '--game=one_piece',
+      '--cardtrader-game-id=15',
+      '--database-url-env=ONE_PIECE_MARKETPLACE_DATABASE_URL',
+      '--schema=marketplace_one_piece',
+      '--table=cardtrader_blueprints',
+      '--backfill-images',
+    ]),
+    {
+      pool,
+      api: {
+        get: async (apiPath) => {
+          if (apiPath === '/games') return [{ id: 15, name: 'One Piece' }];
+          if (apiPath === '/categories') return [];
+          if (apiPath === '/expansions') return [{ id: 1, game_id: 15, name: 'OP01' }];
+          throw new Error(`unexpected ${apiPath}`);
+        },
+      },
+      config: {},
+    },
+  );
+
+  assert.equal(result.counts.fetched, 0);
+  assert.equal(result.counts.missingCdn, 1);
+  assert.deepEqual(result.imageResult.chunks, [{ ids: [9] }]);
+  assert.equal(queries.length, 1);
 });
 
 test('image key planning applies game CDN prefix and three derivatives', () => {

@@ -1,0 +1,430 @@
+POKÉMON TCG EXPANSION SHORTNAMES, SET CODES & CARD NICKNAMES
+Research/reference file for Pokoin
+Last checked online: 2026-09-12
+
+IMPORTANT
+- Keep canonical set codes separate from informal collector aliases.
+- Prefer the canonical code for database identity and aliases only for search.
+- Some short aliases collide heavily (BS, AR, DR, PF, SV, SS, TM, etc.).
+- Card nicknames are community terms, not official Pokémon names.
+- Informal nicknames evolve; this file focuses on high-confidence/common collector usage.
+
+======================================================================
+1) ENGLISH / WESTERN EXPANSIONS
+Format: ERA | EXPANSION | CANONICAL CODE | COMMON SEARCH ALIASES | NOTES
+======================================================================
+Original | Base Set | BS | Base, Base Set | canonical BS
+Original | Jungle | JU | Jungle | canonical JU
+Original | Fossil | FO | Fossil | canonical FO
+Original | Base Set 2 | B2 | Base 2, Base2 | canonical B2
+Original | Team Rocket | TR | Rocket, Team Rocket | canonical TR
+Original | Gym Heroes | G1 | GH, Gym Heroes | canonical G1
+Original | Gym Challenge | G2 | GC, Gym Challenge | canonical G2
+Neo | Neo Genesis | N1 | Neo Gen, Neo Genesis | canonical N1
+Neo | Neo Discovery | N2 | Neo Disc, Neo Discovery | canonical N2
+Neo | Neo Revelation | N3 | Neo Rev, Neo Revelation | canonical N3
+Neo | Neo Destiny | N4 | Neo Dest, Neo Destiny | canonical N4
+Legendary Collection | Legendary Collection | LC | LC, Legendary Collection | canonical LC
+e-Card | Expedition Base Set | EX | Expedition, Expedition Base | canonical EX; do not confuse with later EX era
+e-Card | Aquapolis | AQ | Aquapolis | canonical AQ
+e-Card | Skyridge | SK | Skyridge | canonical SK
+EX | EX Ruby & Sapphire | RS | Ruby & Sapphire, R&S, RS | canonical RS
+EX | EX Sandstorm | SS | Sandstorm, SS | canonical SS
+EX | EX Dragon | DR | Dragon, DR | canonical DR
+EX | EX Team Magma vs Team Aqua | MA | TMTA, Magma vs Aqua | canonical MA
+EX | EX Hidden Legends | HL | Hidden Legends, HL | canonical HL
+EX | EX FireRed & LeafGreen | RG | FRLG, FireRed LeafGreen, RG | canonical RG; FRLG is common search shorthand
+EX | EX Team Rocket Returns | TRR | Team Rocket Returns, TRR | canonical TRR
+EX | EX Deoxys | DX | Deoxys, DX | canonical DX
+EX | EX Emerald | EM | Emerald, EM | canonical EM
+EX | EX Unseen Forces | UF | Unseen Forces, UF | canonical UF
+EX | EX Delta Species | DS | Delta Species, DS | canonical DS
+EX | EX Legend Maker | LM | Legend Maker, LM | canonical LM
+EX | EX Holon Phantoms | HP | Holon Phantoms, HP | canonical HP
+EX | EX Crystal Guardians | CG | Crystal Guardians, CG | canonical CG
+EX | EX Dragon Frontiers | DF | Dragon Frontiers, DF | canonical DF
+EX | EX Power Keepers | PK | Power Keepers, PK | canonical PK
+Diamond & Pearl | Diamond & Pearl | DP | DP, Diamond & Pearl | canonical DP
+Diamond & Pearl | Mysterious Treasures | MT | Mysterious Treasures, MT | canonical MT
+Diamond & Pearl | Secret Wonders | SW | Secret Wonders, SW | canonical SW
+Diamond & Pearl | Great Encounters | GE | Great Encounters, GE | canonical GE
+Diamond & Pearl | Majestic Dawn | MD | Majestic Dawn, MD | canonical MD
+Diamond & Pearl | Legends Awakened | LA | Legends Awakened, LA | canonical LA
+Diamond & Pearl | Stormfront | SF | Stormfront, SF | canonical SF
+Platinum | Platinum | PL | Platinum, PL | canonical PL
+Platinum | Rising Rivals | RR | Rising Rivals, RR | canonical RR
+Platinum | Supreme Victors | SV | Supreme Victors, SV | canonical SV; conflicts with Scarlet & Violet shorthand
+Platinum | Arceus | AR | Arceus, AR | canonical AR
+HeartGold & SoulSilver | HeartGold & SoulSilver | HS | HGSS, HeartGold SoulSilver, HS | canonical HS; HGSS common era shorthand
+HeartGold & SoulSilver | Unleashed | UL | Unleashed, UL | canonical UL
+HeartGold & SoulSilver | Undaunted | UD | Undaunted, UD | canonical UD
+HeartGold & SoulSilver | Triumphant | TM | Triumphant, TM | canonical TM
+Call of Legends | Call of Legends | CL | CoL, Call of Legends, CL | canonical CL; CoL common collector shorthand
+Black & White | Black & White | BLW | BW, Black & White, BLW | canonical BLW; BW common era shorthand
+Black & White | Emerging Powers | EPO | Emerging Powers, EPO | canonical EPO
+Black & White | Noble Victories | NVI | Noble Victories, NVI | canonical NVI
+Black & White | Next Destinies | NXD | Next Destinies, NXD | canonical NXD
+Black & White | Dark Explorers | DEX | Dark Explorers, DEX | canonical DEX
+Black & White | Dragons Exalted | DRX | Dragons Exalted, DRX | canonical DRX
+Black & White | Dragon Vault | DRV | Dragon Vault, DRV | canonical DRV
+Black & White | Boundaries Crossed | BCR | Boundaries Crossed, BCR | canonical BCR
+Black & White | Plasma Storm | PLS | Plasma Storm, PLS | canonical PLS
+Black & White | Plasma Freeze | PLF | Plasma Freeze, PLF | canonical PLF
+Black & White | Plasma Blast | PLB | Plasma Blast, PLB | canonical PLB
+Black & White | Legendary Treasures | LTR | Legendary Treasures, LT, LTR | canonical LTR
+XY | Kalos Starter Set | KSS | Kalos Starter, KSS | canonical KSS
+XY | XY | XY | XY | canonical XY
+XY | Flashfire | FLF | Flashfire, FLF | canonical FLF
+XY | Furious Fists | FFI | Furious Fists, FFI | canonical FFI
+XY | Phantom Forces | PHF | Phantom Forces, PHF | canonical PHF
+XY | Primal Clash | PRC | Primal Clash, PRC | canonical PRC
+XY | Double Crisis | DCR | Double Crisis, DCR | canonical DCR
+XY | Roaring Skies | ROS | Roaring Skies, ROS | canonical ROS
+XY | Ancient Origins | AOR | Ancient Origins, AO, AOR | canonical AOR
+XY | BREAKthrough | BKT | BREAKthrough, Breakthrough, BKT | canonical BKT
+XY | BREAKpoint | BKP | BREAKpoint, Breakpoint, BKP | canonical BKP
+XY | Generations | GEN | Generations, GEN | canonical GEN
+XY | Fates Collide | FCO | Fates Collide, FCO | canonical FCO
+XY | Steam Siege | STS | Steam Siege, STS | canonical STS
+XY | Evolutions | EVO | Evolutions, EVO | canonical EVO
+Sun & Moon | Sun & Moon | SUM | SM, Sun & Moon, SUM | canonical SUM; SM common era shorthand
+Sun & Moon | Guardians Rising | GRI | Guardians Rising, GRI | canonical GRI
+Sun & Moon | Burning Shadows | BUS | Burning Shadows, BUS | canonical BUS
+Sun & Moon | Shining Legends | SLG | Shining Legends, SLG | canonical SLG
+Sun & Moon | Crimson Invasion | CIN | Crimson Invasion, CIN | canonical CIN
+Sun & Moon | Ultra Prism | UPR | Ultra Prism, UPR | canonical UPR
+Sun & Moon | Forbidden Light | FLI | Forbidden Light, FLI | canonical FLI
+Sun & Moon | Celestial Storm | CES | Celestial Storm, CES | canonical CES
+Sun & Moon | Dragon Majesty | DRM | Dragon Majesty, DRM | canonical DRM
+Sun & Moon | Lost Thunder | LOT | Lost Thunder, LOT | canonical LOT
+Sun & Moon | Team Up | TEU | Team Up, TEU | canonical TEU
+Sun & Moon | Detective Pikachu | DET | Detective Pikachu, DET | canonical DET
+Sun & Moon | Unbroken Bonds | UNB | Unbroken Bonds, UNB | canonical UNB
+Sun & Moon | Unified Minds | UNM | Unified Minds, UNM | canonical UNM
+Sun & Moon | Hidden Fates | HIF | Hidden Fates, HF, HIF | canonical HIF
+Sun & Moon | Cosmic Eclipse | CEC | Cosmic Eclipse, CE, CEC | canonical CEC
+Sword & Shield | Sword & Shield | SSH | SWSH, Sword & Shield, SSH | canonical SSH; SWSH common era shorthand
+Sword & Shield | Rebel Clash | RCL | Rebel Clash, RCL | canonical RCL
+Sword & Shield | Darkness Ablaze | DAA | Darkness Ablaze, DAA | canonical DAA
+Sword & Shield | Champion's Path | CPA | Champions Path, Champion's Path, CPA | canonical CPA
+Sword & Shield | Vivid Voltage | VIV | Vivid Voltage, VV, VIV | canonical VIV
+Sword & Shield | Shining Fates | SHF | Shining Fates, SF, SHF | canonical SHF
+Sword & Shield | Battle Styles | BST | Battle Styles, BST | canonical BST
+Sword & Shield | Chilling Reign | CRE | Chilling Reign, CR, CRE | canonical CRE
+Sword & Shield | Evolving Skies | EVS | Evolving Skies, ES, EVS | canonical EVS; "Evolving Cries" is a community joke nickname
+Sword & Shield | Celebrations | CEL | Celebrations, CEL, 25th | canonical CEL
+Sword & Shield | Fusion Strike | FST | Fusion Strike, FS, FST | canonical FST
+Sword & Shield | Brilliant Stars | BRS | Brilliant Stars, BRS | canonical BRS
+Sword & Shield | Astral Radiance | ASR | Astral Radiance, AR, ASR | canonical ASR
+Sword & Shield | Pokémon GO | PGO | Pokemon GO, PoGO, PGO | canonical PGO
+Sword & Shield | Lost Origin | LOR | Lost Origin, LO, LOR | canonical LOR
+Sword & Shield | Silver Tempest | SIT | Silver Tempest, ST, SIT | canonical SIT
+Sword & Shield | Crown Zenith | CRZ | Crown Zenith, CZ, CRZ | canonical CRZ
+Scarlet & Violet | Scarlet & Violet | SVI | SV, Scarlet & Violet, SVI | canonical SVI; SV common era shorthand
+Scarlet & Violet | Paldea Evolved | PAL | Paldea Evolved, PE, PAL | canonical PAL
+Scarlet & Violet | Obsidian Flames | OBF | Obsidian Flames, OF, OBF | canonical OBF
+Scarlet & Violet | 151 | MEW | 151, Pokemon 151, SV151 | canonical MEW; collectors overwhelmingly search "151"
+Scarlet & Violet | Paradox Rift | PAR | Paradox Rift, PR, PAR | canonical PAR
+Scarlet & Violet | Paldean Fates | PAF | Paldean Fates, PF, PAF | canonical PAF
+Scarlet & Violet | Temporal Forces | TEF | Temporal Forces, TF, TEF | canonical TEF
+Scarlet & Violet | Twilight Masquerade | TWM | Twilight Masquerade, TM, TWM | canonical TWM
+Scarlet & Violet | Shrouded Fable | SFA | Shrouded Fable, SFA | canonical SFA
+Scarlet & Violet | Stellar Crown | SCR | Stellar Crown, SC, SCR | canonical SCR
+Scarlet & Violet | Surging Sparks | SSP | Surging Sparks, SS, SSP | canonical SSP; collides with SWSH Black Star promo shorthand in some databases
+Scarlet & Violet | Prismatic Evolutions | PRE | Prismatic Evolutions, PE, PRE | canonical PRE
+Scarlet & Violet | Journey Together | JTG | Journey Together, JT, JTG | canonical JTG
+Scarlet & Violet | Destined Rivals | DRI | Destined Rivals, DR, DRI | canonical DRI
+Scarlet & Violet | Black Bolt | BLK | Black Bolt, BB, BLK | canonical BLK
+Scarlet & Violet | White Flare | WHT | White Flare, WF, WHT | canonical WHT
+Mega Evolution | Mega Evolution | MEG | MEGA, Mega Evolution, MEG | canonical MEG
+Mega Evolution | Phantasmal Flames | PFL | Phantasmal Flames, PF, PFL | canonical PFL
+Mega Evolution | Ascended Heroes | ASC | Ascended Heroes, AH, ASC | canonical ASC
+Mega Evolution | Perfect Order | POR | Perfect Order, PO, POR | canonical POR
+Mega Evolution | Chaos Rising | CRI | Chaos Rising, CR, CRI | canonical CRI
+Mega Evolution | Pitch Black | PBL | Pitch Black, PB, PBL | canonical PBL
+Mega Evolution | 30th Celebration | 30C (current English scans; official abbreviation should be rechecked at release) | 30th, 30th Celebration, 30C | releases 2026-09-16
+Mega Evolution | Delta Reign | DLR (current English scans / pre-release indexing) | Delta Reign, DR, DLR | announced 2026-11-06; recheck final packaging at release
+
+
+======================================================================
+2) USEFUL ENGLISH PROMO / SPECIAL CODES
+======================================================================
+Wizards Black Star Promos | WP
+Nintendo Black Star Promos | NP
+DP Black Star Promos | DPP
+HGSS Black Star Promos | HSP
+BW Black Star Promos | BWP
+XY Black Star Promos | XYP
+SM Black Star Promos | SMP
+SWSH Black Star Promos | SSP
+SV Black Star Promos | SVP
+ME Black Star Promos | MEP
+POP Series 1–9 | POP1–POP9
+Trick or Trade 2022 | TT22
+Trick or Trade 2023 | TT23
+Trick or Trade 2024 | TT24
+
+Collision warning: SSP is the canonical expansion code for Surging Sparks, while some
+databases also use SSP for the Sword & Shield Black Star Promo series. Resolve with
+era/product type, not the bare three letters alone.
+
+======================================================================
+3) COMMON SET-LEVEL COMMUNITY NICKNAMES
+======================================================================
+Evolving Skies | EVS | Evolving Cries | HIGH confidence community joke nickname
+Chilling Reign | CRE | Chilling Pain | MEDIUM confidence community joke nickname
+
+Do NOT use joke names as canonical identifiers. They are search aliases only.
+
+======================================================================
+4) JAPANESE MODERN PRINTED SET CODES
+Format: ERA | JAPANESE EXPANSION | PRINTED CODE | COMMON ENGLISH ALIAS
+======================================================================
+Note: modern Japanese SM/S/SV/M blocks have stable printed alphanumeric marks.
+Older Japanese releases are better identified by official set name/symbol rather than
+inventing a modern-style short code that was not printed in the same way.
+
+Sun & Moon | Collection Sun | SM1S | Collection Sun
+Sun & Moon | Collection Moon | SM1M | Collection Moon
+Sun & Moon | Sun & Moon | SM1+ | Sun & Moon
+Sun & Moon | Islands Await You | SM2K | Islands Await You
+Sun & Moon | Alolan Moonlight | SM2L | Alolan Moonlight
+Sun & Moon | Facing a New Trial | SM2+ | Facing a New Trial
+Sun & Moon | To Have Seen the Battle Rainbow | SM3H | Battle Rainbow
+Sun & Moon | Darkness that Consumes Light | SM3N | Darkness that Consumes Light
+Sun & Moon | Shining Legends | SM3+ | Shining Legends
+Sun & Moon | Awakened Heroes | SM4S | Awakened Heroes
+Sun & Moon | Ultradimensional Beasts | SM4A | Ultradimensional Beasts
+Sun & Moon | GX Battle Boost | SM4+ | GX Battle Boost
+Sun & Moon | Ultra Sun | SM5S | Ultra Sun
+Sun & Moon | Ultra Moon | SM5M | Ultra Moon
+Sun & Moon | Ultra Force | SM5+ | Ultra Force
+Sun & Moon | Forbidden Light | SM6 | Forbidden Light
+Sun & Moon | Dragon Storm | SM6A | Dragon Storm
+Sun & Moon | Champion Road | SM6B | Champion Road
+Sun & Moon | Sky-Splitting Charisma | SM7 | Sky-Splitting Charisma
+Sun & Moon | Thunderclap Spark | SM7A | Thunderclap Spark
+Sun & Moon | Fairy Rise | SM7B | Fairy Rise
+Sun & Moon | Super-Burst Impact | SM8 | Super-Burst Impact
+Sun & Moon | Dark Order | SM8A | Dark Order
+Sun & Moon | GX Ultra Shiny | SM8B | GX Ultra Shiny
+Sun & Moon | Tag Bolt | SM9 | Tag Bolt
+Sun & Moon | Night Unison | SM9A | Night Unison
+Sun & Moon | Full Metal Wall | SM9B | Full Metal Wall
+Sun & Moon | Double Blaze | SM10 | Double Blaze
+Sun & Moon | GG End | SM10A | GG End
+Sun & Moon | Sky Legend | SM10B | Sky Legend
+Sun & Moon | Miracle Twin | SM11 | Miracle Twin
+Sun & Moon | Remix Bout | SM11A | Remix Bout
+Sun & Moon | Dream League | SM11B | Dream League
+Sun & Moon | Alter Genesis | SM12 | Alter Genesis
+Sun & Moon | TAG TEAM GX: Tag All Stars | SM12A | Tag All Stars
+
+Sword & Shield | Sword | S1W | Sword
+Sword & Shield | Shield | S1H | Shield
+Sword & Shield | VMAX Rising | S1A | VMAX Rising
+Sword & Shield | Rebellion Crash | S2 | Rebellion Crash
+Sword & Shield | Explosive Walker | S2A | Explosive Flame Walker
+Sword & Shield | Infinity Zone | S3 | Infinity Zone
+Sword & Shield | Legendary Heartbeat | S3A | Legendary Heartbeat
+Sword & Shield | Amazing Volt Tackle | S4 | Shocking Volt Tackle
+Sword & Shield | Shiny Star V | S4A | Shiny Star V
+Sword & Shield | Single Strike Master | S5I | Single Strike Master
+Sword & Shield | Rapid Strike Master | S5R | Rapid Strike Master
+Sword & Shield | Peerless Fighters | S5A | Matchless Fighters
+Sword & Shield | Silver Lance | S6H | Silver Lance
+Sword & Shield | Jet-Black Spirit | S6K | Jet Black Spirit
+Sword & Shield | Eevee Heroes | S6A | Eevee Heroes
+Sword & Shield | Skyscraping Perfection | S7D | Towering Perfection
+Sword & Shield | Blue Sky Stream | S7R | Blue Sky Stream
+Sword & Shield | Fusion Arts | S8 | Fusion Arts
+Sword & Shield | 25th Anniversary Collection | S8A | 25th Anniversary Collection
+Sword & Shield | VMAX Climax | S8B | VMAX Climax
+Sword & Shield | Star Birth | S9 | Star Birth
+Sword & Shield | Battle Region | S9A | Battle Region
+Sword & Shield | Time Gazer | S10D | Time Gazer
+Sword & Shield | Space Juggler | S10P | Space Juggler
+Sword & Shield | Dark Phantasma | S10A | Dark Phantasma
+Sword & Shield | Pokémon GO | S10B | Pokemon GO
+Sword & Shield | Lost Abyss | S11 | Lost Abyss
+Sword & Shield | Incandescent Arcana | S11A | Incandescent Arcana
+Sword & Shield | Paradigm Trigger | S12 | Paradigm Trigger
+Sword & Shield | VSTAR Universe | S12A | VSTAR Universe
+
+Scarlet & Violet | Scarlet ex | SV1S | Scarlet ex
+Scarlet & Violet | Violet ex | SV1V | Violet ex
+Scarlet & Violet | Triplet Beat | SV1A | Triplet Beat
+Scarlet & Violet | Snow Hazard | SV2P | Snow Hazard
+Scarlet & Violet | Clay Burst | SV2D | Clay Burst
+Scarlet & Violet | Pokémon Card 151 | SV2A | 151, Pokemon Card 151
+Scarlet & Violet | Ruler of the Black Flame | SV3 | Ruler of the Black Flame
+Scarlet & Violet | Raging Surf | SV3A | Raging Surf
+Scarlet & Violet | Ancient Roar | SV4K | Ancient Roar
+Scarlet & Violet | Future Flash | SV4M | Future Flash
+Scarlet & Violet | Shiny Treasure ex | SV4A | Shiny Treasure ex
+Scarlet & Violet | Wild Force | SV5K | Wild Force
+Scarlet & Violet | Cyber Judge | SV5M | Cyber Judge
+Scarlet & Violet | Crimson Haze | SV5A | Crimson Haze
+Scarlet & Violet | Transformation Mask | SV6 | Mask of Change
+Scarlet & Violet | Night Wanderer | SV6A | Night Wanderer
+Scarlet & Violet | Stellar Miracle | SV7 | Stellar Miracle
+Scarlet & Violet | Paradise Dragona | SV7A | Paradise Dragona
+Scarlet & Violet | Super Electric Breaker | SV8 | Super Electric Breaker
+Scarlet & Violet | Terastal Fest ex | SV8A | Terastal Fest ex
+Scarlet & Violet | Battle Partners | SV9 | Battle Partners
+Scarlet & Violet | Hot Wind Arena | SV9A | Heat Wave Arena
+Scarlet & Violet | Glory of Team Rocket | SV10 | Glory of the Rocket Gang
+Scarlet & Violet | Black Bolt | SV11B | Black Bolt
+Scarlet & Violet | White Flare | SV11W | White Flare
+
+Mega Evolution | Mega Brave | M1L | Mega Brave
+Mega Evolution | Mega Symphonia | M1S | Mega Symphonia
+Mega Evolution | Inferno X | M2 | Inferno X
+Mega Evolution | MEGA Dream ex | M2A | MEGA Dream ex
+Mega Evolution | Nihil Zero | M3 | Nihil Zero
+Mega Evolution | Ninja Spinner | M4 | Ninja Spinner
+Mega Evolution | Abyss Eye | M5 | Abyss Eye
+Mega Evolution | Storm Emeralda | M6 | Storm Emeralda
+Mega Evolution | 30th Celebration | M6A | 30th Celebration
+
+======================================================================
+5) MAINLAND SIMPLIFIED CHINESE SET CODES
+Format: ERA | EXPANSION / COMMON TRANSLATION | PRINTED/CATALOG CODE | NOTES
+======================================================================
+Note: catalog databases may append a trailing C (for example CSV10C) to identify the
+Chinese-language catalog entry. Treat that language suffix separately from the printed set mark.
+
+Sun & Moon | Storming Emergence - Radiant | CSM1a | Mainland Simplified Chinese
+Sun & Moon | Storming Emergence - Verdant | CSM1b | Mainland Simplified Chinese
+Sun & Moon | Storming Emergence - Abundant | CSM1c | Mainland Simplified Chinese
+Sun & Moon | Battle Elite | CSM1.5 | Mainland Simplified Chinese
+Sun & Moon | Shining Synergy - Shower | CSM2a | Mainland Simplified Chinese
+Sun & Moon | Shining Synergy - Supreme | CSM2b | Mainland Simplified Chinese
+Sun & Moon | Shining Synergy - Summon | CSM2c | Mainland Simplified Chinese
+Sun & Moon | Striking Competition | CSM2.5 | Mainland Simplified Chinese
+
+Sword & Shield | Dynamax Clash - Thunder | CS1a | Mainland Simplified Chinese
+Sword & Shield | Dynamax Clash - Flame | CS1b | Mainland Simplified Chinese
+Sword & Shield | Dynamax Tactics | CS1.5 | Mainland Simplified Chinese
+Sword & Shield | Vivid Portrayals - Obsidian | CS2a | Mainland Simplified Chinese
+Sword & Shield | Vivid Portrayals - Indigo | CS2b | Mainland Simplified Chinese
+Sword & Shield | Brilliant Counterattack | CS2.5 | Mainland Simplified Chinese
+Sword & Shield | Primordial Arts - Overgrowth | CS3a | CardTrader may call this Primordial Martial Arts
+Sword & Shield | Primordial Arts - Torrent | CS3b | CardTrader may call this Primordial Martial Arts
+Sword & Shield | Scorching Skies | CS3.5 | Mainland Simplified Chinese
+Sword & Shield | Polychromatic / Nine Colors Gathering - Friends | CS4a | translated title varies
+Sword & Shield | Polychromatic / Nine Colors Gathering - Origin | CS4b | translated title varies
+Sword & Shield | Flame Dance of the End | CS4.5 | also seen as Final Flame Dance
+Sword & Shield | Gallant Galaxy / Brave Stars - Charm | CS5a | translated title varies
+Sword & Shield | Gallant Galaxy / Brave Stars - Brave | CS5b | translated title varies
+Sword & Shield | Overshadowed Radiance / Shadow of Glory | CS5.5 | translated title varies
+Sword & Shield | Marine Shadow / Shadow of the Blue Sea - Roar | CS6a | translated title varies
+Sword & Shield | Marine Shadow / Shadow of the Blue Sea - Pursuit/Banish | CS6b | translated title varies
+Sword & Shield | Victory Lodestar | CS6.5 | also seen as Victory Star Guide
+
+Scarlet & Violet | Ancient Times, Future Progress / Eternal Birth | CSV1 | some catalogs use CSV1C
+Scarlet & Violet | Miracle Journey | CSV2 | some catalogs append C
+Scarlet & Violet | Fearless Terastal | CSV3 | some catalogs append C
+Scarlet & Violet | Bonus Round | CSV4 | some catalogs append C
+Scarlet & Violet | Ardent Obsidian / Dark Crystal Blaze | CSV5 | some catalogs append C
+Scarlet & Violet | Arcane Truth / True Mystery | CSV6 | some catalogs append C
+Scarlet & Violet | Blade Awakening | CSV7 | some catalogs append C
+Scarlet & Violet | Sparkling Fable / Brilliant Illusions | CSV8 | some catalogs append C
+Scarlet & Violet | Stellar Crystal | CSV9 | some catalogs append C
+Scarlet & Violet | Terastal Gathering | CSV9.5 | some catalogs append C
+Scarlet & Violet | Together in Pursuit of Glory / Chasing Glory | CSV10 | some catalogs use CSV10C
+Scarlet & Violet | Journey Theme Pack | CSVL1 | adventure/travel pack family
+Scarlet & Violet | Travel Theme Pack | CSVL2 | adventure/travel pack family
+Scarlet & Violet | Kitakami Theme Pack | CSVL3 | theme pack family
+Scarlet & Violet | Happy Set 1 | CSVH1 | Happy pack
+Scarlet & Violet | Happy Set 2 | CSVH2 | Happy pack
+Scarlet & Violet | Happy Set 3 | CSVH3 | Happy pack
+Scarlet & Violet | Happy Set 4 | CSVH4 | Happy pack
+Scarlet & Violet | Happy Set 5 | CSVH5 | Happy pack
+Scarlet & Violet | Battle Party: Dream Together | CSVE1 | also cataloged as Dream Together
+Scarlet & Violet | Battle Party: Shining Dream | CSVE2 | special product
+
+======================================================================
+6) COMMON INDIVIDUAL-CARD / CARD-FAMILY NICKNAMES
+Format: NICKNAME | CARD | SET | NUMBER | NOTES
+======================================================================
+Moonbreon | Umbreon VMAX | Evolving Skies | 215/203 | extremely common; moon-themed alternate-art Umbreon VMAX; Japanese counterpart Eevee Heroes S6a 095/069
+Mewtube | Mewtwo-GX | Shining Legends | 78/73 | extremely common; Mewtwo is depicted inside a laboratory tube
+Bubble Mew | Mew ex | Paldean Fates | 232/091 | very common English-market nickname; bind by set/number because Japanese discussions can use the phrase differently
+Chonkachu / Chunkachu | Pikachu VMAX | Vivid Voltage | 188/185 | common nickname, especially for the Rainbow Rare Pikachu VMAX chase
+Sleepy Tyranitar | Tyranitar V | Battle Styles | 155/163 | common descriptive nickname for the alternate art showing Tyranitar asleep
+Sunbreon | Espeon VMAX | Fusion Strike | 270/264 | common counterpart-style nickname to Moonbreon
+Tina | Giratina V | Lost Origin | 186/196 | common collector shorthand for the Giratina V alternate-art chase; "Lost Tina" more often means the deck archetype
+Van Gogh Pikachu | Pikachu with Grey Felt Hat | SV Black Star Promo | 085 | ubiquitous nickname for the Van Gogh Museum collaboration promo
+Munch Pikachu / Scream Pikachu | Pikachu | SM-P Promo | 288/SM-P | 2018 Munch exhibition promo
+Munch Psyduck / Scream Psyduck | Psyduck | SM-P Promo | 286/SM-P | 2018 Munch exhibition promo
+Munch Eevee / Scream Eevee | Eevee | SM-P Promo | 287/SM-P | 2018 Munch exhibition promo
+Munch Mimikyu / Scream Mimikyu | Mimikyu | SM-P Promo | 289/SM-P | 2018 Munch exhibition promo
+Munch Rowlet / Scream Rowlet | Rowlet | SM-P Promo | 290/SM-P | 2018 Munch exhibition promo
+Poncho Pikachu | Pikachu promo family | XY-P / SM-P | various | family nickname, not one card; includes Mega Charizard X/Y and Rayquaza/Shiny Rayquaza poncho promos
+Red Cheeks Pikachu | Pikachu | Base Set | 58/102 variant | common name for the red-cheek artwork variant
+Yellow Cheeks Pikachu | Pikachu | Base Set | 58/102 variant | common name for the yellow-cheek artwork variant
+PikaRom / Pikarom | Pikachu & Zekrom-GX | Team Up | various prints | competitive/collector portmanteau; also used for the deck
+ReshiZard / Reshizard | Reshiram & Charizard-GX | Unbroken Bonds | various prints | very common competitive/collector portmanteau
+MewMew | Mewtwo & Mew-GX | Unified Minds | 71/236 and variants | common competitive shorthand
+ADP | Arceus & Dialga & Palkia-GX | Cosmic Eclipse | 156/236 and variants | extremely established shorthand; ADPZ/ZADP means ADP + Zacian deck
+GardEon / Gardeon | Gardevoir & Sylveon-GX | Unbroken Bonds | various prints | common competitive shorthand/portmanteau
+Heart Latias & Latios / Lati@s heart card | Latias & Latios-GX | Team Up | 170/181 | common descriptive collector alias; less standardized than Moonbreon/Mewtube
+
+======================================================================
+7) HIGH-RISK ALIAS COLLISIONS FOR SEARCH
+======================================================================
+BS | Base Set; informally can also mean Battle Styles, Brilliant Stars, or Burning Shadows
+SV | Supreme Victors official code; also universal shorthand for Scarlet & Violet
+SS | EX Sandstorm official code; also an informal shorthand for several S-starting sets
+AR | Arceus official code; also commonly typed for Astral Radiance
+DR | EX Dragon official code; can be typed for Destined Rivals or Delta Reign
+TM | Triumphant official code; can also mean Twilight Masquerade
+PF | informal shorthand can mean Paldean Fates or Phantasmal Flames
+PE | informal shorthand can mean Paldea Evolved or Prismatic Evolutions
+CR | informal shorthand can mean Chilling Reign or Chaos Rising
+SSP | Surging Sparks expansion code; also SWSH promo-series notation in some databases
+EX | Expedition Base Set official abbreviation; also the name of the 2003–2007 EX era/mechanic
+
+Recommended Pokoin search model:
+1. Exact canonical code + market + era is strongest.
+2. Full expansion name is next.
+3. Common aliases are non-unique search synonyms.
+4. Card nicknames should resolve to an exact card/set/number where possible.
+5. Never use a 2-letter collector alias as a database primary key.
+
+======================================================================
+8) SOURCES CHECKED
+======================================================================
+English expansion list/codes:
+https://bulbapedia.bulbagarden.net/wiki/List_of_Pok%C3%A9mon_Trading_Card_Game_expansions
+
+Japanese expansion list:
+https://bulbapedia.bulbagarden.net/wiki/List_of_Japanese_TCG_Expansions
+
+Mainland China overview / Simplified Chinese releases:
+https://bulbapedia.bulbagarden.net/wiki/Pok%C3%A9mon_in_mainland_China
+https://www.tcgcollector.com/sets/cn
+
+Official current/future Mega Evolution announcements:
+https://www.pokemon.com/us/news/get-ready-for-pokemon-tcg-30th-celebration
+https://www.pokemon.com/us/news/the-pokemon-tcg-mega-evolution-delta-reign-expansion-arrives-november-6-2026
+
+Useful nickname/reference sites checked during research:
+https://www.tcgplayer.com/
+https://www.pokebeach.com/
+https://www.serebii.net/
+https://bulbapedia.bulbagarden.net/wiki/Pikachu_(Base_Set_58)
+https://bulbapedia.bulbagarden.net/wiki/Arceus_%26_Dialga_%26_Palkia-GX_(Cosmic_Eclipse_156)
+
+NOTES ON COMPLETENESS
+- The English expansion section is intended as a complete Western expansion-code list through
+  the announced 2026 Mega Evolution products known on 2026-09-12.
+- 30th Celebration and Delta Reign are current/future products. Their pre-release codes are
+  included but should be rechecked against final English packaging/database listings at release.
+- Japanese and Simplified Chinese sections emphasize modern printed codes because those are the
+  most useful aliases for search and catalog matching.
+- Individual-card nicknames are inherently informal. There is no official finite master list;
+  this section contains established/high-value names found repeatedly in collector usage.
+
+END OF FILE

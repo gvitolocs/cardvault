@@ -35,17 +35,19 @@ PokemonCard _card({
 }
 
 void main() {
-  test('scan JSON does not treat TCGplayer id as a CardTrader blueprint', () {
+  test('Milo hit id is leftover ct_id and doubles to the public desk', () {
     final hit = CardScanHit.fromJson({
-      'id': '888001',
-      'name': 'Espurr',
-      'collector_number': '58/122',
-      'set': 'BREAKpoint',
-      'score': 0.53,
+      'id': '399354',
+      'ct_id': '399354',
+      'public_id': '798708',
+      'name': 'Mega Delphox ex',
+      'collector_number': '008/084',
+      'set': 'Pitch Black',
+      'score': 0.91,
     });
 
-    expect(hit.tcgplayerId, '888001');
-    expect(hit.cardtraderBlueprintId, isEmpty);
+    expect(hit.cardtraderBlueprintId, '399354');
+    expect(hit.tcgplayerId, isEmpty);
     expect(
       scanHitMarketplacePath(
         name: hit.name,
@@ -53,7 +55,29 @@ void main() {
         setName: hit.setName,
         cardtraderBlueprintId: hit.cardtraderBlueprintId,
       ),
-      '/marketplace/search?q=Espurr+58', // Fast-only fallback when no catalog row
+      '/marketplace/en/cards/798708/card-mega-delphox-ex-008-084-pitch-black',
+    );
+  });
+
+  test('id-only Milo payload is still leftover ct_id, not a TCGplayer product', () {
+    final hit = CardScanHit.fromJson({
+      'id': '110481',
+      'name': 'Espurr',
+      'collector_number': '58/122',
+      'set': 'BREAKpoint',
+      'score': 0.53,
+    });
+
+    expect(hit.cardtraderBlueprintId, '110481');
+    expect(hit.tcgplayerId, isEmpty);
+    expect(
+      scanHitMarketplacePath(
+        name: hit.name,
+        collectorNumber: hit.collectorNumber,
+        setName: hit.setName,
+        cardtraderBlueprintId: hit.cardtraderBlueprintId,
+      ),
+      '/marketplace/en/cards/220962/card-espurr-58-122-breakpoint',
     );
   });
 
@@ -70,7 +94,7 @@ void main() {
     );
   });
 
-  test('matched marketplace card wins over TCGplayer product id', () {
+  test('matched marketplace card wins over leftover scan id', () {
     final matched = _card();
     expect(
       scanHitMarketplacePath(

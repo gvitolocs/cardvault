@@ -1371,7 +1371,7 @@ narrowing for typed previews.
     be able to return the full background pool requested by Flutter, not only
     the visible row count.
   - Hydrates visible preview rows with `expansion_symbol_url` from Oracle
-    `cardtrader_pokemon_expansions.symbol_image_url` when available. Keep
+    `pokoin_pokemon_expansions.symbol_image_url` when available. Keep
     `./_supabase` lazy/optional so Oracle autocomplete and logo hydration do not
     fail if the Supabase REST fallback is unavailable or not bundled.
   - Keep `api/marketplace-autocomplete.test.js` updated for typo ranking,
@@ -1412,7 +1412,7 @@ narrowing for typed previews.
     port database writes to Oracle before running again.
 - `scripts/import-ptcg-expansion-symbols.js`
   - Legacy Supabase-era expansion symbol importer. Port writes to Oracle
-    `cardtrader_pokemon_expansions` before running again.
+    `pokoin_pokemon_expansions` before running again.
 
 ## Required Env
 
@@ -1452,7 +1452,7 @@ expansions/symbols/<cardtrader-expansion-name>.png
 ```
 
 After porting, the importer should upsert Oracle
-`public.cardtrader_pokemon_expansions`, storing the CardTrader expansion id,
+`public.pokoin_pokemon_expansions`, storing the CardTrader expansion id,
 CardTrader code/name, matched source asset code, CDN URL, and R2 object key.
 
 Run from the project root:
@@ -1473,7 +1473,7 @@ uploads one source logo per expansion to R2 as:
 expansions/logos/<cardtrader-expansion-name>.<source-extension>
 ```
 
-Then it updates `public.cardtrader_pokemon_expansions.logo_image_url`,
+Then it updates `public.pokoin_pokemon_expansions.logo_image_url`,
 `logo_object_key`, and `logo_imported_at` beside the existing `symbol_*`
 fields. Run a small dry run first, then apply all missing logos:
 
@@ -1933,7 +1933,7 @@ API health.
   the row has one. Logos are Oracle/R2-backed: the Flutter badge already
   prefers `expansionSymbolUrl`; keep `/api/marketplace-autocomplete` hydrating
   `expansion_symbol_url` from Oracle
-  `cardtrader_pokemon_expansions.symbol_image_url` before falling back to text
+  `pokoin_pokemon_expansions.symbol_image_url` before falling back to text
   set codes such as `PE`, `SBS`, or `PF`. Supabase is only an optional
   name-index fallback and must not be required for Oracle autocomplete rows or
   logo hydration.

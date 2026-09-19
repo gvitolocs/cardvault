@@ -125,7 +125,7 @@ async function listExpansionSymbols({
         min(expansions.logo_object_key) as logo_object_key,
         count(*)::integer as card_count
       from public.marketplace_card_versions versions
-      left join public.cardtrader_pokemon_expansions expansions
+      left join public.pokoin_pokemon_expansions expansions
         on expansions.name = versions.expansion_name
       ${where}
       group by versions.expansion_name
@@ -193,7 +193,7 @@ async function updateExpansionSymbol({
   const idResult = await marketplaceQuery(
     `
       select expansion_id
-      from public.cardtrader_pokemon_expansions
+      from public.pokoin_pokemon_expansions
       where name = $1
       limit 1
     `,
@@ -208,7 +208,7 @@ async function updateExpansionSymbol({
   const logoObjectKey = objectKeyFromCdnUrl(logoUrl, 'expansions/logos');
   const result = await marketplaceQuery(
     `
-      insert into public.cardtrader_pokemon_expansions (
+      insert into public.pokoin_pokemon_expansions (
         expansion_id,
         game_id,
         name,

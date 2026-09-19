@@ -1,0 +1,21 @@
+[Unit]
+Description=Meilisearch (Pokoin marketplace / peer2)
+After=network.target
+
+[Service]
+Type=simple
+User=meili
+Group=meili
+WorkingDirectory=/opt/meilisearch
+EnvironmentFile=/etc/pokemon-card-vault/meili.env
+ExecStart=/usr/local/bin/meilisearch --config-file-path /etc/pokemon-card-vault/meili.toml
+Restart=always
+RestartSec=3
+LimitNOFILE=65536
+MemoryMax=256M
+MemoryLow=80M
+MemorySwapMax=0
+OOMScoreAdjust=-400
+
+[Install]
+WantedBy=multi-user.target

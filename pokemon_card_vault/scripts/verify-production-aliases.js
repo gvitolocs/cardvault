@@ -26,10 +26,12 @@ const PRODUCTION_ALIASES = [
 const FULL_ROUTE_ALIASES = new Set([
   'pokoin.com',
   'www.pokoin.com',
-  'explorer.pokoin.com',
 ]);
 
 const ALIAS_LANDING_CHECKS = {
+  'explorer.pokoin.com': [
+    { path: '/', label: 'explorer Caddy landing', expect: 'ok' },
+  ],
   'wallet.pokoin.com': [
     { path: '/', label: 'wallet alias landing', expect: 'ok' },
     { path: '/wallet', label: 'wallet canonical route', expect: 'ok' },

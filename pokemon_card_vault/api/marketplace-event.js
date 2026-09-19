@@ -1,4 +1,5 @@
 const marketplaceDb = require('./_marketplace_db');
+const { recordMarketplaceImage } = require('./_marketplace_image_log');
 const { verifyBearerToken } = require('./_firebase');
 
 const WEIGHTS = {
@@ -25,9 +26,10 @@ const ALLOWED_METADATA_KEYS = new Set([
   'productType',
   'trainerName',
   'tags',
+  'imageUrl',
+  'homepageImageUrl',
+  'ctId',
 ]);
-
-const HOT_REFRESH_INTERVAL = "2 minutes";
 
 async function optionalUserUid(req) {
   const header = req.headers.authorization || '';
@@ -91,6 +93,15 @@ module.exports = async function handler(req, res) {
 
   try {
     const userUid = await optionalUserUid(req);
+    recordMarketplaceImage({
+      source: 'marketplace-event',
+      status: 'navigate',
+      cardId,
+      ctId: metadata.ctId,
+      name: metadata.name,
+      route: metadata.source,
+      url: metadata.imageUrl || metadata.homepageImageUrl || '',
+    });
     const values = [
       cardId,
       eventType,
@@ -101,7 +112,18 @@ module.exports = async function handler(req, res) {
       await marketplaceDb.marketplaceQuery(
         `
           insert into public.marketplace_card_events (card_id, event_type, weight, metadata, user_uid)
-          values ($1, $2, $3, $4::jsonb, $5)
+          select resolved.card_id, $2, $3, $4::jsonb, $5
+          from (
+            select coalesce(
+              (
+                select c.card_id
+                from public.marketplace_cards c
+                where c.card_id = $1::bigint or c.ct_id = $1::bigint
+                limit 1
+              ),
+              $1::bigint
+            ) as card_id
+          ) resolved
         `,
         [...values, userUid],
       );
@@ -112,7 +134,18 @@ module.exports = async function handler(req, res) {
       await marketplaceDb.marketplaceQuery(
         `
           insert into public.marketplace_card_events (card_id, event_type, weight, metadata)
-          values ($1, $2, $3, $4::jsonb)
+          select resolved.card_id, $2, $3, $4::jsonb
+          from (
+            select coalesce(
+              (
+                select c.card_id
+                from public.marketplace_cards c
+                where c.card_id = $1::bigint or c.ct_id = $1::bigint
+                limit 1
+              ),
+              $1::bigint
+            ) as card_id
+          ) resolved
         `,
         values,
       );
@@ -136,18 +169,6 @@ module.exports = async function handler(req, res) {
         }
       });
     }
-
-    await marketplaceDb.marketplaceQuery(
-      `
-        select case
-          when coalesce(max(refreshed_at), timestamp with time zone 'epoch') < now() - $1::interval
-          then public.refresh_marketplace_hot_blueprints()
-          else null
-        end as refreshed_count
-        from public.marketplace_hot_blueprints
-      `,
-      [HOT_REFRESH_INTERVAL],
-    );
 
     return res.status(204).end();
   } catch (error) {

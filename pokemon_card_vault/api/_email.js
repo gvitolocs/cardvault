@@ -69,7 +69,7 @@ async function sendVerificationEmail({ admin, email, username, verificationLink 
   const safeUsername = String(username || 'Pokoin user');
 
   return sendEmail({
-    from: emailFrom(),
+    from: noReplyEmailFrom(),
     to: email,
     subject: 'Verify your Pokoin account',
     text: [
