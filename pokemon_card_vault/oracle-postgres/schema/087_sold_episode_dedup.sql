@@ -35,6 +35,15 @@ set status = 'invalid',
     )
 where h.id in (select id from episodes where next_episode_day is not null);
 
+-- An invalidated episode's observation must not feed the once-sold count.
+delete from public.marketplace_price_observations o
+using public.cardtrader_market_listing_removed_history h
+where h.provider = 'cardtrader'
+  and h.status = 'invalid'
+  and h.archive_metadata->>'reclassifiedBecause' = 'earlier_episode_reappeared_d000070'
+  and o.source = 'cardtrader_removed_sale'
+  and o.source_item_id = h.provider || ':' || h.external_listing_id || ':' || h.removed_day::text || ':' || h.archive_reason;
+
 create or replace function public.refresh_cardtrader_sold_daily(
   target_day date default null
 )
