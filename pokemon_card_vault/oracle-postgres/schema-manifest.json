@@ -63,7 +63,8 @@
     "059_sanitize_sep12_complete_book_cutover.sql",
     "060_cardtrader_category_kind.sql",
     "061_sanitize_cheap25_inferred_sales.sql",
-    "062_catalog_languages.sql"
+    "062_catalog_languages.sql",
+    "088_seller_stack_continuity.sql"
   ],
   "allowedDuplicatePrefixes": {
     "003": "Historical split between CardTrader listing cache and marketplace search RPC work; preserve apply order until renumbered in a planned migration cleanup.",

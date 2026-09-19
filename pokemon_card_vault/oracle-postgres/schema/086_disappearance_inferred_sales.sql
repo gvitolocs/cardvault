@@ -776,6 +776,21 @@ begin
   from cardtrader_market_listing_refresh_scope scope
   into v_cache_scope_blueprint_ids;
 
+  -- A complete, valid refresh can prove continuity for the previous
+  -- observation. Partial or sanity-frozen books must not retract sales.
+  if v_can_archive
+     and not exists (
+       select 1
+       from cardtrader_refresh_sanity sanity
+       where sanity.suspicious
+     ) then
+    perform public.reconcile_cardtrader_seller_stack_continuity(
+      v_provider,
+      v_removed_day,
+      v_cache_scope_blueprint_ids
+    );
+  end if;
+
   -- Homepage cache is rebuilt once in finalize_cardtrader_daily_market_refresh.
   -- Per-expansion cache refresh is too expensive for 800+ expansions.
   if p_finalize and jsonb_array_length(coalesce(v_cache_scope_blueprint_ids, '[]'::jsonb)) > 0 then
