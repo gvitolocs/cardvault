@@ -631,6 +631,10 @@
       "destination": "/api/cardtrader-disconnect.js"
     },
     {
+      "source": "/api/cardtrader-webhook/:uid",
+      "destination": "/api/cardtrader-webhook.js?uid=:uid"
+    },
+    {
       "source": "/api/cardtrader-clean-listings",
       "destination": "/api/cardtrader-clean-listings.js"
     },

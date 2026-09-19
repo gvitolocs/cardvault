@@ -989,13 +989,20 @@ function createStore({
     submitKey,
     sellerName = 'Pokoin seller',
     intent: rawIntent,
+    targets: rawTargets,
   }) {
     const intent = rawIntent === 'collection' ? 'collection' : 'list';
+    const { normalizeTargets, pushAndLinkListing, pushListingToCardTrader } = require('./_cardtrader_seller_listings');
+    const targets = intent === 'collection'
+      ? { pokoin: true, cardtrader: false }
+      : normalizeTargets(rawTargets || { pokoin: true, cardtrader: false });
     const key = rules.cleanText(submitKey, 80);
 
     // Phase 1 (Postgres): validate + upsert listings as NON-PURCHASABLE
     // (`inactive`). Purchase paths require `status = 'active'`, so there is no
     // window where a scan listing is buyable before ownership + batch finalize.
+    // CardTrader-only skips Pokoin listing rows.
+    const writePokoinListings = intent === 'list' && targets.pokoin;
     const prepared = await withTx(pool, async (client) => {
       const batch = await lockBatch(client, sellerUid, batchId, { open: false });
       if (batch.status === 'submitted') return { already: true, batch };
@@ -1033,7 +1040,7 @@ function createStore({
       for (const row of rows) {
         let listingId = null;
         let listingStatus = null;
-        if (intent === 'list') {
+        if (writePokoinListings) {
           const inserted = await client.query(
             `insert into public.marketplace_user_listings (
                card_id, seller_uid, seller_name, condition, language, price_pkn, quantity_available, signed, reverse,
@@ -1156,7 +1163,7 @@ function createStore({
       if (batch.status === 'submitted') return { already: true, batch };
       if (batch.status !== 'open') throw httpError(409, 'This batch is closed.', { code: 'batch_closed' });
       for (const entry of prepared.created) {
-        if (intent === 'list' && entry.listingId) {
+        if (writePokoinListings && entry.listingId) {
           const activated = await client.query(
             `update public.marketplace_user_listings
                set status = 'active', updated_at = now()
@@ -1182,7 +1189,8 @@ function createStore({
       }
       const result = {
         intent,
-        listings: intent === 'list' ? prepared.created.length : 0,
+        targets,
+        listings: writePokoinListings ? prepared.created.length : 0,
         ownership: ownership.length,
         cards: prepared.created.reduce((sum, c) => sum + Number(c.quantity), 0),
         created: prepared.created.map((c) => ({
@@ -1209,17 +1217,92 @@ function createStore({
     });
 
     require('./_scan_bus').notifyBatch(batchId);
-    if (!out.already && intent === 'list') {
+    if (!out.already && writePokoinListings) {
       const cardIds = [...new Set(out.result.created.map((c) => c.cardId))];
       await onListingsCreated(cardIds).catch((error) => {
         console.error('scan submit price summary refresh skipped', { message: error.message });
       });
     }
+
+    let cardtrader = { ok: true, skipped: true, reason: 'not_requested' };
+    if (!out.already && intent === 'list' && targets.cardtrader) {
+      const { getFirebaseAdmin } = require('./_firebase');
+      const firestore = getFirebaseAdmin().firestore();
+      const productIds = [];
+      const errors = [];
+      for (const entry of prepared.created) {
+        const row = entry.row;
+        try {
+          if (entry.listingId) {
+            const pushed = await pushAndLinkListing({
+              firestore,
+              uid: sellerUid,
+              listing: {
+                id: entry.listingId,
+                cardId: row.card_id,
+                pricePkn: row.price_pkn,
+                quantityAvailable: row.quantity,
+                condition: row.condition,
+                language: row.language,
+                signed: row.signed,
+                reverse: row.foil_state === 'reverse',
+                firstEdition: row.first_edition,
+                foilState: row.foil_state,
+                graded: row.graded,
+                altered: row.altered,
+                sellerComment: row.seller_comment,
+              },
+            });
+            productIds.push(pushed.productId);
+          } else {
+            const pushed = await pushListingToCardTrader({
+              firestore,
+              uid: sellerUid,
+              listing: {
+                cardId: row.card_id,
+                pricePkn: row.price_pkn,
+                quantityAvailable: row.quantity,
+                condition: row.condition,
+                language: row.language,
+                signed: row.signed,
+                reverse: row.foil_state === 'reverse',
+                firstEdition: row.first_edition,
+                foilState: row.foil_state,
+                graded: row.graded,
+                altered: row.altered,
+                sellerComment: row.seller_comment,
+              },
+            });
+            productIds.push(pushed.productId);
+          }
+        } catch (error) {
+          errors.push({ itemId: entry.itemId, error: error.message || 'CardTrader create failed.' });
+        }
+      }
+      cardtrader = {
+        ok: errors.length === 0,
+        productIds,
+        errors: errors.length ? errors : undefined,
+      };
+      if (out.result && typeof out.result === 'object') {
+        out.result.cardtrader = cardtrader;
+        try {
+          await pool.query(
+            `update public.scan_batches set submit_result = $2, updated_at = now() where id = $1`,
+            [batchId, out.result],
+          );
+        } catch (error) {
+          console.error('scan submit cardtrader result persist skipped', { message: error.message });
+        }
+      }
+    }
+
     const batch = rules.batchView(out.batch);
     return {
       batch,
       result: out.already ? out.batch.submit_result : out.result,
       alreadySubmitted: out.already === true,
+      cardtrader,
     };
   }
 

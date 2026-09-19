@@ -57,6 +57,7 @@ module.exports = async function handler(req, res) {
           batchId: body.batchId,
           submitKey: body.submitKey,
           intent: body.intent,
+          targets: body.targets,
           sellerName: sellerNameOf(decoded),
         }));
       case 'discard':

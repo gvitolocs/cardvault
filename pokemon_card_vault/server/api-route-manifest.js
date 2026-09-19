@@ -141,6 +141,22 @@ const routeDefinitions = [
     },
   },
   {
+    path: '/api/cardtrader-webhook/:uid',
+    file: 'cardtrader-webhook.js',
+    methods: ['POST'],
+    purpose: 'Receive CardTrader order webhooks for a connected seller and decrement linked Pokoin inventory.',
+    auth: 'CardTrader Signature HMAC using the seller shared_secret.',
+    params: {
+      path: '`uid` Firebase seller uid registered as the webhook URL suffix.',
+      body: 'Raw CardTrader webhook JSON (order.create / order.update / order.destroy).',
+    },
+    dependencies: {
+      env: ['CARDTRADER_TOKEN_ENCRYPTION_KEY', 'FIREBASE_*', 'MARKETPLACE_DATABASE_URL', 'MARKETPLACE_WRITER_DATABASE_URL'],
+      services: ['Firebase Admin', 'Oracle/Postgres marketplace writer', 'CardTrader webhooks'],
+    },
+    rawBody: true,
+  },
+  {
     path: '/api/cardtrader-import-dry-run',
     file: 'cardtrader-import-dry-run.js',
     methods: ['POST'],

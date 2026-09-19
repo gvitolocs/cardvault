@@ -6,6 +6,7 @@ const {
   fetchCart,
   purchaseCart,
 } = require('./_cardtrader_client');
+const { decrementLinkedCardTraderProduct } = require('./_cardtrader_seller_listings');
 const {
   _test: {
     readLiveCardTraderListings,
@@ -526,7 +527,7 @@ async function verifyAndDecrementListings(items) {
             and seller_uid = $3
             and status = 'active'
             and quantity_available >= $2
-          returning card_id, source_listing_id, source, seller_uid
+          returning card_id, source_listing_id, source, seller_uid, quantity_available
         `,
         [item.listingId, item.quantity, item.sellerUid],
       );
@@ -543,6 +544,7 @@ async function verifyAndDecrementListings(items) {
         sellerUid: row.seller_uid || item.sellerUid,
         sourceListingId: cleanText(row.source_listing_id || item.sourceListingId, 160),
         source: cleanText(row.source || item.source, 80),
+        remainingQuantity: Number(row.quantity_available) || 0,
       });
     }
   } catch (error) {
@@ -574,6 +576,28 @@ async function verifyAndDecrementListings(items) {
     });
   }
   return decremented;
+}
+
+async function syncCardTraderAfterPokoinSale({ admin, firestore, decremented = [] }) {
+  const results = [];
+  for (const entry of decremented) {
+    if (!entry || entry.external || !entry.sourceListingId) {
+      results.push({ skipped: true, reason: 'not_linked' });
+      continue;
+    }
+    const result = await decrementLinkedCardTraderProduct({
+      firestore,
+      uid: entry.sellerUid,
+      sourceListingId: entry.sourceListingId,
+      quantity: entry.quantity,
+      remainingQuantity: entry.remainingQuantity,
+    }).catch((error) => ({ ok: false, error: error.message }));
+    results.push({ listingId: entry.listingId, ...result });
+  }
+  return {
+    ok: results.every((row) => row.ok !== false || row.skipped),
+    items: results,
+  };
 }
 
 async function syncSellerOwnershipAfterPhysicalSale({ admin, firestore, decremented = [] }) {
@@ -748,6 +772,7 @@ async function createPaidOrder({ admin, firestore, decoded, body }) {
   // Physical sale: seller no longer owns the sold quantity. NFT-only checkout
   // keeps NFT custody semantics unchanged (buyer collection write above).
   let sellerOwnership = { ok: true, skipped: true, reason: 'nft_only' };
+  let cardTraderSync = { ok: true, skipped: true, reason: 'nft_only' };
   if (fulfillmentMode !== 'nft_only') {
     sellerOwnership = await syncSellerOwnershipAfterPhysicalSale({
       admin,
@@ -756,6 +781,14 @@ async function createPaidOrder({ admin, firestore, decoded, body }) {
     }).catch((error) => {
       console.error('seller collection ownership decrement failed', error);
       return { ok: false, error: error.message || 'ownership decrement failed' };
+    });
+    cardTraderSync = await syncCardTraderAfterPokoinSale({
+      admin,
+      firestore,
+      decremented,
+    }).catch((error) => {
+      console.error('linked CardTrader decrement failed', error);
+      return { ok: false, error: error.message || 'cardtrader decrement failed' };
     });
   }
 

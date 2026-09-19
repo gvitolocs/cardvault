@@ -85,9 +85,20 @@ async function decryptIntegrationToken(firestore, uid) {
   return decryptSecret(doc.data().encryptedToken);
 }
 
+async function decryptIntegrationSharedSecret(firestore, uid) {
+  const doc = await readIntegrationDoc(firestore, uid);
+  if (!doc.exists || doc.data()?.enabled !== true || !doc.data()?.encryptedSharedSecret) {
+    const error = new Error('CardTrader webhook secret is not available for this seller.');
+    error.statusCode = 404;
+    throw error;
+  }
+  return decryptSecret(doc.data().encryptedSharedSecret);
+}
+
 module.exports = {
   COLLECTION,
   PROVIDER,
+  decryptIntegrationSharedSecret,
   decryptIntegrationToken,
   disconnectIntegration,
   integrationDocId,

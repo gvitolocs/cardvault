@@ -8,6 +8,12 @@ const {
     PKNRESERVE_SELLER_USERNAME,
   },
 } = require('./cardtrader-live-listings');
+const {
+  destroyLinkedCardTraderProduct,
+  normalizeTargets,
+  pushAndLinkListing,
+  pushListingToCardTrader,
+} = require('./_cardtrader_seller_listings');
 
 function cleanLimit(value, fallback = 500) {
   if (value === undefined || value === null || value === '') return fallback;
@@ -618,6 +624,7 @@ function isReserveListingRow(row = {}) {
 
 async function createListing(req, decoded) {
   const body = req.body || {};
+  const targets = normalizeTargets(body.targets || {});
   const pricePkn = Number(body.pricePkn);
   const quantityAvailable = Number(body.quantityAvailable);
   const reserveListing = isReserveListingBody(body);
@@ -640,6 +647,38 @@ async function createListing(req, decoded) {
   if (reserveListing) {
     await requireReserveAccess(decoded);
   }
+
+  let cardtrader = { ok: true, skipped: true, reason: 'not_requested' };
+
+  // CardTrader-only: push to CT without a Pokoin sellable row.
+  if (!targets.pokoin && targets.cardtrader) {
+    const firestore = getFirebaseAdmin().firestore();
+    try {
+      const pushed = await pushListingToCardTrader({
+        firestore,
+        uid: decoded.uid,
+        listing: {
+          cardId: cleanText(body.cardId, 80),
+          pricePkn,
+          quantityAvailable,
+          condition: cleanText(body.condition, 20) || 'NM',
+          language: cleanText(body.language, 10) || 'EN',
+          signed: body.signed === true,
+          reverse: body.reverse === true,
+          firstEdition: body.firstEdition === true,
+          foilState: cleanText(body.foilState, 40) || (body.reverse === true ? 'reverse' : 'standard'),
+          graded: body.graded === true,
+          altered: body.altered === true,
+          sellerComment: cleanText(body.sellerComment, 500),
+        },
+      });
+      cardtrader = { ok: true, productId: pushed.productId, sourceListingId: pushed.sourceListingId };
+    } catch (error) {
+      cardtrader = { ok: false, error: error.message || 'CardTrader create failed.' };
+    }
+    return { listing: null, cardtrader, targets };
+  }
+
   await verifyOwnedNftForListing({
     uid: decoded.uid,
     body,
@@ -705,9 +744,39 @@ async function createListing(req, decoded) {
     values,
   );
   const [row] = await enrichListingRowsWithSellerProfiles(result.rows);
-  const listing = listingRow(row || result.rows[0], { owner: true });
+  let listing = listingRow(row || result.rows[0], { owner: true });
   await refreshPriceSummary(listing.cardId);
-  return listing;
+
+  if (targets.cardtrader) {
+    const firestore = getFirebaseAdmin().firestore();
+    try {
+      const pushed = await pushAndLinkListing({
+        firestore,
+        uid: decoded.uid,
+        listing: {
+          id: listing.id,
+          cardId: listing.cardId,
+          pricePkn: listing.pricePkn,
+          quantityAvailable: listing.quantityAvailable,
+          condition: listing.condition,
+          language: listing.language,
+          signed: listing.signed,
+          reverse: listing.reverse,
+          firstEdition: listing.firstEdition,
+          foilState: listing.foilState,
+          graded: listing.graded,
+          altered: listing.altered,
+          sellerComment: listing.sellerComment,
+        },
+      });
+      cardtrader = { ok: true, productId: pushed.productId, sourceListingId: pushed.sourceListingId };
+      listing = { ...listing, sourceListingId: pushed.sourceListingId };
+    } catch (error) {
+      cardtrader = { ok: false, error: error.message || 'CardTrader create failed.' };
+    }
+  }
+
+  return { ...listing, cardtrader, targets };
 }
 
 async function updateListing(req, decoded, id) {
@@ -798,6 +867,26 @@ async function updateListing(req, decoded, id) {
   const [row] = await enrichListingRowsWithSellerProfiles(result.rows);
   const listing = listingRow(row || result.rows[0], { owner: true });
   await refreshPriceSummary(listing.cardId);
+
+  const becameInactive = status === 'inactive' || status === 'sold_out'
+    || (quantityValue !== undefined && Number(quantityValue) === 0);
+  if (becameInactive && existingListing.source_listing_id) {
+    try {
+      const firestore = getFirebaseAdmin().firestore();
+      await destroyLinkedCardTraderProduct({
+        firestore,
+        uid: decoded.uid,
+        sourceListingId: existingListing.source_listing_id,
+        quantity: Number(existingListing.quantity_available) || 0,
+      });
+    } catch (error) {
+      console.error('linked CardTrader destroy on cancel failed', {
+        listingId: id,
+        message: error.message,
+      });
+    }
+  }
+
   return listing;
 }
 
@@ -863,8 +952,13 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ listing });
     }
     if (req.method === 'POST') {
-      const listing = await createListing(req, decoded);
-      return res.status(200).json(listing);
+      const created = await createListing(req, decoded);
+      // Back-compat: desk clients that expect a bare listing still get listing fields
+      // at the top level when a Pokoin row was created.
+      if (created && created.listing === null) {
+        return res.status(200).json(created);
+      }
+      return res.status(200).json(created);
     }
     if (req.method === 'PATCH' && id) {
       const listing = await updateListing(req, decoded, id);

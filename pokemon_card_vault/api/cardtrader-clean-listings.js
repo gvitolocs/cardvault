@@ -8,6 +8,7 @@ function linkedListingPredicate() {
       or lower(coalesce(source, '')) like 'cardtrader%'
       or lower(coalesce(source_listing_id, '')) like '%cardtrader%'
       or lower(coalesce(source_listing_id, '')) like '%cardtrader.com%'
+      or lower(coalesce(source_listing_id, '')) like 'ct:%'
     )
   `;
 }
