@@ -1,22 +1,33 @@
 # Oracle Marketplace Postgres
 
 This directory contains the repeatable schema and migration tooling for the
-Oracle-backed marketplace/catalog/search database. Oracle Postgres is the source
-of truth for marketplace projections; Supabase is retained for forum tables only.
+marketplace/catalog/search database. **Live writes are nezopt 15T Postgres.**
+Oracle runs Docker **`cardtrader-oracle-api`** (CardTrader GET + full
+`oracle-api-server`). The Raspberry Pi (`pi-home`, Docker
+`pokoin-marketplace-postgres-replica`) is a streaming **replica** that the
+public API reads at `127.0.0.1:5432`. Map: pokoin-web
+`docs/CARDTRADER_ORACLE_API.md`. Forum PostgREST is a separate leftover
+and is not used for cards, home, or sets.
 
 ## Environment
 
 Set these locally or in Vercel/CI before running migration commands:
 
 ```bash
-export SUPABASE_DB_URL='postgresql://...'
-export MARKETPLACE_DATABASE_URL='postgresql://pokoin_marketplace:...@peer4-host:5432/pokoin_marketplace'
+export MARKETPLACE_DATABASE_URL='postgresql://pokoin_marketplace:...@127.0.0.1:5432/pokoin_marketplace?sslmode=require'
 export MARKETPLACE_DATABASE_SSL_VERIFY=0
 ```
 
-`SUPABASE_DB_URL` is only used by the copy step. `MARKETPLACE_DATABASE_URL` is
-used by migration, verification, listing storage, and the Vercel marketplace
-APIs. The migration script also auto-loads `.env.local`, so local commands can
+`MARKETPLACE_DATABASE_URL` is used by migration, verification, listing storage,
+and local importers. Write host is **nezopt 15T** (`127.0.0.1:25432` on
+nezopt; Oracle dump/API use tunnel `:15543`). The Pi LAN
+`192.168.178.46:5432` is the API replica — do not migrate or dump-write
+there. Do not use `92.5.23.133` or `141.147.62.244` — those Always Free peers
+and their disks are gone (2026-08-10). CPU-heavy image jobs should run on
+nezopt, not inside `cardtrader-oracle-api`. Public `api.pokoin.com` is the Pi,
+not this Oracle Docker API.
+
+The migration script also auto-loads `.env.local`, so local commands can
 usually run without manual exports.
 
 ## Commands
@@ -35,7 +46,7 @@ Or run the complete flow:
 node scripts/oracle-marketplace-migrate.js all
 ```
 
-Forum tables remain in Supabase and are intentionally not included here.
+Forum tables (still PostgREST) are intentionally not included here.
 
 `oracle-postgres/schema-manifest.json` is the tracked apply-order manifest for
 `oracle-postgres/schema/*.sql`. Add every new schema file there and run
@@ -71,7 +82,7 @@ The full operating runbook is in
 ## Runtime Tables
 
 - `public.cardtrader_pokemon_blueprints`: imported CardTrader blueprint source rows.
-- `public.cardtrader_pokemon_expansions`: expansion metadata, aliases, and symbols.
+- `public.pokoin_pokemon_expansions`: expansion metadata, aliases, and symbols.
 - `public.marketplace_cardtrader_import_jobs`: Oracle VM CardTrader import job queue/status rows.
 - `public.cardtrader_market_listing_snapshots`: current global CardTrader marketplace product rows from `GET /marketplace/products`.
 - `cheapest_homepage_cache_blueprint`: canonical design concept for the analytics/Postgres cheapest eligible Zero + 1-Day Ready price projection by blueprint, with EUR/PKN price; currently may be backed by legacy physical table `public.cardtrader_blueprint_listing_cache` until a migration renames it.

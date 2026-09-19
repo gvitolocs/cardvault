@@ -403,7 +403,7 @@ as $$
         end
       )::numeric as token_score
     from query_tokens qt
-    join public.cardtrader_pokemon_expansions e
+    join public.pokoin_pokemon_expansions e
       on e.normalized_name = qt.token
       or e.compact_name = public.marketplace_search_compact(qt.token)
       or (length(qt.token) >= 2 and e.normalized_name like qt.token || '%')
@@ -1095,7 +1095,7 @@ as $$
         end
       )::numeric as token_score
     from query_tokens qt
-    join public.cardtrader_pokemon_expansions e
+    join public.pokoin_pokemon_expansions e
       on e.normalized_name = qt.token
       or e.compact_name = public.marketplace_search_compact(qt.token)
       or (length(qt.token) >= 2 and e.normalized_name like qt.token || '%')

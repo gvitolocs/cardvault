@@ -974,7 +974,11 @@ begin
     public.marketplace_price_pkn_from_cardtrader(snapshot.price, snapshot.price_cents, snapshot.currency),
     snapshot.quantity,
     coalesce(nullif(snapshot.condition, ''), 'NM'),
-    coalesce(nullif(snapshot.language, ''), 'EN'),
+      public.cardtrader_listing_language_for_blueprint(
+        snapshot.language,
+        coalesce(snapshot.properties, '{}'::jsonb),
+        coalesce(snapshot.blueprint_id, snapshot.cardtrader_blueprint_id)
+      ),
     false,
     false,
     case when lower(coalesce(snapshot.properties->>'foil_state', snapshot.properties->>'foilState', '')) = 'reverse' then 'reverse' else 'standard' end,
@@ -1041,7 +1045,11 @@ begin
     public.marketplace_price_pkn_from_cardtrader(history.price, history.price_cents, history.currency),
     history.quantity,
     coalesce(nullif(history.condition, ''), 'NM'),
-    coalesce(nullif(history.language, ''), 'EN'),
+    public.cardtrader_listing_language_for_blueprint(
+      history.language,
+      coalesce(history.properties, '{}'::jsonb),
+      coalesce(history.blueprint_id, history.cardtrader_blueprint_id)
+    ),
     false,
     false,
     case when lower(coalesce(history.properties->>'foil_state', history.properties->>'foilState', '')) = 'reverse' then 'reverse' else 'standard' end,

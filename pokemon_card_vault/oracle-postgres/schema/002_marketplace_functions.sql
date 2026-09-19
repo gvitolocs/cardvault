@@ -30,12 +30,25 @@ as $$
   ) tokens;
 $$;
 
-create or replace function public.marketplace_url_slug_part(value text)
-returns text
+create or replace function public.pokoin_public_number(cardtrader_id bigint)
+returns bigint
 language sql
 immutable
 as $$
-  select trim(both '-' from regexp_replace(replace(lower(coalesce(value, '')), 'é', 'e'), '[^a-z0-9]+', '-', 'g'));
+  select cardtrader_id * 2;
+$$;
+
+create or replace function public.marketplace_url_slug_part(value text)
+returns text
+language sql
+stable
+as $$
+  select trim(both '-' from regexp_replace(
+    lower(public.unaccent(coalesce(value, ''))),
+    '[^a-z0-9]+',
+    '-',
+    'g'
+  ));
 $$;
 
 create or replace function public.marketplace_edit_distance(left_text text, right_text text)
@@ -184,7 +197,7 @@ begin
         raw.priority
       from (
         select name as alias, name as expansion_name, 'expansion_name'::text as source, 300 as priority
-        from public.cardtrader_pokemon_expansions
+        from public.pokoin_pokemon_expansions
         where name <> ''
         union all
         select localized_name as alias, expansion_name, source || '_localized_expansion', 45 as priority
@@ -193,7 +206,7 @@ begin
           and coalesce(expansion_name, '') <> ''
         union all
         select code as alias, name as expansion_name, 'cardtrader_code'::text as source, 160 as priority
-        from public.cardtrader_pokemon_expansions
+        from public.pokoin_pokemon_expansions
         where coalesce(code, '') <> ''
         union all
         select cardmarket_set_code as alias, expansion_name, 'cardmarket_set_code'::text as source, 140 as priority
@@ -313,7 +326,7 @@ as $$
     select
       *,
       nullif(trim(version_text), '') is not null as has_version,
-      number ~ '^[0-9]{1,4}[a-z]?/[0-9]{1,4}' as has_collector_number,
+      number ~ '[0-9]{1,4}[a-z]?/[0-9]{1,4}' as has_collector_number,
       number = id_text or number ~ '^[0-9]{5,}$' as looks_like_blueprint_number,
       expansion ~ 'world championship decks|world championships .* deck' as is_championship_set
     from normalized
@@ -321,9 +334,9 @@ as $$
   select case
     when has_collector_number
     then 'card'
-    when name ~ '(^|[^a-z0-9])(coin|sleeves|sleeve|playmat|binder|portfolio|divider|dividers|accessory|bag|shoulder bag)([^a-z0-9]|$)'
-      or category ~ '(^|[^a-z0-9])(coin|sleeves|sleeve|playmat|binder|portfolio|divider|dividers|accessory|bag|shoulder bag)([^a-z0-9]|$)'
-      or type ~ '(^|[^a-z0-9])(coin|sleeves|sleeve|playmat|binder|portfolio|divider|dividers|accessory|bag|shoulder bag)([^a-z0-9]|$)'
+    when name ~ '(^|[^a-z0-9])(coin|sleeves|sleeve|playmat|binder|portfolio|divider|dividers|accessory|bag|shoulder bag|backpack)([^a-z0-9]|$)'
+      or category ~ '(^|[^a-z0-9])(coin|sleeves|sleeve|playmat|binder|portfolio|divider|dividers|accessory|bag|shoulder bag|backpack)([^a-z0-9]|$)'
+      or type ~ '(^|[^a-z0-9])(coin|sleeves|sleeve|playmat|binder|portfolio|divider|dividers|accessory|bag|shoulder bag|backpack)([^a-z0-9]|$)'
     then 'accessory'
     when name ~ '(^|[^a-z0-9])(booster box|display box|sealed box)([^a-z0-9]|$)'
       or category ~ '(^|[^a-z0-9])(booster box|display box|sealed box)([^a-z0-9]|$)'
@@ -1268,6 +1281,12 @@ begin
     left(public.marketplace_search_compact(c.name), 3),
     left(public.marketplace_search_compact(c.set_name), 3),
     public.marketplace_search_normalize(c.set_name),
+    -- Catalog "interestingness" (about 0–40), not typeahead name-intent.
+    -- Additive under SQL token/name scores (hundreds–thousands). Home fallback
+    -- and Meili's last ranking rule still use it. GX/product bonuses will bury
+    -- Mimikyu under Mimikyu GX on a prefix; pokoin-web suggest reorders groups
+    -- in api/_meili_suggest.js. Do not drop this column. See
+    -- docs/marketplace-search-ranking.md.
     (
       case when c.item_kind = 'product' then 12 else 0 end +
       case when c.rarity ilike '%rare%' then 8 else 0 end +
@@ -1523,8 +1542,9 @@ begin
     source_text = excluded.source_text,
     updated_at = now();
 
-  insert into public.cardtrader_pokemon_expansions (
-    expansion_id, game_id, code, name, normalized_name, compact_name, name_tokens, updated_at
+  insert into public.pokoin_pokemon_expansions (
+    expansion_id, game_id, code, name, normalized_name, compact_name, name_tokens,
+    nationality, milo_gallery, updated_at
   )
   select
     max(b.expansion_id),
@@ -1534,20 +1554,27 @@ begin
     public.marketplace_search_normalize(source.set_name),
     public.marketplace_search_compact(source.set_name),
     public.marketplace_search_tokenize(source.set_name),
+    public.pokoin_expansion_nationality(max(nullif(b.expansion->>'code', '')), source.set_name),
+    public.pokoin_expansion_milo_gallery(
+      public.pokoin_expansion_nationality(max(nullif(b.expansion->>'code', '')), source.set_name)
+    ),
     now()
   from (select distinct set_name from public.marketplace_search_candidates where set_name <> '') source
-  left join public.cardtrader_pokemon_blueprints b
+  left join public.pokoin_pokemon_blueprints b
     on public.marketplace_search_normalize(coalesce(b.expansion->>'name', b.blueprint->>'expansion_name', '')) = public.marketplace_search_normalize(source.set_name)
   group by source.set_name
   on conflict (normalized_name) do update set
-    expansion_id = coalesce(public.cardtrader_pokemon_expansions.expansion_id, excluded.expansion_id),
-    code = coalesce(public.cardtrader_pokemon_expansions.code, excluded.code),
+    expansion_id = coalesce(public.pokoin_pokemon_expansions.expansion_id, excluded.expansion_id),
+    code = coalesce(public.pokoin_pokemon_expansions.code, excluded.code),
     name = excluded.name,
     compact_name = excluded.compact_name,
     name_tokens = excluded.name_tokens,
+    nationality = excluded.nationality,
+    milo_gallery = excluded.milo_gallery,
     updated_at = now();
 
   perform public.marketplace_seed_expansion_aliases();
+  perform public.pokoin_refresh_expansion_nationality();
 
   get diagnostics refreshed_count = row_count;
   return refreshed_count;

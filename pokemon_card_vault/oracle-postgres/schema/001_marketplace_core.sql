@@ -248,7 +248,7 @@ alter table public.cardtrader_pokemon_blueprints
 alter table public.cardtrader_pokemon_blueprints
   add column if not exists homepage_object_key text;
 
-create table if not exists public.cardtrader_pokemon_expansions (
+create table if not exists public.pokoin_pokemon_expansions (
   expansion_id integer,
   game_id integer not null default 5,
   code text,
@@ -263,18 +263,20 @@ create table if not exists public.cardtrader_pokemon_expansions (
   logo_image_url text,
   logo_object_key text,
   logo_imported_at timestamptz,
+  nationality text not null default 'unknown',
+  milo_gallery text not null default 'none',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
-create index if not exists cardtrader_pokemon_expansions_expansion_id_idx
-  on public.cardtrader_pokemon_expansions (expansion_id);
+create index if not exists pokoin_pokemon_expansions_expansion_id_idx
+  on public.pokoin_pokemon_expansions (expansion_id);
 
-create index if not exists cardtrader_pokemon_expansions_normalized_trgm_idx
-  on public.cardtrader_pokemon_expansions using gin (normalized_name gin_trgm_ops);
+create index if not exists pokoin_pokemon_expansions_normalized_trgm_idx
+  on public.pokoin_pokemon_expansions using gin (normalized_name gin_trgm_ops);
 
-create index if not exists cardtrader_pokemon_expansions_compact_trgm_idx
-  on public.cardtrader_pokemon_expansions using gin (compact_name gin_trgm_ops);
+create index if not exists pokoin_pokemon_expansions_compact_trgm_idx
+  on public.pokoin_pokemon_expansions using gin (compact_name gin_trgm_ops);
 
 create table if not exists public.marketplace_trainers (
   trainer_name text primary key,
@@ -764,6 +766,11 @@ create index if not exists marketplace_search_candidates_expansion_name_idx
 
 create table if not exists public.marketplace_card_urls (
   card_id bigint primary key references public.marketplace_search_candidates(card_id) on delete cascade,
+  -- Fresh install: public_number = card_id * 2 while card_id is still the scrape
+  -- original. After 018, card_id is our id (ct_id * 2) and public_number is
+  -- generated as card_id. See 018_pokoin_card_id_ct_id.sql and
+  -- docs/marketplace-public-ids.md.
+  public_number bigint generated always as (card_id * 2) stored,
   language text not null default 'en',
   canonical_slug text not null check (canonical_slug <> ''),
   canonical_slug_normalized text not null check (canonical_slug_normalized <> ''),
@@ -809,6 +816,9 @@ alter table public.marketplace_card_urls
 alter table public.marketplace_card_urls
   add column if not exists source_projected_at timestamptz;
 
+alter table public.marketplace_card_urls
+  add column if not exists public_number bigint generated always as (card_id * 2) stored;
+
 drop index if exists public.marketplace_card_urls_language_slug_idx;
 drop index if exists public.marketplace_card_urls_language_slug_normalized_idx;
 drop index if exists public.marketplace_card_urls_canonical_path_idx;
@@ -827,6 +837,9 @@ create index if not exists marketplace_card_urls_canonical_path_idx
 
 create index if not exists marketplace_card_urls_canonical_path_normalized_idx
   on public.marketplace_card_urls (canonical_path_normalized);
+
+create unique index if not exists marketplace_card_urls_public_number_idx
+  on public.marketplace_card_urls (public_number);
 
 create index if not exists marketplace_card_urls_uniqueness_idx
   on public.marketplace_card_urls (is_unique, duplicate_group_size desc, language, canonical_slug_normalized);
