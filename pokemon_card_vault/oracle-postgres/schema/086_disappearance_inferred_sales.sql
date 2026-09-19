@@ -37,6 +37,9 @@ begin;
 set local statement_timeout = 0;
 set local lock_timeout = 0;
 set local idle_in_transaction_session_timeout = 0;
+-- The backfill hash-joins ~3M live-stack rows against ~125k history rows;
+-- default work_mem spills ~10GB to temp and turns minutes into an hour.
+set local work_mem = '512MB';
 
 alter table public.cardtrader_market_listing_removed_history
   add column if not exists status text not null default 'confirmed';
