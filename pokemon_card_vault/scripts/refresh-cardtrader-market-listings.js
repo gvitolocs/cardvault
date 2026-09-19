@@ -45,6 +45,7 @@ function loadDefaultFallbackEnvFiles(primaryPath, fallbackPaths = [path.join(ROO
 }
 
 function integerOrNull(value) {
+  if (value == null || value === '') return null;
   const number = Number(value);
   return Number.isSafeInteger(number) ? Math.trunc(number) : null;
 }
@@ -54,15 +55,25 @@ function parseArgs(argv) {
     envFile: process.env.CARDTRADER_MARKET_REFRESH_ENV_FILE || DEFAULT_ENV_FILE,
     dryRun: false,
     archiveMissing: undefined,
+    byBlueprint: false,
+    completeBook: false,
+    finalize: undefined,
     maxBlueprints: undefined,
     maxProducts: undefined,
+    maxExpansions: undefined,
     requestDelayMs: undefined,
     blueprintBatchSize: undefined,
     blueprintConcurrency: undefined,
+    expansionConcurrency: undefined,
+    persistConcurrency: undefined,
+    expansionShardCount: undefined,
+    expansionShardIndex: undefined,
     refreshBatchBlueprints: undefined,
     removedDay: '',
     blueprintIds: [],
+    expansionIds: [],
     expansionId: undefined,
+    minExpansionId: undefined,
     language: '',
   };
 
@@ -75,18 +86,42 @@ function parseArgs(argv) {
       options.archiveMissing = true;
     } else if (arg === '--no-archive-missing') {
       options.archiveMissing = false;
+    } else if (arg === '--by-blueprint') {
+      options.byBlueprint = true;
+    } else if (arg === '--by-expansion') {
+      options.byBlueprint = false;
+    } else if (arg === '--complete-book') {
+      options.completeBook = true;
+    } else if (arg === '--no-complete-book') {
+      options.completeBook = false;
+    } else if (arg === '--finalize') {
+      options.finalize = true;
+    } else if (arg === '--no-finalize') {
+      options.finalize = false;
     } else if (arg.startsWith('--env-file=')) {
       options.envFile = arg.slice('--env-file='.length).trim();
     } else if (arg.startsWith('--max-blueprints=')) {
       options.maxBlueprints = integerOrNull(arg.slice('--max-blueprints='.length));
     } else if (arg.startsWith('--max-products=')) {
       options.maxProducts = integerOrNull(arg.slice('--max-products='.length));
+    } else if (arg.startsWith('--max-expansions=')) {
+      options.maxExpansions = integerOrNull(arg.slice('--max-expansions='.length));
     } else if (arg.startsWith('--request-delay-ms=')) {
       options.requestDelayMs = integerOrNull(arg.slice('--request-delay-ms='.length));
     } else if (arg.startsWith('--blueprint-batch-size=')) {
       options.blueprintBatchSize = integerOrNull(arg.slice('--blueprint-batch-size='.length));
     } else if (arg.startsWith('--blueprint-concurrency=')) {
       options.blueprintConcurrency = integerOrNull(arg.slice('--blueprint-concurrency='.length));
+    } else if (arg.startsWith('--expansion-concurrency=')) {
+      options.expansionConcurrency = integerOrNull(arg.slice('--expansion-concurrency='.length));
+    } else if (arg.startsWith('--persist-concurrency=')) {
+      options.persistConcurrency = integerOrNull(arg.slice('--persist-concurrency='.length));
+    } else if (arg.startsWith('--shard-count=')) {
+      options.expansionShardCount = integerOrNull(arg.slice('--shard-count='.length));
+    } else if (arg.startsWith('--shard-index=')) {
+      options.expansionShardIndex = integerOrNull(arg.slice('--shard-index='.length));
+    } else if (arg.startsWith('--min-expansion-id=')) {
+      options.minExpansionId = integerOrNull(arg.slice('--min-expansion-id='.length));
     } else if (arg.startsWith('--refresh-batch-blueprints=')) {
       options.refreshBatchBlueprints = integerOrNull(arg.slice('--refresh-batch-blueprints='.length));
     } else if (arg.startsWith('--removed-day=')) {
@@ -100,7 +135,14 @@ function parseArgs(argv) {
         .map((value) => integerOrNull(value.trim()))
         .filter((id) => id != null && id > 0));
     } else if (arg.startsWith('--expansion-id=')) {
-      options.expansionId = integerOrNull(arg.slice('--expansion-id='.length));
+      const id = integerOrNull(arg.slice('--expansion-id='.length));
+      if (id != null && id > 0) options.expansionIds.push(id);
+      options.expansionId = id;
+    } else if (arg.startsWith('--expansion-ids=')) {
+      options.expansionIds.push(...arg.slice('--expansion-ids='.length)
+        .split(',')
+        .map((value) => integerOrNull(value.trim()))
+        .filter((id) => id != null && id > 0));
     } else if (arg.startsWith('--language=')) {
       options.language = arg.slice('--language='.length).trim();
     } else {
@@ -124,16 +166,26 @@ function databaseConfigured(env = process.env) {
 function publicOptions(options) {
   return {
     dryRun: options.dryRun,
+    byBlueprint: options.byBlueprint,
+    completeBook: options.completeBook,
+    finalize: options.finalize,
     archiveMissing: options.archiveMissing,
     maxBlueprints: options.maxBlueprints,
     maxProducts: options.maxProducts,
+    maxExpansions: options.maxExpansions,
     requestDelayMs: options.requestDelayMs,
     blueprintBatchSize: options.blueprintBatchSize,
     blueprintConcurrency: options.blueprintConcurrency,
+    expansionConcurrency: options.expansionConcurrency,
+    persistConcurrency: options.persistConcurrency,
+    expansionShardCount: options.expansionShardCount,
+    expansionShardIndex: options.expansionShardIndex,
     refreshBatchBlueprints: options.refreshBatchBlueprints,
     removedDay: options.removedDay || undefined,
     blueprintCount: options.blueprintIds.length,
+    expansionCount: options.expansionIds.length,
     expansionId: options.expansionId,
+    minExpansionId: options.minExpansionId,
     language: options.language || undefined,
   };
 }
@@ -163,16 +215,26 @@ async function main() {
   const { normalizeRefreshOptions, runRefresh } = require('../api/_cardtrader_daily_listings_refresh');
   const refreshOptions = normalizeRefreshOptions({
     dryRun: cliOptions.dryRun,
+    byBlueprint: cliOptions.byBlueprint,
+    completeBook: cliOptions.completeBook,
+    finalize: cliOptions.finalize,
     archiveMissing: cliOptions.archiveMissing,
     maxBlueprints: cliOptions.maxBlueprints,
     maxProducts: cliOptions.maxProducts,
+    maxExpansions: cliOptions.maxExpansions,
     requestDelayMs: cliOptions.requestDelayMs,
     blueprintBatchSize: cliOptions.blueprintBatchSize,
     blueprintConcurrency: cliOptions.blueprintConcurrency,
+    expansionConcurrency: cliOptions.expansionConcurrency,
+    persistConcurrency: cliOptions.persistConcurrency,
+    expansionShardCount: cliOptions.expansionShardCount,
+    expansionShardIndex: cliOptions.expansionShardIndex,
     refreshBatchBlueprints: cliOptions.refreshBatchBlueprints,
     removedDay: cliOptions.removedDay,
     blueprintIds: cliOptions.blueprintIds.join(','),
+    expansionIds: cliOptions.expansionIds.join(','),
     expansionId: cliOptions.expansionId,
+    minExpansionId: cliOptions.minExpansionId,
     language: cliOptions.language,
     onProgress: (progress) => {
       console.log('CardTrader market listing refresh progress', progress);
