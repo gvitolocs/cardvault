@@ -44,23 +44,43 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ usernames: [] });
     }
 
-    const snapshot = await firestore
-      .collection('usernames')
-      .orderBy('username')
-      .startAt(query)
-      .endAt(`${query}\uf8ff`)
-      .limit(8)
-      .get();
+    // Username docs are keyed by the handle (doc id). Prefix-scan on
+    // documentId so older rows that never got a `username` field still match.
+    // Falling back to orderBy('username') covers any odd id/field mismatch.
+    let snapshot;
+    try {
+      snapshot = await firestore
+        .collection('usernames')
+        .orderBy(admin.firestore.FieldPath.documentId())
+        .startAt(query)
+        .endAt(`${query}\uf8ff`)
+        .limit(12)
+        .get();
+    } catch (err) {
+      console.warn('search-recipient-emails documentId scan failed, trying username field', err.message || err);
+      snapshot = await firestore
+        .collection('usernames')
+        .orderBy('username')
+        .startAt(query)
+        .endAt(`${query}\uf8ff`)
+        .limit(12)
+        .get();
+    }
 
     const usernames = [];
+    const seen = new Set();
     for (const doc of snapshot.docs) {
       const username = String(doc.data()?.username || doc.id || '').trim().toLowerCase();
       const uid = String(doc.data()?.uid || '');
-      if (!username || uid === decoded.uid) {
+      if (!username || !/^[a-z0-9]{3,32}$/.test(username) || uid === decoded.uid || seen.has(username)) {
         continue;
       }
+      if (!username.startsWith(query)) {
+        continue;
+      }
+      seen.add(username);
       usernames.push(username);
-      if (usernames.length >= 5) {
+      if (usernames.length >= 8) {
         break;
       }
     }
