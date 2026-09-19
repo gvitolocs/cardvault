@@ -1209,37 +1209,55 @@ where h.provider = 'cardtrader'
   and coalesce(h.archive_metadata->>'refreshImportedAt', '') = r.run_ts
   and h.status = 'confirmed';
 
--- 2) Backfill pre-cutover vanish rows that pass the corrected continuity and
---    validity checks. listing_id_rotated rows are intentionally left alone
+-- 2) Precompute the facet fingerprint once per candidate row (single pass —
+--    the jsonb facet helpers re-fetch TOASTed properties on every call), then
+--    classify set-based. listing_id_rotated rows are intentionally left alone
 --    (their stack had a live successor; the successor's own row carries the
 --    units if the stack later vanished).
+create temp table cardtrader_pre_cutover on commit drop as
+select
+  h.id,
+  h.external_listing_id,
+  coalesce(h.blueprint_id, h.cardtrader_blueprint_id) as blueprint_id,
+  h.seller_account_id,
+  h.quantity,
+  lower(btrim(h.condition)) as cond,
+  lower(btrim(h.language)) as lang,
+  public.cardtrader_listing_is_reverse(coalesce(h.properties, '{}'::jsonb), false, '') as rev,
+  public.cardtrader_listing_is_first_edition(coalesce(h.properties, '{}'::jsonb), false) as fe,
+  public.cardtrader_listing_is_graded(coalesce(h.raw_metadata, '{}'::jsonb), coalesce(h.properties, '{}'::jsonb)) as gr,
+  exists (
+    select 1
+    from public.cardtrader_market_listing_snapshots s
+    where s.provider = 'cardtrader'
+      and s.external_listing_id = h.external_listing_id
+  ) as id_back_live,
+  h.archive_reason
+from public.cardtrader_market_listing_removed_history h
+where h.provider = 'cardtrader'
+  and h.removed_day < '2026-09-11'
+  and h.archive_reason in ('inferred_sale', 'dropped_from_cheapest_25')
+  and h.status = 'confirmed'
+  and coalesce(h.seller_account_id, '') <> ''
+  and coalesce(h.quantity, 0) > 0;
+create index on cardtrader_pre_cutover (blueprint_id, seller_account_id, cond, lang, rev, fe, gr);
+
 with backfill as (
-  select h.id
-  from public.cardtrader_market_listing_removed_history h
-  where h.provider = 'cardtrader'
-    and h.removed_day < '2026-09-11'
-    and h.archive_reason in ('inferred_sale', 'dropped_from_cheapest_25')
-    and h.status = 'confirmed'
-    and coalesce(h.seller_account_id, '') <> ''
-    and coalesce(h.quantity, 0) > 0
-    and not exists (
-      select 1
-      from public.cardtrader_market_listing_snapshots s
-      where s.provider = 'cardtrader'
-        and s.external_listing_id = h.external_listing_id
-    )
+  select c.id
+  from cardtrader_pre_cutover c
+  where not c.id_back_live
+    and c.seller_account_id not in (select seller_account_id from cardtrader_vacation_sellers)
     and not exists (
       select 1
       from cardtrader_live_stacks ls
-      where ls.blueprint_id is not distinct from coalesce(h.blueprint_id, h.cardtrader_blueprint_id)
-        and ls.seller_account_id = h.seller_account_id
-        and ls.cond = lower(btrim(h.condition))
-        and ls.lang = lower(btrim(h.language))
-        and ls.rev = public.cardtrader_listing_is_reverse(coalesce(h.properties, '{}'::jsonb), false, '')
-        and ls.fe = public.cardtrader_listing_is_first_edition(coalesce(h.properties, '{}'::jsonb), false)
-        and ls.gr = public.cardtrader_listing_is_graded(coalesce(h.raw_metadata, '{}'::jsonb), coalesce(h.properties, '{}'::jsonb))
+      where ls.blueprint_id is not distinct from c.blueprint_id
+        and ls.seller_account_id = c.seller_account_id
+        and ls.cond = c.cond
+        and ls.lang = c.lang
+        and ls.rev = c.rev
+        and ls.fe = c.fe
+        and ls.gr = c.gr
     )
-    and h.seller_account_id not in (select seller_account_id from cardtrader_vacation_sellers)
 )
 update public.cardtrader_market_listing_removed_history h
 set archive_reason = 'inferred_sale',
@@ -1254,31 +1272,23 @@ where h.id in (select id from backfill);
 --     are not sales — invalidate them the way the runtime correction pass
 --     would (mirrors T4c/T4e classification and the retraction semantics).
 with continuity_found as (
-  select h.id
-  from public.cardtrader_market_listing_removed_history h
-  where h.provider = 'cardtrader'
-    and h.removed_day < '2026-09-11'
-    and h.archive_reason = 'inferred_sale'
-    and h.status = 'confirmed'
+  select c.id
+  from cardtrader_pre_cutover c
+  where c.archive_reason = 'inferred_sale'
     and (
-      exists (
-        select 1
-        from public.cardtrader_market_listing_snapshots s
-        where s.provider = 'cardtrader'
-          and s.external_listing_id = h.external_listing_id
-      )
+      c.id_back_live
+      or c.seller_account_id in (select seller_account_id from cardtrader_vacation_sellers)
       or exists (
         select 1
         from cardtrader_live_stacks ls
-        where ls.blueprint_id is not distinct from coalesce(h.blueprint_id, h.cardtrader_blueprint_id)
-          and ls.seller_account_id = h.seller_account_id
-          and ls.cond = lower(btrim(h.condition))
-          and ls.lang = lower(btrim(h.language))
-          and ls.rev = public.cardtrader_listing_is_reverse(coalesce(h.properties, '{}'::jsonb), false, '')
-          and ls.fe = public.cardtrader_listing_is_first_edition(coalesce(h.properties, '{}'::jsonb), false)
-          and ls.gr = public.cardtrader_listing_is_graded(coalesce(h.raw_metadata, '{}'::jsonb), coalesce(h.properties, '{}'::jsonb))
+        where ls.blueprint_id is not distinct from c.blueprint_id
+          and ls.seller_account_id = c.seller_account_id
+          and ls.cond = c.cond
+          and ls.lang = c.lang
+          and ls.rev = c.rev
+          and ls.fe = c.fe
+          and ls.gr = c.gr
       )
-      or h.seller_account_id in (select seller_account_id from cardtrader_vacation_sellers)
     )
 )
 update public.cardtrader_market_listing_removed_history h
