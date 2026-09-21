@@ -26,13 +26,11 @@ const ITEM_COLUMNS = `
   seller_comment, listing_id, updated_at
 `;
 
-/** The listing carries the slot inside the box: `box1·47`, or `box1·47-49`
- * for a stack. The row's editable location stays the bare box name. */
+/** Listing location: bare box + slotText (`box1·47` or `box1·2·5`). */
 function listingLocationOf(row, slot) {
   if (!String(row.location || '').trim()) return row.location || '';
   if (!slot) return row.location;
-  const range = slot.end > slot.start ? `-${slot.end}` : '';
-  return `${row.location}·${slot.start}${range}`;
+  return `${row.location}${rules.slotText(slot)}`;
 }
 
 async function withTx(pool, fn) {
@@ -219,6 +217,9 @@ async function defaultUpsertScanOwnership(args) {
 function createStore({
   pool,
   lookupCards = async () => new Map(),
+  // (hitIds, topId) → catalog printings of the hits plus every member of the
+  // top hit's artwork. Empty = no printing choice (per-printing rule only).
+  lookupPrintings = async () => [],
   now = () => Date.now(),
   randomInt,
   onListingsCreated = async () => {},
@@ -437,6 +438,8 @@ function createStore({
       serverTime: nowMs,
       label: 'Pokoin Dashboard',
       defaultsLabel: rules.defaultsLabel(batch.rows[0]?.defaults),
+      game: rules.normalizeDefaults(batch.rows[0]?.defaults || {}).game || 'pokemon',
+      scanCatalog: rules.scanPhoneCatalog(rules.normalizeDefaults(batch.rows[0]?.defaults || {}).game),
     };
   }
 
@@ -484,11 +487,15 @@ function createStore({
       throw sessionGone({ idle: out.idle === true });
     }
     if (out.wasLost) require('./_scan_bus').notifyBatch(out.session.batch_id);
+    const batchDefaults = rules.normalizeDefaults(out.session.batch_defaults || {});
+    const phoneCatalog = rules.scanPhoneCatalog(batchDefaults.game);
     return {
       status: out.session.status,
       paused: out.session.paused === true,
       serverTime: nowMs,
-      defaultsLabel: rules.defaultsLabel(out.session.batch_defaults),
+      defaultsLabel: rules.defaultsLabel(batchDefaults),
+      game: batchDefaults.game || 'pokemon',
+      scanCatalog: phoneCatalog,
       received: Number(out.session.phone_scans || 0),
     };
   }
@@ -511,8 +518,33 @@ function createStore({
     return { ok: true };
   }
 
-  function cardFields(meta, cardId) {
-    const card = cardId ? meta.get(cardId) : null;
+  // Catalog rows for the printing choice; resolved against the batch language
+  // later. Only a confident top hit can be a confident artwork, so weaker
+  // scans skip the lookup. A failed lookup keeps today's per-printing rule.
+  async function printingRowsFor(hits) {
+    const scored = rules.candidatesFromHits(hits, hits.length);
+    if (!scored.length || scored[0].score < rules.MATCH_SCORE) return [];
+    try {
+      return await lookupPrintings(scored.map((c) => c.cardId), scored[0].cardId);
+    } catch (error) {
+      console.error('scan printing lookup skipped', { message: error.message });
+      return [];
+    }
+  }
+
+  function cardFields(meta, cardId, printingRows = []) {
+    const row = cardId && !meta.has(cardId)
+      ? printingRows.find((r) => String(r.card_id) === String(cardId))
+      : null;
+    const card = cardId
+      ? meta.get(cardId) || (row && {
+        name: row.name,
+        setName: row.set_name,
+        number: row.card_number,
+        imageUrl: row.image_url,
+        nationality: String(row.nationality || '').toLowerCase(),
+      })
+      : null;
     return {
       card_id: cardId || null,
       card_name: card?.name || '',
@@ -544,6 +576,7 @@ function createStore({
       imageUrl: meta.get(c.cardId)?.imageUrl || '',
       nationality: meta.get(c.cardId)?.nationality || '',
     }));
+    const printingRows = await printingRowsFor(event.hits);
 
     const out = await withTx(pool, async (client) => {
       const session = await sessionForToken(client, token, { lock: true });
@@ -599,7 +632,23 @@ function createStore({
       }
       const picked = rules.pickDefaults(batch.defaults_history, capturedMs);
       const snapshot = picked.defaults;
-      const top = recognition.state === 'unmatched' ? null : candidates[0];
+      // Artwork + print family (the language in force at capture). A phone
+      // choice counts only if the server offers that printing too.
+      const printing = printingRows.length
+        ? rules.resolvePrintings({
+          hits: event.hits,
+          rows: printingRows,
+          language: snapshot.language,
+          choice: event.printingChoice,
+        })
+        : null;
+      const decided = printing
+        ? { state: printing.state, candidates: printing.candidates, topScore: printing.topScore, margin: printing.margin }
+        : { ...recognition, candidates };
+      let top = null;
+      if (printing) top = { cardId: printing.cardId };
+      else if (decided.state === 'ambiguous') top = rules.provisionalCandidate(candidates, snapshot.language);
+      else if (decided.state === 'matched') top = candidates[0];
 
       const lastRow = (await client.query(
         `select * from public.scan_items where batch_id = $1 and status <> 'removed'
@@ -619,17 +668,25 @@ function createStore({
       const consecutive = head && lastEvent && (lastEvent.id === lastRow.id);
       const merge = consecutive
         && top
-        && rules.shouldMerge({ previous: head, recognition, cardId: top.cardId, snapshot })
+        && rules.shouldMerge({ previous: head, recognition: decided, cardId: top.cardId, snapshot })
         && head.quantity + snapshot.quantity <= 99;
 
       const bump = await bumpBatch(client, batch.id, { positions: 1 });
-      const fields = cardFields(meta, top?.cardId);
+      const fields = cardFields(meta, top?.cardId, printingRows);
       const recognitionJson = {
-        state: recognition.state,
+        state: decided.state,
         catalog: event.catalog,
-        topScore: recognition.topScore,
-        margin: recognition.margin,
-        candidates,
+        topScore: decided.topScore,
+        margin: decided.margin,
+        candidates: decided.candidates,
+        ...(printing ? {
+          printing: {
+            artwork: printing.artwork,
+            family: printing.family,
+            offered: printing.choose ? printing.candidates.map((c) => c.cardId) : [],
+            chosen: printing.chosen || null,
+          },
+        } : {}),
       };
       const inserted = await client.query(
         `insert into public.scan_items (
@@ -642,7 +699,7 @@ function createStore({
          ) returning ${ITEM_COLUMNS}`,
         [
           batch.id, session.seller_uid, event.scanEventId, session.id, event.clientSequence,
-          new Date(capturedMs), new Date(receivedAtMs), recognition.state, recognitionJson,
+          new Date(capturedMs), new Date(receivedAtMs), decided.state, recognitionJson,
           picked.version, snapshot, event.image, event.timings,
           bump.seq, bump.position, merge ? 'merged' : 'active', merge ? head.id : null,
           fields.card_id, fields.card_name, fields.set_name, fields.collector_number, fields.image_url,
@@ -666,7 +723,17 @@ function createStore({
          where id = $1`,
         [session.id],
       );
-      return { item: inserted.rows[0], head: headRow, session, recognition };
+      const activeForSlots = (await client.query(
+        `select id, location, quantity, defaults_snapshot
+           from public.scan_items
+          where batch_id = $1 and status = 'active'
+          order by position`,
+        [batch.id],
+      )).rows;
+      const slots = rules.boxSlots(activeForSlots);
+      const targetId = headRow?.id || inserted.rows[0].id;
+      const stackFull = Boolean(slots.get(targetId)?.filledStack);
+      return { item: inserted.rows[0], head: headRow, session, recognition: decided, printing, stackFull };
     });
 
     if (out.gone) {
@@ -711,6 +778,9 @@ function createStore({
       setName: insertedItem.set_name || null,
       collectorNumber: insertedItem.collector_number || null,
       catalog: event.catalog || null,
+      printingFamily: out.printing?.family || null,
+      printingOffered: out.printing?.choose ? out.printing.candidates.length : 0,
+      printingChosen: out.printing?.chosen || null,
       merged: Boolean(out.head),
       headId: out.head?.id || null,
       headQuantity: out.head ? Number(out.head.quantity) : null,
@@ -723,10 +793,47 @@ function createStore({
       itemId: out.item.id,
       recognitionState: out.recognition.state,
       merged: Boolean(out.head),
+      stackFull: out.stackFull === true,
       headId: out.head?.id || null,
       headQuantity: out.head ? Number(out.head.quantity) : null,
       serverTime: receivedAtMs,
       received: Number(out.session.phone_scans || 0) + 1,
+    };
+  }
+
+  /**
+   * Phone asks before sending a scan: which printings of this artwork does
+   * the batch language allow? Read-only; the scan event is still the only
+   * write, and ingest re-checks any choice made from this answer.
+   */
+  async function resolvePrintingsForPhone({ token, body }) {
+    const nowMs = now();
+    const request = rules.parsePrintingRequest(body);
+    const session = await sessionForToken(pool, token);
+    if (!session || session.status !== 'connected') throw sessionGone();
+    const batch = (await pool.query(
+      'select defaults_history from public.scan_batches where id = $1',
+      [session.batch_id],
+    )).rows[0];
+    const capturedMs = rules.capturedAtServer({
+      capturedAt: request.capturedAt,
+      clockOffsetMs: request.clockOffsetMs,
+      receivedAtMs: nowMs,
+      floorMs: session.phone_connected_at ? new Date(session.phone_connected_at).getTime() - 5000 : 0,
+    });
+    const { language } = rules.pickDefaults(batch?.defaults_history, capturedMs).defaults;
+    const rows = await printingRowsFor(request.hits);
+    const printing = rows.length ? rules.resolvePrintings({ hits: request.hits, rows, language }) : null;
+    const resolved = printing && rows.find((row) => String(row.card_id) === printing.cardId);
+    return {
+      serverTime: nowMs,
+      language,
+      family: rules.printFamily(language).id,
+      state: printing ? printing.state : rules.classifyRecognition(request.hits).state,
+      choose: Boolean(printing?.choose),
+      cardId: printing && !printing.choose ? printing.cardId : '',
+      name: resolved ? rules.cleanText(resolved.name, 160) : '',
+      printings: printing?.choose ? printing.printings.map(rules.printingTile) : [],
     };
   }
 
@@ -1022,21 +1129,9 @@ function createStore({
         });
       }
       const created = [];
-      // Position inside the box: rows carry the start position in force when
-      // they were captured (`defaults_snapshot.startPosition`). Walking queue
-      // order, a stack claims `quantity` slots in its location, and a later
-      // anchor re-starts the counter when the seller moved to a new spot.
-      const slotCounters = new Map();
-      const slotFor = new Map();
-      for (const row of rows) {
-        const loc = String(row.location || '').trim();
-        if (!loc) continue;
-        const anchor = Math.max(1, Math.trunc(Number(row.defaults_snapshot?.startPosition)) || 1);
-        const start = Math.max((slotCounters.get(loc) || 0) + 1, anchor);
-        const end = start + (Number(row.quantity) || 1) - 1;
-        slotFor.set(row.id, { start, end });
-        slotCounters.set(loc, end);
-      }
+      // Location → Stack → Position. Snapshot may be legacy flat startPosition
+      // (treated as absolute) or stack/stackSize/startPosition.
+      const slotFor = rules.boxSlots(rows);
       for (const row of rows) {
         let listingId = null;
         let listingStatus = null;
@@ -1346,6 +1441,7 @@ function createStore({
     claimPairing,
     heartbeat,
     leave,
+    resolvePrintingsForPhone,
     ingestScan,
     readBatchSnapshot,
     listOpenBatches,
@@ -1393,6 +1489,35 @@ async function lookupCardsFromCatalog(cardIds) {
   return map;
 }
 
+// Printings of the hits plus every single-card member of the top hit's CLIP
+// artwork (`pokoin_version_sets`, the key GET /api/marketplace-version-set
+// reads), with the expansion's print nationality and mark. One indexed query
+// on the replica (card_id pkey + version index); energies top out near 130 rows.
+const PRINTING_ROWS_SQL = `
+  select c.card_id::text as card_id, c.name, c.set_name, c.card_number, c.version,
+         coalesce(nullif(c.cdn_image_url, ''), nullif(c.image_url, ''), '') as image_url,
+         coalesce(e.nationality, '') as nationality, coalesce(e.kind, '') as kind,
+         coalesce(e.code, '') as code, coalesce(e.symbol_image_url, '') as symbol_image_url
+  from public.marketplace_search_candidates c
+  left join public.pokoin_pokemon_expansions e on lower(e.name) = lower(c.set_name)
+  where c.item_kind = 'single'
+    and c.product_type = 'card'
+    and (
+      c.card_id = any($1::bigint[])
+      or c.version = (select version from public.marketplace_search_candidates where card_id = $2::bigint)
+    )
+  limit 400
+`;
+
+async function lookupPrintingsFromCatalog(cardIds, topId) {
+  const ids = [...new Set((cardIds || []).map(rules.cleanCardId).filter(Boolean))];
+  const top = rules.cleanCardId(topId);
+  if (!ids.length || !top) return [];
+  const { marketplaceQuery } = require('./_marketplace_db');
+  const result = await marketplaceQuery(PRINTING_ROWS_SQL, [ids.map(Number), Number(top)]);
+  return result.rows;
+}
+
 let defaultStore = null;
 
 function getScanStore() {
@@ -1402,6 +1527,7 @@ function getScanStore() {
     defaultStore = createStore({
       pool: getMarketplaceWriterPool(),
       lookupCards: lookupCardsFromCatalog,
+      lookupPrintings: lookupPrintingsFromCatalog,
       // Same refresh createListing runs after a POST.
       onListingsCreated: async (cardIds) => {
         for (const cardId of cardIds) {
@@ -1422,5 +1548,7 @@ module.exports = {
   getScanStore,
   setScanStoreForTests,
   lookupCardsFromCatalog,
+  lookupPrintingsFromCatalog,
+  PRINTING_ROWS_SQL,
   withTx,
 };
