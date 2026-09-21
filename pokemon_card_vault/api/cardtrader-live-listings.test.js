@@ -161,8 +161,8 @@ test('CardTrader live listings normalizes marketplace products without secrets',
   assert.equal(listing.price, 12.99);
   assert.equal(listing.priceCents, 1299);
   assert.equal(listing.currency, 'EUR');
-  assert.equal(listing.displayPricePkn, 2798);
-  assert.equal(listing.markupPkn, 200);
+  assert.equal(listing.displayPricePkn, 2598);
+  assert.equal(listing.markupPkn, 0);
   assert.equal(listing.buyerPrice.priceCents, 1399);
   assert.equal(listing.sellerPrice.priceCents, 1200);
   assert.equal(listing.quantity, 2);
@@ -210,11 +210,11 @@ test('CardTrader live listings extracts public seller comments and normalizes co
   assert.equal(_test.normalizeCondition('PO'), 'Poor');
 });
 
-test('CardTrader live listings filters to zero or 1-Day Ready and converts EUR plus markup to PKN', () => {
+test('CardTrader live listings filters to zero or 1-Day Ready and converts EUR to PKN at dump rate', () => {
   const { _test } = loadEndpointWithStubs();
 
   assert.equal(_test.pknReferencePrice({ PKN_CHECKOUT_USDT_PRICE: '0.01' }), 0.01);
-  assert.equal(_test.cardTraderDisplayPricePkn(4, 'EUR', { PKN_CHECKOUT_USDT_PRICE: '0.01' }), 600);
+  assert.equal(_test.cardTraderDisplayPricePkn(4, 'EUR', { PKN_CHECKOUT_USDT_PRICE: '0.01' }), 400);
 
   const listings = _test.listingsFromMarketplacePayload(
     {
@@ -247,8 +247,8 @@ test('CardTrader live listings filters to zero or 1-Day Ready and converts EUR p
 
   assert.deepEqual(listings.map((listing) => listing.externalListingId), ['1', '2']);
   assert.deepEqual(listings.map((listing) => listing.seller.accountName), ['pknreserve', 'pknreserve']);
-  assert.equal(listings[0].displayPricePkn, 1000);
-  assert.equal(_test.CARDTRADER_MARKUP_PKN, 200);
+  assert.equal(listings[0].displayPricePkn, 800);
+  assert.equal(_test.CARDTRADER_MARKUP_PKN, 0);
 });
 
 test('CardTrader live listings infers shipping mode for blueprint 248856 examples', () => {
