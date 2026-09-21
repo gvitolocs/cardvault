@@ -29,6 +29,7 @@ const LANGUAGES = ['EN', 'IT', 'FR', 'DE', 'ES', 'JP', 'PT', 'NL', 'PL', 'RU', '
 const FINISHES = ['standard', 'holo', 'reverse', 'stamped', 'promo', 'other'];
 
 const DEFAULT_BATCH_DEFAULTS = Object.freeze({
+  game: 'pokemon',
   language: 'EN',
   condition: 'NM',
   foilState: 'standard',
@@ -122,7 +123,9 @@ function normalizeDefaults(input = {}, base = DEFAULT_BATCH_DEFAULTS) {
   } else {
     startPosition = Math.min(stackSize, startPosition);
   }
+  const GAMES = ['pokemon', 'one_piece', 'riftbound'];
   return {
+    game: has('game') ? pick(GAMES, src.game, base.game || 'pokemon') : (base.game || 'pokemon'),
     language: has('language') ? pick(LANGUAGES, src.language, base.language) : base.language,
     condition: has('condition') ? pick(CONDITIONS, src.condition, base.condition) : base.condition,
     foilState: has('foilState') ? pick(FINISHES, src.foilState, base.foilState) : base.foilState,
@@ -223,6 +226,14 @@ function boxSlots(rows) {
     counters.set(loc, endAbs);
   }
   return slots;
+}
+
+
+function scanPhoneCatalog(gameId) {
+  const id = String(gameId || 'pokemon');
+  if (id === 'one_piece') return { family: 'one_piece', variant: 'singles', catalogId: 'one_piece_singles' };
+  if (id === 'riftbound') return { family: 'riftbound', variant: 'western', catalogId: 'riftbound_western' };
+  return { family: 'pokemon', variant: 'generic', catalogId: 'pokemon_generic' };
 }
 
 function defaultsLabel(defaults = DEFAULT_BATCH_DEFAULTS) {
@@ -874,6 +885,7 @@ module.exports = {
   cleanCardId,
   normalizeDefaults,
   defaultsLabel,
+  scanPhoneCatalog,
   locationDefaultsText,
   indexToStackPos,
   stackPosToIndex,

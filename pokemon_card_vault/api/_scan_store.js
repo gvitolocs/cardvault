@@ -438,6 +438,8 @@ function createStore({
       serverTime: nowMs,
       label: 'Pokoin Dashboard',
       defaultsLabel: rules.defaultsLabel(batch.rows[0]?.defaults),
+      game: rules.normalizeDefaults(batch.rows[0]?.defaults || {}).game || 'pokemon',
+      scanCatalog: rules.scanPhoneCatalog(rules.normalizeDefaults(batch.rows[0]?.defaults || {}).game),
     };
   }
 
@@ -485,11 +487,15 @@ function createStore({
       throw sessionGone({ idle: out.idle === true });
     }
     if (out.wasLost) require('./_scan_bus').notifyBatch(out.session.batch_id);
+    const batchDefaults = rules.normalizeDefaults(out.session.batch_defaults || {});
+    const phoneCatalog = rules.scanPhoneCatalog(batchDefaults.game);
     return {
       status: out.session.status,
       paused: out.session.paused === true,
       serverTime: nowMs,
-      defaultsLabel: rules.defaultsLabel(out.session.batch_defaults),
+      defaultsLabel: rules.defaultsLabel(batchDefaults),
+      game: batchDefaults.game || 'pokemon',
+      scanCatalog: phoneCatalog,
       received: Number(out.session.phone_scans || 0),
     };
   }
