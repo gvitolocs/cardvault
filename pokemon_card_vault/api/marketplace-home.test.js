@@ -172,7 +172,7 @@ test('marketplace home API preserves database emoji contract', () => {
   assert.ok(card.emoji.includes('🔮'));
 });
 
-test('marketplace home card payload uses CardTrader stock and +200 PKN price', () => {
+test('marketplace home card payload uses CardTrader stock and dump-rate PKN price', () => {
   const card = toCardJson({
     card_id: 316600,
     name: 'Leafeon',

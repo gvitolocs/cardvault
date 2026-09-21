@@ -2,7 +2,7 @@ const { cleanToken, fetchMarketplaceProducts } = require('./_cardtrader_client')
 const { marketplaceQuery } = require('./_marketplace_db');
 
 const PROVIDER = 'cardtrader';
-const CARDTRADER_MARKUP_PKN = 200;
+const CARDTRADER_MARKUP_PKN = 0; // shipping pad removed; market reference = EUR/0.005 only
 const DEFAULT_MAX_BLUEPRINTS = 100_000;
 const MAX_BLUEPRINTS_PER_RUN = 100_000;
 const DEFAULT_REFRESH_BATCH_BLUEPRINTS = 700;
@@ -272,8 +272,7 @@ function summarizeDryRunCacheRows(rows, scopeBlueprintIds, env = process.env) {
   for (const row of rows) {
     if (!isCacheEligibleRow(row, env)) continue;
     const blueprintId = Number(row.blueprintId);
-    const pricePkn = marketplacePricePknFromCardTrader(row.price, row.priceCents, row.currency, env) +
-      CARDTRADER_MARKUP_PKN;
+    const pricePkn = marketplacePricePknFromCardTrader(row.price, row.priceCents, row.currency, env);
     const existing = byBlueprint.get(blueprintId);
     if (!existing || pricePkn < existing.cheapestPricePkn) {
       byBlueprint.set(blueprintId, {
@@ -487,7 +486,7 @@ async function refreshOracleBlueprintListingCache({
             incoming.price,
             incoming.price_cents,
             incoming.currency
-          ) + 200 as price_pkn,
+          ) as price_pkn,
           incoming.quantity,
           incoming.seller_country,
           case

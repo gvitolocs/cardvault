@@ -267,7 +267,7 @@ function syntheticCardTraderListingRow({ listing, seller, fallbackCardId }) {
       sellerComment: publicSellerComment(listing.sellerComment),
       sourcePrice: listing.price == null ? null : Number(listing.price),
       sourceCurrency: cleanText(listing.currency, 12) || 'EUR',
-      markupPkn: 200,
+      markupPkn: 0,
       nftTag: true,
     },
     status: 'active',
