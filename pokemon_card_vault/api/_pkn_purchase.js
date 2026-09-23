@@ -1,3 +1,11 @@
+function paymentIntentIdFromSession(session) {
+  const value = session && session.payment_intent;
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'object' && value.id) return String(value.id);
+  return '';
+}
+
 async function handleCompletedCheckout({ admin, session }) {
   const firestore = admin.firestore();
   const purchaseRef = firestore.collection('pkn_purchases').doc(session.id);
@@ -30,7 +38,7 @@ async function handleCompletedCheckout({ admin, session }) {
       uid,
       email: metadata.email || session.customer_details?.email || '',
       stripeSessionId: session.id,
-      stripePaymentIntentId: session.payment_intent || '',
+      stripePaymentIntentId: paymentIntentIdFromSession(session),
       amountFiat: fiatCents,
       currency: session.currency || 'eur',
       amountPkn: pknAmount,
@@ -71,4 +79,7 @@ async function handleCompletedCheckout({ admin, session }) {
   };
 }
 
-module.exports = { handleCompletedCheckout };
+module.exports = {
+  handleCompletedCheckout,
+  paymentIntentIdFromSession,
+};
