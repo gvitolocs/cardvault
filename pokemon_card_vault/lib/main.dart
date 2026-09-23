@@ -24,6 +24,7 @@ import 'screens/card_detail_screen.dart';
 import 'screens/card_versions_screen.dart';
 import 'screens/artist_collection_screen.dart';
 import 'screens/marketplace_signal_screen.dart';
+import 'screens/marketplace_competitive_renovation_screen.dart';
 import 'screens/marketplace_competitive_screen.dart';
 import 'screens/cardtrader_connect_screen.dart';
 import 'screens/marketplace_admin_edit_screen.dart';
@@ -791,11 +792,34 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/marketplace/competitive',
+            pageBuilder: (context, state) => _appPage(
+              state,
+              const MarketplaceCompetitiveRenovationScreen(),
+            ),
+          ),
+          GoRoute(
+            path: '/marketplace/competitive/decks/:deckId',
+            pageBuilder: (context, state) => _appPage(
+              state,
+              const MarketplaceCompetitiveRenovationScreen(),
+            ),
+          ),
+          GoRoute(
+            path: '/marketplace/competitive/decklists/:decklistId',
+            pageBuilder: (context, state) => _appPage(
+              state,
+              const MarketplaceCompetitiveRenovationScreen(),
+            ),
+          ),
+          // Placeholder name for the existing meta hub / top decks UI while
+          // the public competitive URL shows the renovation page.
+          GoRoute(
+            path: '/marketplace/competitive-wip',
             pageBuilder: (context, state) =>
                 _appPage(state, const MarketplaceCompetitiveScreen()),
           ),
           GoRoute(
-            path: '/marketplace/competitive/decks/:deckId',
+            path: '/marketplace/competitive-wip/decks/:deckId',
             pageBuilder: (context, state) => _appPage(
               state,
               MarketplaceCompetitiveScreen(
@@ -804,7 +828,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             ),
           ),
           GoRoute(
-            path: '/marketplace/competitive/decklists/:decklistId',
+            path: '/marketplace/competitive-wip/decklists/:decklistId',
             pageBuilder: (context, state) => _appPage(
               state,
               MarketplaceCompetitiveScreen(
