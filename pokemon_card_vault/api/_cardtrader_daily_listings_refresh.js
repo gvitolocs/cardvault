@@ -172,8 +172,16 @@ function isCardTraderRateLimitError(error) {
   return error && error.statusCode === 502 && /HTTP 429\b/.test(String(error.message || ''));
 }
 
+function isCardTraderAuthenticationRejection(error) {
+  // `_cardtrader_client` deliberately maps CardTrader's 401/403 response to
+  // a user-safe status 400. Once a refresh has successfully started, a later
+  // rejection is an intermittent upstream session failure, not bad local config.
+  return error && error.statusCode === 400
+    && String(error.message || '') === 'CardTrader rejected this API token.';
+}
+
 function isTransientCardTraderFetchError(error) {
-  if (isCardTraderRateLimitError(error)) return true;
+  if (isCardTraderRateLimitError(error) || isCardTraderAuthenticationRejection(error)) return true;
   const message = String(error && error.message ? error.message : '');
   const code = String((error && error.cause && error.cause.code) || error.code || '');
   return message === 'fetch failed'
@@ -786,6 +794,12 @@ async function fetchMarketplaceProductsWithRetry(token, params, options) {
       if (!isTransientCardTraderFetchError(error) || attempt === MAX_RATE_LIMIT_RETRIES) {
         throw error;
       }
+      emitRefreshProgress(options, 'marketplace_fetch_retry', {
+        attempt: attempt + 1,
+        params,
+        reason: isCardTraderAuthenticationRejection(error) ? 'authentication_rejected' : 'transient_fetch_error',
+        message: String(error && error.message ? error.message : error),
+      });
       await sleep(RATE_LIMIT_DELAY_MS * (attempt + 1));
     }
   }
@@ -1342,6 +1356,8 @@ module.exports = {
   fetchMarketplaceRowsForExpansion,
   finalizeDailyRefresh,
   integerOrNull,
+  isCardTraderAuthenticationRejection,
+  isTransientCardTraderFetchError,
   normalizeCardTraderMarketProduct,
   normalizeRefreshOptions,
   parseIntegerList,

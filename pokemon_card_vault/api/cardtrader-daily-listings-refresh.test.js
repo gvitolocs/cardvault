@@ -639,6 +639,22 @@ test('complete-book observations archive missing listings; partial ones never do
   }, { truncated: false }), false);
 });
 
+test('a CardTrader rejection after a successful refresh call is retried', () => {
+  const refresh = loadRefreshModuleWithStubs();
+
+  const rejected = Object.assign(new Error('CardTrader rejected this API token.'), {
+    statusCode: 400,
+  });
+  assert.equal(refresh.isCardTraderAuthenticationRejection(rejected), true);
+  assert.equal(refresh.isTransientCardTraderFetchError(rejected), true);
+  assert.equal(
+    refresh.isTransientCardTraderFetchError(
+      Object.assign(new Error('CardTrader request failed with HTTP 404.'), { statusCode: 502 }),
+    ),
+    false,
+  );
+});
+
 test('CardTrader refresh reports derived listing cache count', async () => {
   const refresh = loadRefreshModuleWithStubs();
   const calls = [];
