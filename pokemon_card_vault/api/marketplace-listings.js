@@ -890,11 +890,14 @@ async function updateListing(req, decoded, id) {
   return listing;
 }
 
-async function decrementListing(req, id) {
+// Seller-only manual stock decrement. Checkout decrements through
+// marketplace-orders; nobody else may reduce another seller's stock.
+async function decrementListing(req, decoded, id) {
   const quantity = Number(req.body?.quantity || 0);
   if (!Number.isSafeInteger(quantity) || quantity <= 0) {
     return null;
   }
+  await readListingForOwner(id, decoded.uid);
   const result = await marketplaceWriteQuery(
     `
       update public.marketplace_user_listings
@@ -903,9 +906,10 @@ async function decrementListing(req, id) {
         status = case when greatest(quantity_available - $2, 0) = 0 then 'sold_out' else status end,
         updated_at = now()
       where id = $1
+        and seller_uid = $3
       returning *
     `,
-    [id, quantity],
+    [id, quantity, decoded.uid],
   );
   const enrichedRows = result.rows[0]
     ? await enrichListingRowsWithSellerProfiles(result.rows)
@@ -948,7 +952,7 @@ module.exports = async function handler(req, res) {
     const action = cleanText(url.searchParams.get('action'), 40);
 
     if (req.method === 'POST' && action === 'decrement' && id) {
-      const listing = await decrementListing(req, id);
+      const listing = await decrementListing(req, decoded, id);
       return res.status(200).json({ listing });
     }
     if (req.method === 'POST') {
