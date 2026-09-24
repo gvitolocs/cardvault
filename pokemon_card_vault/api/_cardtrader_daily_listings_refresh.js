@@ -1237,17 +1237,34 @@ async function runCatalogExpansionRefresh(token, options, env) {
     });
   }
 
+  // A failing expansion (e.g. CardTrader rejecting the API token) must not
+  // abort the others mid-write: stop handing out new expansions, let the
+  // in-flight ones finish persisting, finalize what was written, then fail.
+  // Promise.all used to reject at the first error, skip finalize (stale
+  // sold stats) and let the pool close under running population upserts.
+  let firstError = null;
   async function expansionWorker() {
-    while (nextIndex < expansions.length && totals.fetchedProducts < options.maxProducts) {
+    while (!firstError && nextIndex < expansions.length && totals.fetchedProducts < options.maxProducts) {
       const index = nextIndex;
       nextIndex += 1;
-      await refreshOneExpansion(index);
+      try {
+        await refreshOneExpansion(index);
+      } catch (error) {
+        if (!firstError) {
+          firstError = error;
+          emitRefreshProgress(options, 'expansion_refresh_failed', {
+            expansionId: expansions[index] && expansions[index].expansionId,
+            message: String(error && error.message ? error.message : error),
+            stoppingAfterInFlight: true,
+          });
+        }
+      }
     }
   }
 
   await Promise.all(Array.from({ length: workerCount }, expansionWorker));
 
-  if (wanted.size === 0 && totals.fetchedProducts < options.maxProducts) {
+  if (!firstError && wanted.size === 0 && totals.fetchedProducts < options.maxProducts) {
     const ungroupedIds = await readUngroupedBlueprintIdsFromOracle(
       Math.min(options.maxBlueprints, 5_000),
     );
@@ -1272,9 +1289,18 @@ async function runCatalogExpansionRefresh(token, options, env) {
 
   let finalized = null;
   if (!options.dryRun && options.finalize) {
-    emitRefreshProgress(options, 'finalize_start', { removedDay: options.removedDay });
+    // Finalize only rebuilds from what was persisted, so it is safe and
+    // needed even after a partial run: it keeps sold stats in step with the
+    // retractions/confirmations this run wrote.
+    emitRefreshProgress(options, 'finalize_start', { removedDay: options.removedDay, partialRun: Boolean(firstError) });
     finalized = await finalizeDailyRefresh({ removedDay: options.removedDay, env });
     emitRefreshProgress(options, 'finalize_done', finalized);
+  }
+
+  if (firstError) {
+    firstError.partialTotals = totals;
+    firstError.finalized = finalized;
+    throw firstError;
   }
 
   return {
