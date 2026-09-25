@@ -41,7 +41,7 @@ function familyForPath(path) {
   if (/listings|marketplace-cart|marketplace-orders|watchlist|marketplace-recents|marketplace-event/.test(p)) {
     return 'commerce';
   }
-  if (/auth-login|user-current-page|cache-google/.test(p)) {
+  if (/auth-login|user-current-page|cache-google|ensure-username/.test(p)) {
     return 'auth';
   }
   if (/stripe|create-pkn|crypto-pkn|earn-pkn|top-up|wpkn|bitcoin/.test(p)) {
