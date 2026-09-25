@@ -65,6 +65,29 @@ function shouldReplaceExistingUsername({ username, uid, email, forcePokemon }) {
   return Boolean(forcePokemon && isGeneratedWalletUsername(username, uid, email));
 }
 
+const USERNAME_RE = /^[a-z0-9]{3,32}$/;
+
+function registryPayload({ uid, username, displayName, existing, now }) {
+  return {
+    uid,
+    username,
+    displayName: String(displayName || ''),
+    displayNameSearch: displayNameSearchKey(displayName || username),
+    createdAt: existing?.exists ? existing.data()?.createdAt || now : now,
+    updatedAt: now,
+  };
+}
+
+/** Read the registry entry for `name` and say whether `uid` owns it.
+ * Only an owned entry may be deleted: a profile that drifted from the
+ * registry must never delete somebody else's name. */
+async function readOwnedRegistry(transaction, firestore, name, uid) {
+  if (!USERNAME_RE.test(name)) return { ref: null, owned: false };
+  const ref = firestore.collection('usernames').doc(name);
+  const doc = await transaction.get(ref);
+  return { ref, doc, owned: doc.exists && doc.data()?.uid === uid };
+}
+
 async function assignUniqueUsername({
   firestore,
   admin,
@@ -76,8 +99,9 @@ async function assignUniqueUsername({
   const userRef = firestore.collection('users').doc(uid);
   const now = admin.firestore.FieldValue.serverTimestamp();
   let assigned = '';
-
   await firestore.runTransaction(async (transaction) => {
+    const oldUsername = String(previousUsername || '').trim().toLowerCase();
+    const old = await readOwnedRegistry(transaction, firestore, oldUsername, uid);
     const cleanBase = baseUsernameFrom(base);
     for (let suffix = 0; suffix < 10000; suffix += 1) {
       const candidate = suffix === 0 ? cleanBase : `${cleanBase}${suffix}`;
@@ -87,21 +111,12 @@ async function assignUniqueUsername({
       if (usernameDoc.exists && owner !== uid) {
         continue;
       }
-
-      const oldUsername = String(previousUsername || '').trim().toLowerCase();
-      if (oldUsername && oldUsername !== candidate) {
-        transaction.delete(firestore.collection('usernames').doc(oldUsername));
+      if (old.owned && oldUsername !== candidate) {
+        transaction.delete(old.ref);
       }
       transaction.set(
         usernameRef,
-        {
-          uid,
-          username: candidate,
-          displayName: String(displayName || ''),
-          displayNameSearch: displayNameSearchKey(displayName || candidate),
-          createdAt: usernameDoc.exists ? usernameDoc.data()?.createdAt || now : now,
-          updatedAt: now,
-        },
+        registryPayload({ uid, username: candidate, displayName, existing: usernameDoc, now }),
         { merge: true },
       );
       transaction.set(
@@ -120,10 +135,13 @@ async function assignUniqueUsername({
       statusCode: 409,
     });
   });
-
   return assigned;
 }
 
+/** The username transfers and receive codes resolve for `uid`. Keeps a
+ * valid profile name, re-registering it when the `usernames` entry is
+ * missing; assigns a fresh one when the profile has none, an invalid one,
+ * or one the registry gives to another account. */
 async function ensureUniqueUsername({
   firestore,
   admin,
@@ -135,29 +153,42 @@ async function ensureUniqueUsername({
   const userRef = firestore.collection('users').doc(uid);
   const now = admin.firestore.FieldValue.serverTimestamp();
   let assigned = '';
-
+  let previousUsername = '';
   await firestore.runTransaction(async (transaction) => {
+    assigned = '';
     const userDoc = await transaction.get(userRef);
-    const existing = String(userDoc.data()?.username || '').trim().toLowerCase();
-    if (existing && !shouldReplaceExistingUsername({
+    const data = userDoc.data() || {};
+    const existing = String(data.username || '').trim().toLowerCase();
+    previousUsername = existing;
+    if (!USERNAME_RE.test(existing) || shouldReplaceExistingUsername({
       username: existing,
       uid,
       email,
       forcePokemon: preferPokemon,
     })) {
-      assigned = existing;
       return;
     }
+    const registry = await readOwnedRegistry(transaction, firestore, existing, uid);
+    if (registry.doc.exists && !registry.owned) {
+      return;
+    }
+    if (!registry.doc.exists) {
+      transaction.set(
+        registry.ref,
+        registryPayload({ uid, username: existing, displayName: data.displayName || displayName, existing: registry.doc, now }),
+        { merge: true },
+      );
+    }
+    if (data.username !== existing || data.usernameLower !== existing) {
+      transaction.set(userRef, { username: existing, usernameLower: existing, updatedAt: now }, { merge: true });
+    }
+    assigned = existing;
   });
-
   if (assigned) {
     return assigned;
   }
-
-  const userDoc = await userRef.get();
-  const previousUsername = String(userDoc.data()?.username || '').trim().toLowerCase();
   const base = preferPokemon ? randomPokemonUsernameBase() : baseUsernameFrom(email || displayName || uid);
-  assigned = await assignUniqueUsername({
+  return assignUniqueUsername({
     firestore,
     admin,
     uid,
@@ -165,28 +196,20 @@ async function ensureUniqueUsername({
     displayName,
     previousUsername,
   });
-
-  return assigned;
 }
 
 async function updateUniqueUsername({ firestore, admin, uid, desiredUsername }) {
-  const clean = normalizeRequestedUsername(desiredUsername);
-  const userDoc = await firestore.collection('users').doc(uid).get();
-  const previousUsername = String(userDoc.data()?.username || '').trim().toLowerCase();
-  if (previousUsername === clean) {
-    return clean;
-  }
   return claimExactUsername({
     firestore,
     admin,
     uid,
-    username: clean,
-    displayName: userDoc.data()?.displayName || clean,
-    email: userDoc.data()?.email || '',
-    previousUsername,
+    username: normalizeRequestedUsername(desiredUsername),
   });
 }
 
+/** Give `uid` exactly `username`. Idempotent: claiming the current name
+ * repairs a missing registry entry. The previous name is read inside the
+ * transaction and released only if this account owns it. */
 async function claimExactUsername({
   firestore,
   admin,
@@ -194,54 +217,63 @@ async function claimExactUsername({
   username,
   displayName = '',
   email = '',
-  previousUsername = '',
 }) {
   const clean = normalizeRequestedUsername(username);
   const userRef = firestore.collection('users').doc(uid);
   const usernameRef = firestore.collection('usernames').doc(clean);
   const now = admin.firestore.FieldValue.serverTimestamp();
-
   await firestore.runTransaction(async (transaction) => {
+    const userDoc = await transaction.get(userRef);
+    const data = userDoc.data() || {};
     const usernameDoc = await transaction.get(usernameRef);
+    const oldUsername = String(data.username || '').trim().toLowerCase();
+    const old = oldUsername && oldUsername !== clean
+      ? await readOwnedRegistry(transaction, firestore, oldUsername, uid)
+      : { owned: false };
     const owner = String(usernameDoc.data()?.uid || '');
     if (usernameDoc.exists && owner !== uid) {
       throw Object.assign(new Error('Username is already taken.'), {
         statusCode: 409,
       });
     }
-
-    const oldUsername = String(previousUsername || '').trim().toLowerCase();
-    if (oldUsername && oldUsername !== clean) {
-      transaction.delete(firestore.collection('usernames').doc(oldUsername));
+    if (old.owned) {
+      transaction.delete(old.ref);
     }
-
+    const profileDisplayName = String(data.displayName || displayName || '');
     transaction.set(
       usernameRef,
-      {
-        uid,
-        username: clean,
-        displayName: String(displayName || clean),
-        displayNameSearch: displayNameSearchKey(displayName || clean),
-        createdAt: usernameDoc.exists ? usernameDoc.data()?.createdAt || now : now,
-        updatedAt: now,
-      },
+      registryPayload({ uid, username: clean, displayName: profileDisplayName || clean, existing: usernameDoc, now }),
       { merge: true },
     );
-    transaction.set(
-      userRef,
-      {
-        uid,
-        email: String(email || ''),
-        displayName: String(displayName || clean),
-        username: clean,
-        usernameLower: clean,
-        updatedAt: now,
-      },
-      { merge: true },
-    );
+    const profile = { uid, username: clean, usernameLower: clean, updatedAt: now };
+    if (!data.displayName) profile.displayName = profileDisplayName || clean;
+    if (!data.email && email) profile.email = String(email);
+    transaction.set(userRef, profile, { merge: true });
   });
-
   return clean;
+}
+
+/** POST body handling shared by /api/ensure-username and
+ * /api/search-recipient-emails: `{username}` claims it, `{}` ensures one. */
+async function usernameForRequest({ firestore, admin, decoded, requestedUsername = '' }) {
+  const requested = String(requestedUsername || '').trim();
+  if (requested) {
+    return updateUniqueUsername({
+      firestore,
+      admin,
+      uid: decoded.uid,
+      desiredUsername: requested,
+    });
+  }
+  const userDoc = await firestore.collection('users').doc(decoded.uid).get();
+  const profile = userDoc.data() || {};
+  return ensureUniqueUsername({
+    firestore,
+    admin,
+    uid: decoded.uid,
+    email: decoded.email || profile.email || '',
+    displayName: profile.displayName || decoded.name || '',
+  });
 }
 
 module.exports = {
@@ -253,4 +285,5 @@ module.exports = {
   normalizeRequestedUsername,
   randomPokemonUsernameBase,
   updateUniqueUsername,
+  usernameForRequest,
 };
