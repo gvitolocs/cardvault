@@ -9,10 +9,15 @@ const {
 const { decrementLinkedCardTraderProduct } = require('./_cardtrader_seller_listings');
 const {
   _test: {
+    PKNRESERVE_SELLER_USERNAME: LIVE_RESERVE_SELLER_USERNAME,
     readLiveCardTraderListings,
   },
 } = require('./cardtrader-live-listings');
 const { decrementSellerOwnershipForSale } = require('./_user_card_collection');
+
+// Live CardTrader offers are sold by the pknreserve account; the buyer's
+// request never chooses who is credited for them.
+const PKNRESERVE_SELLER_USERNAME = LIVE_RESERVE_SELLER_USERNAME || 'pknreserve';
 
 function cleanText(value, maxLength = 240) {
   return String(value || '').trim().slice(0, maxLength);
@@ -316,9 +321,26 @@ function assertCardTraderCheckoutCanProceed(items, body = {}, env = process.env)
   assertCardTraderBuyConfigured(env);
 }
 
-async function verifyCardTraderLiveItems(items, { query = marketplaceQuery } = {}) {
+async function pknReserveSellerUid(firestore) {
+  const doc = await firestore.collection('usernames').doc(PKNRESERVE_SELLER_USERNAME).get();
+  const uid = cleanText(doc.exists ? doc.data()?.uid : '', 160);
+  if (!uid) {
+    const error = new Error('CardTrader checkout is not available right now.');
+    error.statusCode = 503;
+    throw error;
+  }
+  return uid;
+}
+
+async function verifyCardTraderLiveItems(items, { query = marketplaceQuery, reserveSellerUid = '' } = {}) {
   const cardTraderItems = items.filter(isCardTraderLiveItem);
+  if (cardTraderItems.length && !reserveSellerUid) {
+    const error = new Error('CardTrader checkout is not available right now.');
+    error.statusCode = 503;
+    throw error;
+  }
   for (const item of cardTraderItems) {
+    item.sellerUid = reserveSellerUid;
     const productId = cardTraderProductIdForItem(item);
     const blueprintId = cleanText(item.sourceMetadata?.cardtraderBlueprintId || item.card?.id, 80);
     if (!productId || !blueprintId) {
@@ -344,7 +366,46 @@ async function verifyCardTraderLiveItems(items, { query = marketplaceQuery } = {
       error.statusCode = 409;
       throw error;
     }
+    const livePricePkn = numberValue(liveListing.displayPricePkn, NaN);
+    if (!(livePricePkn > 0) || livePricePkn > item.unitPricePkn) {
+      const error = new Error(`CardTrader listing ${productId} is no longer available at this price. Refresh and try again.`);
+      error.statusCode = 409;
+      throw error;
+    }
+    // Live CardTrader rows are always NFT/reserve tagged (see
+    // syntheticCardTraderListingRow in marketplace-listings.js).
+    applyServerPrice(item, { unitPricePkn: livePricePkn, nftAvailable: true, reserveAvailable: true });
   }
+}
+
+// Overwrite the client's price and NFT flags with the server's copy so
+// totals, seller credits and escrow release never trust the request body.
+function applyServerPrice(item, { unitPricePkn, nftAvailable, reserveAvailable }) {
+  item.unitPricePkn = unitPricePkn;
+  item.totalPricePkn = unitPricePkn * item.quantity;
+  item.nftAvailable = nftAvailable;
+  item.reserveAvailable = reserveAvailable;
+  return item;
+}
+
+function orderTotals(items, body, fulfillmentMode) {
+  if (fulfillmentMode === 'nft_only' && items.some((item) => !item.nftAvailable && !item.reserveAvailable)) {
+    const error = new Error('NFT-only checkout requires every item to have the NFT tag.');
+    error.statusCode = 400;
+    throw error;
+  }
+  const subtotalPkn = items.reduce((sum, item) => sum + item.totalPricePkn, 0);
+  const taxPkn = Math.max(0, numberValue(body?.taxPkn));
+  const shippingPkn = fulfillmentMode === 'nft_only'
+    ? 0
+    : Math.max(0, numberValue(body?.shippingPkn));
+  const totalPkn = subtotalPkn + taxPkn + shippingPkn;
+  if (!Number.isFinite(totalPkn) || totalPkn <= 0) {
+    const error = new Error('Order total is invalid.');
+    error.statusCode = 400;
+    throw error;
+  }
+  return { subtotalPkn, taxPkn, shippingPkn, totalPkn };
 }
 
 async function markCardTraderPurchaseStatus({
@@ -516,6 +577,10 @@ async function verifyAndDecrementListings(items) {
         });
         continue;
       }
+      // The buyer is charged the stored price, never the client's copy: the
+      // row must still ask at most what the cart showed (a seller raise
+      // fails the checkout instead of charging more), and the item is
+      // re-priced from price_pkn below.
       const result = await marketplaceQuery(
         `
           update public.marketplace_user_listings
@@ -527,16 +592,24 @@ async function verifyAndDecrementListings(items) {
             and seller_uid = $3
             and status = 'active'
             and quantity_available >= $2
-          returning card_id, source_listing_id, source, seller_uid, quantity_available
+            and price_pkn > 0
+            and price_pkn <= $4
+          returning card_id, source_listing_id, source, seller_uid, quantity_available,
+            price_pkn, nft_available, reserve_available
         `,
-        [item.listingId, item.quantity, item.sellerUid],
+        [item.listingId, item.quantity, item.sellerUid, item.unitPricePkn],
       );
       const row = result.rows[0];
       if (!row) {
-        const error = new Error(`Listing ${item.listingId} is no longer available.`);
+        const error = new Error(`Listing ${item.listingId} is no longer available at this price. Refresh and try again.`);
         error.statusCode = 409;
         throw error;
       }
+      applyServerPrice(item, {
+        unitPricePkn: numberValue(row.price_pkn),
+        nftAvailable: row.nft_available === true,
+        reserveAvailable: row.reserve_available === true,
+      });
       decremented.push({
         listingId: item.listingId,
         quantity: item.quantity,
@@ -630,30 +703,16 @@ async function createPaidOrder({ admin, firestore, decoded, body }) {
     error.statusCode = 400;
     throw error;
   }
-  const subtotalPkn = items.reduce((sum, item) => sum + item.totalPricePkn, 0);
   const fulfillmentMode = cleanFulfillmentMode(body?.fulfillmentMode);
-  if (fulfillmentMode === 'nft_only' && items.some((item) => !item.nftAvailable && !item.reserveAvailable)) {
-    const error = new Error('NFT-only checkout requires every item to have the NFT tag.');
-    error.statusCode = 400;
-    throw error;
-  }
-  const taxPkn = Math.max(0, numberValue(body?.taxPkn));
-  const shippingPkn = fulfillmentMode === 'nft_only'
-    ? 0
-    : Math.max(0, numberValue(body?.shippingPkn));
-  const computedTotal = subtotalPkn + taxPkn + shippingPkn;
-  const requestedTotal = numberValue(body?.totalPkn, computedTotal);
-  const totalPkn = Math.max(computedTotal, requestedTotal);
-  if (!Number.isFinite(totalPkn) || totalPkn <= 0) {
-    const error = new Error('Order total is invalid.');
-    error.statusCode = 400;
-    throw error;
-  }
-
   if (fulfillmentMode !== 'nft_only') {
     assertCardTraderCheckoutCanProceed(items, body, process.env);
   }
-  await verifyCardTraderLiveItems(items);
+  // Both calls re-price every item from the server (listing row / live
+  // CardTrader offer); totals are computed only afterwards.
+  const reserveSellerUid = items.some(isCardTraderLiveItem)
+    ? await pknReserveSellerUid(firestore)
+    : '';
+  await verifyCardTraderLiveItems(items, { reserveSellerUid });
   const decremented = await verifyAndDecrementListings(items);
 
   const orderRef = firestore.collection('orders').doc();
@@ -664,7 +723,12 @@ async function createPaidOrder({ admin, firestore, decoded, body }) {
   const escrow = physicalUsesEscrow(fulfillmentMode);
 
   let orderData = null;
+  let subtotalPkn = 0;
+  let taxPkn = 0;
+  let shippingPkn = 0;
+  let totalPkn = 0;
   try {
+    ({ subtotalPkn, taxPkn, shippingPkn, totalPkn } = orderTotals(items, body, fulfillmentMode));
     await firestore.runTransaction(async (transaction) => {
       const buyerBalance = await transaction.get(buyerBalanceRef);
       const available = numberValue(buyerBalance.data()?.availablePkn);
@@ -969,6 +1033,36 @@ function sellerOnOrder(data, uid) {
   return Array.isArray(data.sellerUids) && data.sellerUids.includes(uid);
 }
 
+// Escrow money only moves for orders this server checked out: the buyer's
+// escrow debit is a ledger entry clients cannot write (firestore.rules), and
+// the order is re-read inside the transaction so a second concurrent
+// release/refund sees it already settled.
+async function readEscrowInTransaction(transaction, firestore, orderRef, orderId, buyerUid) {
+  const fresh = await transaction.get(orderRef);
+  const data = fresh.data() || {};
+  if (!fresh.exists || data.paymentStatus !== 'escrow') {
+    const error = new Error('This order is not in escrow.');
+    error.statusCode = 400;
+    throw error;
+  }
+  const ledger = await transaction.get(
+    firestore.collection('ledger_entries').where('orderId', '==', orderId).limit(20),
+  );
+  const totalPkn = numberValue(data.totalPkn);
+  const funded = ledger.docs.some((doc) => {
+    const entry = doc.data() || {};
+    return entry.uid === buyerUid &&
+      entry.type === 'marketplace_order_escrow' &&
+      numberValue(entry.amountPkn) === -totalPkn;
+  });
+  if (!funded || !(totalPkn > 0)) {
+    const error = new Error('This order has no escrow payment.');
+    error.statusCode = 409;
+    throw error;
+  }
+  return data;
+}
+
 async function loadOrderOrThrow(firestore, orderId) {
   const orderRef = firestore.collection('orders').doc(orderId);
   const doc = await orderRef.get();
@@ -993,8 +1087,9 @@ async function confirmDelivery({ admin, firestore, decoded, orderId }) {
     throw error;
   }
   const now = admin.firestore.FieldValue.serverTimestamp();
-  const sellerTotals = sellerTotalsFromItems(data.items || []);
   await firestore.runTransaction(async (transaction) => {
+    const escrowed = await readEscrowInTransaction(transaction, firestore, orderRef, orderId, decoded.uid);
+    const sellerTotals = sellerTotalsFromItems(escrowed.items || []);
     for (const [sellerUid, amountPkn] of sellerTotals.entries()) {
       transaction.set(
         firestore.collection('balances').doc(sellerUid),
@@ -1057,8 +1152,14 @@ async function reportProblem({ admin, firestore, decoded, orderId, reason, notes
   const why = cleanText(reason, 40) || 'not_as_described';
   const now = admin.firestore.FieldValue.serverTimestamp();
   if (why === 'not_shipped' && canAutoRefundNotShipped(data)) {
-    const totalPkn = numberValue(data.totalPkn);
     await firestore.runTransaction(async (transaction) => {
+      const escrowed = await readEscrowInTransaction(transaction, firestore, orderRef, orderId, decoded.uid);
+      if (!canAutoRefundNotShipped(escrowed)) {
+        const error = new Error('This order can no longer be refunded automatically.');
+        error.statusCode = 409;
+        throw error;
+      }
+      const totalPkn = numberValue(escrowed.totalPkn);
       transaction.set(
         firestore.collection('balances').doc(decoded.uid),
         {
@@ -1195,6 +1296,12 @@ module.exports._test = {
   orderPayload,
   shippingAddressFromBody,
   verifyCardTraderLiveItems,
+  applyServerPrice,
+  orderTotals,
+  pknReserveSellerUid,
+  readEscrowInTransaction,
+  confirmDelivery,
+  reportProblem,
   syncSellerOwnershipAfterPhysicalSale,
   verifyAndDecrementListings,
 };

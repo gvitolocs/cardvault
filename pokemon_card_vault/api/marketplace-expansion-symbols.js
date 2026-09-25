@@ -51,7 +51,10 @@ function isValidHttpUrl(value) {
 
 async function requireDebugOrAdmin(req) {
   const decoded = await verifyBearerToken(req);
-  const email = String(decoded.email || '').trim().toLowerCase();
+  // Only the verified token email counts; profile usernames are not proof.
+  const email = decoded.email_verified === true
+    ? String(decoded.email || '').trim().toLowerCase()
+    : '';
   const allowlist = [
     'vitologiuseppe17@gmail.com',
     'pokoinpos@gmail.com',
@@ -63,7 +66,7 @@ async function requireDebugOrAdmin(req) {
     .split(',')
     .map((value) => value.trim().toLowerCase())
     .filter(Boolean);
-  if (allowlist.includes(email)) {
+  if (email && allowlist.includes(email)) {
     return decoded;
   }
 
@@ -71,13 +74,11 @@ async function requireDebugOrAdmin(req) {
   const userDoc = await admin.firestore().collection('users').doc(decoded.uid).get();
   const profile = userDoc.data() || {};
   const role = String(profile.role || '').trim().toLowerCase();
-  const username = String(profile.username || '').trim().toLowerCase();
   if (
     profile.admin === true ||
     profile.isAdmin === true ||
     profile.hasAdminAccess === true ||
-    role === 'admin' ||
-    username === 'vitologiuseppe17'
+    role === 'admin'
   ) {
     return decoded;
   }

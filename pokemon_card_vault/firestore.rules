@@ -10,45 +10,40 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == uid;
     }
 
+    // Profile fields a signed-in client may write on its own users doc.
+    // Everything else (admin/role/roles/silverUntil, username, walletAddress,
+    // photo*, reserve flags, …) is server-owned: the API trusts those fields
+    // for admin access, Silver, reserve listings and deposit verification.
+    function clientProfileKeys() {
+      return ['email', 'displayName', 'createdAt', 'updatedAt', 'lastLoginAt', 'lastSeenAt'];
+    }
+
     match /users/{uid} {
-      allow read, create, update: if owns(uid);
+      allow read: if owns(uid);
+      allow create: if owns(uid)
+        && request.resource.data.keys().hasOnly(clientProfileKeys().concat(['walletAddress']))
+        && request.resource.data.get('walletAddress', null) == null;
+      allow update: if owns(uid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(clientProfileKeys());
       allow delete: if false;
     }
 
+    // username → uid, wallet → uid and email → wallet registries resolve
+    // transfers, wallet sign-in and send-to-email. Only the API writes them
+    // (_username.js, wallet-auth/*, wallet-link*).
     match /usernames/{username} {
       allow read: if signedIn();
-      allow create: if signedIn()
-        && request.resource.data.uid == request.auth.uid
-        && request.resource.data.username == username
-        && username.matches('^[a-z0-9]{3,32}$');
-      allow update: if signedIn()
-        && resource.data.uid == request.auth.uid
-        && request.resource.data.uid == request.auth.uid
-        && request.resource.data.username == username;
-      allow delete: if false;
+      allow write: if false;
     }
 
     match /wallet_addresses/{address} {
       allow read: if signedIn();
-      allow create: if signedIn()
-        && request.resource.data.uid == request.auth.uid
-        && request.resource.data.address == address
-        && request.resource.data.email is string;
-      allow update: if signedIn()
-        && resource.data.uid == request.auth.uid
-        && request.resource.data.uid == request.auth.uid
-        && request.resource.data.address == address;
-      allow delete: if false;
+      allow write: if false;
     }
 
     match /email_wallets/{email} {
       allow read: if signedIn();
-      allow create, update: if signedIn()
-        && request.resource.data.uid == request.auth.uid
-        && request.resource.data.email == email
-        && request.resource.data.address is string
-        && request.resource.data.address.matches('^0x[a-f0-9]{40}$');
-      allow delete: if false;
+      allow write: if false;
     }
 
     match /balances/{uid} {
@@ -83,8 +78,9 @@ service cloud.firestore {
       allow read: if signedIn()
         && (resource.data.uid == request.auth.uid
           || request.auth.uid in resource.data.sellerUids);
-      allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
-      allow update, delete: if false;
+      // Orders are created only by POST /api/marketplace-orders (admin SDK):
+      // escrow release and refunds credit PKN from these documents.
+      allow create, update, delete: if false;
     }
 
     match /card_listings/{listingId} {
@@ -169,14 +165,9 @@ service cloud.firestore {
 
     match /withdraw_requests/{requestId} {
       allow read: if signedIn() && resource.data.uid == request.auth.uid;
-      allow create: if signedIn()
-        && request.resource.data.uid == request.auth.uid
-        && request.resource.data.status == 'pending'
-        && request.resource.data.amountPkn is int
-        && request.resource.data.amountPkn > 0
-        && request.resource.data.toAddress is string
-        && request.resource.data.toAddress.matches('^0x[a-fA-F0-9]{40}$');
-      allow update, delete: if false;
+      // Created only by POST /api/request-pkn-withdraw, which locks the
+      // balance first; a client-made pending row would have nothing behind it.
+      allow create, update, delete: if false;
     }
 
     match /forum_categories/{categoryId} {
