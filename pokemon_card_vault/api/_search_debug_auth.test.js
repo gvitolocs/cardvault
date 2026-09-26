@@ -55,43 +55,30 @@ test('search debug reads configured admin and debug email allowlists', () => {
   }
 });
 
-test('search debug authorizer allows Firestore admin profiles', async () => {
-  const { authorizeSearchDebugRequest } = loadSearchDebugAuthWithFirebaseStub({
+test('search debug authorizer allows a custom-claim admin and rejects a Firestore admin profile', async () => {
+  const claimed = loadSearchDebugAuthWithFirebaseStub({
     verifyBearerToken: async () => ({
       uid: 'admin-uid',
       email: 'admin-user@example.com',
-    }),
-    getFirebaseAdmin: () => ({
-      firestore: () => ({
-        collection: (name) => {
-          assert.equal(name, 'users');
-          return {
-            doc: (uid) => {
-              assert.equal(uid, 'admin-uid');
-              return {
-                get: async () => ({
-                  data: () => ({
-                    username: 'admin-user',
-                    role: 'admin',
-                  }),
-                }),
-              };
-            },
-          };
-        },
-      }),
+      admin: true,
     }),
   });
-
-  const user = await authorizeSearchDebugRequest({
+  const user = await claimed.authorizeSearchDebugRequest({
     headers: { authorization: 'Bearer token' },
   });
+  assert.equal(user.uid, 'admin-uid');
 
-  assert.deepEqual(user, {
-    uid: 'admin-uid',
-    email: 'admin-user@example.com',
-    username: 'admin-user',
+  const profile = loadSearchDebugAuthWithFirebaseStub({
+    verifyBearerToken: async () => ({
+      uid: 'admin-uid',
+      email: 'admin-user@example.com',
+      username: 'vitologiuseppe17',
+    }),
   });
+  await assert.rejects(
+    () => profile.authorizeSearchDebugRequest({ headers: { authorization: 'Bearer token' } }),
+    (error) => error.statusCode === 403,
+  );
 });
 
 test('search debug authorizer rejects non-admin profiles', async () => {

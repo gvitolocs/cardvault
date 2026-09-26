@@ -63,6 +63,7 @@ async function statusIngestGame(req, res, env = process.env) {
   if (isPokemonIngestGame(raw)) {
     throw pokemonStaysOnPiError();
   }
+  authorizeIngestRequest(req, env);
   const config = ingestGameConfig(raw);
   if (!config) {
     throw unknownIngestGameError(raw);

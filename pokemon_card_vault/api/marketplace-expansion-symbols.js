@@ -1,5 +1,5 @@
 const { marketplaceQuery } = require('./_marketplace_db');
-const { getFirebaseAdmin, verifyBearerToken } = require('./_firebase');
+const { authorizeSearchDebugRequest } = require('./_search_debug_auth');
 
 function cleanLimit(value, fallback = 300) {
   const limit = Number(value);
@@ -50,42 +50,7 @@ function isValidHttpUrl(value) {
 }
 
 async function requireDebugOrAdmin(req) {
-  const decoded = await verifyBearerToken(req);
-  // Only the verified token email counts; profile usernames are not proof.
-  const email = decoded.email_verified === true
-    ? String(decoded.email || '').trim().toLowerCase()
-    : '';
-  const allowlist = [
-    'vitologiuseppe17@gmail.com',
-    'pokoinpos@gmail.com',
-    process.env.MARKETPLACE_ADMIN_EMAILS || '',
-    process.env.MARKETPLACE_DEBUG_EMAILS || '',
-    process.env.ADMIN_SIGNUP_EMAIL || '',
-  ]
-    .join(',')
-    .split(',')
-    .map((value) => value.trim().toLowerCase())
-    .filter(Boolean);
-  if (email && allowlist.includes(email)) {
-    return decoded;
-  }
-
-  const admin = getFirebaseAdmin();
-  const userDoc = await admin.firestore().collection('users').doc(decoded.uid).get();
-  const profile = userDoc.data() || {};
-  const role = String(profile.role || '').trim().toLowerCase();
-  if (
-    profile.admin === true ||
-    profile.isAdmin === true ||
-    profile.hasAdminAccess === true ||
-    role === 'admin'
-  ) {
-    return decoded;
-  }
-
-  const error = new Error('Debug access required.');
-  error.statusCode = 403;
-  throw error;
+  await authorizeSearchDebugRequest(req);
 }
 
 async function listExpansionSymbols({

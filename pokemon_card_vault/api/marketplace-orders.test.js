@@ -14,7 +14,10 @@ function loadMarketplaceOrdersWithStubs({ query = async () => ({ rows: [] }), li
       };
     }
     if (request === './_marketplace_db') {
-      return { marketplaceQuery: (...args) => query(...args) };
+      return {
+        marketplaceQuery: (...args) => query(...args),
+        marketplaceWriteQuery: (...args) => query(...args),
+      };
     }
     if (request === './_marketplace_sale_notifications') {
       return { sendSellerSaleNotificationsForPaidOrder: async () => ({ ok: true }) };

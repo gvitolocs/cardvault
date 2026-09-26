@@ -2989,10 +2989,29 @@ async function callPokontactService({ message, chatRecord, user, page, pageConte
   }
 }
 
+const assistantHits = new Map();
+
+function assistantRateLimited(req) {
+  const forwarded = String(req.headers?.['x-forwarded-for'] || req.headers?.['X-Forwarded-For'] || '').split(',')[0].trim();
+  const ip = forwarded || String(req.socket?.remoteAddress || 'unknown');
+  const now = Date.now();
+  const fresh = (assistantHits.get(ip) || []).filter((stamp) => now - stamp < 60_000);
+  if (fresh.length >= 20) {
+    assistantHits.set(ip, fresh);
+    return true;
+  }
+  fresh.push(now);
+  assistantHits.set(ip, fresh);
+  return false;
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ error: 'Method not allowed.' });
+  }
+  if (assistantRateLimited(req)) {
+    return res.status(429).json({ error: 'Too many Pokontact messages.' });
   }
 
   try {

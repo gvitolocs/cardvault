@@ -1,4 +1,4 @@
-const { getFirebaseAdmin, verifyBearerToken } = require('./_firebase');
+const { verifyBearerToken } = require('./_firebase');
 
 // Operator emails. Matched only against the verified email on the Firebase
 // ID token: display names and profile usernames are user-editable
@@ -47,22 +47,6 @@ async function authorizeSearchDebugRequest(req) {
     hasAdminAccess(decoded)
   ) {
     return { uid, email, username };
-  }
-  try {
-    // Admin flags on users/{uid} are server-owned (firestore.rules); the
-    // profile username is only returned for display, never checked.
-    const snapshot = await getFirebaseAdmin()
-      .firestore()
-      .collection('users')
-      .doc(uid)
-      .get();
-    const data = snapshot.data() || {};
-    username = normalize(data.username) || username;
-    if (hasAdminAccess(data)) {
-      return { uid, email, username };
-    }
-  } catch (error) {
-    console.warn('search debug profile lookup failed', error);
   }
   const error = new Error('Search debug is not enabled for this account.');
   error.statusCode = 403;

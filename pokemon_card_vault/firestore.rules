@@ -32,17 +32,20 @@ service cloud.firestore {
     // transfers, wallet sign-in and send-to-email. Only the API writes them
     // (_username.js, wallet-auth/*, wallet-link*).
     match /usernames/{username} {
-      allow read: if signedIn();
+      allow get: if signedIn();
+      allow list: if false;
       allow write: if false;
     }
 
     match /wallet_addresses/{address} {
-      allow read: if signedIn();
+      allow get: if signedIn() && resource.data.uid == request.auth.uid;
+      allow list: if false;
       allow write: if false;
     }
 
     match /email_wallets/{email} {
-      allow read: if signedIn();
+      allow get: if signedIn();
+      allow list: if false;
       allow write: if false;
     }
 
@@ -172,21 +175,7 @@ service cloud.firestore {
 
     match /forum_categories/{categoryId} {
       allow read: if true;
-      allow create: if signedIn()
-        && categoryId in ['general', 'cards', 'pkn', 'validators']
-        && request.resource.data.title is string
-        && request.resource.data.description is string
-        && request.resource.data.iconName is string
-        && request.resource.data.order is int
-        && request.resource.data.topicCount == 1
-        && request.resource.data.postCount == 1;
-      allow update: if signedIn()
-        && resource.id in ['general', 'cards', 'pkn', 'validators']
-        && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['topicCount', 'postCount', 'updatedAt'])
-        && request.resource.data.topicCount >= resource.data.topicCount
-        && request.resource.data.postCount >= resource.data.postCount;
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
     match /forum_topics/{topicId} {

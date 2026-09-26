@@ -8,6 +8,22 @@ const CORS_HEADERS = {
   'Access-Control-Max-Age': '86400',
 };
 
+const classifyHits = new Map();
+
+function classifyRateLimited(req) {
+  const forwarded = String(req.headers?.['x-forwarded-for'] || req.headers?.['X-Forwarded-For'] || '').split(',')[0].trim();
+  const ip = forwarded || String(req.socket?.remoteAddress || 'unknown');
+  const now = Date.now();
+  const fresh = (classifyHits.get(ip) || []).filter((stamp) => now - stamp < 60_000);
+  if (fresh.length >= 30) {
+    classifyHits.set(ip, fresh);
+    return true;
+  }
+  fresh.push(now);
+  classifyHits.set(ip, fresh);
+  return false;
+}
+
 function setCorsHeaders(res) {
   for (const [key, value] of Object.entries(CORS_HEADERS)) {
     res.setHeader(key, value);
@@ -163,6 +179,9 @@ module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST, OPTIONS');
     return res.status(405).json({ error: 'Method not allowed.' });
+  }
+  if (classifyRateLimited(req)) {
+    return res.status(429).json({ ok: false, error: 'Too many classification requests.' });
   }
 
   try {

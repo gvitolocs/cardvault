@@ -2,11 +2,12 @@ const {
   listMarketplaceImages,
   recordMarketplaceImage,
 } = require('./_marketplace_image_log');
+const { authorizeSearchDebugRequest } = require('./_search_debug_auth');
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Access-Control-Max-Age': '86400',
 };
 
@@ -39,6 +40,11 @@ module.exports = async function handler(req, res) {
     return res.status(204).end();
   }
   if (req.method === 'GET') {
+    try {
+      await authorizeSearchDebugRequest(req);
+    } catch (error) {
+      return res.status(error.statusCode || 401).json({ error: error.message || 'Sign in required.' });
+    }
     const url = new URL(req.url, `https://${req.headers.host || 'pokoin.com'}`);
     const rows = listMarketplaceImages(url.searchParams.get('limit'));
     res.setHeader('Cache-Control', 'no-store');

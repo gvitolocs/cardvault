@@ -75,13 +75,7 @@ async function userHasReserveAccess(decoded) {
     console.warn('reserve role custom claim lookup failed', error);
   }
 
-  try {
-    const snapshot = await admin.firestore().collection('users').doc(uid).get();
-    return hasReserveAccess(snapshot.data() || {});
-  } catch (error) {
-    console.warn('reserve role profile lookup failed', error);
-    return false;
-  }
+  return false;
 }
 
 async function requireReserveAccess(decoded) {

@@ -1,5 +1,5 @@
 const { getFirebaseAdmin, verifyBearerToken } = require('./_firebase');
-const { marketplaceQuery } = require('./_marketplace_db');
+const { marketplaceQuery, marketplaceWriteQuery } = require('./_marketplace_db');
 const { sendSellerSaleNotificationsForPaidOrder } = require('./_marketplace_sale_notifications');
 const {
   addProductToCart,
@@ -581,7 +581,7 @@ async function verifyAndDecrementListings(items) {
       // row must still ask at most what the cart showed (a seller raise
       // fails the checkout instead of charging more), and the item is
       // re-priced from price_pkn below.
-      const result = await marketplaceQuery(
+      const result = await marketplaceWriteQuery(
         `
           update public.marketplace_user_listings
           set
@@ -623,7 +623,7 @@ async function verifyAndDecrementListings(items) {
   } catch (error) {
     for (const entry of decremented.reverse()) {
       if (entry.external) continue;
-      await marketplaceQuery(
+      await marketplaceWriteQuery(
         `
           update public.marketplace_user_listings
           set
@@ -641,7 +641,7 @@ async function verifyAndDecrementListings(items) {
   }
 
   for (const cardId of [...new Set(decremented.filter((entry) => !entry.external).map((entry) => entry.cardId).filter(Boolean))]) {
-    await marketplaceQuery(
+    await marketplaceWriteQuery(
       'select public.refresh_marketplace_blueprint_price_summary($1)',
       [cardId],
     ).catch((error) => {
@@ -816,7 +816,7 @@ async function createPaidOrder({ admin, firestore, decoded, body }) {
   } catch (error) {
     for (const item of items) {
       if (isCardTraderLiveItem(item)) continue;
-      await marketplaceQuery(
+      await marketplaceWriteQuery(
         `
           update public.marketplace_user_listings
           set
