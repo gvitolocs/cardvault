@@ -1145,6 +1145,20 @@ const routeDefinitions = [
     },
   },
   {
+    path: '/api/ensure-username',
+    file: 'ensure-username.js',
+    methods: ['POST'],
+    purpose: 'Return the caller username registered in usernames/{name} (repairing or assigning it), or claim a new exact username.',
+    auth: 'Required Firebase bearer token.',
+    params: {
+      body: 'Optional `username` (3-32 a-z0-9) to claim; empty body ensures the current one.',
+    },
+    dependencies: {
+      env: ['FIREBASE_*'],
+      services: ['Firebase Admin'],
+    },
+  },
+  {
     path: '/api/search-recipient-emails',
     file: 'search-recipient-emails.js',
     methods: ['GET', 'POST'],

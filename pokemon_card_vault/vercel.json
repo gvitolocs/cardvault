@@ -775,6 +775,10 @@
       "destination": "/api/marketplace-listings.js"
     },
     {
+      "source": "/api/marketplace-listings-csv",
+      "destination": "/api/marketplace-listings-csv.js"
+    },
+    {
       "source": "/api/marketplace-orders",
       "destination": "/api/marketplace-orders.js"
     },

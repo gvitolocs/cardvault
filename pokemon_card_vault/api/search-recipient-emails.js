@@ -1,8 +1,7 @@
 const { getFirebaseAdmin, verifyBearerToken } = require('../server/_firebase');
 const {
   displayNameSearchKey,
-  ensureUniqueUsername,
-  updateUniqueUsername,
+  usernameForRequest,
 } = require('../server/_username');
 
 function pushMatch(bag, seen, { username, displayName, uid }, selfUid, query) {
@@ -34,24 +33,11 @@ module.exports = async function handler(req, res) {
     const firestore = admin.firestore();
 
     if (req.method === 'POST') {
-      const requestedUsername = String(req.body?.username || '').trim();
-      if (requestedUsername) {
-        const username = await updateUniqueUsername({
-          firestore,
-          admin,
-          uid: decoded.uid,
-          desiredUsername: requestedUsername,
-        });
-        return res.status(200).json({ username });
-      }
-      const userDoc = await firestore.collection('users').doc(decoded.uid).get();
-      const profile = userDoc.data() || {};
-      const username = await ensureUniqueUsername({
+      const username = await usernameForRequest({
         firestore,
         admin,
-        uid: decoded.uid,
-        email: decoded.email || profile.email || '',
-        displayName: profile.displayName || decoded.name || '',
+        decoded,
+        requestedUsername: req.body?.username,
       });
       return res.status(200).json({ username });
     }

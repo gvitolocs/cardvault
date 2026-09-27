@@ -1,5 +1,14 @@
 const { getFirebaseAdmin, verifyBearerToken } = require('../server/_firebase');
 
+function tokenHasAdminAccess(decoded) {
+  const email = String(decoded?.email || '').trim().toLowerCase();
+  if (email === 'vitologiuseppe17@gmail.com' || email === 'pokoinpos@gmail.com') {
+    return true;
+  }
+  const role = String(decoded?.role || '').trim().toLowerCase();
+  return decoded?.admin === true || decoded?.isAdmin === true || role === 'admin';
+}
+
 const SILVER_PRICE_PKN = 20;
 const SILVER_DURATION_MS = 365 * 24 * 60 * 60 * 1000;
 const POKOIN_TREASURY_USERNAME = 'pokoin';
@@ -27,10 +36,7 @@ module.exports = async function handler(req, res) {
         transaction.get(treasuryUsernameRef),
       ]);
       const profile = userDoc.data() || {};
-      const hasAdminAccess =
-        profile.admin === true ||
-        profile.isAdmin === true ||
-        String(profile.role || '').trim().toLowerCase() === 'admin';
+      const hasAdminAccess = tokenHasAdminAccess(decoded);
       const currentSilverUntil = profile.silverUntil?.toDate?.() || null;
       if (
         hasAdminAccess ||

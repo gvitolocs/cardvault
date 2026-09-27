@@ -9,6 +9,23 @@ function isWholePknAmount(amount) {
   return Number.isInteger(amount) && amount > 0;
 }
 
+const REGISTERED_ADDRESS = /^0x[a-f0-9]{40}$/;
+
+async function registeredWalletAddresses(firestore, uid) {
+  const snap = await firestore.collection('wallet_addresses').where('uid', '==', uid).limit(5).get();
+  const addresses = [];
+  snap.forEach((doc) => {
+    const fromId = String(doc.id || '').trim().toLowerCase();
+    const fromField = String(doc.data()?.address || '').trim().toLowerCase();
+    for (const candidate of [fromId, fromField]) {
+      if (REGISTERED_ADDRESS.test(candidate) && !addresses.includes(candidate)) {
+        addresses.push(candidate);
+      }
+    }
+  });
+  return addresses;
+}
+
 async function creditVerifiedTopUp({
   admin,
   firestore,
@@ -87,10 +104,8 @@ module.exports = async function handler(req, res) {
 
     const admin = getFirebaseAdmin();
     const firestore = admin.firestore();
-    const userRef = firestore.collection('users').doc(decoded.uid);
-    const userDoc = await userRef.get();
-    const walletAddress = String(userDoc.data()?.walletAddress || '').trim().toLowerCase();
-    if (!walletAddress) {
+    const addresses = await registeredWalletAddresses(firestore, decoded.uid);
+    if (addresses.length === 0) {
       return res.status(400).json({ error: 'Link a wallet before topping up your account balance.' });
     }
 
@@ -110,7 +125,7 @@ module.exports = async function handler(req, res) {
         const to = String(tx.to || '').trim().toLowerCase();
         const txAmount = Number(tx.amount ?? tx.value ?? 0);
         if (!/^0x[a-f0-9]{64}$/.test(txHash) ||
-            from !== walletAddress ||
+            !addresses.includes(from) ||
             to !== bank ||
             txAmount !== amount) {
           continue;
@@ -122,7 +137,7 @@ module.exports = async function handler(req, res) {
           fundingHash: txHash,
           verifiedFunding: {
             txHash,
-            fromAddress: walletAddress,
+            fromAddress: from,
             amountPkn: txAmount,
           },
           reconciled: true,
@@ -142,11 +157,27 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    const verifiedFunding = await verifyNativeDeposit({
-      txHash: fundingHash,
-      fromAddress: walletAddress,
-      expectedAmountPkn: amount,
-    });
+    let verifiedFunding = null;
+    let mismatch = null;
+    for (const address of addresses) {
+      try {
+        verifiedFunding = await verifyNativeDeposit({
+          txHash: fundingHash,
+          fromAddress: address,
+          expectedAmountPkn: amount,
+        });
+        break;
+      } catch (error) {
+        if (error.statusCode === 403) {
+          mismatch = error;
+          continue;
+        }
+        throw error;
+      }
+    }
+    if (!verifiedFunding) {
+      throw mismatch || Object.assign(new Error('Link a wallet before topping up your account balance.'), { statusCode: 400 });
+    }
 
     const credited = await creditVerifiedTopUp({
       admin,
