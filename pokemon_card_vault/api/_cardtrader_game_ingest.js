@@ -177,6 +177,32 @@ const INGEST_GAMES = {
     aliases: ['contested_realm'],
     hosts: ['sorcery.pokoin.com'],
   },
+  palworld: {
+    id: 'palworld',
+    slug: 'palworld',
+    displayName: 'Palworld',
+    cardtraderGameId: 26,
+    database: 'pokoin_palworld',
+    databaseUrlEnv: 'PALWORLD_MARKETPLACE_DATABASE_URL',
+    schema: 'marketplace_palworld',
+    table: 'cardtrader_blueprints',
+    cdnKeyPrefix: 'palworld/',
+    aliases: [],
+    hosts: ['palworld.pokoin.com'],
+  },
+  cyberpunk: {
+    id: 'cyberpunk',
+    slug: 'cyberpunk',
+    displayName: 'Cyberpunk',
+    cardtraderGameId: 27,
+    database: 'pokoin_cyberpunk',
+    databaseUrlEnv: 'CYBERPUNK_MARKETPLACE_DATABASE_URL',
+    schema: 'marketplace_cyberpunk',
+    table: 'cardtrader_blueprints',
+    cdnKeyPrefix: 'cyberpunk/',
+    aliases: ['cyberpunk_edgerunners', 'edgerunners'],
+    hosts: ['cyberpunk.pokoin.com'],
+  },
 };
 
 const POKEMON_ALIASES = new Set(['pokemon', 'poke', 'pokémon', 'default']);
