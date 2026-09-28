@@ -18,6 +18,16 @@ import '../services/pokoin_api_auth.dart';
 import '../services/flutter_debug_log.dart';
 import '../utils/card_url.dart';
 
+const double pokoinAssistantDesktopBreakpoint = 960;
+
+bool shouldShowPokoinAssistantOverlay({
+  required double viewportWidth,
+  required String routePath,
+}) {
+  return viewportWidth >= pokoinAssistantDesktopBreakpoint &&
+      routePath != '/pokontact';
+}
+
 const List<_AssistantMessage> _initialAssistantMessages = <_AssistantMessage>[
   _AssistantMessage(
     text:
@@ -766,20 +776,20 @@ Map<String, String> _assistantCardSummary(PokemonCard card) {
     caseSensitive: false,
   ).firstMatch(path);
   if (marketplaceMatch != null) {
-    final doubledId = int.tryParse(marketplaceMatch.group(1) ?? '');
-    final cardId = doubledId != null && doubledId > 0
-        ? '$doubledId'
-        : marketplaceMatch.group(1) ?? '';
+    final publicCardId = marketplaceMatch.group(1) ?? '';
+    final cardId = cardIdFromDoubledId(publicCardId);
     return (
-      cardId: cardId,
+      cardId: cardId.isNotEmpty ? cardId : publicCardId,
       cardTitle: _assistantTitleFromSlug(marketplaceMatch.group(2) ?? ''),
       canonicalPath: path,
     );
   }
   final rootMatch = RegExp(r'^/([0-9]+)(?:/([^/?#]+))?$').firstMatch(path);
   if (rootMatch != null) {
+    final publicCardId = rootMatch.group(1) ?? '';
+    final cardId = cardIdFromDoubledId(publicCardId);
     return (
-      cardId: rootMatch.group(1) ?? '',
+      cardId: cardId.isNotEmpty ? cardId : publicCardId,
       cardTitle: _assistantTitleFromSlug(rootMatch.group(2) ?? ''),
       canonicalPath: path,
     );

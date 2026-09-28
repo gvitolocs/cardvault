@@ -14,6 +14,22 @@ const routeDefinitions = [
     },
   },
   {
+    path: '/api/chat',
+    file: 'chat.js',
+    vercelFallback: false,
+    methods: ['GET', 'POST'],
+    purpose: 'List and read authenticated direct conversations, send messages, and create atomic PKN payment events.',
+    auth: 'Required Firebase bearer token; conversation membership is rechecked for every action.',
+    params: {
+      query: '`action` is `list`, `get`, `message`, `pay`, or `read`; `peer` is used by GET conversation reads.',
+      body: '`peer` plus `text`, `amountPkn`, or read/payment fields according to action.',
+    },
+    dependencies: {
+      env: ['FIREBASE_*'],
+      services: ['Firebase Admin / Firestore'],
+    },
+  },
+  {
     path: '/api/cache-google-profile-picture',
     file: 'cache-google-profile-picture.js',
     methods: ['POST'],
@@ -124,6 +140,22 @@ const routeDefinitions = [
     dependencies: {
       env: ['CARDTRADER_AUTH_TOKEN', 'CARDTRADER_API_TOKEN', 'CARDTRADER_DAILY_LISTINGS_SECRET', 'CRON_SECRET', 'MARKETPLACE_DATABASE_URL', 'PKN_CHECKOUT_USDT_PRICE'],
       services: ['CardTrader API', 'Oracle/Postgres marketplace DB'],
+    },
+  },
+  {
+    path: '/api/cardtrader-game-ingest',
+    file: 'cardtrader-game-ingest.js',
+    vercelFallback: false,
+    methods: ['GET', 'POST', 'OPTIONS'],
+    purpose: 'List isolated satellite-game ingest services, inspect one game, or run a bounded authorized CardTrader ingest.',
+    auth: 'Status and writes for a selected game require the configured CardTrader ingest service secret.',
+    params: {
+      query: '`game` selects One Piece or Riftbound for GET status.',
+      body: '`game` plus bounded discover/apply importer controls for POST.',
+    },
+    dependencies: {
+      env: ['CARDTRADER_GAME_INGEST_SECRET', 'CARDTRADER_AUTH_TOKEN', 'ONE_PIECE_MARKETPLACE_DATABASE_URL', 'RIFTBOUND_MARKETPLACE_DATABASE_URL'],
+      services: ['CardTrader API', 'isolated Oracle/Postgres game databases'],
     },
   },
   {
@@ -501,6 +533,7 @@ const routeDefinitions = [
   {
     path: '/api/marketplace-sales-pulse',
     file: 'marketplace-sales-pulse.js',
+    vercelFallback: false,
     methods: ['GET', 'OPTIONS'],
     purpose: 'Return the latest completed daily marketplace sales leaders plus a bounded activity trend.',
     auth: 'Public.',
@@ -571,6 +604,7 @@ const routeDefinitions = [
   {
     path: '/api/marketplace-version-set',
     file: 'marketplace-version-set.js',
+    vercelFallback: false,
     methods: ['GET', 'OPTIONS'],
     purpose: 'Return the pokoin_version_sets key, member_count, and printings for one public card id.',
     auth: 'Public.',
@@ -772,6 +806,7 @@ const routeDefinitions = [
   {
     path: '/api/marketplace-rails',
     file: 'marketplace-rails.js',
+    vercelFallback: false,
     methods: ['GET', 'OPTIONS'],
     purpose: 'Pi browse rails. Public card_id only. No Supabase.',
     auth: 'Public.',
@@ -781,6 +816,7 @@ const routeDefinitions = [
   {
     path: '/api/marketplace-card-tiles',
     file: 'marketplace-card-tiles.js',
+    vercelFallback: false,
     methods: ['GET', 'OPTIONS'],
     purpose: 'Pi card tiles by public id. No Supabase.',
     auth: 'Public.',
@@ -845,8 +881,24 @@ const routeDefinitions = [
     },
   },
   {
+    path: '/api/marketplace-listings-csv',
+    file: 'marketplace-listings-csv.js',
+    methods: ['GET', 'POST'],
+    purpose: 'Export authenticated seller inventory or preview/import PowerTools, Cardmarket, and CardTrader stock CSV files.',
+    auth: 'Required Firebase bearer token; all reads and writes are scoped to the decoded seller uid.',
+    params: {
+      query: '`format` selects `powertools`, `cardmarket`, or `cardtrader` for GET export.',
+      body: '`csv`, optional `format`, `stackSize`, `priceMode`, and `dryRun` for POST import.',
+    },
+    dependencies: {
+      env: ['MARKETPLACE_DATABASE_URL', 'MARKETPLACE_WRITER_DATABASE_URL', 'FIREBASE_*'],
+      services: ['Oracle/Postgres marketplace DB', 'Firebase Admin'],
+    },
+  },
+  {
     path: '/api/marketplace-collection-summary',
     file: 'marketplace-collection-summary.js',
+    vercelFallback: false,
     methods: ['GET'],
     purpose: 'Authenticated owned-card totals for dashboard Portfolio. Admin Firestore read; uid only from verified bearer.',
     auth: 'Firebase bearer token required. Never accepts a client uid.',
@@ -861,6 +913,7 @@ const routeDefinitions = [
   {
     path: '/api/marketplace-collection',
     file: 'marketplace-collection.js',
+    vercelFallback: false,
     methods: ['GET'],
     purpose: 'Authenticated owned holdings rows for /collection (physical + NFT). Admin Firestore read; uid only from verified bearer.',
     auth: 'Firebase bearer token required. Never accepts a client uid.',
@@ -875,6 +928,7 @@ const routeDefinitions = [
   {
     path: '/api/marketplace-portfolio',
     file: 'marketplace-portfolio.js',
+    vercelFallback: false,
     methods: ['GET', 'OPTIONS'],
     purpose: 'React BFF: Pokoin catalog + native PKN overlay (Portfolio / Explore). No CardTrader leftover images. No USD.',
     auth: 'Public.',
@@ -955,6 +1009,22 @@ const routeDefinitions = [
     dependencies: {
       env: ['MARKETPLACE_DATABASE_URL', 'FIREBASE_*'],
       services: ['Oracle/Postgres marketplace DB', 'optional Firebase Admin'],
+    },
+  },
+  {
+    path: '/api/money-request',
+    file: 'money-request.js',
+    vercelFallback: false,
+    methods: ['GET', 'POST'],
+    purpose: 'Create, list, pay, decline, cancel, and mark notifications for authenticated PKN requests.',
+    auth: 'Required Firebase bearer token; request parties and status transitions are enforced server-side.',
+    params: {
+      query: '`action` selects list, notifications, create, pay, decline, cancel, or read-notifications.',
+      body: 'Create uses `recipientUsername`, `amountPkn`, optional `note` and `clientToken`; mutations use `requestId`.',
+    },
+    dependencies: {
+      env: ['FIREBASE_*'],
+      services: ['Firebase Admin / Firestore'],
     },
   },
   {
@@ -1074,6 +1144,7 @@ const routeDefinitions = [
   {
     path: '/api/scan-batch',
     file: 'scan-batch.js',
+    vercelFallback: false,
     methods: ['GET', 'POST', 'OPTIONS'],
     purpose: 'Scan Connect staged batch: snapshot, Batch Defaults, row edits (duplicate, merge undo), idempotent submit to marketplace_user_listings.',
     auth: 'Required Firebase bearer token; rows are scoped to the seller uid.',
@@ -1089,6 +1160,7 @@ const routeDefinitions = [
   {
     path: '/api/scan-pair',
     file: 'scan-pair.js',
+    vercelFallback: false,
     methods: ['POST', 'OPTIONS'],
     purpose: 'Phone claims a 4-digit Scan Connect pairing code or QR secret and receives a session-scoped phone token.',
     auth: 'Public. Postgres-backed per-IP and global failure limits; identical error for wrong, expired and used codes.',
@@ -1103,6 +1175,7 @@ const routeDefinitions = [
   {
     path: '/api/scan-phone',
     file: 'scan-phone.js',
+    vercelFallback: false,
     methods: ['POST', 'OPTIONS'],
     purpose: 'Paired phone heartbeat, idempotent scan events (scanEventId), and leave.',
     auth: '`Authorization: Scan <phoneToken>` from /api/scan-pair. No Firebase.',
@@ -1118,6 +1191,7 @@ const routeDefinitions = [
   {
     path: '/api/scan-session',
     file: 'scan-session.js',
+    vercelFallback: false,
     methods: ['GET', 'POST', 'OPTIONS'],
     purpose: 'Desktop Scan Session: start/resume with pairing code, regenerate code, disconnect phone, pause, end.',
     auth: 'Required Firebase bearer token.',
@@ -1133,6 +1207,7 @@ const routeDefinitions = [
   {
     path: '/api/scan-stream',
     file: 'scan-stream.js',
+    vercelFallback: false,
     methods: ['GET', 'OPTIONS'],
     purpose: 'Server-sent change stream for one Scan Batch (rows, defaults, session) with cursor replay; closes after 55 s.',
     auth: 'Required Firebase bearer token.',

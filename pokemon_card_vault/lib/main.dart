@@ -54,8 +54,6 @@ import 'utils/card_url.dart';
 import 'wallet/wallet_bridge_stub.dart';
 import 'widgets/pokoin_assistant.dart';
 
-const double _assistantDesktopBreakpoint = 960;
-
 void main() {
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
@@ -409,9 +407,10 @@ class _PokoinAppState extends ConsumerState<PokoinApp> {
       ),
       builder: (context, child) {
         final routePath = router.routeInformationProvider.value.uri.path;
-        final showAssistant =
-            MediaQuery.sizeOf(context).width >= _assistantDesktopBreakpoint &&
-                routePath != '/pokontact';
+        final showAssistant = shouldShowPokoinAssistantOverlay(
+          viewportWidth: MediaQuery.sizeOf(context).width,
+          routePath: routePath,
+        );
         return Stack(
           children: [
             child ?? const SizedBox.shrink(),
