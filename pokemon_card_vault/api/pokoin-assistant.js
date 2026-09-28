@@ -1077,6 +1077,57 @@ function cleanChatRecord(value) {
   })).filter((entry) => entry.text);
 }
 
+const MARKET_CONTEXT_CHALLENGE_RE = /\b(?:you should know|you know(?: that| this| it)?|i (?:already )?told you|i just told you|check (?:the )?(?:chat|messages|above)|read (?:the )?(?:chat|messages|above)|same (?:card|one)|that one|the one i (?:said|mentioned|have)|dovresti saperlo|lo sai|te l['’]?ho (?:gia )?detto|guarda (?:la )?chat|leggi (?:sopra|la chat)|quella di prima)\b/i;
+const MARKET_CLARIFICATION_RE = /\b(?:which|what)\s+(?:exact\s+)?(?:set|printing|version|card number|collector number|condition|language)\b|\b(?:set name|card number|collector number|exact printing|which one)\b|\b(?:quale|che)\s+(?:set|espansione|versione|numero|condizione|lingua)\b/i;
+
+function cleanConversationCardSubject(value) {
+  const subject = cleanText(value, 180)
+    .replace(/^[\s,.:;!?-]+|[\s,.:;!?-]+$/g, '')
+    .replace(/^(?:a|an|the|my|this|that|una?|uno|la|il|lo|questa?|quella?)\s+/i, '')
+    .replace(/\s+(?:card|carta)$/i, '')
+    .trim();
+  return /^(?:it|this|that|one|card|carta|same one)$/i.test(subject) ? '' : subject;
+}
+
+function pendingMarketSubject(chatRecord = [], pageContext = {}) {
+  const pageSubject = cleanConversationCardSubject(
+    pageContext.cardTitle || pageContext.activeCard?.name,
+  );
+  if (pageSubject) return pageSubject;
+
+  const recent = cleanChatRecord(chatRecord);
+  const lastAssistant = [...recent].reverse().find((entry) => entry.role === 'assistant')?.text || '';
+  const clarificationSubject = lastAssistant.match(
+    /\bwhich\s+(?:exact\s+)?(?:set|printing|version)(?:\s+or\s+(?:set|printing|version))?\s+is\s+(?:your|the)\s+(.+?)\s+from\b/i,
+  )?.[1];
+  if (clarificationSubject) return cleanConversationCardSubject(clarificationSubject);
+
+  for (let index = recent.length - 1; index >= 0; index -= 1) {
+    if (recent[index].role !== 'user') continue;
+    const text = recent[index].text;
+    const subject = text.match(
+      /\b(?:i have|i['’]?ve got|my card is|i own|ho|possiedo)\s+(?:a|an|the|una?|uno|la|il|lo)?\s*(.+)$/i,
+    )?.[1] || text.match(
+      /\b(?:how much (?:is|are)|what(?:'s| is))\s+(.+?)\s+(?:worth|valued|value|cost)\b/i,
+    )?.[1];
+    const cleaned = cleanConversationCardSubject(subject);
+    if (cleaned) return cleaned;
+  }
+  return '';
+}
+
+function pendingMarketClarificationReply({ message, chatRecord, pageContext } = {}) {
+  if (!MARKET_CONTEXT_CHALLENGE_RE.test(String(message || ''))) return '';
+  const recent = cleanChatRecord(chatRecord);
+  const lastAssistant = [...recent].reverse().find((entry) => entry.role === 'assistant')?.text || '';
+  if (!MARKET_CLARIFICATION_RE.test(lastAssistant)) return '';
+  const subject = pendingMarketSubject(recent, pageContext) || 'that card';
+  const italian = /\b(?:dovresti|saperlo|lo sai|detto|guarda|leggi|quella)\b/i.test(String(message || ''));
+  return italian
+    ? `Lo so: stiamo parlando di ${subject}. Mi manca ancora la stampa esatta, perché set e numeri diversi possono avere valori molto diversi. Mandami il set, il numero della carta o una foto e controllerò i dati di mercato senza indovinare.`
+    : `I do know we are talking about ${subject}. I still need the exact printing because different sets and card numbers can have very different values. Send the set, card number, or a photo and I will check the market data without guessing.`;
+}
+
 function shouldBypassPeerService(localIntent, message = '', chatRecord = []) {
   if (localIntent === 'greeting' || localIntent === 'casual') {
     return true;
@@ -2961,6 +3012,9 @@ async function callPokontactService({ message, chatRecord, user, page, pageConte
       body: JSON.stringify({
         message,
         messages: chatRecord,
+        deferMemory: true,
+        userId: user.uid || user.identityKey || '',
+        sessionId: user.sessionId || user.uid || '',
         user,
         page,
         pageContext,
@@ -2987,6 +3041,74 @@ async function callPokontactService({ message, chatRecord, user, page, pageConte
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function recordPokontactTurn({ message, reply, user, pageContext, intent, serviceDelivery }) {
+  if (!POKONTACT_SERVICE_TOKEN) {
+    return { ok: false, skipped: true, reason: 'POKONTACT_SERVICE_TOKEN is not configured.' };
+  }
+  const controller = new AbortController();
+  const configuredTimeout = POKONTACT_SERVICE_TIMEOUT_MS > 0 ? POKONTACT_SERVICE_TIMEOUT_MS : 4000;
+  const timeout = setTimeout(() => controller.abort(), Math.min(4000, configuredTimeout));
+  try {
+    const response = await fetch(`${POKONTACT_SERVICE_URL}/observe`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${POKONTACT_SERVICE_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        message: cleanText(message, 3000),
+        reply: cleanText(reply, 5000),
+        userId: user.uid || user.identityKey || '',
+        sessionId: user.sessionId || user.uid || '',
+        user: {
+          uid: cleanText(user.uid, 160),
+          identityKey: cleanText(user.identityKey, 160),
+          sessionId: cleanText(user.sessionId, 160),
+        },
+        metadata: {
+          intent: cleanText(intent, 80),
+          source: cleanText(serviceDelivery?.source, 120) || 'pokoin-web-gateway',
+          provider: cleanText(serviceDelivery?.provider, 120),
+          pageKind: cleanText(pageContext?.kind, 80),
+          pagePath: cleanText(pageContext?.internalUri || pageContext?.path, 300),
+        },
+      }),
+      signal: controller.signal,
+    });
+    const payload = await response.json().catch(() => ({}));
+    return response.ok && payload?.saved === true
+      ? { ok: true, saved: true, source: 'poko-honcho' }
+      : {
+          ok: false,
+          saved: false,
+          status: response.status,
+          error: cleanText(payload?.error, 160) || 'conversation save failed',
+        };
+  } catch (error) {
+    return {
+      ok: false,
+      saved: false,
+      error: error.name === 'AbortError'
+        ? 'conversation save timed out'
+        : cleanText(error.message, 160),
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function sendPokontactResponse(res, body, context) {
+  const conversationMemory = await recordPokontactTurn({
+    message: context.message,
+    reply: body.reply,
+    user: context.user,
+    pageContext: context.pageContext,
+    intent: body.intent,
+    serviceDelivery: body.serviceDelivery,
+  });
+  return res.status(200).json({ ...body, conversationMemory });
 }
 
 const assistantHits = new Map();
@@ -3031,10 +3153,15 @@ module.exports = async function handler(req, res) {
     }));
     user.sessionId = sessionId;
     user.identityKey = user.uid || sessionId || 'guest';
+    const sendResponse = (body) => sendPokontactResponse(res, body, {
+      message,
+      user,
+      pageContext,
+    });
     const userPreferences = inferUserPreferences({ message, chatRecord });
     const localIntent = classifyIntent(message);
     if (localIntent === 'unsafe-cyber') {
-      return res.status(200).json({
+      return sendResponse({
         reply: sanitizePokoEmoji(unsafeCyberReply(message)),
         intent: localIntent,
         forwarded: false,
@@ -3051,7 +3178,7 @@ module.exports = async function handler(req, res) {
       });
     }
     if (localIntent === 'navigation') {
-      return res.status(200).json({
+      return sendResponse({
         reply: sanitizePokoEmoji(navigationReply(message)),
         intent: localIntent,
         forwarded: false,
@@ -3067,6 +3194,28 @@ module.exports = async function handler(req, res) {
         assistant: 'Pokontact',
       });
     }
+    const continuityReply = pendingMarketClarificationReply({
+      message,
+      chatRecord,
+      pageContext,
+    });
+    if (continuityReply) {
+      return sendResponse({
+        reply: sanitizePokoEmoji(continuityReply),
+        intent: 'marketplace',
+        forwarded: false,
+        emailDelivery: null,
+        actions: [],
+        pageContext,
+        serviceDelivery: {
+          ok: true,
+          source: 'local-conversation-continuity',
+          provider: 'pokoin-conversation-guardrail',
+          model: 'deterministic',
+        },
+        assistant: 'Pokontact',
+      });
+    }
     const cardOpinionDelivery = await currentCardOpinionDelivery({
       message,
       page,
@@ -3076,7 +3225,7 @@ module.exports = async function handler(req, res) {
       return null;
     });
     if (cardOpinionDelivery) {
-      return res.status(200).json({
+      return sendResponse({
         reply: sanitizePokoEmoji(cardOpinionDelivery.reply),
         intent: cardOpinionDelivery.intent,
         forwarded: false,
@@ -3103,7 +3252,7 @@ module.exports = async function handler(req, res) {
         return null;
       });
       if (deckDelivery) {
-        return res.status(200).json({
+        return sendResponse({
           reply: sanitizePokoEmoji(deckDelivery.reply),
           intent: deckDelivery.intent,
           forwarded: false,
@@ -3132,7 +3281,7 @@ module.exports = async function handler(req, res) {
         return null;
       });
       if (recommendationDelivery) {
-        return res.status(200).json({
+        return sendResponse({
           reply: sanitizePokoEmoji(recommendationDelivery.reply),
           intent: recommendationDelivery.intent,
           forwarded: false,
@@ -3160,7 +3309,7 @@ module.exports = async function handler(req, res) {
         return null;
       });
       if (marketplaceDelivery) {
-        return res.status(200).json({
+        return sendResponse({
           reply: sanitizePokoEmoji(marketplaceDelivery.reply),
           intent: marketplaceDelivery.intent,
           forwarded: false,
@@ -3229,7 +3378,7 @@ module.exports = async function handler(req, res) {
     }
     reply = sanitizePokoEmoji(reply);
 
-    return res.status(200).json({
+    return sendResponse({
       reply,
       intent,
       forwarded,
@@ -3290,6 +3439,9 @@ module.exports._test = {
   casualReply,
   greetingReply,
   shouldBypassPeerService,
+  pendingMarketSubject,
+  pendingMarketClarificationReply,
+  recordPokontactTurn,
   resolvePokontactServiceUrl,
   DEFAULT_POKONTACT_SERVICE_URL,
   loadEmailHelper,

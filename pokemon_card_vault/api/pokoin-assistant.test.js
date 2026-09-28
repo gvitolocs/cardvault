@@ -82,7 +82,14 @@ test('Pokontact helpers module-load in deploy-pokoin-web output layout', () => {
     fs.mkdirSync(deployServerDir);
 
     copyApiFile('pokoin-assistant', deployApiDir);
-    for (const helper of ['_firebase', '_email', '_marketplace_db', '_slug']) {
+    for (const helper of [
+      '_firebase',
+      '_email',
+      '_marketplace_db',
+      '_marketplace_game',
+      '_cardtrader_game_ingest',
+      '_slug',
+    ]) {
       copyApiFile(helper, deployServerDir);
     }
 
@@ -97,6 +104,39 @@ test('Pokontact helpers module-load in deploy-pokoin-web output layout', () => {
   } finally {
     fs.rmSync(deployDir, { force: true, recursive: true });
   }
+});
+
+test('pending market clarification preserves the card in the regression conversation', () => {
+  const assistant = loadAssistantWithStubs({});
+  const chatRecord = [
+    { role: 'user', text: 'I have raichu ex' },
+    { role: 'assistant', text: 'Nice! Which exact set or printing is your Raichu ex from?' },
+  ];
+
+  assert.equal(assistant._test.pendingMarketSubject(chatRecord), 'Raichu ex');
+  const reply = assistant._test.pendingMarketClarificationReply({
+    message: 'You should know',
+    chatRecord,
+    pageContext: {},
+  });
+  assert.match(reply, /talking about Raichu ex/i);
+  assert.match(reply, /exact printing/i);
+  assert.doesNotMatch(reply, /nice to meet you|hello|hi!/i);
+});
+
+test('pending market clarification prefers an active card and ignores unrelated context', () => {
+  const assistant = loadAssistantWithStubs({});
+  const reply = assistant._test.pendingMarketClarificationReply({
+    message: 'I already told you',
+    chatRecord: [{ role: 'assistant', text: 'Which card number is printed on it?' }],
+    pageContext: { activeCard: { name: 'Dark Charizard' } },
+  });
+  assert.match(reply, /Dark Charizard/);
+  assert.equal(assistant._test.pendingMarketClarificationReply({
+    message: 'You should know',
+    chatRecord: [{ role: 'assistant', text: 'What is your favorite color?' }],
+    pageContext: {},
+  }), '');
 });
 
 test('most expensive card tool returns a navigation action', async () => {
@@ -353,6 +393,13 @@ test('Italian current-card investment question uses contextual card answer', asy
   let peerServiceCalled = false;
   global.fetch = async (url) => {
     const textUrl = String(url);
+    if (textUrl.endsWith('/observe')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true, saved: true }),
+      };
+    }
     if (textUrl.includes('reddit.com/search.json')) {
       return {
         ok: true,
@@ -801,7 +848,14 @@ test('English explicit Rayquaza card prompt opens Rayquaza direct card page', as
 test('casual gelato chat is not forced to docs, marketplace, or navigation', async () => {
   const originalFetch = global.fetch;
   let peerServiceCalled = false;
-  global.fetch = async () => {
+  global.fetch = async (url) => {
+    if (String(url).endsWith('/observe')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true, saved: true }),
+      };
+    }
     peerServiceCalled = true;
     return {
       ok: true,
@@ -1428,6 +1482,59 @@ test('greeting returns JSON fallback when peer service is not configured', async
   assert.equal(res.body.serviceDelivery.reason, 'local_greeting');
 });
 
+test('handler answers a challenged pending valuation and records the visible turn', async () => {
+  const originalFetch = global.fetch;
+  let providerCalled = false;
+  let observedTurn = null;
+  global.fetch = async (url, options) => {
+    if (String(url).endsWith('/observe')) {
+      observedTurn = JSON.parse(options.body);
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true, saved: true }),
+      };
+    }
+    providerCalled = true;
+    throw new Error('provider should not be called');
+  };
+  try {
+    const assistant = loadAssistantWithStubs({
+      env: { POKONTACT_SERVICE_TOKEN: 'secret' },
+      marketplaceQuery: async () => {
+        throw new Error('marketplace should not be queried for the clarification guard');
+      },
+    });
+    const res = createResponse();
+
+    await assistant({
+      method: 'POST',
+      headers: {},
+      body: {
+        message: 'You should know',
+        messages: [
+          { role: 'user', text: 'I have raichu ex' },
+          { role: 'assistant', text: 'Which set or printing is your Raichu ex from?' },
+        ],
+        sessionId: 'givi-regression-session',
+        page: 'https://pokoin.com/marketplace',
+        username: 'guest',
+      },
+    }, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(providerCalled, false);
+    assert.equal(res.body.intent, 'marketplace');
+    assert.match(res.body.reply, /talking about Raichu ex/i);
+    assert.equal(res.body.serviceDelivery.source, 'local-conversation-continuity');
+    assert.equal(observedTurn.message, 'You should know');
+    assert.equal(observedTurn.reply, res.body.reply);
+    assert.equal(res.body.conversationMemory.saved, true);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
 test('assistant sanitizes and returns structured page context on greeting', async () => {
   const assistant = loadAssistantWithStubs({});
   const res = createResponse();
@@ -1474,9 +1581,16 @@ test('assistant sanitizes and returns structured page context on greeting', asyn
 
 test('greeting bypasses peer service even when configured', async () => {
   const originalFetch = global.fetch;
-  let fetchCalled = false;
-  global.fetch = async () => {
-    fetchCalled = true;
+  let providerCalled = false;
+  global.fetch = async (url) => {
+    if (String(url).endsWith('/observe')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true, saved: true }),
+      };
+    }
+    providerCalled = true;
     return {
       ok: true,
       status: 200,
@@ -1507,7 +1621,7 @@ test('greeting bypasses peer service even when configured', async () => {
     }, res);
 
     assert.equal(res.statusCode, 200);
-    assert.equal(fetchCalled, false);
+    assert.equal(providerCalled, false);
     assert.equal(res.body.intent, 'greeting');
     assert.deepEqual(res.body.actions, []);
     assert.equal(res.body.serviceDelivery.skipped, true);
@@ -1693,11 +1807,18 @@ test('service URL resolves to peer1 Poko endpoint by default', () => {
 
 test('token-only configuration calls peer1 Poko endpoint', async () => {
   const originalFetch = global.fetch;
-  let requestedUrl = '';
-  let requestBody = null;
+  const requests = [];
   global.fetch = async (url, options) => {
-    requestedUrl = String(url);
-    requestBody = JSON.parse(options.body);
+    const requestedUrl = String(url);
+    const requestBody = JSON.parse(options.body);
+    requests.push({ url: requestedUrl, body: requestBody });
+    if (requestedUrl.endsWith('/observe')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true, saved: true }),
+      };
+    }
     return {
       ok: true,
       status: 200,
@@ -1736,14 +1857,20 @@ test('token-only configuration calls peer1 Poko endpoint', async () => {
     }, res);
 
     assert.equal(res.statusCode, 200);
-    assert.equal(requestedUrl, `${assistant._test.DEFAULT_POKONTACT_SERVICE_URL}/chat`);
-    assert.equal(requestBody.pageContext.kind, 'search');
-    assert.match(requestBody.context, /Current page kind: search/);
-    assert.match(requestBody.context, /Current search query: Magikarp/);
-    assert.match(requestBody.context, /Visible cards/);
+    const chatRequest = requests.find((request) => request.url.endsWith('/chat'));
+    const observeRequest = requests.find((request) => request.url.endsWith('/observe'));
+    assert.equal(chatRequest.url, `${assistant._test.DEFAULT_POKONTACT_SERVICE_URL}/chat`);
+    assert.equal(chatRequest.body.pageContext.kind, 'search');
+    assert.equal(chatRequest.body.deferMemory, true);
+    assert.match(chatRequest.body.context, /Current page kind: search/);
+    assert.match(chatRequest.body.context, /Current search query: Magikarp/);
+    assert.match(chatRequest.body.context, /Visible cards/);
+    assert.equal(observeRequest.body.message, 'tell me something');
+    assert.equal(observeRequest.body.reply, 'Oracle Poko is awake ✨');
     assert.equal(res.body.reply, 'Oracle Poko is awake ✨');
     assert.equal(res.body.serviceDelivery.ok, true);
     assert.equal(res.body.serviceDelivery.source, 'poko-peer1');
+    assert.equal(res.body.conversationMemory.saved, true);
   } finally {
     global.fetch = originalFetch;
   }

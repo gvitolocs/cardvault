@@ -39,6 +39,12 @@ const APPROVED_DUPLICATION_EXCEPTIONS = {
   'marketplace-home.js': [
     'Home fallback query passes the configured PKN reference into Postgres price functions; new JavaScript price conversion should use shared helpers.',
   ],
+  'marketplace-listings-csv.js': [
+    'Stock CSV import/export preserves seller comments verbatim; it does not filter promotional comments or render public listing copy.',
+  ],
+  'marketplace-portfolio.js': [
+    'Portfolio uses a numeric card-only fallback when a stored canonical_path is absent; it does not generate a localized card slug.',
+  ],
   'pokoin-assistant.js': [
     'Assistant sanitizes user/page paths and reads canonical paths from Oracle; new card URL generation should call marketplace-card-url or DB URLs.',
   ],

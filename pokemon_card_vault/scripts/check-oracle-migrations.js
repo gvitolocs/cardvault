@@ -9,7 +9,7 @@ const MANIFEST_PATH = path.join(ROOT_DIR, 'oracle-postgres', 'schema-manifest.js
 const MIGRATE_SCRIPT = path.join(ROOT_DIR, 'scripts', 'oracle-marketplace-migrate.js');
 
 function migrationPrefix(file) {
-  const match = file.match(/^(\d{3})_[a-z0-9_]+\.sql$/);
+  const match = file.match(/^(\d{3})_[a-z0-9_.]+\.sql$/);
   return match ? match[1] : '';
 }
 
