@@ -33,6 +33,23 @@ const CARDS = new Map([
   ['233564', { name: 'Pikachu δ', setName: 'Legend Maker', number: '093/92', imageUrl: '', nationality: 'western' }],
 ]);
 
+// Catalog printings for the printing choice (marketplace_search_candidates +
+// pokoin_pokemon_expansions shape). Only these ids have an artwork key, so
+// every other test keeps the per-printing rule.
+const PRINTING_ROWS = [
+  ['242396', 'HeartGold & SoulSilver', '115/123', 'western', 'official', 'hgs'],
+  ['224950', 'Call of Legends', '88/95', 'western', 'official', 'clo'],
+  ['279166', 'HeartGold Collection', '2009', 'japanese', 'official', 'l1'],
+  ['525054', 'League Promos', 'Play! Pokemon | Holo Promo 88/95', 'western', 'promo', 'lpr'],
+].map(([card_id, set_name, card_number, nationality, kind, code]) => ({
+  card_id, name: 'Grass Energy', set_name, card_number, version: 'v222492', nationality, kind, code,
+  symbol_image_url: '', image_url: `https://cdn.pokoin.com/${card_id}.jpg`,
+}));
+const lookupPrintings = async (ids, topId) => {
+  const version = PRINTING_ROWS.find((row) => row.card_id === String(topId))?.version;
+  return PRINTING_ROWS.filter((row) => ids.includes(row.card_id) || (version && row.version === version));
+};
+
 const JPEG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), crypto.randomBytes(2000)]).toString('base64');
 
 async function resetSchema() {
@@ -72,6 +89,7 @@ before(async () => {
   setScanStoreForTests(createStore({
     pool,
     lookupCards: async (ids) => new Map(ids.filter((id) => CARDS.has(id)).map((id) => [id, CARDS.get(id)])),
+    lookupPrintings,
     onListingsCreated: async (ids) => {
       refreshed.push(...ids);
     },
@@ -379,6 +397,7 @@ test('writer database unavailable → 500 with a generic message, no stack or co
     setScanStoreForTests(createStore({
       pool,
       lookupCards: async (ids) => new Map(ids.filter((id) => CARDS.has(id)).map((id) => [id, CARDS.get(id)])),
+      lookupPrintings,
       onListingsCreated: async (ids) => { refreshed.push(...ids); },
     }));
   }
@@ -605,7 +624,10 @@ test('ambiguous and unmatched scans never merge, block submit, and are fixed by 
   const snap = (await desktop.batch('seller-a', s.batch.id)).body;
   const rowAmb = snap.items.find((i) => i.id === amb1.itemId);
   assert.deepEqual(rowAmb.recognition.candidates.map((c) => c.cardId), ['504600', '233564']);
-  assert.equal(rowAmb.cardId, '504600', 'best candidate preselected');
+  // EN batch: the best candidate in the western print family is preselected
+  // (never the Japanese PCG-P print), and it still needs review.
+  assert.equal(rowAmb.cardId, '233564', 'best in-family candidate preselected');
+  assert.equal(rowAmb.reviewed, false);
   assert.equal(rowAmb.hasImage, true);
   const unmatchedRow = snap.items.find((i) => i.id === none.itemId);
   assert.equal(unmatchedRow.cardId, '');
@@ -623,7 +645,8 @@ test('ambiguous and unmatched scans never merge, block submit, and are fixed by 
   assert.deepEqual(new Set(blocked.body.problems.map((p) => p.reason)), new Set(['needs_review', 'no_printing']));
 
   await desktop.act('seller-a', 'item', { itemId: amb1.itemId, patch: { confirm: true } });
-  const replaced = await desktop.act('seller-a', 'item', { itemId: amb2.itemId, patch: { cardId: '233564' } });
+  // amb2 is preselected on the western 233564; the seller replaces it with the other candidate.
+  const replaced = await desktop.act('seller-a', 'item', { itemId: amb2.itemId, patch: { cardId: '504600' } });
   assert.equal(replaced.body.items[0].cardName, 'Pikachu δ');
   assert.equal(replaced.body.items[0].reviewed, true);
   assert.equal(replaced.body.items[0].pricePkn, null, 'price cleared when the printing changes');
@@ -632,6 +655,93 @@ test('ambiguous and unmatched scans never merge, block submit, and are fixed by 
   const submitted = await desktop.act('seller-a', 'submit', { batchId: s.batch.id, submitKey: 'k1' });
   assert.equal(submitted.status, 200, JSON.stringify(submitted.body));
   assert.equal(submitted.body.result.listings, 4);
+});
+
+// HGSS Grass Energy: HGSS 115/123 and COL 88/95 are the same leftover painting
+// (gallery cosine 0.999); the JP HeartGold Collection print scores close too.
+const energyHits = () => [
+  { public_id: '242396', score: 0.95, name: 'Grass Energy' },
+  { public_id: '224950', score: 0.949, name: 'Grass Energy' },
+  { public_id: '279166', score: 0.935, name: 'Grass Energy' },
+];
+const printingsFor = (phone, hits) => call('POST', '/api/scan-phone?action=printings', {
+  phone,
+  body: { recognition: { catalog: 'pokemon_generic', hits }, capturedAt: Date.now(), clockOffsetMs: 0 },
+});
+
+test('printing choice: a western batch is asked HGSS / COL / Play! stamp; a JP batch gets the Japanese print; nothing is written', { skip }, async () => {
+  const s = await pair();
+  const en = await printingsFor(s.phone, energyHits());
+  assert.equal(en.status, 200, JSON.stringify(en.body));
+  assert.equal(en.body.family, 'western');
+  assert.equal(en.body.choose, true);
+  assert.deepEqual(en.body.printings.map((t) => [t.cardId, t.setCode, t.number]), [
+    ['224950', 'CLO', '88/95'],
+    ['242396', 'HGS', '115/123'],
+    ['525054', 'LPR', '88/95'],
+  ]);
+  assert.ok(en.body.printings.every((t) => t.symbolUrl.startsWith('https://cdn.pokoin.com/expansions/symbols/')));
+  assert.equal(en.body.printings[1].label, 'HeartGold & SoulSilver, card 115/123');
+
+  await desktop.act('seller-a', 'defaults', { batchId: s.batch.id, defaults: { language: 'JP' } });
+  const jp = await printingsFor(s.phone, energyHits());
+  assert.equal(jp.body.family, 'japanese');
+  assert.equal(jp.body.choose, false);
+  assert.equal(jp.body.state, 'matched');
+  assert.equal(jp.body.cardId, '279166');
+
+  // Not a recognised artwork: no choice, the scan keeps today's per-printing rule.
+  const other = await printingsFor(s.phone, [hit('220962', 0.95)]);
+  assert.equal(other.body.choose, false);
+  assert.equal(other.body.state, 'matched');
+
+  const unpaired = await call('POST', '/api/scan-phone?action=printings', { phone: 'x'.repeat(43), body: {} });
+  assert.equal(unpaired.status, 401);
+  assert.equal((await desktop.batch('seller-a', s.batch.id)).body.items.length, 0);
+});
+
+test('printing choice: the tapped printing is a matched row; retries / double taps stay one event; repeats merge', { skip }, async () => {
+  const s = await pair();
+  const tapped = scanBody(energyHits(), { printing: { cardId: '224950' } });
+  const first = await scan(s.phone, tapped);
+  assert.equal(first.status, 200, JSON.stringify(first.body));
+  assert.equal(first.body.recognitionState, 'matched');
+  const retry = await scan(s.phone, tapped);
+  assert.equal(retry.body.duplicate, true);
+  const second = await scan(s.phone, scanBody(energyHits(), { printing: { cardId: '224950' } }));
+  assert.equal(second.body.merged, true);
+  assert.equal(second.body.headQuantity, 2);
+
+  const snap = (await desktop.batch('seller-a', s.batch.id)).body;
+  assert.equal(snap.items.filter((i) => i.status === 'active').length, 1);
+  const row = snap.items.find((i) => i.id === first.body.itemId);
+  assert.equal(row.cardId, '224950');
+  assert.equal(row.setName, 'Call of Legends');
+  assert.equal(row.collectorNumber, '88/95');
+  assert.equal(row.nationality, 'western');
+  assert.equal(row.quantity, 2);
+  assert.deepEqual(row.recognition.printing.offered, ['224950', '242396', '525054']);
+  assert.equal(row.recognition.printing.chosen, '224950');
+  assert.equal(row.recognition.printing.family, 'western');
+});
+
+test('printing choice skipped or not offered: the row waits for desk review with only the offered printings', { skip }, async () => {
+  const s = await pair();
+  const skipped = (await scan(s.phone, scanBody(energyHits()))).body;
+  const refused = (await scan(s.phone, scanBody(energyHits(), { printing: { cardId: '279166' } }))).body;
+  assert.equal(skipped.recognitionState, 'ambiguous');
+  assert.equal(refused.recognitionState, 'ambiguous', 'a JP print is never accepted into a western batch');
+  assert.equal(refused.merged, false);
+  const snap = (await desktop.batch('seller-a', s.batch.id)).body;
+  const row = snap.items.find((i) => i.id === skipped.itemId);
+  assert.deepEqual(row.recognition.candidates.map((c) => c.cardId), ['224950', '242396', '525054']);
+  assert.equal(row.cardId, '242396', 'best-scored printing preselected, not confirmed');
+  for (const id of [skipped.itemId, refused.itemId]) {
+    await desktop.act('seller-a', 'item', { itemId: id, patch: { pricePkn: 5 } });
+  }
+  const blocked = await desktop.act('seller-a', 'submit', { batchId: s.batch.id, submitKey: 'p1' });
+  assert.equal(blocked.status, 409);
+  assert.deepEqual(new Set(blocked.body.problems.map((p) => p.reason)), new Set(['needs_review']));
 });
 
 test('immutable scan event columns cannot be rewritten', { skip }, async () => {
