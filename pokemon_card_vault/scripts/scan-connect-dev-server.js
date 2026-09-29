@@ -35,6 +35,24 @@ const FIXTURE_CARDS = {
   '256260': { name: 'Stormfront 16', setName: 'Stormfront', number: '16/100', nationality: 'western' },
 };
 
+// Printing choice fixtures (catalog row shape of `lookupPrintingsFromCatalog`):
+// HGSS-era Grass Energy, one CLIP artwork across HGSS, Call of Legends, the
+// Play! Pokémon stamped COL promo and the Japanese HeartGold Collection print.
+const FIXTURE_PRINTINGS = [
+  ['242396', 'HeartGold & SoulSilver', '115/123', 'western', 'official', 'hgs'],
+  ['224950', 'Call of Legends', '88/95', 'western', 'official', 'clo'],
+  ['525054', 'League Promos', 'Play! Pokemon | Holo Promo 88/95', 'western', 'promo', 'lpr'],
+  ['279166', 'HeartGold Collection', '2009', 'japanese', 'official', 'l1'],
+].map(([card_id, set_name, card_number, nationality, kind, code]) => ({
+  card_id, name: 'Grass Energy', set_name, card_number, version: 'v222492', nationality, kind, code,
+  symbol_image_url: '', image_url: '',
+}));
+
+async function lookupFixturePrintings(ids, topId) {
+  const version = FIXTURE_PRINTINGS.find((row) => row.card_id === String(topId))?.version;
+  return FIXTURE_PRINTINGS.filter((row) => ids.includes(row.card_id) || (version && row.version === version));
+}
+
 async function resetSchema(pool) {
   await pool.query(`
     drop table if exists public.scan_items, public.scan_pairings, public.scan_rate_limits,
@@ -87,6 +105,9 @@ async function main() {
   setScanStoreForTests(createStore({
     pool,
     lookupCards: async (ids) => new Map(ids.filter((id) => FIXTURE_CARDS[id]).map((id) => [id, { imageUrl: '', ...FIXTURE_CARDS[id] }])),
+    lookupPrintings: lookupFixturePrintings,
+    // E2E has no Firebase Admin; ownership is exercised in integration tests.
+    upsertScanOwnership: async () => ({ ok: true, skipped: true, reason: 'scan_dev_fake' }),
   }));
   require('../api/_scan_http').setDesktopVerifierForTests(async (req) => {
     const auth = String(req.headers.authorization || '');

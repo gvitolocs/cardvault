@@ -280,3 +280,207 @@ test('boxSlots sized stacks: listing uses stack·pos and flags filledStack', () 
   assert.equal(slots.get('b').filledStack, true);
   assert.ok(rules.slotText(slots.get('b')).includes('·'));
 });
+
+// ---- Printing choice (artwork → print family → printings) ----
+// Fixtures mirror production catalog rows (marketplace_search_candidates +
+// pokoin_pokemon_expansions). No set or program is special-cased in code.
+
+const hit = (public_id, score) => ({ public_id, score, name: 'Card' });
+const p = (card_id, set_name, card_number, version, nationality, kind = 'official', code = '') => ({
+  card_id, name: 'Card', set_name, card_number, version, nationality, kind, code, symbol_image_url: '', image_url: '',
+});
+const GRASS = 'v222492';
+const ENERGY = [
+  p('242396', 'HeartGold & SoulSilver', '115/123', GRASS, 'western', 'official', 'hgs'),
+  p('224950', 'Call of Legends', '88/95', GRASS, 'western', 'official', 'clo'),
+  p('279166', 'HeartGold Collection', '2009', GRASS, 'japanese'),
+  p('525054', 'League Promos', 'Play! Pokemon | Holo Promo 88/95', GRASS, 'western', 'promo', 'lpr'),
+  p('222492', 'Base Set', '99/102', GRASS, 'western'),
+  p('268388', 'Base Set Shadowless', 'Shadowless | 99/102', GRASS, 'western', 'subset'),
+  p('264058', 'XY', '132/146', GRASS, 'western'),
+  p('242398', 'HeartGold & SoulSilver', '116/123', 'v222490', 'western'),
+];
+const PUMPKABOO = [
+  p('332628', 'Evolving Skies', '076/203', 'v332628', 'western'),
+  p('484518', 'Play! Pokémon Prize Pack Series', '076/203', 'v332628', 'western', 'promo', 'playprizep'),
+  p('609516', 'World Championship Decks 2022', 'WCD 2022 | Ondrej Skubal | 076/203', 'v332628', 'western', 'side_product'),
+  p('448040', 'Trick or Trade', '076/203', 'v332628', 'american', 'side_product', 'trickortrade'),
+  p('270600', 'Towering Perfection', '016/067', 'v332628', 'japanese'),
+];
+const WOCHIEN = [
+  p('540696', 'Shiny Treasure ex', 'Gold Secret Rare | 355/190', 'v540696', 'japanese'),
+  p('548848', 'Paldean Fates', 'Gold Secret Rare | 240/091', 'v540696', 'western'),
+  p('722606', 'CSVL2: Travel Special Pack', 'CSVL2C | Gold Secret Rare 129/052', 'v540696', 'chinese'),
+];
+const ids = (res) => res.printings.map((row) => row.card_id);
+
+test('printFamily: the batch language fixes the candidate universe before any printing choice', () => {
+  for (const lang of ['EN', 'IT', 'FR', 'DE', 'ES', 'PT', 'NL', 'PL', 'RU']) {
+    assert.deepEqual(rules.printFamily(lang).tiers, [['western']], lang);
+  }
+  assert.deepEqual(rules.printFamily('JP').tiers, [['japanese'], ['korean']]);
+  assert.deepEqual(rules.printFamily('KO').tiers, [['korean'], ['japanese']]);
+  assert.deepEqual(rules.printFamily('ZH').tiers, [['chinese']]);
+  assert.deepEqual(rules.printFamily('ZHT').tiers, [['chinese']]);
+  assert.equal(rules.printFamily('').id, 'western');
+});
+
+test('A. one western printing: no choice, today\'s automatic match', () => {
+  const res = rules.resolvePrintings({
+    hits: [hit('548848', 0.95), hit('540696', 0.9)],
+    rows: WOCHIEN,
+    language: 'EN',
+  });
+  assert.equal(res.state, 'matched');
+  assert.equal(res.choose, false);
+  assert.equal(res.cardId, '548848');
+});
+
+test('B. HGSS energy: the artwork matches, the printing is asked, never picked', () => {
+  const hits = [hit('242396', 0.95), hit('224950', 0.949), hit('279166', 0.93), hit('222492', 0.8)];
+  const res = rules.resolvePrintings({ hits, rows: ENERGY, language: 'EN' });
+  assert.equal(res.state, 'ambiguous');
+  assert.equal(res.choose, true);
+  // Tied in-family hits + the unscored same-number stamped reprint (COL 88/95 Play! promo).
+  // Base Set 99/102 was scored and ruled out (0.80 < 0.95 − 0.08); XY 132/146 is another number.
+  assert.deepEqual(ids(res), ['224950', '242396', '525054']);
+  assert.equal(res.cardId, '242396', 'provisional card is the best-scored one, pending review');
+  const tiles = res.printings.map(rules.printingTile);
+  assert.deepEqual(tiles.map((t) => [t.setName, t.number, t.setCode]), [
+    ['Call of Legends', '88/95', 'CLO'],
+    ['HeartGold & SoulSilver', '115/123', 'HGS'],
+    ['League Promos', '88/95', 'LPR'],
+  ]);
+  assert.equal(tiles[1].symbolUrl, 'https://cdn.pokoin.com/expansions/symbols/heartgold-and-soulsilver.png?v=cm1');
+  assert.equal(tiles[2].detail, 'Play! Pokemon · Holo Promo');
+  assert.equal(tiles[0].label, 'Call of Legends, card 88/95');
+
+  const picked = rules.resolvePrintings({ hits, rows: ENERGY, language: 'EN', choice: '224950' });
+  assert.equal(picked.state, 'matched');
+  assert.equal(picked.cardId, '224950');
+  assert.equal(picked.chosen, '224950');
+});
+
+test('B. a choice the server does not offer is ignored', () => {
+  const hits = [hit('242396', 0.95), hit('224950', 0.949)];
+  const res = rules.resolvePrintings({ hits, rows: ENERGY, language: 'EN', choice: '264058' });
+  assert.equal(res.state, 'ambiguous');
+  assert.equal(res.chosen, '');
+});
+
+test('C. western batch: Japanese / Chinese printings of the same artwork are never offered', () => {
+  const hits = [hit('279166', 0.99), hit('242396', 0.95), hit('224950', 0.95)];
+  const res = rules.resolvePrintings({ hits, rows: ENERGY, language: 'IT' });
+  assert.ok(!ids(res).includes('279166'));
+  assert.ok(res.printings.every((row) => ['western', 'american'].includes(row.nationality)));
+  const wo = rules.resolvePrintings({ hits: [hit('540696', 0.97), hit('722606', 0.93), hit('548848', 0.9)], rows: WOCHIEN, language: 'EN' });
+  assert.deepEqual(ids(wo), ['548848']);
+  assert.equal(wo.cardId, '548848');
+});
+
+test('D. Japanese batch: only the Japanese print family is considered', () => {
+  const hits = [hit('242396', 0.99), hit('224950', 0.99), hit('279166', 0.93)];
+  const res = rules.resolvePrintings({ hits, rows: ENERGY, language: 'JP' });
+  assert.deepEqual(ids(res), ['279166']);
+  assert.equal(res.state, 'matched');
+  assert.equal(res.choose, false);
+});
+
+test('E. Chinese batch: the Chinese printing, never the western duplicate', () => {
+  const hits = [hit('548848', 0.97), hit('540696', 0.93), hit('722606', 0.9)];
+  const res = rules.resolvePrintings({ hits, rows: WOCHIEN, language: 'ZH' });
+  assert.deepEqual(ids(res), ['722606']);
+  assert.equal(res.cardId, '722606');
+});
+
+test('F. Trick or Trade: original and pumpkin reprint are separate printings with their own mark', () => {
+  const hits = [hit('332628', 0.96), hit('484518', 0.955), hit('270600', 0.85)];
+  const res = rules.resolvePrintings({ hits, rows: PUMPKABOO, language: 'EN' });
+  assert.equal(res.choose, true);
+  // Trick or Trade (american print → western family) and WCD are not in the
+  // recognition gallery, so they are offered by printed number.
+  assert.deepEqual(ids(res), ['332628', '484518', '448040', '609516']);
+  const tot = rules.printingTile(res.printings[2]);
+  assert.equal(tot.symbolUrl, 'https://cdn.pokoin.com/expansions/symbols/trick-or-trade.png?v=cm1');
+  assert.equal(tot.number, '076/203');
+  assert.equal(tot.setCode, 'TRICKORTRADE');
+  assert.equal(rules.printingTile(res.printings[3]).detail, 'WCD 2022 · Ondrej Skubal');
+});
+
+test('G. Play! Pokémon / League stamp: offered when unscored, not when the camera ruled it out', () => {
+  const rows = [
+    p('332574', 'Evolving Skies', '049/203', 'v332574', 'western'),
+    p('600010', 'League Promos', 'League Promo | 049/203', 'v332574', 'western', 'promo', 'lpr'),
+  ];
+  const unscored = rules.resolvePrintings({ hits: [hit('332574', 0.95)], rows, language: 'EN' });
+  assert.deepEqual(ids(unscored), ['332574', '600010']);
+  assert.equal(rules.printingTile(unscored.printings[1]).detail, 'League Promo');
+  const ruledOut = rules.resolvePrintings({ hits: [hit('332574', 0.95), hit('600010', 0.8)], rows, language: 'EN' });
+  assert.deepEqual(ids(ruledOut), ['332574']);
+  assert.equal(ruledOut.choose, false);
+});
+
+test('only another region\'s printing was seen: family siblings are offered, a long list stays a desk review', () => {
+  const two = rules.resolvePrintings({ hits: [hit('270600', 0.95)], rows: PUMPKABOO.filter((r) => r.card_id !== '609516'), language: 'EN' });
+  assert.deepEqual(ids(two), ['332628', '484518', '448040']);
+  const many = Array.from({ length: rules.MAX_SIBLING_PRINTINGS + 1 }, (_, i) => p(String(900000 + i * 2), `Set ${i}`, `${i + 1}/99`, 'vX', 'western'));
+  assert.equal(rules.resolvePrintings({ hits: [hit('279166', 0.95)], rows: [...many, { ...ENERGY[2], version: 'vX' }], language: 'EN' }), null);
+});
+
+test('printing layer steps aside: artwork doubt, weak top, no artwork key, no printing in the family', () => {
+  // Two artworks within 0.08: recognition doubt, not a printing choice.
+  assert.equal(rules.resolvePrintings({ hits: [hit('242396', 0.9), hit('242398', 0.86)], rows: ENERGY, language: 'EN' }), null);
+  assert.equal(rules.resolvePrintings({ hits: [hit('242396', 0.79), hit('224950', 0.79)], rows: ENERGY, language: 'EN' }), null);
+  assert.equal(rules.resolvePrintings({ hits: [hit('999998', 0.95)], rows: [p('999998', 'X', '1/2', '', 'western')], language: 'EN' }), null);
+  assert.equal(rules.resolvePrintings({ hits: [hit('279166', 0.95)], rows: [ENERGY[2]], language: 'EN' }), null);
+  assert.equal(rules.resolvePrintings({ hits: [hit('242396', 0.95)], rows: ENERGY, language: 'VI' }), null);
+  assert.equal(rules.resolvePrintings({ hits: [hit('242396', 0.95)], rows: [], language: 'EN' }), null);
+});
+
+test('printed numbers keep every qualifier and compare n/m without leading zeros', () => {
+  assert.deepEqual(rules.printedNumber('Rare | 076/203'), { number: '076/203', key: '76/203', detail: 'Rare' });
+  assert.deepEqual(rules.printedNumber('Play! Pokemon | Holo Promo 88/95'), { number: '88/95', key: '88/95', detail: 'Play! Pokemon · Holo Promo' });
+  assert.equal(rules.printedNumber('TG01/TG30').key, 'TG1/TG30');
+  assert.deepEqual(rules.printedNumber('SVP 135'), { number: 'SVP 135', key: 'SVP135', detail: '' });
+  assert.equal(rules.printedNumber('BW-P 140').number, 'BW-P 140');
+  assert.deepEqual(rules.printedNumber('2011 Unnumbered'), { number: '', key: '', detail: '2011 Unnumbered' });
+  assert.equal(rules.printedNumber('Non-Holo | Trainer Kit 5/30').detail, 'Non-Holo · Trainer Kit');
+});
+
+test('printing tile: subset variants stay visible, stored marks are a second source', () => {
+  const tile = rules.printingTile({
+    card_id: '700002',
+    name: 'Eevee',
+    set_name: 'Prismatic Evolutions - Master Ball Reverse Holo',
+    card_number: '074/131',
+    kind: 'subset',
+    nationality: 'western',
+    code: 'pre',
+    symbol_image_url: 'https://cdn.pokoin.com/expansions/symbols/prismatic-evolutions.png',
+  });
+  assert.equal(tile.detail, 'Master Ball Reverse Holo');
+  assert.equal(tile.symbolAltUrl, 'https://cdn.pokoin.com/expansions/symbols/prismatic-evolutions.png');
+  assert.equal(tile.label, 'Prismatic Evolutions - Master Ball Reverse Holo, card 074/131, Master Ball Reverse Holo');
+});
+
+test('scan event carries the phone printing choice as a public card id only', () => {
+  const base = { scanEventId: '5f0c7a4e-2b7c-4c55-9a4e-0d9e3f0a1b2c', clientSequence: 1 };
+  assert.equal(rules.parseScanEvent({ ...base, printing: { cardId: '242396' } }).printingChoice, '242396');
+  assert.equal(rules.parseScanEvent({ ...base, printing: { cardId: 'x' } }).printingChoice, '');
+  assert.equal(rules.parseScanEvent(base).printingChoice, '');
+  const req = rules.parsePrintingRequest({ recognition: { hits: Array.from({ length: 20 }, (_, i) => hit(String(i + 2), 0.5)) } });
+  assert.equal(req.hits.length, 10);
+});
+
+test('ambiguous rows preselect the best candidate of the batch print family, else the best overall', () => {
+  const cands = [
+    { cardId: '504600', score: 0.83, nationality: 'japanese' },
+    { cardId: '233564', score: 0.8, nationality: 'western' },
+    { cardId: '722606', score: 0.7, nationality: 'chinese' },
+  ];
+  assert.equal(rules.provisionalCandidate(cands, 'EN').cardId, '233564');
+  assert.equal(rules.provisionalCandidate(cands, 'JP').cardId, '504600');
+  assert.equal(rules.provisionalCandidate(cands, 'ZHT').cardId, '722606');
+  assert.equal(rules.provisionalCandidate(cands.slice(0, 1), 'EN').cardId, '504600', 'no western candidate: keep the best');
+  assert.equal(rules.provisionalCandidate([], 'EN'), null);
+});
