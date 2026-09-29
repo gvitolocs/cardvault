@@ -30,9 +30,10 @@ function rewriteCdnKeyPrefix(url, fromId, toId) {
 
 function rewriteCdnPokoinPrefix(url, row = {}) {
   const source = String(url || '');
-  // Multi-game R2 keys stay raw CardTrader ids (one-piece/<ct_id>_…, riftbound/<ct_id>_…).
-  // Pokemon leftover keys are rewritten to public card_id.
-  if (/\/(?:one-piece|riftbound)\//i.test(source)) {
+  // Prefixed multi-game keys stay raw CardTrader ids
+  // (magic/<ct_id>_…, one-piece/<ct_id>_…). Pokemon leftover keys are
+  // rewritten to public card_id.
+  if (/(?:^|\/)(?:one-piece|riftbound|magic|yugioh|lorcana|flesh-and-blood|digimon|dragon-ball-super|vanguard|star-wars|union-arena|gundam|sorcery|palworld|cyberpunk)\//i.test(source)) {
     return source;
   }
   const pokoin = String(row.card_id ?? row.id ?? '').trim();

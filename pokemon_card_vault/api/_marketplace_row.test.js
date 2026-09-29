@@ -30,6 +30,32 @@ test('rewrites leftover CardTrader CDN prefixes to our id', () => {
   );
 });
 
+test('keeps every multi-game CDN prefix on the leftover ct_id', () => {
+  for (const prefix of [
+    'one-piece',
+    'riftbound',
+    'magic',
+    'yugioh',
+    'lorcana',
+    'flesh-and-blood',
+    'digimon',
+    'dragon-ball-super',
+    'vanguard',
+    'star-wars',
+    'union-arena',
+    'gundam',
+    'sorcery',
+    'palworld',
+    'cyberpunk',
+  ]) {
+    const url = `https://cdn.pokoin.com/${prefix}/404909_hi-speedroid-clear-wing-rider.jpg`;
+    assert.equal(
+      rewriteCdnPokoinPrefix(url, { card_id: 809818, ct_id: 404909 }),
+      url,
+    );
+  }
+});
+
 test('does not rewrite a leftover Nacli key when the row is Drifloon public 248768', () => {
   assert.equal(
     rewriteCdnKeyPrefix('/card-images/248768_nacli.jpg', '124384', '248768'),
