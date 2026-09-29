@@ -639,6 +639,22 @@ test('complete-book observations archive missing listings; partial ones never do
   }, { truncated: false }), false);
 });
 
+test('a CardTrader rejection after a successful refresh call is retried', () => {
+  const refresh = loadRefreshModuleWithStubs();
+
+  const rejected = Object.assign(new Error('CardTrader rejected this API token.'), {
+    statusCode: 400,
+  });
+  assert.equal(refresh.isCardTraderAuthenticationRejection(rejected), true);
+  assert.equal(refresh.isTransientCardTraderFetchError(rejected), true);
+  assert.equal(
+    refresh.isTransientCardTraderFetchError(
+      Object.assign(new Error('CardTrader request failed with HTTP 404.'), { statusCode: 502 }),
+    ),
+    false,
+  );
+});
+
 test('CardTrader refresh reports derived listing cache count', async () => {
   const refresh = loadRefreshModuleWithStubs();
   const calls = [];
@@ -817,4 +833,66 @@ test('CardTrader snapshot upsert disables statement timeout on the same connecti
   assert.match(source, /SET LOCAL statement_timeout = 0/);
   assert.match(source, /queryWithDisabledStatementTimeout/);
   assert.match(source, /code === '57014'/);
+});
+
+test('CardTrader expansion refresh: a rejected token lets in-flight sets finish, still finalizes, then fails', async () => {
+  const fetched = [];
+  const persisted = [];
+  const sqlSeen = [];
+  let failedAt = null;
+  const refresh = loadRefreshModuleWithStubs({
+    fetchMarketplaceProducts: async (_token, params) => {
+      const id = Number(params.expansion_id);
+      fetched.push(id);
+      if (id === 12) {
+        const error = new Error('CardTrader rejected this API token.');
+        error.statusCode = 400;
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 40));
+      return { [100 + id]: [{ id: `listing-${id}`, quantity: 1, price_cents: 100 }] };
+    },
+    getMarketplacePool: () => ({
+      connect: async () => ({
+        query: async (sql, values) => {
+          sqlSeen.push(String(sql));
+          if (String(sql).includes('refresh_cardtrader_market_listing_snapshots')) {
+            persisted.push(JSON.parse(values[1])[0].externalListingId);
+          }
+          return { rows: [{ archived_count: 0, deleted_count: 0, upserted_count: 1, cache_refreshed_count: 0 }] };
+        },
+        on: () => {},
+        release: () => {},
+      }),
+    }),
+    marketplaceQuery: async (sql) => {
+      sqlSeen.push(String(sql));
+      if (String(sql).includes('group by expansion_id')) {
+        return { rows: [11, 12, 13, 14].map((id) => ({ expansion_id: id, blueprint_ids: [100 + id] })) };
+      }
+      return { rows: [{}] };
+    },
+  });
+
+  await assert.rejects(
+    refresh.runRefresh({
+      expansionIds: [11, 12, 13, 14],
+      expansionConcurrency: 2,
+      requestDelayMs: 0,
+      finalize: true,
+      onProgress: (event) => {
+        if (event.event === 'expansion_refresh_failed' && failedAt === null) failedAt = fetched.length;
+      },
+    }, { CARDTRADER_AUTH_TOKEN: 'token' }),
+    /rejected this API token/,
+  );
+
+  // 11 was in flight when 12 failed: it must finish persisting.
+  assert.ok(persisted.includes('listing-11'), `persisted: ${persisted}`);
+  // Set 12 may be retried first (transient-auth retry), but once it has
+  // finally failed no new set is started.
+  assert.notEqual(failedAt, null, 'failure event emitted');
+  assert.deepEqual(fetched.slice(failedAt), [], `sets fetched after failure: ${fetched.slice(failedAt)}`);
+  // Finalize still runs so sold stats follow what was written.
+  assert.equal(sqlSeen.filter((sql) => sql.includes('finalize_cardtrader_daily_market_refresh')).length, 1);
 });
