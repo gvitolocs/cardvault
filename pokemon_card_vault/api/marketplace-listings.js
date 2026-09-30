@@ -1,4 +1,5 @@
 const { marketplaceQuery, marketplaceWriteQuery } = require('./_marketplace_db');
+const { runWithGame } = require('./_marketplace_game');
 const { getFirebaseAdmin, verifyBearerToken } = require('./_firebase');
 const { requireReserveAccess } = require('./_firebase_roles');
 const { publicSellerComment } = require('./_seller_comment_filter');
@@ -574,7 +575,10 @@ async function readListings(url, decoded) {
   }
   values.push(cleanLimit(url.searchParams.get('limit')));
   const qualifiedWhere = addListingTableAlias(where);
-  const result = await marketplaceQuery(
+  // marketplace_user_listings lives in the central marketplace DB; a game
+  // scope (AsyncLocalStorage) points marketplaceQuery at the game catalog
+  // DB, which has no listings table — pin the read to pokemon (central).
+  const result = await runWithGame('pokemon', () => marketplaceQuery(
     `
       select
         listings.*
@@ -584,7 +588,7 @@ async function readListings(url, decoded) {
       limit $${values.length}
     `,
     values,
-  );
+  ));
   const enrichedRows = sellerUsername
     ? result.rows
     : await enrichListingRowsWithSellerProfiles(result.rows);
