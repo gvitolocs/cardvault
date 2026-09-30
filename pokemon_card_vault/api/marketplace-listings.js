@@ -928,6 +928,11 @@ async function readPublicOffersForCard(cardId, limit = 40, options = {}) {
   if (options.nativeOnly) {
     url.searchParams.set('nativeOnly', '1');
   }
+  // The edge defaults to the pokemon game scope; game card desks must forward
+  // their game or the listings filter hides every tagged row.
+  if (options.game) {
+    url.searchParams.set('game', String(options.game));
+  }
   return readListings(url, null);
 }
 

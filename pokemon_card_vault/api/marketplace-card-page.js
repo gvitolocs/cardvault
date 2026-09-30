@@ -156,7 +156,7 @@ function createHandler(deps = {}) {
         ),
         includeOffers
           ? withTimeout(
-            () => safeCall('offers', () => loadOffers(cardId, offerLimit, { nativeOnly: !liveOffers }), []),
+            () => safeCall('offers', () => loadOffers(cardId, offerLimit, { nativeOnly: !liveOffers, game }), []),
             liveOffers ? 8000 : 800,
             [],
             'marketplace-card-page offers',
