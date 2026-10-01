@@ -1,25 +1,30 @@
 'use strict';
 
+const { routeDefinitions } = require('../server/api-route-manifest');
+const { FAMILIES, familyForPath } = require('../server/api-route-families');
+
 /**
- * Frozen client contract for React / Flutter / JS.
- * Served at GET /api/__contract. Keep in sync with docs/react-api-architecture.md.
+ * Client reference aligned with the public 2026-10-01 contract.
+ * Route inventory must describe this release, never a copied live-server list.
+ * Served at GET /api/__contract; regenerate docs with npm run api:docs.
  */
-const CLIENT_CONTRACT = {
-  "version": "2026-09-22.1",
+const CLIENT_REFERENCE = {
+  "version": "2026-10-01.1",
   "title": "Pokoin marketplace client contract for React / Flutter / JS",
   "hosts": {
     "api": "https://api.pokoin.com",
     "publicSite": "https://pokoin.com",
     "cdn": "https://cdn.pokoin.com",
     "rewriteNote": "https://pokoin.com/api/* rewrites to https://api.pokoin.com/api/*. Do not add Vercel serverless functions.",
-    "localDev": "npm run api:server  (server/oracle-api-server.js)"
+    "localDev": "npm run api:server; default http://127.0.0.1:8080 (PORT or ORACLE_API_PORT overrides)",
+    "apiRuntime": "Docker pokoin-oracle-api on pi-home (Raspberry Pi), exposed through Cloudflare tunnel"
   },
   "identity": {
     "publicIdField": [
       "id",
       "card_id"
     ],
-    "formula": "public_card_id = cardtrader_blueprint_id * 2",
+    "formula": "For CardTrader-backed catalog records: public_card_id = cardtrader_blueprint_id * 2. Use the returned public id; do not apply this formula to arbitrary external/provider ids.",
     "examples": {
       "espurr": {
         "card_id": "220962",
@@ -56,7 +61,7 @@ const CLIENT_CONTRACT = {
     "decision": "Codevira D00000B"
   },
   "images": {
-    "r2KeyPrefix": "ct_id",
+    "r2KeyPrefix": "Legacy Pokemon objects use ct_id; satellite games may use game-specific prefixes. Treat keys as opaque and use API image URLs.",
     "doNotBuildFilenamesFromPublicId": true,
     "fields": {
       "imageUrl": "Full art (typically 330x460 baseline JPEG). Prefer this for grids and heroes.",
@@ -69,14 +74,18 @@ const CLIENT_CONTRACT = {
     "cdnWorker": "pokoin-cdn-card-images",
     "r2Bucket": "cardvault-images",
     "observability": "GET/POST /api/marketplace-image-log",
-    "decodeNote": "Flutter CanvasKit fails progressive JPEG and tiny VP8 preview webp. React <img> can decode those, but still must not use 180px previews as full-size art."
+    "decodeNote": "Flutter CanvasKit fails progressive JPEG and tiny VP8 preview webp. React <img> can decode those, but still must not use 180px previews as full-size art.",
+    "rules": [
+      "Use gridImageUrl for grids and heroImageUrl for detail.",
+      "Do not synthesize image keys from public IDs. Palworld/Cyberpunk legacy image keys use raw CardTrader IDs; the API handles this mapping."
+    ]
   },
   "availability": {
     "serverOwnsFlag": true,
     "fields": {
-      "isMarketAvailable": "boolean \u2014 show price vs Out of stock",
-      "inStock": "boolean \u2014 same value, HTML-friendly alias",
-      "stock": "int \u2014 native + eligible CardTrader quantity",
+      "isMarketAvailable": "boolean — show price vs Out of stock",
+      "inStock": "boolean — same value, HTML-friendly alias",
+      "stock": "int — native + eligible CardTrader quantity",
       "hasCardTraderListing": "bool",
       "cardtraderEligibleListingCount": "int",
       "price": "number PKN ask when available"
@@ -87,7 +96,8 @@ const CLIENT_CONTRACT = {
   },
   "search": {
     "engine": "meili",
-    "host": "127.0.0.1:7700 on pi-home next to the public API",
+    "scope": "Meilisearch for English Pokemon retrieval; SQL for satellite games and legacy non-English full search",
+    "host": "127.0.0.1:7700 on pi-home alongside the public API",
     "indexes": [
       "marketplace_cards",
       "marketplace_name_tokens"
@@ -95,59 +105,84 @@ const CLIENT_CONTRACT = {
     "queryParam": "query",
     "queryAlias": "q",
     "notes": [
-      "GET /api/marketplace-suggest is Meili-only typeahead for pokoin-web (grouped printings, no SQL).",
-      "Meili English documents include name, expansion aliases, and card_number.",
-      "Search page hydrates identity plus listed cheapest PKN from cheapest_homepage_cache_blueprint; shop listings stay on the card page.",
-      "POST /api/marketplace-autocomplete remains for Flutter until that client switches to suggest.",
-      "Do not put Meili on peer1."
+      "Pokemon suggest retrieves grouped printings from Meilisearch; optional SQL enrichment supplies title language and expansion nationality.",
+      "Satellite-game suggest uses the selected game catalog SQL path.",
+      "Non-English Pokemon suggest returns an empty result with meta.reason=meili_unavailable when the language gate is closed; do not assume it uses full-search SQL fallback.",
+      "Search page hydrates identity/image and overlays cached cheapest PKN. Shop listing rows remain on the card page.",
+      "POST /api/marketplace-autocomplete remains the Flutter pool endpoint; POST /api/searchbar-token-predict supplies ghost-text prediction.",
+      "Plain prefixes favor the base display name; explicit variant tokens retain variant intent.",
+      "Meilisearch stays on pi-home. Oracle is the catalog import/write primary."
     ],
     "params": {
       "query": "Name / number string",
       "limit": "Page size (search path caps ~100)",
       "offset": "Meili offset",
-      "search_language": "Non-en stays legacy SQL",
+      "search_language": "Display/search language; aliases lang and language. Default en.",
       "productType": "Facet",
-      "productSearchOnly": "1 = Product search universe: sealed products plus the jumbo subtype (no separate jumbo tab)"
+      "productSearchOnly": "1 = Product search universe: sealed products plus the jumbo subtype (no separate jumbo tab)",
+      "game": "Game scope; see games.supported",
+      "print_language": "Print universe all|western|japanese|korean|chinese; alias printLanguage. Japanese and Korean selections share the JP/KO universe.",
+      "match": "Suggest only: all requires every query token; omitted uses the default matching strategy."
     },
     "autocomplete": "POST /api/marketplace-autocomplete { search_term, result_limit } (Flutter)",
     "suggest": "GET /api/marketplace-suggest?q= (pokoin-web popup)",
     "fullSearch": "GET /api/marketplace-cards?query=",
-    "searchPage": "GET /api/marketplace-search-page?query="
+    "searchPage": "GET /api/marketplace-search-page?query=",
+    "tokenPredict": "POST /api/searchbar-token-predict",
+    "counts": {
+      "suggest": "shown is the capped number of popup printings (at most 20). count is the matching/filtered universe estimate, not the popup length. globalCount is available on Pokemon responses.",
+      "searchPage": "count is the returned page length. total is the matching query total when available, otherwise null; never treat count as the catalog total. Use hasMore and offset for pagination."
+    }
   },
   "auth": {
     "provider": "Firebase Auth",
     "header": "Authorization: Bearer <Firebase ID token>",
     "login": "POST /api/auth-login",
     "logout": "Client-side Firebase signOut. No server logout.",
-    "extensionBridge": "GET /extension/auth-bridge"
+    "extensionBridge": "GET /extension/auth-bridge",
+    "rules": [
+      "Protected routes derive UID from the verified Firebase token, never from a client body UID.",
+      "Do not log or embed bearer tokens in documentation. See routes[].auth for each endpoint."
+    ]
   },
   "pageApis": {
     "home": {
       "path": "GET /api/marketplace-home-page",
       "legacy": "GET /api/marketplace-home is the Flutter snapshot (CardTrader hydrate, often 30s+). React must not call it.",
-      "query": "recentCardIds optional comma-separated public ids; limit optional max 48",
-      "returns": "cards[], sections.{recentlySeenIds,bestSellerIds,featuredIds,newArrivalIds,spotlightIds}"
+      "query": "game; recentCardIds optional comma-separated public ids; limit default 36, max 48",
+      "returns": "game, cards[], sections.{recentlySeenIds,bestSellerIds,featuredIds,newArrivalIds,spotlightIds}; optional source",
+      "cache": "With recentCardIds: private, no-store. Otherwise public max-age=15, s-maxage=30, stale-while-revalidate=60."
     },
     "suggest": {
       "path": "GET /api/marketplace-suggest",
-      "query": "q, limit (default 20, max 24), search_language, print_language (all\|western\|japanese\|chinese)",
-      "returns": "groups[] of { name, printings[{ id, set, number, rarity, image, href }] }"
+      "query": "q|query, game, limit (default 20, max 24 groups; popup capped at 20 printings), search_language|lang|language, print_language|printLanguage, match=all optional",
+      "returns": "query, game, groups[] of {name, printings[{id,set,number,rarity,image,href,...}]}, shown, count; Pokemon also globalCount and printLanguage. Empty/degraded responses can include meta.reason.",
+      "cache": "public max-age=5, s-maxage=30, stale-while-revalidate=120 on successful reads; degraded responses use shorter caching."
     },
     "search": {
       "path": "GET /api/marketplace-search-page",
-      "query": "query|q, limit, offset, productType, productSearchOnly, lang, includeFacets",
-      "returns": "cards[], facets.products[], count, hasMore, limit, offset. Identity hydrate plus listed cheapest PKN; no snapshot listing join."
+      "query": "query|q, game, limit (default/max 100), offset (default 0), productType, productSearchOnly=1, search_language|lang|language, print_language|printLanguage, includeFacets (default enabled; 0 disables)",
+      "returns": "query, game, productType, productSearchOnly, lang, cards[], facets.products[], count, total (nullable), hasMore, limit, offset. Identity/image hydrate plus cached cheapest PKN; no live shop-listing read.",
+      "cache": "public max-age=15, s-maxage=60, stale-while-revalidate=120"
     },
     "card": {
       "path": "GET /api/marketplace-card-page",
-      "query": "cardId required. lang, slug, includeSales, includeOffers, includeSameAs (default 0), liveOffers (default 0 = native listings only)",
-      "returns": "card, version (CLIP pokoin_version_sets key, also card.version), versionCount, versions[] (same-artwork printings), neighbors.{prev,next} (3 each, collector order, wraps), sameAs[], offers[], cheapest, sales[], artist, canonicalPath, seo"
+      "query": "cardId|id required (public id), game, lang|language|search_language, cardSlug|slug, includeSales, includeOffers, includeSameAs, liveOffers (all flags default off; 1|true|yes enables), offerLimit (default 40, max 80), salesLimit (default 40, max 120)",
+      "returns": "card, game, version, visualTheme, versionCount, versions[], rarities[], neighbors.{prev,next}, sameAs[], offers[], cheapest, sales[], artist, canonicalPath, seo, lookup",
+      "offers": "includeOffers=1 is required to populate offers. liveOffers=1 additionally requests live CardTrader; otherwise only native listings are requested. Optional reads may return empty arrays on timeout/failure.",
+      "cache": "public max-age=10, s-maxage=30, stale-while-revalidate=60"
     },
     "expansion": {
       "path": "GET /api/marketplace-expansion-page",
-      "query": "expansionName or slug. productType default card. limit (default 200, max 400), offset. Omit both name and slug to list expansions.",
+      "query": "game; expansionName or slug; productType default card; limit (default 200, max 400), offset. Omit both name and slug for the expansion index (limit default 500, max 2000).",
       "returns": "expansion { name, slug, cardCount }, cards[], total, count, hasMore, limit, offset. cardCount/total is stored catalog_card_count (grid singles with art), not the page size and not TCGDex printedTotal.",
       "cardCount": "Read public.marketplace_set_card_counts.catalog_card_count / pokoin_pokemon_expansions.catalog_card_count. Refresh: refresh_marketplace_set_catalog_counts(). Do not COUNT(*) on the request."
+    },
+    "portfolio": {
+      "path": "GET /api/marketplace-portfolio",
+      "query": "game; id optional; limit Pokemon default 400/max 500, satellite default 2000/max 2500",
+      "returns": "game, currency, totals, games[], items[], holdings[]. Catalog explore data, not authenticated personal holdings.",
+      "pricing": "PKN, with available native-listing and Pokemon cheapest-cache overlays; unpriced rows use pricePkn=0."
     }
   },
   "silver": {
@@ -166,10 +201,10 @@ const CLIENT_CONTRACT = {
     "itemKind": "single",
     "productType": "card",
     "canonicalPath": "/marketplace/en/cards/548832/card-mew-ex-special-illustration-rare-232-091-paldean-fates",
-    "imageUrl": "/card-images/{card_id}_\u2026.jpg",
-    "previewImageUrl": "/card-images/{card_id}_\u2026.jpg",
-    "gridImageUrl": "/card-images/{card_id}_\u2026.jpg",
-    "heroImageUrl": "/card-images/{card_id}_\u2026.jpg",
+    "imageUrl": "/card-images/{card_id}_….jpg",
+    "previewImageUrl": "/card-images/{card_id}_….jpg",
+    "gridImageUrl": "/card-images/{card_id}_….jpg",
+    "heroImageUrl": "/card-images/{card_id}_….jpg",
     "isMarketAvailable": false,
     "inStock": false,
     "acceptBothCamelAndSnake": true
@@ -199,6 +234,7 @@ const CLIENT_CONTRACT = {
       "card",
       "catalog",
       "commerce",
+      "scan",
       "cardtrader",
       "cardmarket",
       "auth",
@@ -213,7 +249,10 @@ const CLIENT_CONTRACT = {
       "docs/react-api-architecture.md",
       "docs/react-page-apis.md",
       "docs/oracle-api-migration.md",
-      "docs/api-route-catalog.json"
+      "docs/api-route-catalog.json",
+      "docs/pokoin-api.md",
+      "workflows/meilisearch-peer-workflow.md",
+      "memory/architecture.md"
     ]
   },
   "bffGaps": [],
@@ -225,10 +264,104 @@ const CLIENT_CONTRACT = {
   ],
   "flutterNativeStays": true,
   "doNotRewriteWholeFlutterRepo": true,
-  "routeCount": 83,
-  "flutterPathCount": 69
+  "updatedAt": "2026-10-01",
+  "scope": "Client API reference. Publication of this contract does not deploy business-logic changes. routes and routeCount are derived from the running server manifest.",
+  "topology": {
+    "api": "pi-home",
+    "meilisearch": "pi-home, http://127.0.0.1:7700",
+    "cache": "Valkey on pi-home",
+    "pokemonCatalogReads": "Postgres streaming replica on pi-home",
+    "catalogPrimary": "pokoin-marketplace Oracle: CardTrader imports and migrations write to the primary, never to the Pi replica",
+    "satelliteCatalogs": "Game-scoped isolated databases; selecting a game does not create an isolated user-listings store."
+  },
+  "games": {
+    "default": "pokemon",
+    "supported": [
+      "pokemon",
+      "magic",
+      "yugioh",
+      "flesh_and_blood",
+      "digimon",
+      "dragon_ball_super",
+      "vanguard",
+      "one_piece",
+      "lorcana",
+      "star_wars",
+      "union_arena",
+      "riftbound",
+      "gundam",
+      "sorcery",
+      "palworld",
+      "cyberpunk"
+    ],
+    "query": "game (alias marketplaceGame)",
+    "headers": [
+      "x-pokoin-game",
+      "x-marketplace-game"
+    ],
+    "resolution": "Non-Pokemon query scope first, then game header, then recognized forwarded/site hostname. Unknown game values normalize to pokemon.",
+    "rule": "Carry the selected game across search, detail, expansion, portfolio and listing requests. Public IDs returned by the API are already normalized."
+  },
+  "listings": {
+    "path": "/api/marketplace-listings",
+    "methods": [
+      "GET",
+      "POST",
+      "PATCH"
+    ],
+    "publicRead": "GET with cardId (public id), game and limit (default 500, max 1000). nativeOnly=1 or live=0 skips live CardTrader. Response: {listings:[]}.",
+    "sellerRead": "sellerUid requires a Firebase bearer token matching the owner UID. sellerUsername reads active public seller inventory. Do not pass both.",
+    "write": "POST creates; PATCH?id=<listing-id> updates. Firebase bearer required; ownership and reserve privileges are checked server-side.",
+    "gameScope": "Native marketplace_user_listings is the shared central store; catalog/game tags scope seller inventory. Clients must send game and must not choose a database.",
+    "cache": "private, no-store"
+  },
+  "payments": {
+    "currency": "PKN for marketplace values",
+    "authority": "Prices, balances, ownership and privileges are checked by the server. Client totals are not payment authority.",
+    "discovery": "See routes for marketplace-checkout-quote, create-order-checkout-session, marketplace-orders, create-pkn-checkout-session and stripe-webhook; availability is determined by the running manifest."
+  },
+  "health": {
+    "path": "GET /healthz (alias /api/healthz)",
+    "dependencies": [
+      "Postgres",
+      "Valkey",
+      "Meilisearch",
+      "CDN"
+    ],
+    "unhealthyStatus": 503
+  },
+  "errors": {
+    "pipelinePolicy": {
+      "status": 503,
+      "body": {
+        "error": "We are working on a solution."
+      }
+    },
+    "handlerErrors": "Validation, auth and not-found errors retain their handler HTTP status. Some handlers still return 500 errors or degraded 200 payloads; do not assume every failure is normalized to the pipeline policy.",
+    "suggest": "Empty/degraded suggestions may include meta.reason; an empty popup alone is not proof that no catalog matches exist."
+  },
+  "compatibility": {
+    "flutterUsage": "docs/flutter-api-usage.json is a repository audit snapshot, not the running route count.",
+    "deploymentNote": "Contract metadata follows the 2026-10-01 public reference. Each release derives routes and routeCount from its own server manifest; matching contract versions do not guarantee identical installed routes or business logic. Updating this file does not deploy production."
+  }
 };
 
-module.exports = {
-  CLIENT_CONTRACT,
-};
+function buildClientContract(routes = routeDefinitions) {
+  const contract = JSON.parse(JSON.stringify(CLIENT_REFERENCE));
+  contract.navigation.families = FAMILIES.map(({ id }) => id);
+  contract.routes = routes.map((route) => ({
+    path: route.path,
+    methods: [...route.methods],
+    family: familyForPath(route.path),
+    purpose: route.purpose,
+    auth: route.auth,
+    params: JSON.parse(JSON.stringify(route.params || {})),
+    ...(route.rawBody ? { rawBody: true } : {}),
+  }));
+  contract.routeCount = contract.routes.length;
+  return contract;
+}
+
+const CLIENT_CONTRACT = buildClientContract();
+
+module.exports = { CLIENT_CONTRACT, buildClientContract };

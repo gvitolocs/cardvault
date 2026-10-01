@@ -78,7 +78,9 @@ async function main() {
       const contractJson = JSON.parse(contract.body);
       assert.equal(contractJson.hosts.api, 'https://api.pokoin.com');
       assert.equal(contractJson.identity.decision, 'Codevira D00000B');
-      assert.equal(contractJson.images.r2KeyPrefix, 'ct_id');
+      assert.match(contractJson.images.r2KeyPrefix, /ct_id/);
+      assert.equal(contractJson.routeCount, routeDefinitions.length);
+      assert.deepEqual(contractJson.routes.map((route) => route.path), routeDefinitions.map((route) => route.path));
       assert.equal(contractJson.availability.serverOwnsFlag, true);
       assert.equal(contractJson.navigation.routesGrouped, 'GET /api/__routes?group=1');
 

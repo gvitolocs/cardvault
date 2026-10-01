@@ -15,8 +15,8 @@ This file is the human contract. Machine-readable twins:
 
 | Artifact | Role |
 | --- | --- |
-| [`react-api-contract.json`](./react-api-contract.json) | Frozen JSON (identity, images, search, availability, page BFFs) |
-| `GET https://api.pokoin.com/api/__contract` | Same JSON from the live API |
+| [`react-api-contract.json`](./react-api-contract.json) | Generated local contract (identity, images, search, availability, page BFFs and installed route inventory) |
+| `GET https://api.pokoin.com/api/__contract` | Contract from the deployed release; its route inventory can differ from this checkout |
 | `GET https://api.pokoin.com/api/__routes` | Route index with `family` on each row |
 | `GET https://api.pokoin.com/api/__routes?group=1` | Same list grouped (`page-bff`, `search`, `catalog`, …) |
 | [`react-page-apis.md`](./react-page-apis.md) | Home / search / card / expansion BFF cookbook for Next.js |
@@ -26,6 +26,22 @@ This file is the human contract. Machine-readable twins:
 Do **not** split `api/*.js` into subfolders. `oracle-api-server` maps
 `/api/foo` → `api/foo.js`. Navigate with families in `__routes` /
 `server/api-route-families.js`.
+
+### Contract maintenance (2026-10-01)
+
+`api/_client_contract.js` uses the public `2026-10-01.1` client reference.
+`buildClientContract()` derives `routes`, `routeCount` and route families from
+this release's `server/api-route-manifest.js`; it does not copy the public
+server's inventory. Each route exposes path, methods, family, purpose, auth,
+params and optional rawBody, not internal environment dependencies.
+
+Run `npm run api:docs` after changes to regenerate the JSON contract and route
+catalog. Run `node --test api/_client_contract.test.js` to verify generated JSON,
+manifest alignment and local HTTP introspection. On 2026-10-01 this checkout
+contains 107 routes, while the inspected public release exposes 130; identical
+reference versions do not imply identical deployments. Do not add nonexistent
+handlers merely to match that count. Regenerating documentation does not deploy
+the API or alter business logic.
 
 **Set desk count:** `expansion.cardCount` is
 `marketplace_set_card_counts.catalog_card_count` (also on
@@ -53,7 +69,8 @@ Related:
 - [`marketplace-search-ranking.md`](./marketplace-search-ranking.md) — typeahead vs catalog rank, every file, Postgres `search_weight`
 
 Business rules live in `pokemon_card_vault/api/*.js` served by Docker
-`pokoin-oracle-api` on **pokoin-marketplace**. They do **not** live in Vercel
+`pokoin-oracle-api` on **pi-home** via the Cloudflare tunnel. Oracle
+**pokoin-marketplace** is the catalog import/write primary. APIs do **not** live in Vercel
 serverless functions (Hobby cap is 12; `api/**` is excluded from web deploys).
 
 ---
@@ -216,8 +233,8 @@ Owner: `api/_marketplace_row.js` (`rewriteCdnPokoinPrefix`,
 
 ## 5. Search
 
-English search uses Meili (`MARKETPLACE_SEARCH_ENGINE=meili`) on
-`pokoin-marketplace` localhost `:7700`. Documents include **name**, expansion
+English Pokemon search uses Meili (`MARKETPLACE_SEARCH_ENGINE=meili`) on
+`pi-home` localhost `:7700`, alongside the public API. Documents include **name**, expansion
 aliases, and **`card_number`**. Numbered queries such as `Drowzee 210/198`
 match in the index; the API still prefers an exact collector-number row if
 Meili returns a mixed page.
@@ -226,9 +243,9 @@ Two client paths:
 
 | Client | Endpoint | SQL |
 | --- | --- | --- |
-| pokoin-web header | `GET /api/marketplace-suggest?q=` | None (Meili display fields, grouped printings) |
+| pokoin-web header | `GET /api/marketplace-suggest?q=` | Pokemon retrieval in Meili; optional SQL enrichment. Satellite games use scoped SQL. |
 | Flutter searchbar | `POST /api/marketplace-autocomplete` | Hydrate + rank (legacy) |
-| Search results page | `GET /api/marketplace-search-page?query=` | Identity + image only (no listing-cache join) |
+| Search results page | `GET /api/marketplace-search-page?query=` | Identity + image plus cached cheapest PKN, not live shop listings |
 
 Query parameter: **`query`** (Flutter). Alias **`q`** is also accepted.
 `?q=Cacturne` used to be ignored and returned default `search_weight` products.
@@ -236,21 +253,31 @@ Query parameter: **`query`** (Flutter). Alias **`q`** is also accepted.
 | Param | Meaning |
 | --- | --- |
 | `query` | Name / number string |
-| `limit` | Page size (search path caps ~100); suggest default 12, max 24 |
+| `limit` | Page size (search path caps 100); suggest default 20, max 24 groups, popup at most 20 printings |
 | `offset` | Meili offset |
-| `search_language` / `lang` | Non-`en` stays legacy SQL |
+| `search_language` / `lang` / `language` | Display/search language; full search retains legacy SQL for non-English, but Pokemon suggest can return empty `meta.reason=meili_unavailable` when its language gate is closed |
 | `productType` | Facet |
-| `productSearchOnly=1` | Sealed products only |
+| `productSearchOnly=1` | Sealed products plus jumbo subtype |
+| `game` | Selected game scope; carry it across browse, detail and listing requests |
+| `print_language` / `printLanguage` | all, western, japanese, korean, chinese; Japanese and Korean share the JP/KO universe |
+| `match=all` | Suggest only: require every query token |
+
+For suggest, `shown` is popup length, while `count` estimates the matching
+universe. For search-page, `count` is page length and `total` is the matching
+query total when available, otherwise null. Never infer catalog size from a
+page length; paginate with `offset`, `limit` and `hasMore`.
 
 `expansion=Scarlet & Violet` is **not** a handler param (ignored). Filter by
 set after hydration or add a real facet on the API — do not assume the query
 string is forwarded.
 
-Price and stock stay on the **card page**. Typeahead is a card picker
+Cached cheapest PKN can accompany search cards; shop offers stay on the
+**card page**. Typeahead is a card picker
 (CardTrader-style groups), not a mini results grid.
 
-Meili is on the marketplace VM only. Delta sync:
-`scripts/meili-sync-marketplace-delta.js` (timer on that host).
+Meili stays on pi-home with the public API, not the Oracle import VM. Delta
+sync: `scripts/meili-sync-marketplace-delta.js`; follow
+`workflows/meilisearch-peer-workflow.md` for deployment ownership.
 
 Owner: `api/marketplace-search-candidates.js`
 (`collectorNumberKey`, `rankRowsByQueryCollectorNumber`),

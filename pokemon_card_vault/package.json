@@ -4,7 +4,7 @@
   "scripts": {
     "api:docs": "node scripts/generate-api-docs.js",
     "api:server": "node server/oracle-api-server.js",
-    "api:check": "node scripts/check-oracle-api-server.js && npm run api:lint && npm run api:coverage && npm run api:migrations:check",
+    "api:check": "node --test api/_client_contract.test.js && node scripts/check-oracle-api-server.js && npm run api:lint && npm run api:coverage && npm run api:migrations:check",
     "api:lint": "node scripts/check-api-guardrails.js",
     "api:coverage": "node scripts/check-api-route-tests.js",
     "api:migrations:check": "node scripts/check-oracle-migrations.js",

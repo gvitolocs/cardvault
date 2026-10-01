@@ -2,6 +2,11 @@
 
 > **React / JS contract (canonical):** [`react-api-architecture.md`](./react-api-architecture.md)
 > Machine-readable: [`react-api-contract.json`](./react-api-contract.json) and live `GET /api/__contract`.
+
+The `2026-10-01.1` contract now derives `routes` and `routeCount` from each
+release's server manifest. Generate this checkout's JSON with `npm run api:docs`;
+do not assume the deployed route inventory equals the local one. See
+[`react-api-architecture.md`](./react-api-architecture.md#contract-maintenance-2026-10-01).
 > Production API host is **`https://api.pokoin.com`**. `https://pokoin.com/api/*` is a rewrite to that host.
 > Do not add Vercel serverless functions. Flutter stays Android/iOS; public web moves to React.
 

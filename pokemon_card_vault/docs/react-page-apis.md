@@ -11,6 +11,12 @@ serverless functions.
 Live machine contract: `GET https://api.pokoin.com/api/__contract`
 Human contract: `docs/react-api-architecture.md`
 
+The local JSON is generated with `npm run api:docs` from
+`api/_client_contract.js` and the installed route manifest. Its reference version
+is `2026-10-01.1`; route inventories are release-specific (107 in this checkout,
+130 on the public release inspected on 2026-10-01). A documentation update is
+not a production deployment. Carry `game` across all page/API requests.
+
 Flutter Android/iOS keeps using the older granular APIs
 (`marketplace-card-versions`, `marketplace-listings`, `marketplace-cards`).
 The page BFFs compose those handlers.
@@ -76,7 +82,8 @@ Response:
 ```
 
 Join `sections.*.Ids` to `cards` by `id`. `recentCardIds` is not cached
-(`Cache-Control: private, no-store`). Without it, home is cached ~30s.
+(`Cache-Control: private, max-age=0, no-store`). Without it, the header is
+`public, max-age=15, s-maxage=30, stale-while-revalidate=60`.
 
 `newArrivalIds` is newest English singles with collector numbers
 (`028/132`), not products.
@@ -114,20 +121,30 @@ Response:
   "limit": 100,
   "offset": 0,
   "count": 100,
+  "total": null,
   "hasMore": true,
   "cards": [],
   "facets": { "products": [{ "productType": "card", "count": 80 }] }
 }
 ```
 
-English `query` uses Meili on the marketplace VM. Alias `q` works.
-The search **page** hydrates identity and image only (no listing-cache join).
-Header typeahead is `GET /api/marketplace-suggest` (Meili-only grouped
-printings). Group order for plain prefixes is **base name first**
+English Pokemon `query` uses Meili on pi-home alongside the public API.
+Alias `q` works. The search **page** hydrates identity/image and cached
+cheapest PKN, without live shop-listing reads. Satellite games use scoped SQL.
+Header typeahead is `GET /api/marketplace-suggest` (Pokemon retrieval via Meili
+with optional SQL enrichment; satellite retrieval via scoped SQL).
+Group order for plain prefixes is **base name first**
 (`mimik` → Mimikyu, not Mimikyu GX). Catalog `search_weight` still boosts
 GX/products in Meili; the popup reranks in `api/_meili_suggest.js`. Full
 map: [`marketplace-search-ranking.md`](./marketplace-search-ranking.md).
 Load more with `offset += limit` while `hasMore`.
+
+Search-page `count` is page length, not the query total; `total` is nullable.
+Suggest `shown` is the capped popup length, while `count` is the matching
+universe estimate. Non-English Pokemon suggest can return empty
+`meta.reason=meili_unavailable` when the language gate is closed; do not assume
+the full-search SQL fallback applies to suggest. Successful suggest reads use
+`public, max-age=5, s-maxage=30, stale-while-revalidate=120`.
 
 Expansion browse is **not** `?expansion=Mega+Evolution` on search.
 That param is ignored. Use the expansion page API.
@@ -140,9 +157,9 @@ GET /api/marketplace-card-page?cardId=548832&includeSales=1
 GET /api/marketplace-card-page?cardId=703382&includeSameAs=1&liveOffers=1
 ```
 
-First paint is a `card_id` primary-key lookup plus native listings. Same-set
+First paint is a `card_id` primary-key lookup; offers require `includeOffers=1`. Same-set
 printings come from `set_name` + `name` (not `marketplace-card-versions`).
-`includeSameAs` and `liveOffers` are **off** unless the client asks; both
+`includeOffers`, `includeSales`, `includeSameAs` and `liveOffers` are **off** unless the client asks; the latter two
 were the 30s hang (statement timeout on sameAs, live CardTrader via
 `readPublicOffersForCard`).
 
@@ -154,8 +171,9 @@ Response keys: `card`, `version` (CLIP `pokoin_version_sets` key, also
 `sameAs`, `offers`, `cheapest`, `sales` (empty unless `includeSales=1`),
 `artist`, `canonicalPath`, `seo`.
 
-`card.heroImageUrl` is the full JPEG. Offers are native listings plus
-live CardTrader (pknreserve). `sameAs` is other printings of the same
+`card.heroImageUrl` is the full JPEG. With `includeOffers=1`, offers are native
+listings; add `liveOffers=1` to request live CardTrader as well. Optional reads
+can return empty arrays on failure/timeout. `sameAs` is other printings of the same
 name/set.
 
 Canonical browser path is `card.canonicalPath`, also available from

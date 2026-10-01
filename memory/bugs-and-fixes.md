@@ -13,6 +13,13 @@ Use this file for notable incidents and verified fixes. Link to PRs/commits when
 - **Risk area** (payments / auth / wallet / migrations / blockchain):
 ```
 
+### 2026-10-01 — Client API contract and generated docs match the installed manifest
+- **Symptom**: Local `/api/__contract` and JSON documentation were version `2026-09-22.1` with a frozen count of 83, despite 107 routes in the local manifest. The inspected public release had version `2026-10-01.1` and 130 routes.
+- **Root cause**: `_client_contract.js` contained a manually maintained reference and route count; generated docs reproduced that stale value.
+- **Fix**: Align client-reference metadata with `2026-10-01.1`, derive the safe route inventory/count/families from the installed manifest, regenerate JSON, and correct the human docs for Pi topology, scoped search, cache and opt-in offers. Release inventories remain distinct; no missing handlers were invented or production code deployed.
+- **Verify**: 54 targeted tests passed, including local HTTP contract/introspection and generated JSON equality. `npm run api:check` validates the contract as part of its standard checks.
+- **Risk area**: API metadata/documentation; no payment, auth or database behavior changed.
+
 ### 2026-09-29 — Flutter search artwork and collapsible mobile filters
 - **Symptom**: Ranked card names appeared with default images; the mobile filter panel pushed search results far below the fold.
 - **Root cause**: Candidate-label fallback cards discarded artwork. The compact search layout rendered all filters above the results.

@@ -1,19 +1,20 @@
 {
-  "version": "2026-09-22.1",
+  "version": "2026-10-01.1",
   "title": "Pokoin marketplace client contract for React / Flutter / JS",
   "hosts": {
     "api": "https://api.pokoin.com",
     "publicSite": "https://pokoin.com",
     "cdn": "https://cdn.pokoin.com",
     "rewriteNote": "https://pokoin.com/api/* rewrites to https://api.pokoin.com/api/*. Do not add Vercel serverless functions.",
-    "localDev": "npm run api:server  (server/oracle-api-server.js)"
+    "localDev": "npm run api:server; default http://127.0.0.1:8080 (PORT or ORACLE_API_PORT overrides)",
+    "apiRuntime": "Docker pokoin-oracle-api on pi-home (Raspberry Pi), exposed through Cloudflare tunnel"
   },
   "identity": {
     "publicIdField": [
       "id",
       "card_id"
     ],
-    "formula": "public_card_id = cardtrader_blueprint_id * 2",
+    "formula": "For CardTrader-backed catalog records: public_card_id = cardtrader_blueprint_id * 2. Use the returned public id; do not apply this formula to arbitrary external/provider ids.",
     "examples": {
       "espurr": {
         "card_id": "220962",
@@ -50,7 +51,7 @@
     "decision": "Codevira D00000B"
   },
   "images": {
-    "r2KeyPrefix": "ct_id",
+    "r2KeyPrefix": "Legacy Pokemon objects use ct_id; satellite games may use game-specific prefixes. Treat keys as opaque and use API image URLs.",
     "doNotBuildFilenamesFromPublicId": true,
     "fields": {
       "imageUrl": "Full art (typically 330x460 baseline JPEG). Prefer this for grids and heroes.",
@@ -63,7 +64,11 @@
     "cdnWorker": "pokoin-cdn-card-images",
     "r2Bucket": "cardvault-images",
     "observability": "GET/POST /api/marketplace-image-log",
-    "decodeNote": "Flutter CanvasKit fails progressive JPEG and tiny VP8 preview webp. React <img> can decode those, but still must not use 180px previews as full-size art."
+    "decodeNote": "Flutter CanvasKit fails progressive JPEG and tiny VP8 preview webp. React <img> can decode those, but still must not use 180px previews as full-size art.",
+    "rules": [
+      "Use gridImageUrl for grids and heroImageUrl for detail.",
+      "Do not synthesize image keys from public IDs. Palworld/Cyberpunk legacy image keys use raw CardTrader IDs; the API handles this mapping."
+    ]
   },
   "availability": {
     "serverOwnsFlag": true,
@@ -81,7 +86,8 @@
   },
   "search": {
     "engine": "meili",
-    "host": "127.0.0.1:7700 on pi-home next to the public API",
+    "scope": "Meilisearch for English Pokemon retrieval; SQL for satellite games and legacy non-English full search",
+    "host": "127.0.0.1:7700 on pi-home alongside the public API",
     "indexes": [
       "marketplace_cards",
       "marketplace_name_tokens"
@@ -89,59 +95,84 @@
     "queryParam": "query",
     "queryAlias": "q",
     "notes": [
-      "GET /api/marketplace-suggest is Meili-only typeahead for pokoin-web (grouped printings, no SQL).",
-      "Meili English documents include name, expansion aliases, and card_number.",
-      "Search page hydrates identity plus listed cheapest PKN from cheapest_homepage_cache_blueprint; shop listings stay on the card page.",
-      "POST /api/marketplace-autocomplete remains for Flutter until that client switches to suggest.",
-      "Do not put Meili on peer1."
+      "Pokemon suggest retrieves grouped printings from Meilisearch; optional SQL enrichment supplies title language and expansion nationality.",
+      "Satellite-game suggest uses the selected game catalog SQL path.",
+      "Non-English Pokemon suggest returns an empty result with meta.reason=meili_unavailable when the language gate is closed; do not assume it uses full-search SQL fallback.",
+      "Search page hydrates identity/image and overlays cached cheapest PKN. Shop listing rows remain on the card page.",
+      "POST /api/marketplace-autocomplete remains the Flutter pool endpoint; POST /api/searchbar-token-predict supplies ghost-text prediction.",
+      "Plain prefixes favor the base display name; explicit variant tokens retain variant intent.",
+      "Meilisearch stays on pi-home. Oracle is the catalog import/write primary."
     ],
     "params": {
       "query": "Name / number string",
       "limit": "Page size (search path caps ~100)",
       "offset": "Meili offset",
-      "search_language": "Non-en stays legacy SQL",
+      "search_language": "Display/search language; aliases lang and language. Default en.",
       "productType": "Facet",
-      "productSearchOnly": "1 = Product search universe: sealed products plus the jumbo subtype (no separate jumbo tab)"
+      "productSearchOnly": "1 = Product search universe: sealed products plus the jumbo subtype (no separate jumbo tab)",
+      "game": "Game scope; see games.supported",
+      "print_language": "Print universe all|western|japanese|korean|chinese; alias printLanguage. Japanese and Korean selections share the JP/KO universe.",
+      "match": "Suggest only: all requires every query token; omitted uses the default matching strategy."
     },
     "autocomplete": "POST /api/marketplace-autocomplete { search_term, result_limit } (Flutter)",
     "suggest": "GET /api/marketplace-suggest?q= (pokoin-web popup)",
     "fullSearch": "GET /api/marketplace-cards?query=",
-    "searchPage": "GET /api/marketplace-search-page?query="
+    "searchPage": "GET /api/marketplace-search-page?query=",
+    "tokenPredict": "POST /api/searchbar-token-predict",
+    "counts": {
+      "suggest": "shown is the capped number of popup printings (at most 20). count is the matching/filtered universe estimate, not the popup length. globalCount is available on Pokemon responses.",
+      "searchPage": "count is the returned page length. total is the matching query total when available, otherwise null; never treat count as the catalog total. Use hasMore and offset for pagination."
+    }
   },
   "auth": {
     "provider": "Firebase Auth",
     "header": "Authorization: Bearer <Firebase ID token>",
     "login": "POST /api/auth-login",
     "logout": "Client-side Firebase signOut. No server logout.",
-    "extensionBridge": "GET /extension/auth-bridge"
+    "extensionBridge": "GET /extension/auth-bridge",
+    "rules": [
+      "Protected routes derive UID from the verified Firebase token, never from a client body UID.",
+      "Do not log or embed bearer tokens in documentation. See routes[].auth for each endpoint."
+    ]
   },
   "pageApis": {
     "home": {
       "path": "GET /api/marketplace-home-page",
       "legacy": "GET /api/marketplace-home is the Flutter snapshot (CardTrader hydrate, often 30s+). React must not call it.",
-      "query": "recentCardIds optional comma-separated public ids; limit optional max 48",
-      "returns": "cards[], sections.{recentlySeenIds,bestSellerIds,featuredIds,newArrivalIds,spotlightIds}"
+      "query": "game; recentCardIds optional comma-separated public ids; limit default 36, max 48",
+      "returns": "game, cards[], sections.{recentlySeenIds,bestSellerIds,featuredIds,newArrivalIds,spotlightIds}; optional source",
+      "cache": "With recentCardIds: private, no-store. Otherwise public max-age=15, s-maxage=30, stale-while-revalidate=60."
     },
     "suggest": {
       "path": "GET /api/marketplace-suggest",
-      "query": "q, limit (default 20, max 24), search_language, print_language (all|western|japanese|chinese)",
-      "returns": "groups[] of { name, printings[{ id, set, number, rarity, image, href }] }"
+      "query": "q|query, game, limit (default 20, max 24 groups; popup capped at 20 printings), search_language|lang|language, print_language|printLanguage, match=all optional",
+      "returns": "query, game, groups[] of {name, printings[{id,set,number,rarity,image,href,...}]}, shown, count; Pokemon also globalCount and printLanguage. Empty/degraded responses can include meta.reason.",
+      "cache": "public max-age=5, s-maxage=30, stale-while-revalidate=120 on successful reads; degraded responses use shorter caching."
     },
     "search": {
       "path": "GET /api/marketplace-search-page",
-      "query": "query|q, limit, offset, productType, productSearchOnly, lang, includeFacets",
-      "returns": "cards[], facets.products[], count, hasMore, limit, offset. Identity hydrate plus listed cheapest PKN; no snapshot listing join."
+      "query": "query|q, game, limit (default/max 100), offset (default 0), productType, productSearchOnly=1, search_language|lang|language, print_language|printLanguage, includeFacets (default enabled; 0 disables)",
+      "returns": "query, game, productType, productSearchOnly, lang, cards[], facets.products[], count, total (nullable), hasMore, limit, offset. Identity/image hydrate plus cached cheapest PKN; no live shop-listing read.",
+      "cache": "public max-age=15, s-maxage=60, stale-while-revalidate=120"
     },
     "card": {
       "path": "GET /api/marketplace-card-page",
-      "query": "cardId required. lang, slug, includeSales, includeOffers, includeSameAs (default 0), liveOffers (default 0 = native listings only)",
-      "returns": "card, version (CLIP pokoin_version_sets key, also card.version), versionCount, versions[] (same-artwork printings), neighbors.{prev,next} (3 each, collector order, wraps), sameAs[], offers[], cheapest, sales[], artist, canonicalPath, seo"
+      "query": "cardId|id required (public id), game, lang|language|search_language, cardSlug|slug, includeSales, includeOffers, includeSameAs, liveOffers (all flags default off; 1|true|yes enables), offerLimit (default 40, max 80), salesLimit (default 40, max 120)",
+      "returns": "card, game, version, visualTheme, versionCount, versions[], rarities[], neighbors.{prev,next}, sameAs[], offers[], cheapest, sales[], artist, canonicalPath, seo, lookup",
+      "offers": "includeOffers=1 is required to populate offers. liveOffers=1 additionally requests live CardTrader; otherwise only native listings are requested. Optional reads may return empty arrays on timeout/failure.",
+      "cache": "public max-age=10, s-maxage=30, stale-while-revalidate=60"
     },
     "expansion": {
       "path": "GET /api/marketplace-expansion-page",
-      "query": "expansionName or slug. productType default card. limit (default 200, max 400), offset. Omit both name and slug to list expansions.",
+      "query": "game; expansionName or slug; productType default card; limit (default 200, max 400), offset. Omit both name and slug for the expansion index (limit default 500, max 2000).",
       "returns": "expansion { name, slug, cardCount }, cards[], total, count, hasMore, limit, offset. cardCount/total is stored catalog_card_count (grid singles with art), not the page size and not TCGDex printedTotal.",
       "cardCount": "Read public.marketplace_set_card_counts.catalog_card_count / pokoin_pokemon_expansions.catalog_card_count. Refresh: refresh_marketplace_set_catalog_counts(). Do not COUNT(*) on the request."
+    },
+    "portfolio": {
+      "path": "GET /api/marketplace-portfolio",
+      "query": "game; id optional; limit Pokemon default 400/max 500, satellite default 2000/max 2500",
+      "returns": "game, currency, totals, games[], items[], holdings[]. Catalog explore data, not authenticated personal holdings.",
+      "pricing": "PKN, with available native-listing and Pokemon cheapest-cache overlays; unpriced rows use pricePkn=0."
     }
   },
   "silver": {
@@ -193,6 +224,7 @@
       "card",
       "catalog",
       "commerce",
+      "scan",
       "cardtrader",
       "cardmarket",
       "auth",
@@ -207,7 +239,10 @@
       "docs/react-api-architecture.md",
       "docs/react-page-apis.md",
       "docs/oracle-api-migration.md",
-      "docs/api-route-catalog.json"
+      "docs/api-route-catalog.json",
+      "docs/pokoin-api.md",
+      "workflows/meilisearch-peer-workflow.md",
+      "memory/architecture.md"
     ]
   },
   "bffGaps": [],
@@ -219,6 +254,1470 @@
   ],
   "flutterNativeStays": true,
   "doNotRewriteWholeFlutterRepo": true,
-  "routeCount": 83,
-  "flutterPathCount": 69
+  "updatedAt": "2026-10-01",
+  "scope": "Client API reference. Publication of this contract does not deploy business-logic changes. routes and routeCount are derived from the running server manifest.",
+  "topology": {
+    "api": "pi-home",
+    "meilisearch": "pi-home, http://127.0.0.1:7700",
+    "cache": "Valkey on pi-home",
+    "pokemonCatalogReads": "Postgres streaming replica on pi-home",
+    "catalogPrimary": "pokoin-marketplace Oracle: CardTrader imports and migrations write to the primary, never to the Pi replica",
+    "satelliteCatalogs": "Game-scoped isolated databases; selecting a game does not create an isolated user-listings store."
+  },
+  "games": {
+    "default": "pokemon",
+    "supported": [
+      "pokemon",
+      "magic",
+      "yugioh",
+      "flesh_and_blood",
+      "digimon",
+      "dragon_ball_super",
+      "vanguard",
+      "one_piece",
+      "lorcana",
+      "star_wars",
+      "union_arena",
+      "riftbound",
+      "gundam",
+      "sorcery",
+      "palworld",
+      "cyberpunk"
+    ],
+    "query": "game (alias marketplaceGame)",
+    "headers": [
+      "x-pokoin-game",
+      "x-marketplace-game"
+    ],
+    "resolution": "Non-Pokemon query scope first, then game header, then recognized forwarded/site hostname. Unknown game values normalize to pokemon.",
+    "rule": "Carry the selected game across search, detail, expansion, portfolio and listing requests. Public IDs returned by the API are already normalized."
+  },
+  "listings": {
+    "path": "/api/marketplace-listings",
+    "methods": [
+      "GET",
+      "POST",
+      "PATCH"
+    ],
+    "publicRead": "GET with cardId (public id), game and limit (default 500, max 1000). nativeOnly=1 or live=0 skips live CardTrader. Response: {listings:[]}.",
+    "sellerRead": "sellerUid requires a Firebase bearer token matching the owner UID. sellerUsername reads active public seller inventory. Do not pass both.",
+    "write": "POST creates; PATCH?id=<listing-id> updates. Firebase bearer required; ownership and reserve privileges are checked server-side.",
+    "gameScope": "Native marketplace_user_listings is the shared central store; catalog/game tags scope seller inventory. Clients must send game and must not choose a database.",
+    "cache": "private, no-store"
+  },
+  "payments": {
+    "currency": "PKN for marketplace values",
+    "authority": "Prices, balances, ownership and privileges are checked by the server. Client totals are not payment authority.",
+    "discovery": "See routes for marketplace-checkout-quote, create-order-checkout-session, marketplace-orders, create-pkn-checkout-session and stripe-webhook; availability is determined by the running manifest."
+  },
+  "health": {
+    "path": "GET /healthz (alias /api/healthz)",
+    "dependencies": [
+      "Postgres",
+      "Valkey",
+      "Meilisearch",
+      "CDN"
+    ],
+    "unhealthyStatus": 503
+  },
+  "errors": {
+    "pipelinePolicy": {
+      "status": 503,
+      "body": {
+        "error": "We are working on a solution."
+      }
+    },
+    "handlerErrors": "Validation, auth and not-found errors retain their handler HTTP status. Some handlers still return 500 errors or degraded 200 payloads; do not assume every failure is normalized to the pipeline policy.",
+    "suggest": "Empty/degraded suggestions may include meta.reason; an empty popup alone is not proof that no catalog matches exist."
+  },
+  "compatibility": {
+    "flutterUsage": "docs/flutter-api-usage.json is a repository audit snapshot, not the running route count.",
+    "deploymentNote": "Contract metadata follows the 2026-10-01 public reference. Each release derives routes and routeCount from its own server manifest; matching contract versions do not guarantee identical installed routes or business logic. Updating this file does not deploy production."
+  },
+  "routes": [
+    {
+      "path": "/api/auth-login",
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "family": "auth",
+      "purpose": "Validate the current Firebase bearer token and return safe auth metadata.",
+      "auth": "Required Firebase bearer token.",
+      "params": {
+        "body": "No required JSON body fields."
+      }
+    },
+    {
+      "path": "/api/chat",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "family": "other",
+      "purpose": "List and read authenticated direct conversations, send messages, and create atomic PKN payment events.",
+      "auth": "Required Firebase bearer token; conversation membership is rechecked for every action.",
+      "params": {
+        "query": "`action` is `list`, `get`, `message`, `pay`, or `read`; `peer` is used by GET conversation reads.",
+        "body": "`peer` plus `text`, `amountPkn`, or read/payment fields according to action."
+      }
+    },
+    {
+      "path": "/api/cache-google-profile-picture",
+      "methods": [
+        "POST"
+      ],
+      "family": "auth",
+      "purpose": "Download the authenticated user Google avatar, optimize it, and store it in R2.",
+      "auth": "Required Firebase bearer token.",
+      "params": {
+        "body": "No required fields; uses the authenticated Firebase profile picture URL."
+      }
+    },
+    {
+      "path": "/api/cardmarket-redirect",
+      "methods": [
+        "GET"
+      ],
+      "family": "cardmarket",
+      "purpose": "Resolve a marketplace blueprint to a Cardmarket product/search URL and redirect, or return JSON when requested.",
+      "auth": "Public.",
+      "params": {
+        "query": "`id` public card_id or leftover ct_id, optional `blueprintId` leftover, `locale` optional two-letter locale, `format=json` optional, `game` for One Piece / Riftbound."
+      }
+    },
+    {
+      "path": "/api/cardmarket-scrape-observation",
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "family": "cardmarket",
+      "purpose": "Record Cardmarket scrape/association observations used by marketplace import review tooling.",
+      "auth": "Required Firebase bearer token.",
+      "params": {
+        "body": "Cardmarket observation payload including blueprint/product identifiers and scrape metadata."
+      }
+    },
+    {
+      "path": "/api/cardtrader-blueprint-listings",
+      "methods": [
+        "GET",
+        "OPTIONS"
+      ],
+      "family": "cardtrader",
+      "purpose": "Return historical/daily CardTrader marketplace listing snapshots for one blueprint/card ID from Oracle.",
+      "auth": "Public.",
+      "params": {
+        "query": "`blueprintId` required for CardTrader blueprint IDs; `cardId` accepted for mapped Pokoin card IDs; `limit`, `page`, and `cursor` optional."
+      }
+    },
+    {
+      "path": "/api/cardtrader-live-listings",
+      "methods": [
+        "GET",
+        "OPTIONS"
+      ],
+      "family": "cardtrader",
+      "purpose": "Return live on-demand CardTrader marketplace listings for one blueprint/card ID without persisting results.",
+      "auth": "Public.",
+      "params": {
+        "query": "`blueprintId` for a CardTrader blueprint ID or `cardId` for a Pokoin card ID such as `248856`; `language`/`lang` and `limit` optional. Without `limit`, returns all rows from CardTrader for the blueprint; explicit limits cap the client response only."
+      }
+    },
+    {
+      "path": "/api/cardtrader-clean-listings",
+      "methods": [
+        "POST"
+      ],
+      "family": "cardtrader",
+      "purpose": "Deactivate CardTrader-linked listings owned by the authenticated seller.",
+      "auth": "Required Firebase bearer token for the seller.",
+      "params": {
+        "body": "No required fields."
+      }
+    },
+    {
+      "path": "/api/cardtrader-connect",
+      "methods": [
+        "POST",
+        "DELETE"
+      ],
+      "family": "cardtrader",
+      "purpose": "Connect, replace, or disconnect an authenticated seller CardTrader token.",
+      "auth": "Required Firebase bearer token.",
+      "params": {
+        "body": "`token` required for POST. DELETE has no body."
+      }
+    },
+    {
+      "path": "/api/cardtrader-daily-listings-refresh",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "family": "cardtrader",
+      "purpose": "Manual/admin diagnostic trigger for global CardTrader marketplace listing snapshots; scheduled ingestion is owned by the Oracle/peer4 host script.",
+      "auth": "Required CARDTRADER_DAILY_LISTINGS_SECRET, CARDTRADER_DAILY_REFRESH_SECRET, or CRON_SECRET bearer/header secret.",
+      "params": {
+        "query": "`dryRun`, `maxBlueprints`, `maxProducts`, `archiveMissing`, `removedDay`, `blueprintId`, `blueprintIds`, `expansionId`, and `language` are optional bounded controls.",
+        "body": "Same controls as query parameters for POST."
+      }
+    },
+    {
+      "path": "/api/ingest/:game",
+      "methods": [
+        "GET",
+        "POST",
+        "OPTIONS"
+      ],
+      "family": "cardtrader",
+      "purpose": "List or run an isolated non-Pokemon CardTrader game ingest on the Oracle 15T service. Pokemon remains on pi-home.",
+      "auth": "Status and writes for a selected game require the configured CardTrader ingest service secret.",
+      "params": {
+        "query": "`game` route parameter or query value; bounded importer controls are accepted for POST.",
+        "body": "`game`, `apply`, `discoverOnly`, and bounded import controls for POST."
+      }
+    },
+    {
+      "path": "/api/cardtrader-game-ingest",
+      "methods": [
+        "GET",
+        "POST",
+        "OPTIONS"
+      ],
+      "family": "cardtrader",
+      "purpose": "List isolated satellite-game ingest services, inspect one game, or run a bounded authorized CardTrader ingest.",
+      "auth": "Status and writes for a selected game require the configured CardTrader ingest service secret.",
+      "params": {
+        "query": "`game` selects One Piece or Riftbound for GET status.",
+        "body": "`game` plus bounded discover/apply importer controls for POST."
+      }
+    },
+    {
+      "path": "/api/cardtrader-disconnect",
+      "methods": [
+        "POST"
+      ],
+      "family": "cardtrader",
+      "purpose": "Disconnect the authenticated seller CardTrader integration.",
+      "auth": "Required Firebase bearer token.",
+      "params": {
+        "body": "No required fields."
+      }
+    },
+    {
+      "path": "/api/cardtrader-webhook/:uid",
+      "methods": [
+        "POST"
+      ],
+      "family": "cardtrader",
+      "purpose": "Receive CardTrader order webhooks for a connected seller and decrement linked Pokoin inventory.",
+      "auth": "CardTrader Signature HMAC using the seller shared_secret.",
+      "params": {
+        "path": "`uid` Firebase seller uid registered as the webhook URL suffix.",
+        "body": "Raw CardTrader webhook JSON (order.create / order.update / order.destroy)."
+      },
+      "rawBody": true
+    },
+    {
+      "path": "/api/cardtrader-import-dry-run",
+      "methods": [
+        "POST"
+      ],
+      "family": "cardtrader",
+      "purpose": "Read the authenticated seller CardTrader export and return a redacted import summary without writing inventory.",
+      "auth": "Required Firebase bearer token.",
+      "params": {
+        "body": "Optional dry-run controls; no writes are performed."
+      }
+    },
+    {
+      "path": "/api/cardtrader-redirect",
+      "methods": [
+        "GET"
+      ],
+      "family": "cardtrader",
+      "purpose": "Redirect a public card id or leftover ct_id to the CardTrader leftover blueprint page.",
+      "auth": "Public.",
+      "params": {
+        "query": "`id` public card_id (ct_id × 2) or leftover ct_id. Optional `blueprintId` leftover. `game` for One Piece / Riftbound. `format=json` returns `{ url, ct_id }`."
+      }
+    },
+    {
+      "path": "/api/cardtrader-status",
+      "methods": [
+        "GET"
+      ],
+      "family": "cardtrader",
+      "purpose": "Return safe CardTrader integration status for the authenticated seller.",
+      "auth": "Required Firebase bearer token.",
+      "params": {
+        "query": "No required query parameters."
+      }
+    },
+    {
+      "path": "/api/create-pkn-checkout-session",
+      "methods": [
+        "POST"
+      ],
+      "family": "payments",
+      "purpose": "Create or reconcile a Stripe Checkout session for buying PKN account balance.",
+      "auth": "Required Firebase bearer token.",
+      "params": {
+        "body": "`pknAmount`, `fiatCents`, and `lookupKey` for new checkout; `checkoutSessionId` for reconciliation."
+      }
+    },
+    {
+      "path": "/api/chat",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "family": "other",
+      "purpose": "List and read canonical direct conversations, post messages, transfer PKN, and update read state.",
+      "auth": "Required Firebase bearer token; conversation membership is rechecked server-side.",
+      "params": {
+        "query": "`action=list|get` and `peer` for GET.",
+        "body": "`peer` plus message, payment, or read fields for POST actions `message`, `pay`, and `read`."
+      }
+    },
+    {
+      "path": "/api/crypto-pkn-purchase/:action",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "family": "payments",
+      "purpose": "Quote, request, and check crypto-to-PKN purchase flows.",
+      "auth": "Required Firebase bearer token.",
+      "params": {
+        "path": "`action` is `quote`, `request`, or `status`.",
+        "body": "`asset` and `amountIn` for quote; `quoteId` and `depositTxHash` for request.",
+        "query": "`requestId` optional for status."
+      }
+    },
+    {
+      "path": "/api/crypto-pkn-sale/:action",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "family": "payments",
+      "purpose": "Quote, request, and check PKN-to-crypto sale flows.",
+      "auth": "Required Firebase bearer token.",
+      "params": {
+        "path": "`action` is `quote`, `request`, or `status`.",
+        "body": "`asset` and `amountIn` for quote; `quoteId`, `depositTxHash`, and `payoutAddress` for request.",
+        "query": "`requestId` optional for status."
+      }
+    },
+    {
+      "path": "/api/deck-card-version-lookup",
+      "methods": [
+        "GET",
+        "POST",
+        "OPTIONS"
+      ],
+      "family": "other",
+      "purpose": "Return ranked marketplace card versions for structured decklist card fields.",
+      "auth": "Public.",
+      "params": {
+        "query": "`name`, `setCode`, `collectorNumber`, optional Limitless expansion fields, `language`, and `limit` are supported.",
+        "body": "Same fields as query parameters for POST."
+      }
+    },
+    {
+      "path": "/api/extension-card-search",
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "family": "search",
+      "purpose": "Search marketplace cards from browser-extension scraped card fields.",
+      "auth": "Public.",
+      "params": {
+        "body": "`query` or structured fields such as `name`, `collectorNumber`, `expansion`, `rarity`, `variation`, `language`, and `limit`."
+      }
+    },
+    {
+      "path": "/api/earn-pkn",
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "family": "payments",
+      "purpose": "Receive Earn PKN sharding inquiries and email the completed form to Pokoin contact.",
+      "auth": "Public.",
+      "params": {
+        "body": "`email`, `numberOfCards`, and `valueOfCards` required; optional `cardList`, `language`, and `conditions`."
+      }
+    },
+    {
+      "path": "/api/flutter-debug-logs",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "family": "debug",
+      "purpose": "Record and read protected Flutter client debug logs.",
+      "auth": "Required debug token or authorized debug/admin Firebase bearer token.",
+      "params": {
+        "query": "GET filters include `limit`, `sessionId`, `userId`, `path`, `category`, and `eventName`.",
+        "body": "POST requires `sessionId` and `eventName`, with optional route/url/user/payload fields."
+      }
+    },
+    {
+      "path": "/api/forum",
+      "methods": [
+        "GET"
+      ],
+      "family": "other",
+      "purpose": "Read forum categories, topic lists, or a single topic with posts.",
+      "auth": "Public.",
+      "params": {
+        "query": "`categoryId` optional for topic lists, `topicId` optional for a single topic."
+      }
+    },
+    {
+      "path": "/api/forum-create-post",
+      "methods": [
+        "POST"
+      ],
+      "family": "other",
+      "purpose": "Create an authenticated forum reply.",
+      "auth": "Required Firebase bearer token.",
+      "params": {
+        "body": "`topicId` and post content fields."
+      }
+    },
+    {
+      "path": "/api/forum-create-topic",
+      "methods": [
+        "POST"
+      ],
+      "family": "other",
+      "purpose": "Create an authenticated forum topic.",
+      "auth": "Required Firebase bearer token.",
+      "params": {
+        "body": "Topic title/content/category fields."
+      }
+    },
+    {
+      "path": "/api/forum-upload-media",
+      "methods": [
+        "POST"
+      ],
+      "family": "other",
+      "purpose": "Optimize forum image media and store it in R2.",
+      "auth": "Required Firebase bearer token.",
+      "params": {
+        "body": "`imageBase64` and either `topicId` or `postId`."
+      }
+    },
+    {
+      "path": "/api/limitless-expansion-blueprints",
+      "methods": [
+        "GET"
+      ],
+      "family": "catalog",
+      "purpose": "Return Limitless expansion-to-Pokoin blueprint mapping rows.",
+      "auth": "Public.",
+      "params": {
+        "query": "`expansionKey`, `setCode`, `name`, `includeBlueprints=1`, and `limit` are supported."
+      }
+    },
+    {
+      "path": "/api/marketplace-artist-cards",
+      "methods": [
+        "GET"
+      ],
+      "family": "catalog",
+      "purpose": "Return artist profile data and marketplace cards grouped by illustrator/artist attribution.",
+      "auth": "Public.",
+      "params": {
+        "query": "`artistSlug` or `artist`; `limit` optional."
+      }
+    },
+    {
+      "path": "/api/marketplace-artist-suggestions",
+      "methods": [
+        "GET"
+      ],
+      "family": "search",
+      "purpose": "Return marketplace artist suggestion rows for artist pages and admin review.",
+      "auth": "Public.",
+      "params": {
+        "query": "Search/filter query parameters including artist text and limit."
+      }
+    },
+    {
+      "path": "/api/marketplace-suggest",
+      "methods": [
+        "GET",
+        "OPTIONS"
+      ],
+      "family": "search",
+      "purpose": "Meili-only typeahead for pokoin-web: grouped printings, no SQL listing hydrate.",
+      "auth": "Public.",
+      "params": {
+        "query": "`q` or `query`; `limit` max groups (default 12, max 24); `lang` / `search_language` (EN Meili only)."
+      }
+    },
+    {
+      "path": "/api/marketplace-autocomplete",
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "family": "search",
+      "purpose": "Return ranked marketplace autocomplete/search suggestions with optional debug metadata.",
+      "auth": "Public for normal search; debug and personalization use optional Firebase bearer token.",
+      "params": {
+        "body": "`search_term`/`query`, `result_limit`, `pool_limit`, `search_language`, optional previous context and debug fields."
+      }
+    },
+    {
+      "path": "/api/marketplace-blueprint-price",
+      "methods": [
+        "GET",
+        "OPTIONS"
+      ],
+      "family": "other",
+      "purpose": "Return the public PKN floor price for a marketplace blueprint/card ID.",
+      "auth": "Public.",
+      "params": {
+        "query": "`blueprintId` required; `cardId` accepted as an alias."
+      }
+    },
+    {
+      "path": "/api/marketplace-card-cheapest-price",
+      "methods": [
+        "GET",
+        "OPTIONS"
+      ],
+      "family": "card",
+      "purpose": "Return the homepage-backed cheapest marketplace price for a card, including CardTrader cache availability.",
+      "auth": "Public.",
+      "params": {
+        "query": "`cardId`, `cardIds`, `canonicalPath`, or structured `name`/`setName`/`collectorNumber`; `language` and bounded `limit` optional."
+      }
+    },
+    {
+      "path": "/api/marketplace-card-page",
+      "methods": [
+        "GET",
+        "OPTIONS"
+      ],
+      "family": "page-bff",
+      "purpose": "React BFF: one card-detail payload (card, versions, versionCount, offers, cheapest, artist, canonicalPath).",
+      "auth": "Public.",
+      "params": {
+        "query": "`cardId` required (public id). `lang`, `slug`, `includeSales`, `includeOffers`, `includeSameAs` (off by default), `liveOffers` optional."
+      }
+    },
+    {
+      "path": "/api/marketplace-card-seo",
+      "methods": [
+        "GET"
+      ],
+      "family": "card",
+      "purpose": "Return server-rendered HTML metadata for marketplace card social previews.",
+      "auth": "Public.",
+      "params": {
+        "query": "`cardId`, `cardSlug`, `language`, or `cardPath` depending on the rewrite source."
+      }
+    },
+    {
+      "path": "/api/marketplace-card-sales",
+      "methods": [
+        "GET"
+      ],
+      "family": "card",
+      "purpose": "Daily sold-median series from CardTrader inferred comps. Pi aggregates the requested language/condition slice; default payload is series + available filter keys, not observation rows.",
+      "auth": "Public.",
+      "params": {
+        "query": "`cardId` required. Optional `condition` / `cond` (NM, SP, MP, PL, Poor) and `language` / `lang` (EN, IT, JP, …). Series includes `sampleCount` (observations in the current slice) and per-day `sampleCount`. `includeRows=1` returns a capped observation sample; omit it for series-only. `limit` only applies with includeRows."
+      }
+    },
+    {
+      "path": "/api/marketplace-sales-pulse",
+      "methods": [
+        "GET",
+        "OPTIONS"
+      ],
+      "family": "other",
+      "purpose": "Return the latest completed daily marketplace sales leaders plus a bounded activity trend.",
+      "auth": "Public.",
+      "params": {
+        "query": "`metric=sales` (default, observed samples) or diagnostic `metric=quantity`; `limit` (max 24) and `days` (max 30) are optional."
+      }
+    },
+    {
+      "path": "/api/marketplace-card-last-median",
+      "methods": [
+        "GET"
+      ],
+      "family": "card",
+      "purpose": "Return the latest UTC-day median inferred sold PKN for one or more marketplace cards from CardTrader removed-sale comps.",
+      "auth": "Public.",
+      "params": {
+        "query": "`cardId` or comma-separated `cardIds` (max 40). `blueprintId` is accepted as an alias of `cardId`. Optional `condition` / `cond` and `language` / `lang` slice the last-day median the same way as marketplace-card-sales."
+      }
+    },
+    {
+      "path": "/api/marketplace-card-shortlink",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "family": "card",
+      "purpose": "Redirect our-id short links to canonical marketplace card URLs (our id = CardTrader ct_id * 2).",
+      "auth": "Public.",
+      "params": {
+        "query": "`cardId` is our marketplace id (ct_id * 2) or leftover ct_id; `path` is `/marketplace/220962` or `/220962/slug`. See docs/marketplace-public-ids.md."
+      }
+    },
+    {
+      "path": "/api/marketplace-card-url",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "family": "card",
+      "purpose": "Return stored canonical_path. cardId is our marketplace id (ct_id * 2); path numbers are the same our-id.",
+      "auth": "Public.",
+      "params": {
+        "query": "`cardId` (our id, or leftover ct_id) or `path` (our-id URL); `language` optional. See docs/marketplace-public-ids.md."
+      }
+    },
+    {
+      "path": "/api/marketplace-card-versions",
+      "methods": [
+        "GET"
+      ],
+      "family": "card",
+      "purpose": "Return card detail/version rows for marketplace card pages.",
+      "auth": "Public.",
+      "params": {
+        "query": "`cardId`, `sameAsCardId`, `cardSlug`, `expansionName`, `query`, `limit`, `productType`, and `language` are supported."
+      }
+    },
+    {
+      "path": "/api/marketplace-version-set",
+      "methods": [
+        "GET",
+        "OPTIONS"
+      ],
+      "family": "card",
+      "purpose": "Return the pokoin_version_sets key, member_count, and printings for one public card id.",
+      "auth": "Public.",
+      "params": {
+        "query": "`cardId` (public marketplace id)."
+      }
+    },
+    {
+      "path": "/api/marketplace-cardmarket-guess-review",
+      "methods": [
+        "GET"
+      ],
+      "family": "cardmarket",
+      "purpose": "Return protected Cardmarket guess review data for search/debug operators.",
+      "auth": "Required authorized debug/admin Firebase bearer token.",
+      "params": {
+        "query": "Review filters and pagination query parameters."
+      }
+    },
+    {
+      "path": "/api/marketplace-cart",
+      "methods": [
+        "POST"
+      ],
+      "family": "commerce",
+      "purpose": "Record marketplace cart add/remove analytics with optional verified user context.",
+      "auth": "Public; optional Firebase bearer token attaches user UID when valid.",
+      "params": {
+        "body": "`cardId` or `blueprintId`, `action`, and optional anonymous/session ID."
+      }
+    },
+    {
+      "path": "/api/marketplace-cards",
+      "methods": [
+        "GET"
+      ],
+      "family": "search",
+      "purpose": "Return searchable marketplace card and product rows.",
+      "auth": "Public.",
+      "params": {
+        "query": "`query`, `limit`, `language`, `productType`, and `productSearchOnly` are supported."
+      }
+    },
+    {
+      "path": "/api/marketplace-debug-artists",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "family": "debug",
+      "purpose": "Inspect and update marketplace artist enrichment/debug classification data.",
+      "auth": "Required authorized debug/admin Firebase bearer token.",
+      "params": {
+        "query": "GET filters for artist debug views.",
+        "body": "`action` plus action-specific artist/classification payload for POST."
+      }
+    },
+    {
+      "path": "/api/marketplace-debug-cardtrader-blueprints",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "family": "cardtrader",
+      "purpose": "Inspect and enqueue protected CardTrader blueprint debug/import work.",
+      "auth": "Required authorized debug/admin Firebase bearer token.",
+      "params": {
+        "query": "GET filters/status fields.",
+        "body": "POST queue/review payload fields."
+      }
+    },
+    {
+      "path": "/api/marketplace-debug-events",
+      "methods": [
+        "GET"
+      ],
+      "family": "debug",
+      "purpose": "Return marketplace event analytics debug data.",
+      "auth": "Required authorized debug/admin Firebase bearer token.",
+      "params": {
+        "query": "Event/card/search filters and limits."
+      }
+    },
+    {
+      "path": "/api/marketplace-debug-refinement",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "family": "debug",
+      "purpose": "Inspect and update marketplace search refinement/debug data.",
+      "auth": "Required authorized debug/admin Firebase bearer token.",
+      "params": {
+        "query": "GET refinement filters.",
+        "body": "POST action-specific refinement payload."
+      }
+    },
+    {
+      "path": "/api/marketplace-image-log",
+      "methods": [
+        "GET",
+        "POST",
+        "OPTIONS"
+      ],
+      "family": "debug",
+      "purpose": "Ring-buffer exact marketplace image URLs served or failed during navigation.",
+      "auth": "Public; POST is IP rate-limited. GET returns the in-memory buffer.",
+      "params": {
+        "query": "GET `limit` (max 250).",
+        "body": "POST `url` required-ish; optional `cardId`, `ctId`, `source`, `status`, `error`, `route`."
+      }
+    },
+    {
+      "path": "/api/marketplace-event",
+      "methods": [
+        "POST"
+      ],
+      "family": "commerce",
+      "purpose": "Record public marketplace interaction/search events and refresh hot-card aggregates opportunistically.",
+      "auth": "Public; optional Firebase bearer token attaches user UID when valid.",
+      "params": {
+        "body": "`cardId`, `eventType`, optional `source` and bounded metadata."
+      }
+    },
+    {
+      "path": "/api/marketplace-expansion-symbols",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "family": "catalog",
+      "purpose": "Read or update marketplace expansion symbol metadata.",
+      "auth": "Required authorized debug/admin Firebase bearer token for both GET and POST.",
+      "params": {
+        "query": "GET filters for expansions.",
+        "body": "Expansion symbol update fields for POST."
+      }
+    },
+    {
+      "path": "/api/marketplace-expansion-page",
+      "methods": [
+        "GET",
+        "OPTIONS"
+      ],
+      "family": "page-bff",
+      "purpose": "React BFF: expansion metadata plus paginated singles for a set browse page.",
+      "auth": "Public.",
+      "params": {
+        "query": "`expansionName` or `slug`; `productType` default card; `limit` and `offset` optional. Omit both name and slug to list expansions."
+      }
+    },
+    {
+      "path": "/api/marketplace-expansions",
+      "methods": [
+        "GET"
+      ],
+      "family": "catalog",
+      "purpose": "Return marketplace expansion list or detail snapshots.",
+      "auth": "Public.",
+      "params": {
+        "query": "Expansion slug/id/detail filters and optional limit."
+      }
+    },
+    {
+      "path": "/api/marketplace-home",
+      "methods": [
+        "GET"
+      ],
+      "family": "other",
+      "purpose": "Return marketplace home snapshot and carousel sections.",
+      "auth": "Public.",
+      "params": {
+        "query": "`recentCardIds` optional comma-separated public ids; returned as sections.recentlySeenIds / spotlightIds."
+      }
+    },
+    {
+      "path": "/api/marketplace-rails",
+      "methods": [
+        "GET",
+        "OPTIONS"
+      ],
+      "family": "other",
+      "purpose": "Pi browse rails. Public card_id only. No Supabase.",
+      "auth": "Public.",
+      "params": {
+        "query": "`id` rail id (`new_cards`, `set:destined-rivals`)."
+      }
+    },
+    {
+      "path": "/api/marketplace-card-tiles",
+      "methods": [
+        "GET",
+        "OPTIONS"
+      ],
+      "family": "other",
+      "purpose": "Pi card tiles by public id. No Supabase.",
+      "auth": "Public.",
+      "params": {
+        "query": "`ids` comma-separated public card ids."
+      }
+    },
+    {
+      "path": "/api/marketplace-home-page",
+      "methods": [
+        "GET",
+        "OPTIONS"
+      ],
+      "family": "page-bff",
+      "purpose": "React BFF: fast home carousels (newest English sets + hot blueprints). No CardTrader hydrate.",
+      "auth": "Public.",
+      "params": {
+        "query": "`recentCardIds` optional comma-separated public ids; `limit` optional (max 48)."
+      }
+    },
+    {
+      "path": "/api/marketplace-competitive",
+      "methods": [
+        "GET"
+      ],
+      "family": "catalog",
+      "purpose": "Return Limitless-backed competitive deck metagame, deck detail, tournament, standings, and pairings data for the marketplace competitive page.",
+      "auth": "Public.",
+      "params": {
+        "query": "`game`, `format`, `year`, `limit`, and `includeGames=1` for the dashboard; `deckId` for public Limitless deck detail; `tournamentId` for tournament standings/pairings detail."
+      }
+    },
+    {
+      "path": "/api/marketplace-hot-blueprints",
+      "methods": [
+        "GET"
+      ],
+      "family": "catalog",
+      "purpose": "Return hot marketplace blueprint rows and rolling interaction counts.",
+      "auth": "Public.",
+      "params": {
+        "query": "`includeCards` and `limit` optional."
+      }
+    },
+    {
+      "path": "/api/marketplace-listings",
+      "methods": [
+        "GET",
+        "POST",
+        "PATCH"
+      ],
+      "family": "commerce",
+      "purpose": "Read public active listings and create/update/decrement authenticated seller listings.",
+      "auth": "Public for active listing reads; writes and seller-owned reads require Firebase bearer token. Reserve listings require reserve role.",
+      "params": {
+        "query": "`cardId`, `sellerUid`, `sellerUsername`, `id`, `action`, and `limit` supported. `nativeOnly=1` (or `live=0`) skips live CardTrader merge on public card reads.",
+        "body": "Create/update listing fields such as `cardId`, seller display fields, condition, language, `pricePkn`, quantity, and source flags."
+      }
+    },
+    {
+      "path": "/api/marketplace-listings-csv",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "family": "commerce",
+      "purpose": "Export authenticated seller inventory or preview/import PowerTools, Cardmarket, and CardTrader stock CSV files.",
+      "auth": "Required Firebase bearer token; all reads and writes are scoped to the decoded seller uid.",
+      "params": {
+        "query": "`format` selects `powertools`, `cardmarket`, or `cardtrader` for GET export.",
+        "body": "`csv`, optional `format`, `stackSize`, `priceMode`, and `dryRun` for POST import."
+      }
+    },
+    {
+      "path": "/api/marketplace-collection-summary",
+      "methods": [
+        "GET"
+      ],
+      "family": "other",
+      "purpose": "Authenticated owned-card totals for dashboard Portfolio. Admin Firestore read; uid only from verified bearer.",
+      "auth": "Firebase bearer token required. Never accepts a client uid.",
+      "params": {
+        "query": "None. Owner is decoded.uid from the Authorization bearer."
+      }
+    },
+    {
+      "path": "/api/marketplace-collection",
+      "methods": [
+        "GET"
+      ],
+      "family": "other",
+      "purpose": "Authenticated owned holdings rows for /collection (physical + NFT). Admin Firestore read; uid only from verified bearer.",
+      "auth": "Firebase bearer token required. Never accepts a client uid.",
+      "params": {
+        "query": "None. Owner is decoded.uid from the Authorization bearer."
+      }
+    },
+    {
+      "path": "/api/marketplace-portfolio",
+      "methods": [
+        "GET",
+        "OPTIONS"
+      ],
+      "family": "page-bff",
+      "purpose": "React BFF: Pokoin catalog + native PKN overlay (Portfolio / Explore). No CardTrader leftover images. No USD.",
+      "auth": "Public.",
+      "params": {
+        "query": "`id` / `cardId` optional public card id or leftover ct_id; `limit` optional (Pokemon max 500, satellite max 2500); `game` for One Piece / Riftbound."
+      }
+    },
+    {
+      "path": "/api/marketplace-orders",
+      "methods": [
+        "POST"
+      ],
+      "family": "commerce",
+      "purpose": "Create paid marketplace orders, decrement listings, credit sellers, and send seller notifications.",
+      "auth": "Required Firebase bearer token.",
+      "params": {
+        "query": "`action=checkout` default, `action=notify-sellers` for notification retry/admin flows.",
+        "body": "`items`, `subtotalPkn`, and `totalPkn` for checkout; notification payload for notify-sellers."
+      }
+    },
+    {
+      "path": "/api/marketplace-search-page",
+      "methods": [
+        "GET",
+        "OPTIONS"
+      ],
+      "family": "page-bff",
+      "purpose": "React BFF: Meili/SQL search results with pagination and product facets.",
+      "auth": "Public.",
+      "params": {
+        "query": "`query` or `q`; `limit`, `offset`, `productType`, `productSearchOnly`, `lang`, `includeFacets`."
+      }
+    },
+    {
+      "path": "/api/marketplace-search-candidates",
+      "methods": [
+        "POST"
+      ],
+      "family": "search",
+      "purpose": "Return split/search candidate rows for marketplace search diagnostics and clients.",
+      "auth": "Public for normal search; debug output requires authorized debug/admin Firebase bearer token.",
+      "params": {
+        "body": "`search_term`/`searchTerm`, `result_limit`, `result_offset`, `search_language`, optional previous context/debug fields."
+      }
+    },
+    {
+      "path": "/api/marketplace-recents",
+      "methods": [
+        "GET",
+        "PUT",
+        "POST",
+        "OPTIONS"
+      ],
+      "family": "commerce",
+      "purpose": "Signed-in recently seen public card ids. Writer is nezopt 15T. Tile JSON is not stored.",
+      "auth": "Firebase bearer token required.",
+      "params": {
+        "body": "`cardIds` array (PUT/POST), optional `cardId` prepended. Max 24 unique public ids."
+      }
+    },
+    {
+      "path": "/api/marketplace-watchlist",
+      "methods": [
+        "POST"
+      ],
+      "family": "commerce",
+      "purpose": "Record marketplace watchlist add/remove analytics with optional verified user context.",
+      "auth": "Public; optional Firebase bearer token attaches user UID when valid.",
+      "params": {
+        "body": "`cardId` or `blueprintId`, `action`, and optional client context."
+      }
+    },
+    {
+      "path": "/api/money-request",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "family": "other",
+      "purpose": "Create, list, pay, decline, cancel, and mark notifications for authenticated PKN requests.",
+      "auth": "Required Firebase bearer token; request parties and status transitions are enforced server-side.",
+      "params": {
+        "query": "`action` selects list, notifications, create, pay, decline, cancel, or read-notifications.",
+        "body": "Create uses `recipientUsername`, `amountPkn`, optional `note` and `clientToken`; mutations use `requestId`."
+      }
+    },
+    {
+      "path": "/api/pokoin-assistant",
+      "methods": [
+        "POST"
+      ],
+      "family": "assistant",
+      "purpose": "Answer Pokontact assistant chat requests with marketplace grounding and optional service handoff.",
+      "auth": "Public; optional Firebase bearer token attaches verified user context.",
+      "params": {
+        "body": "`message` required, optional `messages`, `page`, `pageContext`, and `username`."
+      }
+    },
+    {
+      "path": "/api/user-current-page",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "family": "auth",
+      "purpose": "Store or read the current internal Pokoin page for an assistant browser session.",
+      "auth": "Public anonymous session ID; optional Firebase bearer token scopes reads/writes to the verified user.",
+      "params": {
+        "query": "GET accepts `sessionId` or `session_id`.",
+        "body": "POST requires `sessionId` and a safe internal `path` or Pokoin URL; optional `source`."
+      }
+    },
+    {
+      "path": "/api/social-autopost",
+      "methods": [
+        "POST"
+      ],
+      "family": "social",
+      "purpose": "Post supplied Pokoin social copy or card payloads to configured Telegram and X channels, optionally using the dedicated peer2 social copy agent.",
+      "auth": "Required shared social autopost secret, CRON_SECRET bearer, or authorized debug/admin Firebase bearer token.",
+      "params": {
+        "body": "`targets`, `message`, optional card fields, `dryRun`, `sendPhoto`, `silent`, and `useAgent`."
+      }
+    },
+    {
+      "path": "/api/social-autopost/hot-card",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "family": "social",
+      "purpose": "Select a hot Pokoin marketplace card and post it to configured social channels, optionally using the dedicated peer2 social copy agent.",
+      "auth": "Required shared social autopost secret, CRON_SECRET bearer, or authorized debug/admin Firebase bearer token.",
+      "params": {
+        "query": "`targets`, `window`, `limit`, `dryRun`, `sendPhoto`, `silent`, and `useAgent` for GET.",
+        "body": "Same fields as query for POST; optional `message`, `hook`, and `hashtags` override generated copy."
+      }
+    },
+    {
+      "path": "/api/social-post-agent",
+      "methods": [
+        "POST"
+      ],
+      "family": "social",
+      "purpose": "Generate Telegram and X copy through the dedicated peer2 social agent without posting to providers.",
+      "auth": "Required shared social autopost secret, CRON_SECRET bearer, or authorized debug/admin Firebase bearer token.",
+      "params": {
+        "body": "`targets`, card/message fields, and optional `prompt`; returns generated copy and deterministic fallback metadata."
+      }
+    },
+    {
+      "path": "/api/register-email",
+      "methods": [
+        "POST"
+      ],
+      "family": "other",
+      "purpose": "Start email/password signup by storing pending signup data and sending verification mail, or resend a pending verification (resend: true) with per-email rate limiting.",
+      "auth": "Public.",
+      "params": {
+        "body": "`email`, `password`, optional `username` and `redirectPath`; or `resend: true` with `email` only."
+      }
+    },
+    {
+      "path": "/api/remove-profile-picture",
+      "methods": [
+        "POST"
+      ],
+      "family": "other",
+      "purpose": "Remove the authenticated user custom profile picture and delete old R2 object when present.",
+      "auth": "Required Firebase bearer token.",
+      "params": {
+        "body": "No required fields."
+      }
+    },
+    {
+      "path": "/api/request-pkn-withdraw",
+      "methods": [
+        "POST"
+      ],
+      "family": "other",
+      "purpose": "Withdraw PKN from site balance to a linked native PKN address.",
+      "auth": "Required Firebase bearer token.",
+      "params": {
+        "body": "Withdrawal amount/address or linked-wallet withdrawal fields used by the wallet UI."
+      }
+    },
+    {
+      "path": "/api/scan-batch",
+      "methods": [
+        "GET",
+        "POST",
+        "OPTIONS"
+      ],
+      "family": "scan",
+      "purpose": "Scan Connect staged batch: snapshot, Batch Defaults, row edits (duplicate, merge undo), idempotent submit to marketplace_user_listings.",
+      "auth": "Required Firebase bearer token; rows are scoped to the seller uid.",
+      "params": {
+        "query": "`batchId`; `list=open`; `action=image&itemId=` returns the scan JPEG.",
+        "body": "`action` = defaults | item | add | remove | restore | duplicate | unmerge | submit | discard (pokoin-web docs/SCAN_LISTING_WORKFLOW.md)."
+      }
+    },
+    {
+      "path": "/api/scan-pair",
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "family": "scan",
+      "purpose": "Phone claims a 4-digit Scan Connect pairing code or QR secret and receives a session-scoped phone token.",
+      "auth": "Public. Postgres-backed per-IP and global failure limits; identical error for wrong, expired and used codes.",
+      "params": {
+        "body": "`pin` (4 digits) or `qr`, optional `device` label."
+      }
+    },
+    {
+      "path": "/api/scan-phone",
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "family": "scan",
+      "purpose": "Paired phone heartbeat, idempotent scan events (scanEventId), and leave.",
+      "auth": "`Authorization: Scan <phoneToken>` from /api/scan-pair. No Firebase.",
+      "params": {
+        "query": "`action` = heartbeat | scan | leave.",
+        "body": "scan: `scanEventId`, `clientSequence`, `capturedAt`, `clockOffsetMs`, `recognition.hits`, optional `image` (base64 JPEG ≤ 45 KB), `timings`."
+      }
+    },
+    {
+      "path": "/api/scan-session",
+      "methods": [
+        "GET",
+        "POST",
+        "OPTIONS"
+      ],
+      "family": "scan",
+      "purpose": "Desktop Scan Session: start/resume with pairing code, regenerate code, disconnect phone, pause, end.",
+      "auth": "Required Firebase bearer token.",
+      "params": {
+        "query": "`sessionId` (GET), `action` = start | pairing | disconnect | pause | end (POST).",
+        "body": "`batchId`, `sessionId`, `paused`, `reason`."
+      }
+    },
+    {
+      "path": "/api/scan-stream",
+      "methods": [
+        "GET",
+        "OPTIONS"
+      ],
+      "family": "scan",
+      "purpose": "Server-sent change stream for one Scan Batch (rows, defaults, session) with cursor replay; closes after 55 s.",
+      "auth": "Required Firebase bearer token.",
+      "params": {
+        "query": "`batchId`, `after` cursor."
+      }
+    },
+    {
+      "path": "/api/ensure-username",
+      "methods": [
+        "POST"
+      ],
+      "family": "auth",
+      "purpose": "Return the caller username registered in usernames/{name} (repairing or assigning it), or claim a new exact username.",
+      "auth": "Required Firebase bearer token.",
+      "params": {
+        "body": "Optional `username` (3-32 a-z0-9) to claim; empty body ensures the current one."
+      }
+    },
+    {
+      "path": "/api/search-recipient-emails",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "family": "other",
+      "purpose": "Search usernames for transfers, ensure a username, or update the authenticated user username.",
+      "auth": "Required Firebase bearer token.",
+      "params": {
+        "query": "`q` for GET username search.",
+        "body": "Optional `username` for POST update; empty POST ensures a unique username."
+      }
+    },
+    {
+      "path": "/api/searchbar-cancel",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "family": "search",
+      "purpose": "Mark a searchbar session as cancelled for in-process search cancellation checks.",
+      "auth": "Public.",
+      "params": {
+        "query": "`search_session_id`/`sessionId` supported.",
+        "body": "`search_session_id`/`sessionId` supported."
+      }
+    },
+    {
+      "path": "/api/searchbar-cards",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "family": "search",
+      "purpose": "Stable wrapper around marketplace autocomplete ranking for searchbar experiments and clients.",
+      "auth": "Public; debug/personalization may use optional Firebase bearer token.",
+      "params": {
+        "query": "`query`, `search_language`, `limit`, and `pool_limit` supported for GET.",
+        "body": "`query`, `search_language`, `limit`, `pool_limit`, previous context, debug, and mode fields for POST."
+      }
+    },
+    {
+      "path": "/api/searchbar-token-predict",
+      "methods": [
+        "GET",
+        "POST",
+        "OPTIONS"
+      ],
+      "family": "search",
+      "purpose": "Return lightweight card-name token predictions for active typed fragments.",
+      "auth": "Public.",
+      "params": {
+        "query": "`query`, `search_language`, and `limit` for GET.",
+        "body": "`query`, `search_language`, `limit`, and optional previous prediction context for POST."
+      }
+    },
+    {
+      "path": "/api/signup-notification",
+      "methods": [
+        "POST"
+      ],
+      "family": "other",
+      "purpose": "Send signup notification email for the authenticated user once.",
+      "auth": "Required Firebase bearer token.",
+      "params": {
+        "body": "Optional signup/profile metadata."
+      }
+    },
+    {
+      "path": "/api/stripe-webhook",
+      "methods": [
+        "POST"
+      ],
+      "family": "payments",
+      "purpose": "Handle Stripe Checkout webhooks and credit completed PKN purchases.",
+      "auth": "Stripe webhook signature using raw request body.",
+      "params": {
+        "body": "Raw Stripe webhook payload. Do not pre-parse JSON before signature verification."
+      },
+      "rawBody": true
+    },
+    {
+      "path": "/api/top-up-account-balance",
+      "methods": [
+        "POST"
+      ],
+      "family": "payments",
+      "purpose": "Verify a native PKN funding transaction and credit authenticated site balance.",
+      "auth": "Required Firebase bearer token.",
+      "params": {
+        "body": "`amountPkn`, `fundingTxHash`, and optional `reconcileRecent`."
+      }
+    },
+    {
+      "path": "/api/trainingai-card-classify",
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "family": "assistant",
+      "purpose": "Proxy card image classification requests to the Pokoin TrainingAI Oracle classifier or Hugging Face Space fallback.",
+      "auth": "Public by default; protect upstream classifier with TRAININGAI_HF_TOKEN when private.",
+      "params": {
+        "body": "`imageBase64` JSON or multipart image upload required; `topK`/`top_k` optional from 1 to 10."
+      }
+    },
+    {
+      "path": "/api/transfer-account-balance",
+      "methods": [
+        "POST"
+      ],
+      "family": "other",
+      "purpose": "Transfer PKN site balance from the authenticated user to another Pokoin account.",
+      "auth": "Required Firebase bearer token.",
+      "params": {
+        "body": "Recipient username/email/uid and PKN amount fields."
+      }
+    },
+    {
+      "path": "/api/unlock-silver",
+      "methods": [
+        "POST"
+      ],
+      "family": "other",
+      "purpose": "Unlock Silver status/features for the authenticated account.",
+      "auth": "Required Firebase bearer token.",
+      "params": {
+        "body": "Unlock request fields used by the client."
+      }
+    },
+    {
+      "path": "/api/upload-profile-picture",
+      "methods": [
+        "POST"
+      ],
+      "family": "other",
+      "purpose": "Optimize an uploaded profile picture and store it in R2.",
+      "auth": "Required Firebase bearer token.",
+      "params": {
+        "body": "`imageBase64` required, max 6 MB source image."
+      }
+    },
+    {
+      "path": "/api/verify-email-signup",
+      "methods": [
+        "POST"
+      ],
+      "family": "other",
+      "purpose": "Idempotently finalize a verified email signup into an ACTIVE Pokoin account (Firebase user, pok_email_verified claim, username claim, balances) and return a sign-in custom token.",
+      "auth": "Public token verification.",
+      "params": {
+        "body": "Signup verification `token`."
+      }
+    },
+    {
+      "path": "/api/wallet-auth/nonce",
+      "methods": [
+        "POST"
+      ],
+      "family": "other",
+      "purpose": "Create a nonce challenge for wallet sign-in.",
+      "auth": "Public.",
+      "params": {
+        "body": "Wallet address and client challenge metadata."
+      }
+    },
+    {
+      "path": "/api/wallet-auth/verify",
+      "methods": [
+        "POST"
+      ],
+      "family": "other",
+      "purpose": "Verify a signed wallet nonce and sign in/create the corresponding Firebase user.",
+      "auth": "Public signed wallet challenge.",
+      "params": {
+        "body": "Wallet address, signature, nonce/session fields, and optional profile fields."
+      }
+    },
+    {
+      "path": "/api/wallet-link",
+      "methods": [
+        "POST"
+      ],
+      "family": "other",
+      "purpose": "Link a wallet to the authenticated Firebase account.",
+      "auth": "Required Firebase bearer token.",
+      "params": {
+        "body": "Wallet address/signature/session fields."
+      }
+    },
+    {
+      "path": "/api/wallet-link/complete",
+      "methods": [
+        "POST"
+      ],
+      "family": "other",
+      "purpose": "Complete a wallet-link session from a signed wallet payload.",
+      "auth": "Signed wallet-link session payload.",
+      "params": {
+        "body": "Wallet-link session id, address, signature, and profile fields."
+      }
+    },
+    {
+      "path": "/api/wallet-link/session",
+      "methods": [
+        "POST"
+      ],
+      "family": "other",
+      "purpose": "Create a wallet-link session for an authenticated Firebase account.",
+      "auth": "Required Firebase bearer token.",
+      "params": {
+        "body": "Wallet address and session metadata."
+      }
+    },
+    {
+      "path": "/api/wpkn-exchange/:action",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "family": "payments",
+      "purpose": "Quote, request, and check native PKN/wPKN exchange flows.",
+      "auth": "Required Firebase bearer token.",
+      "params": {
+        "path": "`action` is `quote`, `request`, or `status`.",
+        "body": "`direction`, `amountIn`, `quoteId`, and `toAddress` depending on action.",
+        "query": "`requestId` optional for status."
+      }
+    },
+    {
+      "path": "/api/wpkn-pkn-quote",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "family": "payments",
+      "purpose": "Return a public wPKN/PKN market quote from GeckoTerminal plus the configured PKN USD price.",
+      "auth": "Public.",
+      "params": {
+        "query": "`direction`, `amountIn`.",
+        "body": "`direction`, `amountIn` (POST)."
+      }
+    }
+  ],
+  "routeCount": 107
 }
