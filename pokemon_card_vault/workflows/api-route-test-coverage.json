@@ -1,6 +1,69 @@
 {
   "description": "Baseline for public manifest routes that do not yet have a direct api/<route>.test.js. New manifest routes must add a direct test or an explicit reviewed entry here.",
   "coveredRouteExceptions": {
+    "chat.js": {
+      "path": "/api/chat",
+      "reason": "Firebase handler delegates canonical conversation, membership, unread, amount, and event invariants to the provider-free chat core test suite.",
+      "coveredBy": [
+        "api/_chat_core.test.js"
+      ]
+    },
+    "money-request.js": {
+      "path": "/api/money-request",
+      "reason": "Firebase handler delegates request state, participant authorization, expiry, idempotency, and amount invariants to the provider-free money-request core tests.",
+      "coveredBy": [
+        "api/_money_request_core.test.js"
+      ]
+    },
+    "marketplace-collection-summary.js": {
+      "path": "/api/marketplace-collection-summary",
+      "reason": "Scan Connect integration coverage verifies authenticated collection summary behavior against its shared database and Firebase boundaries.",
+      "coveredBy": [
+        "api/scan-connect.integration.test.js"
+      ]
+    },
+    "marketplace-collection.js": {
+      "path": "/api/marketplace-collection",
+      "reason": "Scan Connect integration coverage verifies authenticated collection rows against the shared scan submission and ownership model.",
+      "coveredBy": [
+        "api/scan-connect.integration.test.js"
+      ]
+    },
+    "scan-batch.js": {
+      "path": "/api/scan-batch",
+      "reason": "The database-backed Scan Connect integration suite covers batch reads, edits, idempotent submission, and owner scoping.",
+      "coveredBy": [
+        "api/scan-connect.integration.test.js"
+      ]
+    },
+    "scan-pair.js": {
+      "path": "/api/scan-pair",
+      "reason": "The database-backed Scan Connect integration suite covers secure pairing, expiry, replay, and rate-limit behavior.",
+      "coveredBy": [
+        "api/scan-connect.integration.test.js"
+      ]
+    },
+    "scan-phone.js": {
+      "path": "/api/scan-phone",
+      "reason": "The database-backed Scan Connect integration suite covers phone tokens, heartbeat, idempotent scan events, and disconnect behavior.",
+      "coveredBy": [
+        "api/scan-connect.integration.test.js"
+      ]
+    },
+    "scan-session.js": {
+      "path": "/api/scan-session",
+      "reason": "The database-backed Scan Connect integration suite covers session creation, pairing regeneration, pause, resume, and end behavior.",
+      "coveredBy": [
+        "api/scan-connect.integration.test.js"
+      ]
+    },
+    "scan-stream.js": {
+      "path": "/api/scan-stream",
+      "reason": "The database-backed Scan Connect integration suite covers authorized event streaming and batch ownership boundaries.",
+      "coveredBy": [
+        "api/scan-connect.integration.test.js"
+      ]
+    },
     "cache-google-profile-picture.js": {
       "path": "/api/cache-google-profile-picture",
       "reason": "Legacy authenticated R2/avatar route; manifest loading, fallback packaging, and smoke safe-error paths are enforced until focused auth/R2 tests are added.",

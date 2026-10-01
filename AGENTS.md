@@ -1,6 +1,6 @@
 <!-- codevira:begin (auto-generated; do not edit) -->
 
-## Codevira-tracked project memory: cardvault
+## Codevira-tracked project memory: cardvault-repo
 
 > **Codevira** — cross-IDE persistent memory. Read it with the codevira MCP tools (`get_session_context`, `search_decisions`); do **not** open `.codevira/*.jsonl` directly — those files are large and token-heavy.
 
@@ -26,6 +26,11 @@
 - **D00000T** [supersedes D000007: Giuseppe 2026-09-11: APIs are from the Pi. Meili lives with that API, not on the Frankfurt dump bo…  ·  `pokemon_card_vault/workflows/meilisearch-peer-workflow.md`  ·  _meili, pi, pokoin, production, search_
 - **D00000U** Public api.pokoin.com and cdn.pokoin.com stay on pi-home (CF tunnel). Oracle pokoin-marketplace is the CardTrader dump …  ·  `memory/architecture.md`  ·  _do-not-revert, oracle, pi, pokoin, postgres, topology_
 - **D00000V** Public pipeline failures return HTTP 503 {error:"We are working on a solution."} and the SPA WorkingOnIt page. Never le…  ·  `docs/API.md`  ·  _errors, pi, pokoin, uptime_
+- **D00000W** POKOIN PROJECT GUIDANCE: the product/architecture guidance supplied in Guidelines.txt on 2026-09-24 and the Pokoin API …  ·  _api-contract, documentation, guidelines, pokoin, security_
+- **D00000X** POKOIN PRODUCT DIRECTION: optimize the end-to-end collector/seller journey scan -> identify -> collection -> value -> o…  ·  _pokoin, product, progressive-disclosure, scanner, ux_
+- **D00000Y** POKOIN CLIENT TARGET ARCHITECTURE: new client state should converge on normalized canonical entities (Card, User, Colle…  ·  _architecture, local-first, outbox, pokoin, state-management_
+- **D00000Z** POKOIN SYNC CORRECTNESS: use ordered sync actions and checkpoint-based delta reconciliation for local-first features. E…  ·  _invariant, pokoin, reconciliation, sync, transactions_
+- **D000010** POKOIN DELIVERY PRACTICE: filter identifiers and lightweight metadata before expensive hydration; introduce risky repla…  ·  _components, feature-flags, observability, pokoin, shadow-mode_
 
 ### Active conventions
 

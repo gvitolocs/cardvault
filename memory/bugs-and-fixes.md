@@ -13,6 +13,14 @@ Use this file for notable incidents and verified fixes. Link to PRs/commits when
 - **Risk area** (payments / auth / wallet / migrations / blockchain):
 ```
 
+### 2026-09-29 — Flutter search artwork and collapsible mobile filters
+- **Symptom**: Ranked card names appeared with default images; the mobile filter panel pushed search results far below the fold.
+- **Root cause**: Candidate-label fallback cards discarded artwork. The compact search layout rendered all filters above the results.
+- **Fix**: First 20 backend candidate labels carry optional artwork; Flutter parses and normalizes it and upgrades image-less duplicate preview rows in place. Search layouts below 880 logical pixels use an initially collapsed `Filters` button with an active-selection count.
+- **Verify**: Regression coverage added to `api/marketplace-autocomplete.test.js` and `test/card_service_test.dart`; local Flutter web hot reload and browser inspection verified filter open/close behavior. See `pokemon_card_vault/docs/marketplace-card-image-pipeline.md` and `pokemon_card_vault/workflows/cardtrader-search-preview-workflow.md`.
+- **Limit**: No production deployment in this session. The reported Reshiram & Zekrom public-number detail error (`226324`) remains unverified; broad search results and expansion counts do not confirm an exact detail route.
+- **Risk area**: marketplace search UI and image metadata.
+
 ### 2026-09-01 — Gold HR Lucario/Gardevoir lost foil texture
 - **Symptom**: Homepage Mega Lucario ex 188 / Mega Gardevoir ex 187 looked like flat gold silhouettes with square corners and a white bottom strip.
 - **Root cause**: Re-encode from pokemontcg `me1/188` / `me1/187` (D00000L). Those renders have no foil grain. Gold-foil JPEG path flattened onto white and skipped the die-cut.

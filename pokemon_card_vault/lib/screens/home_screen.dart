@@ -5,8 +5,10 @@ import 'dart:ui' as ui;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/link.dart';
 
@@ -103,6 +105,7 @@ class _MarketplaceSearchScreenState
   List<PokemonCard> _results = const [];
   bool _isSearching = false;
   bool _searchFocused = false;
+  bool _filtersExpanded = false;
   String? _error;
   String? _selectedProductType;
   String? _selectedExpansion;
@@ -232,9 +235,10 @@ class _MarketplaceSearchScreenState
           ? cardState.previewQuery.trim()
           : cardState.searchQuery.trim();
       if (expansion == null || expansion.isEmpty) {
-        final warmed = warmedQuery.toLowerCase() == normalizedQuery.toLowerCase()
-            ? cardState.searchPreviews
-            : const <PokemonCard>[];
+        final warmed =
+            warmedQuery.toLowerCase() == normalizedQuery.toLowerCase()
+                ? cardState.searchPreviews
+                : const <PokemonCard>[];
         if (warmed.isNotEmpty && mounted && requestId == _requestId) {
           setState(() {
             _results = warmed;
@@ -607,7 +611,30 @@ class _MarketplaceSearchScreenState
                 return ListView(
                   padding: const EdgeInsets.all(18),
                   children: [
-                    filters,
+                    _SearchFiltersToggle(
+                      expanded: _filtersExpanded,
+                      activeFilterCount: [
+                        _selectedProductType,
+                        _selectedExpansion,
+                        _selectedRarity,
+                      ]
+                          .where((value) => value?.trim().isNotEmpty == true)
+                          .length,
+                      onPressed: () {
+                        setState(() => _filtersExpanded = !_filtersExpanded);
+                      },
+                    ),
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeOutCubic,
+                      alignment: Alignment.topCenter,
+                      child: _filtersExpanded
+                          ? Padding(
+                              padding: const EdgeInsets.only(top: 14),
+                              child: filters,
+                            )
+                          : const SizedBox.shrink(),
+                    ),
                     const SizedBox(height: 18),
                     if (_isSearching)
                       const LinearProgressIndicator(color: Color(0xFFFACC15)),
@@ -623,7 +650,8 @@ class _MarketplaceSearchScreenState
                       const SizedBox(height: 18),
                       Center(
                         child: TextButton(
-                          onPressed: _loadingMore ? null : _loadMoreSearchResults,
+                          onPressed:
+                              _loadingMore ? null : _loadMoreSearchResults,
                           child: Text(
                             _loadingMore ? 'Loading…' : 'Load more cards',
                             style: const TextStyle(color: Color(0xFFFACC15)),
@@ -2924,7 +2952,8 @@ class MarketplaceTopSearch extends StatefulWidget {
   State<MarketplaceTopSearch> createState() => _MarketplaceTopSearchState();
 }
 
-class _MarketplaceTopSearchState extends State<MarketplaceTopSearch> {
+class _MarketplaceTopSearchState extends State<MarketplaceTopSearch>
+    with SingleTickerProviderStateMixin {
   final LayerLink _layerLink = LayerLink();
   final OverlayPortalController _overlayController =
       OverlayPortalController(debugLabel: 'marketplace-search-preview');
@@ -2936,6 +2965,7 @@ class _MarketplaceTopSearchState extends State<MarketplaceTopSearch> {
   bool _keepOverlayOpenAfterBlur = false;
   bool _holdingOverlayForHero = false;
   bool _previewOpen = false;
+  late final AnimationController _pokeballController;
 
   bool get _isCompactSearch {
     final size = _safeMediaSize();
@@ -2949,6 +2979,10 @@ class _MarketplaceTopSearchState extends State<MarketplaceTopSearch> {
   @override
   void initState() {
     super.initState();
+    _pokeballController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 620),
+    );
     widget.focusNode.addListener(_syncOverlay);
   }
 
@@ -2969,7 +3003,12 @@ class _MarketplaceTopSearchState extends State<MarketplaceTopSearch> {
     widget.focusNode.removeListener(_syncOverlay);
     _previewOpen = false;
     _previewScrollController.dispose();
+    _pokeballController.dispose();
     super.dispose();
+  }
+
+  void _spinPokeball() {
+    _pokeballController.forward(from: 0);
   }
 
   KeyEventResult _handleSearchKeyEvent(FocusNode node, KeyEvent event) {
@@ -3300,214 +3339,245 @@ class _MarketplaceTopSearchState extends State<MarketplaceTopSearch> {
       child: OverlayPortal(
         controller: _overlayController,
         overlayChildBuilder: _buildOverlay,
-        child: Focus(
-          onKeyEvent: _handleSearchKeyEvent,
-          canRequestFocus: false,
-          child: AnimatedContainer(
-            key: _fieldKey,
-            height: previewOpen ? 48 : 42,
-            duration: const Duration(milliseconds: 260),
-            curve: Curves.easeOutCubic,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(999),
-              boxShadow: previewOpen
-                  ? [
-                      BoxShadow(
-                        color: const Color(0xFF38BDF8).withValues(alpha: 0.18),
-                        blurRadius: 18,
-                        spreadRadius: 1,
-                      ),
-                    ]
-                  : const [],
-            ),
-            child: Stack(
-              alignment: Alignment.centerLeft,
-              children: [
-                TextField(
-                  controller: widget.controller,
-                  focusNode: widget.focusNode,
-                  onChanged: (value) {
-                    SearchDebugTrace.instance.record('flutter.input.changed', {
-                      'query': value,
-                      'length': value.length,
-                      'chars': value.characters.toList(),
-                    });
-                    widget.onChanged(value);
-                  },
-                  onTap: () {
-                    SearchDebugTrace.instance.record('flutter.input.tap', {
-                      'query': widget.query,
-                      'hasFocus': widget.focusNode.hasFocus,
-                    });
-                    if (_isCompactSearch && _hasCompletion) {
-                      _acceptCompletion();
-                      return;
-                    }
-                    _keepOverlayOpenAfterBlur = false;
-                    if (!widget.enablePreviews) {
-                      return;
-                    }
-                    if (!_isCompactSearch &&
-                        widget.controller.text.trim().isEmpty) {
-                      widget.onEmptyFocus?.call();
-                    }
-                    _syncOverlay();
-                    if (_isCompactSearch &&
-                        _meaningfulSearchLength(widget.query) >=
-                            searchPreviewVisibleChars) {
-                      _handoffFocusToPreview();
-                    }
-                  },
-                  style: const TextStyle(color: Colors.white, fontSize: 14),
-                  textInputAction: TextInputAction.search,
-                  onSubmitted: (value) {
-                    SearchDebugTrace.instance
-                        .record('flutter.input.submitted', {
-                      'query': value,
-                    });
-                    widget.onExit?.call('submit');
-                    widget.onShowAll(value);
-                  },
-                  decoration: InputDecoration(
-                    prefixIcon:
-                        const Icon(Icons.search, color: Color(0xFFFACC15)),
-                    suffixIcon: widget.isSearching
-                        ? const Padding(
-                            padding: EdgeInsets.all(12),
-                            child: SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Color(0xFFFACC15),
-                              ),
-                            ),
-                          )
-                        : widget.controller.text.isNotEmpty
-                            ? IconButton(
-                                tooltip: 'Clear search',
-                                onPressed: () {
-                                  SearchDebugTrace.instance.record(
-                                    'flutter.input.clear',
-                                    {'query': widget.controller.text},
-                                  );
-                                  widget.controller.clear();
-                                  _keepOverlayOpenAfterBlur = false;
-                                  widget.onExit?.call('clear');
-                                  widget.onChanged('');
-                                  _removeOverlay();
-                                },
-                                icon: const Icon(Icons.close,
-                                    color: Color(0xFF93A4C8), size: 18),
-                              )
-                            : null,
-                    hintText: widget.hintText,
-                    hintStyle: const TextStyle(color: Color(0xFF93A4C8)),
-                    filled: true,
-                    fillColor: const Color(0xFF111936),
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(999),
-                      borderSide: BorderSide(
-                        color: previewOpen
-                            ? const Color(0xFF38BDF8).withValues(alpha: 0.38)
-                            : Colors.transparent,
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(999),
-                      borderSide: BorderSide(
-                        color: previewOpen
-                            ? const Color(0xFF38BDF8).withValues(alpha: 0.58)
-                            : const Color(0xFFFACC15).withValues(alpha: 0.28),
-                      ),
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(999),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Focus(
+              onKeyEvent: _handleSearchKeyEvent,
+              canRequestFocus: false,
+              child: AnimatedContainer(
+                key: _fieldKey,
+                height: previewOpen ? 48 : 42,
+                duration: const Duration(milliseconds: 260),
+                curve: Curves.easeOutCubic,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(999),
+                  boxShadow: previewOpen
+                      ? [
+                          BoxShadow(
+                            color:
+                                const Color(0xFF38BDF8).withValues(alpha: 0.18),
+                            blurRadius: 18,
+                            spreadRadius: 1,
+                          ),
+                        ]
+                      : const [],
                 ),
-                if (showCompletion)
-                  Positioned.fill(
-                    left: _isCompactSearch ? 48 + mobileCompletionLeft : 48,
-                    right: widget.controller.text.isEmpty ? 14 : 48,
-                    child: IgnorePointer(
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Semantics(
-                          label: 'Autocomplete suggestion $completionText',
-                          child: _isCompactSearch
-                              ? Text(
-                                  completionSuffix.isEmpty
-                                      ? completionText
-                                      : completionSuffix,
-                                  style: TextStyle(
-                                    color: const Color(0xFF93A4C8)
-                                        .withValues(alpha: 0.62),
-                                    fontSize: 14,
+                child: Stack(
+                  alignment: Alignment.centerLeft,
+                  children: [
+                    TextField(
+                      controller: widget.controller,
+                      focusNode: widget.focusNode,
+                      onChanged: (value) {
+                        SearchDebugTrace.instance
+                            .record('flutter.input.changed', {
+                          'query': value,
+                          'length': value.length,
+                          'chars': value.characters.toList(),
+                        });
+                        widget.onChanged(value);
+                      },
+                      onTap: () {
+                        _spinPokeball();
+                        SearchDebugTrace.instance.record('flutter.input.tap', {
+                          'query': widget.query,
+                          'hasFocus': widget.focusNode.hasFocus,
+                        });
+                        if (_isCompactSearch && _hasCompletion) {
+                          _acceptCompletion();
+                          return;
+                        }
+                        _keepOverlayOpenAfterBlur = false;
+                        if (!widget.enablePreviews) {
+                          return;
+                        }
+                        if (!_isCompactSearch &&
+                            widget.controller.text.trim().isEmpty) {
+                          widget.onEmptyFocus?.call();
+                        }
+                        _syncOverlay();
+                        if (_isCompactSearch &&
+                            _meaningfulSearchLength(widget.query) >=
+                                searchPreviewVisibleChars) {
+                          _handoffFocusToPreview();
+                        }
+                      },
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                      textInputAction: TextInputAction.search,
+                      onSubmitted: (value) {
+                        SearchDebugTrace.instance
+                            .record('flutter.input.submitted', {
+                          'query': value,
+                        });
+                        widget.onExit?.call('submit');
+                        widget.onShowAll(value);
+                      },
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(
+                          Icons.search,
+                          color: Color(0xFFFACC15),
+                        ),
+                        suffixIcon: widget.isSearching
+                            ? const Padding(
+                                padding: EdgeInsets.all(12),
+                                child: SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Color(0xFFFACC15),
                                   ),
-                                  overflow: TextOverflow.clip,
-                                  maxLines: 1,
-                                )
-                              : Text.rich(
-                                  TextSpan(
-                                    children: [
-                                      TextSpan(
-                                        text: typedText,
-                                        style: const TextStyle(
-                                          color: Colors.transparent,
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                      TextSpan(
-                                        text: completionSuffix.isEmpty
-                                            ? completionText
-                                            : completionSuffix,
-                                        style: TextStyle(
-                                          color: const Color(0xFF93A4C8)
-                                              .withValues(alpha: 0.62),
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  overflow: TextOverflow.clip,
-                                  maxLines: 1,
                                 ),
+                              )
+                            : widget.controller.text.isNotEmpty
+                                ? IconButton(
+                                    tooltip: 'Clear search',
+                                    onPressed: () {
+                                      SearchDebugTrace.instance.record(
+                                        'flutter.input.clear',
+                                        {'query': widget.controller.text},
+                                      );
+                                      widget.controller.clear();
+                                      _keepOverlayOpenAfterBlur = false;
+                                      widget.onExit?.call('clear');
+                                      widget.onChanged('');
+                                      _removeOverlay();
+                                    },
+                                    icon: const Icon(Icons.close,
+                                        color: Color(0xFF93A4C8), size: 18),
+                                  )
+                                : null,
+                        hintText: widget.hintText,
+                        hintStyle: const TextStyle(color: Color(0xFF93A4C8)),
+                        filled: true,
+                        fillColor: const Color(0xFF111936),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 0),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(999),
+                          borderSide: BorderSide(
+                            color: previewOpen
+                                ? const Color(0xFF38BDF8)
+                                    .withValues(alpha: 0.38)
+                                : Colors.transparent,
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(999),
+                          borderSide: BorderSide(
+                            color: previewOpen
+                                ? const Color(0xFF38BDF8)
+                                    .withValues(alpha: 0.58)
+                                : const Color(0xFFFACC15)
+                                    .withValues(alpha: 0.28),
+                          ),
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(999),
+                          borderSide: BorderSide.none,
                         ),
                       ),
                     ),
-                  ),
-                if (showCompletion && !_isCompactSearch)
-                  Positioned(
-                    right: widget.controller.text.isEmpty ? 14 : 48,
-                    child: IgnorePointer(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color:
-                              const Color(0xFF24324F).withValues(alpha: 0.82),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          completionDebugLabel,
-                          style: const TextStyle(
-                            color: Color(0xFFB6C3E3),
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
+                    if (showCompletion)
+                      Positioned.fill(
+                        left: _isCompactSearch ? 48 + mobileCompletionLeft : 48,
+                        right: widget.controller.text.isEmpty ? 14 : 48,
+                        child: IgnorePointer(
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Semantics(
+                              label: 'Autocomplete suggestion $completionText',
+                              child: _isCompactSearch
+                                  ? Text(
+                                      completionSuffix.isEmpty
+                                          ? completionText
+                                          : completionSuffix,
+                                      style: TextStyle(
+                                        color: const Color(0xFF93A4C8)
+                                            .withValues(alpha: 0.62),
+                                        fontSize: 14,
+                                      ),
+                                      overflow: TextOverflow.clip,
+                                      maxLines: 1,
+                                    )
+                                  : Text.rich(
+                                      TextSpan(
+                                        children: [
+                                          TextSpan(
+                                            text: typedText,
+                                            style: const TextStyle(
+                                              color: Colors.transparent,
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                          TextSpan(
+                                            text: completionSuffix.isEmpty
+                                                ? completionText
+                                                : completionSuffix,
+                                            style: TextStyle(
+                                              color: const Color(0xFF93A4C8)
+                                                  .withValues(alpha: 0.62),
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      overflow: TextOverflow.clip,
+                                      maxLines: 1,
+                                    ),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
-              ],
+                    if (showCompletion && !_isCompactSearch)
+                      Positioned(
+                        right: widget.controller.text.isEmpty ? 14 : 48,
+                        child: IgnorePointer(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF24324F)
+                                  .withValues(alpha: 0.82),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              completionDebugLabel,
+                              style: const TextStyle(
+                                color: Color(0xFFB6C3E3),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ),
-          ),
+            Positioned(
+              left: 16,
+              top: (previewOpen ? 48 : 42) + 6,
+              child: Semantics(
+                label: 'Poké Ball search',
+                child: RotationTransition(
+                  turns: CurvedAnimation(
+                    parent: _pokeballController,
+                    curve: Curves.easeOutCubic,
+                  ),
+                  child: SvgPicture.asset(
+                    'assets/icons/pokepalla.svg',
+                    width: 30,
+                    height: 30,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -4618,7 +4688,9 @@ class _CardCarouselSectionState extends State<_CardCarouselSection> {
               children: [
                 ListView.separated(
                   controller: _scrollController,
-                  cacheExtent: widget.title == 'Recently seen' ? 480 : 0,
+                  scrollCacheExtent: ScrollCacheExtent.pixels(
+                    widget.title == 'Recently seen' ? 480 : 0,
+                  ),
                   addAutomaticKeepAlives: widget.title == 'Recently seen',
                   addRepaintBoundaries: true,
                   padding: const EdgeInsets.symmetric(horizontal: 22),
@@ -4893,6 +4965,44 @@ class _SearchResultSection extends StatelessWidget {
               : 'Try searching for a broader card name, set, or rarity.',
         ),
       ],
+    );
+  }
+}
+
+class _SearchFiltersToggle extends StatelessWidget {
+  const _SearchFiltersToggle({
+    required this.expanded,
+    required this.activeFilterCount,
+    required this.onPressed,
+  });
+
+  final bool expanded;
+  final int activeFilterCount;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final label =
+        activeFilterCount == 0 ? 'Filters' : 'Filters ($activeFilterCount)';
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: OutlinedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(
+          expanded ? Icons.keyboard_arrow_up_rounded : Icons.tune_rounded,
+          size: 20,
+        ),
+        label: Text(label),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: Colors.white,
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.18)),
+          backgroundColor: const Color(0xCC0B1024),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -7026,15 +7136,19 @@ class _MarketplaceSections {
     List<RecentCardView> recentViews = const [],
     Map<String, MarketplaceCheapestPrice> cheapestPricesByCardId = const {},
   }) {
-    final singles =
-        cards.where((card) => _isSingleCard(card) && card.isMarketAvailable).toList();
+    final singles = cards
+        .where((card) => _isSingleCard(card) && card.isMarketAvailable)
+        .toList();
     final personalized = _rankCardsByRecentViews(singles, recentViews);
     final recentCards = _cardsForRecentViews(
       recentViews,
       singles,
       cheapestPricesByCardId,
     );
-    final byIdAll = {for (final card in cards) if (card.id.isNotEmpty) card.id: card};
+    final byIdAll = {
+      for (final card in cards)
+        if (card.id.isNotEmpty) card.id: card
+    };
     final newArrivals = cachedSections == null
         ? const <PokemonCard>[]
         : _cardsForIdsAllowUnavailable(cachedSections.newArrivalIds, byIdAll);
@@ -7042,7 +7156,9 @@ class _MarketplaceSections {
       final byId = {for (final card in singles) card.id: card};
       final bestSellers = _cardsForIds(cachedSections.bestSellerIds, byId);
       final featured = _cardsForIds(cachedSections.featuredIds, byId);
-      if (bestSellers.isNotEmpty || featured.isNotEmpty || newArrivals.isNotEmpty) {
+      if (bestSellers.isNotEmpty ||
+          featured.isNotEmpty ||
+          newArrivals.isNotEmpty) {
         return _MarketplaceSections(
           recentlySeen: recentCards,
           bestSellers: bestSellers.isNotEmpty
@@ -7076,11 +7192,7 @@ class _MarketplaceSections {
     List<String> ids,
     Map<String, PokemonCard> byId,
   ) {
-    return ids
-        .map((id) => byId[id])
-        .whereType<PokemonCard>()
-        .take(12)
-        .toList();
+    return ids.map((id) => byId[id]).whereType<PokemonCard>().take(12).toList();
   }
 
   static List<PokemonCard> _cardsForIds(
@@ -7123,6 +7235,7 @@ class _MarketplaceSections {
           byId[doubledCardId(id)] ??
           byId[cardIdFromDoubledId(id)];
     }
+
     return views
         .map((view) {
           final cheapestPrice = _cheapestPriceForRecentView(

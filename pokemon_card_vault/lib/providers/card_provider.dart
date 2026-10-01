@@ -1765,6 +1765,10 @@ class CardNotifier extends StateNotifier<CardState> {
           setName: card.set,
           number: card.number,
           trainerName: card.trainerName,
+          imageUrl: card.imageUrl,
+          previewImageUrl: card.previewImageUrl,
+          homepageImageUrl: card.homepageImageUrl,
+          expansionSymbolUrl: card.expansionSymbolUrl,
         ),
       ),
     );
@@ -1867,6 +1871,10 @@ class CardNotifier extends StateNotifier<CardState> {
         setName: card.set,
         number: card.number,
         trainerName: card.trainerName,
+        imageUrl: card.imageUrl,
+        previewImageUrl: card.previewImageUrl,
+        homepageImageUrl: card.homepageImageUrl,
+        expansionSymbolUrl: card.expansionSymbolUrl,
       ));
     }
     if (ids.isEmpty) {
@@ -2131,6 +2139,10 @@ class CardNotifier extends StateNotifier<CardState> {
         setName: card.set,
         number: card.number,
         trainerName: card.trainerName,
+        imageUrl: card.imageUrl,
+        previewImageUrl: card.previewImageUrl,
+        homepageImageUrl: card.homepageImageUrl,
+        expansionSymbolUrl: card.expansionSymbolUrl,
       ),
     ));
 
@@ -3179,11 +3191,29 @@ PokemonCard? _placeholderCardFromLabel(SearchCandidateLabel? label) {
   final itemKind = label.itemKind == 'product' ? 'product' : 'single';
   final productType = label.productType.isEmpty ? 'card' : label.productType;
   final type = itemKind == 'product' ? _productTypeLabel(productType) : 'Card';
+  final imageUrl = rewriteCdnPrefixToOurId(
+    label.imageUrl.isNotEmpty ? label.imageUrl : label.previewImageUrl,
+    pokoinCardId: label.id,
+    ctId: label.ctId,
+  );
+  final previewImageUrl = rewriteCdnPrefixToOurId(
+    label.previewImageUrl.isNotEmpty ? label.previewImageUrl : imageUrl,
+    pokoinCardId: label.id,
+    ctId: label.ctId,
+  );
+  final homepageImageUrl = rewriteCdnPrefixToOurId(
+    label.homepageImageUrl.isNotEmpty
+        ? label.homepageImageUrl
+        : previewImageUrl,
+    pokoinCardId: label.id,
+    ctId: label.ctId,
+  );
   return PokemonCard(
     id: label.id,
     name: label.name,
-    imageUrl: '',
-    previewImageUrl: '',
+    imageUrl: imageUrl,
+    previewImageUrl: previewImageUrl,
+    homepageImageUrl: homepageImageUrl,
     rarity: itemKind == 'product' ? type : 'Card',
     type: type,
     hp: 0,
@@ -3210,6 +3240,7 @@ PokemonCard? _placeholderCardFromLabel(SearchCandidateLabel? label) {
     itemKind: itemKind,
     productType: productType,
     trainerName: label.trainerName,
+    expansionSymbolUrl: label.expansionSymbolUrl,
   );
 }
 
@@ -3560,18 +3591,36 @@ List<PokemonCard> _mergePreviewRows({
   int limit = searchPreviewLimit,
 }) {
   final merged = <PokemonCard>[];
-  final seen = <String>{};
+  final indexById = <String, int>{};
   for (final card in [...backendRows, ...fallbackRows]) {
     final id = card.id.trim();
-    if (id.isEmpty || !seen.add(id)) {
+    if (id.isEmpty) {
       continue;
     }
-    merged.add(card);
-    if (merged.length >= limit) {
-      break;
+    final existingIndex = indexById[id];
+    if (existingIndex != null) {
+      // A lightweight context row can arrive before its fully hydrated
+      // counterpart. Keep the same ordering, but never let the empty-image
+      // placeholder win over artwork that arrived later.
+      if (!_hasPreviewArtwork(merged[existingIndex]) &&
+          _hasPreviewArtwork(card)) {
+        merged[existingIndex] = card;
+      }
+      continue;
     }
+    if (merged.length >= limit) {
+      continue;
+    }
+    indexById[id] = merged.length;
+    merged.add(card);
   }
   return merged;
+}
+
+bool _hasPreviewArtwork(PokemonCard card) {
+  return card.imageUrl.trim().isNotEmpty ||
+      card.previewImageUrl.trim().isNotEmpty ||
+      card.homepageImageUrl.trim().isNotEmpty;
 }
 
 List<PokemonCard> _remoteSearchResults(

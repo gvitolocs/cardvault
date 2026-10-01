@@ -20,6 +20,7 @@ const {
   setCorsHeaders,
   jsonOk,
 } = require('./_marketplace_react_card');
+const { canonicalPathForRow } = require('./_marketplace_canonical_path');
 
 const GAME_LABEL = {
   pokemon: 'Pokémon',
@@ -73,7 +74,12 @@ function holdingFromRow(row, game) {
   const expansion = cleanText(row.expansion_name || row.catalog_set || row.set_name, 240);
   const listingCount = Math.max(0, Number(row.listing_count) || 0);
   const canonicalPath = cleanText(row.canonical_path, 800)
-    || (cardId ? `/marketplace/en/cards/${cardId}` : '');
+    || canonicalPathForRow({
+      ...row,
+      card_id: cardId,
+      name,
+      set_name: expansion,
+    });
   return {
     id: cardId,
     cardId,

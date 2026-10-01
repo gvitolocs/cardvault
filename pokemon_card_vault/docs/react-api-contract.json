@@ -1,5 +1,5 @@
 {
-  "version": "2026-09-05.6",
+  "version": "2026-09-22.1",
   "title": "Pokoin marketplace client contract for React / Flutter / JS",
   "hosts": {
     "api": "https://api.pokoin.com",
@@ -81,7 +81,7 @@
   },
   "search": {
     "engine": "meili",
-    "host": "127.0.0.1:7700 on pokoin-marketplace only",
+    "host": "127.0.0.1:7700 on pi-home next to the public API",
     "indexes": [
       "marketplace_cards",
       "marketplace_name_tokens"
@@ -91,7 +91,7 @@
     "notes": [
       "GET /api/marketplace-suggest is Meili-only typeahead for pokoin-web (grouped printings, no SQL).",
       "Meili English documents include name, expansion aliases, and card_number.",
-      "Search page hydrates identity and image only; listings stay on the card page.",
+      "Search page hydrates identity plus listed cheapest PKN from cheapest_homepage_cache_blueprint; shop listings stay on the card page.",
       "POST /api/marketplace-autocomplete remains for Flutter until that client switches to suggest.",
       "Do not put Meili on peer1."
     ],
@@ -101,7 +101,7 @@
       "offset": "Meili offset",
       "search_language": "Non-en stays legacy SQL",
       "productType": "Facet",
-      "productSearchOnly": "1 = sealed products only"
+      "productSearchOnly": "1 = Product search universe: sealed products plus the jumbo subtype (no separate jumbo tab)"
     },
     "autocomplete": "POST /api/marketplace-autocomplete { search_term, result_limit } (Flutter)",
     "suggest": "GET /api/marketplace-suggest?q= (pokoin-web popup)",
@@ -130,7 +130,7 @@
     "search": {
       "path": "GET /api/marketplace-search-page",
       "query": "query|q, limit, offset, productType, productSearchOnly, lang, includeFacets",
-      "returns": "cards[], facets.products[], count, hasMore, limit, offset. Identity hydrate only; no listing-cache join."
+      "returns": "cards[], facets.products[], count, hasMore, limit, offset. Identity hydrate plus listed cheapest PKN; no snapshot listing join."
     },
     "card": {
       "path": "GET /api/marketplace-card-page",

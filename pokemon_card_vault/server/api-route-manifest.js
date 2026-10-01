@@ -127,6 +127,21 @@ const routeDefinitions = [
     },
   },
   {
+    path: '/api/ingest/:game',
+    file: 'cardtrader-game-ingest.js',
+    methods: ['GET', 'POST', 'OPTIONS'],
+    purpose: 'List or run an isolated non-Pokemon CardTrader game ingest on the Oracle 15T service. Pokemon remains on pi-home.',
+    auth: 'GET status is public. POST requires CARDTRADER_INGEST_SECRET, a daily refresh secret, or CRON_SECRET.',
+    params: {
+      query: '`game` route parameter or query value; bounded importer controls are accepted for POST.',
+      body: '`game`, `apply`, `discoverOnly`, and bounded import controls for POST.',
+    },
+    dependencies: {
+      env: ['CARDTRADER_AUTH_TOKEN', 'CARDTRADER_API_TOKEN', 'CARDTRADER_INGEST_SECRET', 'CARDTRADER_DAILY_LISTINGS_SECRET', 'CARDTRADER_DAILY_REFRESH_SECRET', 'CRON_SECRET', 'POKOIN_API_SERVICE_NAME', '*_MARKETPLACE_DATABASE_URL'],
+      services: ['CardTrader API', 'isolated non-Pokemon Oracle/Postgres game databases on nezopt 15T'],
+    },
+  },
+  {
     path: '/api/cardtrader-disconnect',
     file: 'cardtrader-disconnect.js',
     methods: ['POST'],
@@ -194,6 +209,21 @@ const routeDefinitions = [
     dependencies: {
       env: ['STRIPE_SECRET_KEY', 'STRIPE_API_VERSION', 'PUBLIC_SITE_URL', 'PKN_CHECKOUT_CURRENCY', 'PKN_CHECKOUT_USDT_PRICE', 'FIREBASE_*'],
       services: ['Stripe', 'Firebase Admin'],
+    },
+  },
+  {
+    path: '/api/chat',
+    file: 'chat.js',
+    methods: ['GET', 'POST'],
+    purpose: 'List and read canonical direct conversations, post messages, transfer PKN, and update read state.',
+    auth: 'Required Firebase bearer token; conversation membership is rechecked server-side.',
+    params: {
+      query: '`action=list|get` and `peer` for GET.',
+      body: '`peer` plus message, payment, or read fields for POST actions `message`, `pay`, and `read`.',
+    },
+    dependencies: {
+      env: ['FIREBASE_*'],
+      services: ['Firebase Admin', 'Firestore'],
     },
   },
   {
@@ -395,7 +425,7 @@ const routeDefinitions = [
     },
     dependencies: {
       env: ['MEILI_HOST', 'MEILI_API_KEY', 'MEILI_MARKETPLACE_INDEX', 'MARKETPLACE_SEARCH_ENGINE'],
-      services: ['Meilisearch on pokoin-marketplace localhost :7700'],
+      services: ['Meilisearch on pi-home localhost :7700'],
     },
   },
   {
@@ -939,6 +969,21 @@ const routeDefinitions = [
     dependencies: {
       env: ['MARKETPLACE_DATABASE_URL', 'FIREBASE_*'],
       services: ['Oracle/Postgres marketplace DB', 'optional Firebase Admin'],
+    },
+  },
+  {
+    path: '/api/money-request',
+    file: 'money-request.js',
+    methods: ['GET', 'POST'],
+    purpose: 'Create and manage canonical PKN money requests, their chat events, ledger transfers, and notifications.',
+    auth: 'Required Firebase bearer token; request participants and state transitions are enforced server-side.',
+    params: {
+      query: '`action=list|notifications` for GET; POST actions include `create`, `pay`, `decline`, `cancel`, and `read-notifications`.',
+      body: 'Creation accepts recipient username, amount, optional note/client token; mutations accept a request ID.',
+    },
+    dependencies: {
+      env: ['FIREBASE_*'],
+      services: ['Firebase Admin', 'Firestore'],
     },
   },
   {

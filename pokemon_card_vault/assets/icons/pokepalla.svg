@@ -1,0 +1,45 @@
+<svg width="90" height="90" xmlns="http://www.w3.org/2000/svg">
+ <g>
+  <title>Layer 1</title>
+  <g id="svg_676">
+   <path fill="url(#svg_33)" stroke="#003399" opacity="1" d="m45,90c-24.86188,0 -45,-20.13812 -45,-45c0,-24.86188 20.13812,-45 45,-45c24.86188,0 45,20.13812 45,45c0,24.86188 -20.13812,45 -45,45z" id="svg_2"/>
+   <path fill="url(#svg_663)" stroke="#003399" opacity="1" d="m26.19636,42.06077l-14.86674,-3.18285l-11.38289,3.94336l0.7892,9.42736c4.2466,-1.62321 12.07988,0.72773 16.32648,-0.89548l9.21489,-3.57659l2.14863,-2.87039l-2.22957,-2.84541z" id="svg_6" transform="rotate(1.1982, 14.1861, 45.563)" stroke-width="0"/>
+   <path fill="url(#svg_653)" stroke="#003399" opacity="1" d="m1.65584,57.65829l4.89984,3.16632l-5.41081,6.9585l11.52688,-3.92063l15.12946,-0.2994l-5.15105,-10.89883l-2.0682,-0.89542l-4.12609,-0.31015l-6.8518,2.84633l-0.26559,0.06136l-0.0664,0.01534l-0.01107,0.00256l-0.00553,0.00128l-0.00277,0.00064l-0.00138,0.00032l-0.00069,0.00016l-0.00035,0.00008l-0.00017,0.00004l-0.00009,0.00002l-0.00004,0.00001l-0.00002,0l-0.00001,0l-0.00001,0l0,0l0,0l0,0l0,0l0,0l0,0l0,0l0,0l0,0l0,0l0,0l0,0l0,0l-7.59412,3.27146l0.00001,0.00001z" id="svg_7" transform="rotate(-176.442, 14.4731, 59.621)" stroke-width="0"/>
+   <ellipse fill="url(#svg_592)" stroke="#4d4d4d" cx="46.3373" cy="50.6096" id="svg_34" rx="15" ry="14.82759" stroke-width="0"/>
+   <path fill="url(#svg_674)" stroke="#003399" opacity="1" d="m87.56953,47.78894l-13.02406,2.75128l-9.97202,-3.40867l0.69138,-8.14907c3.72025,1.40311 10.58263,-0.62905 14.30287,0.77406l8.07274,3.09163l1.88231,2.48118l-1.95322,2.45959z" id="svg_667" transform="rotate(175.934, 77.0481, 44.761)" stroke-width="0"/>
+   <path fill="url(#svg_675)" stroke="#003399" opacity="1" d="m89.36096,56.53467l-4.7065,3.16632l5.19731,6.9585l-11.07205,-3.92063l-14.53248,-0.2994l4.9478,-10.89883l1.98659,-0.89542l3.96328,-0.31015l6.58144,2.84633l0.25511,0.06136l0.06378,0.01534l0.01063,0.00256l0.00531,0.00128l0.00266,0.00064l0.00133,0.00032l0.00066,0.00016l0.00033,0.00008l0.00017,0.00004l0.00008,0.00002l0.00004,0.00001l0.00002,0l0.00001,0l0.00001,0l0,0l0,0l0,0l0,0l0,0l0,0l0,0l0,0l0,0l0,0l0,0l0,0l0,0l7.29447,3.27146l0,0.00001z" id="svg_668" transform="rotate(175.43, 77.0491, 58.497)" stroke-width="0"/>
+  </g>
+ </g>
+ <defs>
+  <radialGradient id="svg_33" spreadMethod="pad" fx="0.625" fy="0.55391" cx="0.46094" cy="0.46406" r="1.17509">
+   <stop stop-color="#d80808" stop-opacity="0.98047" offset="0.37109"/>
+   <stop stop-color="#6f0011" stop-opacity="0.97266" offset="0.44141"/>
+   <stop stop-color="#161616" offset="0.66406" stop-opacity="0.97266"/>
+  </radialGradient>
+  <radialGradient id="svg_592" spreadMethod="pad" fx="0.70313" fy="0.26484" cx="0.5" cy="0.5" r="0.57243">
+   <stop stop-color="#b2b2b2" stop-opacity="0.98828" offset="0.10938"/>
+   <stop stop-color="#ad1111" stop-opacity="0.99609" offset="0.8125"/>
+   <stop stop-color="#4d4d4d" stop-opacity="0.99609" offset="0.90234"/>
+  </radialGradient>
+  <radialGradient id="svg_653" spreadMethod="pad" fx="0.07031" fy="0.70625" cx="0.5" cy="0.5" r="0.60272">
+   <stop stop-color="#b2b2b2" offset="0.33984"/>
+   <stop stop-color="#4d4d4d" offset="0.82031"/>
+   <stop stop-color="#003399" stop-opacity="0.99609" offset="0.91406"/>
+  </radialGradient>
+  <radialGradient id="svg_663" spreadMethod="pad" fx="0.86328" fy="0.24141" cx="0.5" cy="0.5" r="0.63394" gradientTransform="translate(0,0.025000000000000022) scale(1,0.95)">
+   <stop stop-color="#b2b2b2" offset="0"/>
+   <stop stop-color="#4d4d4d" stop-opacity="0.99219" offset="0.81641"/>
+   <stop stop-color="#003399" stop-opacity="0.99609" offset="0.96094"/>
+  </radialGradient>
+  <radialGradient id="svg_674" spreadMethod="pad" fx="0.88672" fy="0.75312" cx="0.5" cy="0.5" r="0.63394" gradientTransform="translate(0,0.025000000000000022) scale(1,0.95)" y1="1" y2="1">
+   <stop stop-color="#b2b2b2" offset="0"/>
+   <stop stop-color="#4d4d4d" stop-opacity="0.99219" offset="0.81641"/>
+   <stop stop-color="#003399" stop-opacity="0.99609" offset="0.96094"/>
+  </radialGradient>
+  <radialGradient id="svg_675" spreadMethod="pad" fx="0.82813" fy="0.74531" cx="0.5" cy="0.5" r="0.60272" x1="1" x2="1">
+   <stop stop-color="#b2b2b2" offset="0.33984"/>
+   <stop stop-color="#4d4d4d" offset="0.82031"/>
+   <stop stop-color="#003399" stop-opacity="0.99609" offset="0.91406"/>
+  </radialGradient>
+ </defs>
+</svg>

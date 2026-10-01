@@ -1825,6 +1825,32 @@ void main() {
       expect(rows.every((card) => card.imageUrl.isEmpty), isTrue);
     });
 
+    test('lightweight fallback uses artwork carried by candidate labels', () {
+      final context = SearchAutocompleteContext.fromJson({
+        'query': 'pika',
+        'language': 'en',
+        'card_ids': ['25'],
+        'created_at_ms': DateTime.now().millisecondsSinceEpoch,
+        'strategy': 'ranked_pool',
+        'candidate_labels': [
+          {
+            'id': '25',
+            'name': 'Pikachu',
+            'set_name': 'Base Set',
+            'card_number': '25/102',
+            'image_url': 'https://cdn.pokoin.com/25_pikachu.jpg',
+          },
+        ],
+      });
+
+      final rows = searchPreviewFallbackRowsForTest(
+        query: 'pikachu',
+        context: context,
+      );
+
+      expect(rows.single.imageUrl, 'https://cdn.pokoin.com/25_pikachu.jpg');
+    });
+
     test('lightweight fallback preserves ranked context order', () {
       final rows = searchPreviewFallbackRowsForTest(
         query: 'pikachu',
@@ -2354,6 +2380,33 @@ void main() {
       expect(cards, hasLength(searchPreviewLimit));
       expect(cards.first.id, '1');
       expect(cards.last.id, '$searchPreviewLimit');
+    });
+
+    test('autocomplete preview rows keep artwork from candidate metadata', () {
+      final service = CardService();
+      final cards = service.searchAutocompletePreviewCardsFromRowsForTest([
+        {
+          'card_id': '25',
+          'name': 'Pikachu',
+          'set_name': 'Base Set',
+          'card_number': '25/102',
+          'cdn_image_url': 'https://cdn.pokoin.com/25_pikachu.jpg',
+          'preview_image_url':
+              'https://cdn.pokoin.com/previews/25_pikachu.webp',
+          'homepage_image_url':
+              'https://cdn.pokoin.com/previews/25_pikachu_homepage.webp',
+        },
+      ]);
+
+      expect(cards.single.imageUrl, 'https://cdn.pokoin.com/25_pikachu.jpg');
+      expect(
+        cards.single.previewImageUrl,
+        'https://cdn.pokoin.com/previews/25_pikachu.webp',
+      );
+      expect(
+        cards.single.homepageImageUrl,
+        'https://cdn.pokoin.com/previews/25_pikachu_homepage.webp',
+      );
     });
 
     test(

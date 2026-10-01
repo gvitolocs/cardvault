@@ -3313,6 +3313,30 @@ test('candidate labels are bounded lightweight id and name context', () => {
   assert.equal(labels[0].cdn_image_url, undefined);
 });
 
+test('candidate labels retain artwork for the visible autocomplete rows', () => {
+  const labels = candidateLabelsForRows([
+    {
+      card_id: '25',
+      name: 'Pikachu',
+      cdn_image_url: 'https://cdn.pokoin.com/25_pikachu.jpg',
+      preview_image_url: 'https://cdn.pokoin.com/previews/25_pikachu.webp',
+    },
+    ...Array.from({ length: 20 }, (_, index) => ({
+      card_id: `${index + 100}`,
+      name: `Card ${index + 100}`,
+      cdn_image_url: `https://cdn.pokoin.com/${index + 100}_card.jpg`,
+    })),
+  ]);
+
+  assert.equal(labels[0].image_url, 'https://cdn.pokoin.com/25_pikachu.jpg');
+  assert.equal(
+    labels[0].preview_image_url,
+    'https://cdn.pokoin.com/previews/25_pikachu.webp',
+  );
+  assert.equal(labels[19].image_url, 'https://cdn.pokoin.com/118_card.jpg');
+  assert.equal(labels[20].image_url, undefined);
+});
+
 test('split search merge keeps the strongest candidate per blueprint id', () => {
   const results = mergeSearchRows(
     [

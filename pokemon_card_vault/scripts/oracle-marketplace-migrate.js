@@ -79,7 +79,7 @@ async function closePools(...pools) {
 async function runSchema(targetPool) {
   const files = fs
     .readdirSync(SCHEMA_DIR)
-    .filter((name) => name.endsWith('.sql'))
+    .filter((name) => name.endsWith('.sql') && !name.endsWith('.grants.sql'))
     .sort();
 
   for (const file of files) {

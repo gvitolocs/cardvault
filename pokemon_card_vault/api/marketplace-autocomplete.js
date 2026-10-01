@@ -2317,7 +2317,7 @@ function candidateLabelsForRows(rows, limit = 100) {
     const name = String(row.name || '').trim();
     if (!id || !name || seen.has(id)) continue;
     seen.add(id);
-    labels.push({
+    const label = {
       id,
       name,
       item_kind: String(row.item_kind || 'single'),
@@ -2325,7 +2325,30 @@ function candidateLabelsForRows(rows, limit = 100) {
       set_name: String(row.set_name || ''),
       card_number: String(row.card_number || ''),
       trainer_name: String(row.trainer_name || ''),
-    });
+    };
+    // Candidate labels are also used by the client while a later autocomplete
+    // response is being refined. Keep the context light, but retain artwork
+    // for the rows that can actually be visible in the popup. Without this,
+    // the label-only fallback creates cards with an empty imageUrl.
+    if (labels.length < AUTOCOMPLETE_PREVIEW_ROW_LIMIT) {
+      const imageUrl = String(row.cdn_image_url || row.image_url || row.imageUrl || '').trim();
+      const previewImageUrl = String(
+        row.preview_image_url || row.previewImageUrl || imageUrl,
+      ).trim();
+      const homepageImageUrl = String(
+        row.homepage_image_url || row.homepageImageUrl || previewImageUrl || imageUrl,
+      ).trim();
+      const ctId = String(row.ct_id || row.ctId || '').trim();
+      const expansionSymbolUrl = String(
+        row.expansion_symbol_url || row.expansionSymbolUrl || '',
+      ).trim();
+      if (imageUrl) label.image_url = imageUrl;
+      if (previewImageUrl) label.preview_image_url = previewImageUrl;
+      if (homepageImageUrl) label.homepage_image_url = homepageImageUrl;
+      if (ctId) label.ct_id = ctId;
+      if (expansionSymbolUrl) label.expansion_symbol_url = expansionSymbolUrl;
+    }
+    labels.push(label);
     if (labels.length >= limit) break;
   }
   return labels;

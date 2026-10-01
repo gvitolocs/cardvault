@@ -80,19 +80,21 @@ Browser  →  pokoin.com (Vercel static / future Next.js)
 | Piece | Where | Role |
 | --- | --- | --- |
 | Public site | Vercel `pokoin.com` | Static Flutter web today; React later. **Rewrites only.** |
-| HTTP API | `https://api.pokoin.com` → Docker `pokoin-oracle-api:18080` on `pokoin-marketplace` (`130.61.251.250`) | All `/api/*` handlers |
+| HTTP API | `https://api.pokoin.com` → Cloudflare tunnel → Docker `pokoin-oracle-api:18080` on `pi-home` | All `/api/*` handlers |
 | Browser path | `https://pokoin.com/api/*` | Same handlers via Vercel rewrite |
-| Catalog DB | Docker `pokoin-marketplace-postgres` on the same VM | `marketplace_*`, cheapest cache, CardTrader snapshots |
-| Search | Meili `127.0.0.1:7700` on marketplace VM | Indexes `marketplace_cards` (~48975 docs), `marketplace_name_tokens` |
-| Images | Cloudflare Worker `cdn.pokoin.com` + R2 `cardvault-images` | Object storage. Vercel also rewrites `/card-images/*` |
+| Catalog DB writer | Postgres on `pokoin-marketplace` (`130.61.251.250`) | CardTrader dump/import primary; never served as the public API |
+| Catalog DB reader | Postgres streaming replica `127.0.0.1:5432` on `pi-home` | Read path for the public API; never dump-write or migrate here |
+| Search | Meili `127.0.0.1:7700` on `pi-home` | Indexes `marketplace_cards` (~48975 docs), `marketplace_name_tokens` |
+| Images | `cdn.pokoin.com` on `pi-home` with R2 backup | Card image delivery. Vercel also rewrites `/card-images/*` |
 | Auth | Firebase Auth | ID token is the Pokoin bearer token |
 | Chat | `POST /api/pokoin-assistant` → Poko on peer1 `:8789` (VCN only) | Not a Vercel function |
 | Chain | PokoinPoS on `pokoin-peer1` (`92.5.153.117`) | PKN transfers; not the marketplace API host |
 
-**Do not** put Meili, Honcho, Ollama, or the CardVault Node API on peer1 (1 GB).
+**Do not** move the public API or Meili back to Oracle/peer hosts; they stay on
+`pi-home` next to the read replica.
 **Do not** add new Vercel serverless routes.
 **Do not** treat dead Always Free peer IPs as live (`141.147.62.244`,
-`92.5.23.133`, etc.). Catalog Postgres is **pokoin-marketplace**
+`92.5.23.133`, etc.). Writable catalog Postgres is **pokoin-marketplace**
 `130.61.251.250`.
 **Do not** use `deploy-oracle-api-peer3.sh` targeting that dead host.
 

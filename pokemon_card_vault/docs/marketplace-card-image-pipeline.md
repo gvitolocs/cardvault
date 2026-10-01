@@ -1,5 +1,32 @@
 # Marketplace card image pipeline (2026-08-30)
 
+## 2026-09-29 — Flutter autocomplete fallback preserves artwork
+
+Autocomplete could find a card by name while displaying the default image.
+The ranked `candidate_labels` carried identity and display text, but the client
+materialized them with empty image URLs while full rows were still pending.
+
+`api/marketplace-autocomplete.js` now attaches `image_url`,
+`preview_image_url`, `homepage_image_url`, and `expansion_symbol_url`, when
+available, to the first 20 candidate labels. It retains `ct_id` as compatibility
+metadata for rewriting old CDN prefixes; the label ID and public URLs remain
+the Pokoin card ID. Later labels stay lightweight.
+
+`SearchCandidateLabel` in `lib/services/card_service.dart` preserves these
+optional fields through parsing and serialization. In
+`lib/providers/card_provider.dart`, `_placeholderCardFromLabel` uses the artwork
+and `rewriteCdnPrefixToOurId`; `_mergePreviewRows` replaces an image-less duplicate
+with an imaged row without moving its ranked position, even after the row cap
+has been reached.
+
+Regression checks are in `api/marketplace-autocomplete.test.js` (artwork on
+the first 20 labels only) and `test/card_service_test.dart` (label round-trip
+and preview artwork). This fixes lost image metadata, not missing CDN objects
+or missing card-market records. The reported public number `226324` still needs
+separate verification; the local browser test did not establish that its market
+detail page resolves successfully. These changes have not been deployed to
+the production API or web app in this session.
+
 ## Symptom
 
 Card detail pages such as

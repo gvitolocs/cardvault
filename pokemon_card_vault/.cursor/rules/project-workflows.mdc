@@ -16,10 +16,10 @@ alwaysApply: true
   - `workflows/verify-supabase-cardtrader-blueprints.sh`
 - The old Supabase project `msngrrrihwudtnyjatlo` is unrecoverable/inactive; use the active project from `.env.local`.
 - Cloudflare Worker routes need proxied DNS records. Deploying a Worker route alone does not make an unresolved domain work.
-- APIs are first-class project infrastructure. `api.pokoin.com` is the production Oracle API origin; verify `https://api.pokoin.com/healthz`, `/marketplace`, and `/api/__routes` before frontend production deploys.
-- Marketplace Postgres and `api.pokoin.com` run on the OCI VM **pokoin-marketplace** (`130.61.251.250`). SSH: `ssh pokoin-marketplace`. Do not use `honcho-personal`. Do not SSH `141.147.62.244` or `92.5.23.133` (those VMs are gone). nezopt `.env.local` `MARKETPLACE_DATABASE_URL` host is `130.61.251.250`.
-- For Oracle host SSH, read the project workflow/key guide first. The `ubuntu` user has sudo for operational checks/services. Never print private key contents or token values.
-- The production API runs on pokoin-marketplace as Docker container `pokoin-oracle-api` bound to `127.0.0.1:18080`, behind Caddy on ports 80/443.
+- APIs are first-class project infrastructure. `api.pokoin.com` is the production API origin on **pi-home**; verify `https://api.pokoin.com/healthz`, `/marketplace`, and `/api/__routes` before frontend production deploys.
+- Public `api.pokoin.com`, `cdn.pokoin.com`, Meili, and Valkey run on **pi-home** behind the Cloudflare tunnel. The Docker API reads the local Postgres streaming replica at `127.0.0.1:5432`; never run dump imports or migrations against that replica.
+- The OCI VM **pokoin-marketplace** (`130.61.251.250`) is the CardTrader dump/Postgres writer only. Use its `MARKETPLACE_DATABASE_URL` for migrations and dump jobs; do not deploy the public API there. Do not use retired peer IPs `141.147.62.244` or `92.5.23.133`.
+- For host SSH, read the project workflow/key guide first. Never print private key contents or token values.
 - Avoid Vercel serverless API fallback unless the user explicitly requests it for emergency rollback. Normal production web deploys must proxy `/api/*` to `https://api.pokoin.com`.
 - Competitive marketplace rollout is data-dependent. Before expecting `/marketplace/competitive` to show data, apply the non-destructive Oracle/Postgres schema `oracle-postgres/schema/014_limitless_competitive.sql` to the writable primary, then run `node scripts/sync-limitless-competitive.js --apply` after a dry-run/small test.
 - Public Limitless imports may include tournaments, games, standings, and pairings where the API allows. Restricted decklist endpoints may require Limitless approval/API key; document that as a blocker instead of assuming data exists.

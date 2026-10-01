@@ -17,7 +17,7 @@ function main() {
   const manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf8'));
   const actualFiles = fs
     .readdirSync(SCHEMA_DIR)
-    .filter((name) => name.endsWith('.sql'))
+    .filter((name) => name.endsWith('.sql') && !name.endsWith('.grants.sql'))
     .sort();
   const manifestFiles = manifest.files || [];
   const errors = [];
@@ -67,8 +67,8 @@ function main() {
   }
 
   const migrateSource = fs.readFileSync(MIGRATE_SCRIPT, 'utf8');
-  if (!/\.filter\(\(name\) => name\.endsWith\('\.sql'\)\)[\s\S]*\.sort\(\)/.test(migrateSource)) {
-    errors.push('scripts/oracle-marketplace-migrate.js must keep applying oracle-postgres/schema/*.sql in sorted order.');
+  if (!/\.filter\(\(name\) => name\.endsWith\('\.sql'\) && !name\.endsWith\('\.grants\.sql'\)\)[\s\S]*\.sort\(\)/.test(migrateSource)) {
+    errors.push('scripts/oracle-marketplace-migrate.js must keep applying migration SQL in sorted order while excluding separately applied grants files.');
   }
 
   if (errors.length) {

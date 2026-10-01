@@ -1,12 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
-import 'dart:ui' show Rect;
 
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'scan_assets.dart';
 import 'scan_debug_log.dart';
 
 class ScanBox {
@@ -39,10 +38,9 @@ class ScanBox {
   }
 
   factory ScanBox.fromMap(Map<Object?, Object?> raw) {
-    final quad = (raw['quad'] as List?)
-            ?.map((e) => (e as num).toDouble())
-            .toList() ??
-        const <double>[];
+    final quad =
+        (raw['quad'] as List?)?.map((e) => (e as num).toDouble()).toList() ??
+            const <double>[];
     return ScanBox(
       x1: (raw['x1'] as num?)?.toDouble() ?? 0,
       y1: (raw['y1'] as num?)?.toDouble() ?? 0,
@@ -93,7 +91,8 @@ class ScanHit {
   final double yoloConf;
   final List<double> quad;
 
-  String get title => name.isNotEmpty ? name : (id.isNotEmpty ? id : 'Unknown card');
+  String get title =>
+      name.isNotEmpty ? name : (id.isNotEmpty ? id : 'Unknown card');
 
   String get subtitle {
     final parts = [
@@ -106,10 +105,9 @@ class ScanHit {
   }
 
   factory ScanHit.fromMap(Map<Object?, Object?> raw) {
-    final quad = (raw['quad'] as List?)
-            ?.map((e) => (e as num).toDouble())
-            .toList() ??
-        const <double>[];
+    final quad =
+        (raw['quad'] as List?)?.map((e) => (e as num).toDouble()).toList() ??
+            const <double>[];
     return ScanHit(
       rank: (raw['rank'] as num?)?.toInt() ?? 0,
       boxIndex: (raw['boxIndex'] as num?)?.toInt() ?? 0,
@@ -214,49 +212,10 @@ class ScanEngine {
     final dir = Directory('${support.path}/fast_scan');
     await dir.create(recursive: true);
     _supportDir = dir.path;
-    final stamp = await _bundleStamp();
-    final stampFile = File('${dir.path}/bundle.stamp');
-    final sameBuild =
-        stampFile.existsSync() && stampFile.readAsStringSync() == stamp;
-    await Future.wait([
-      _copyAsset(
-        'assets/models/card_detector.tflite',
-        '${dir.path}/card_detector.tflite',
-        force: !sameBuild,
-      ),
-      _copyAsset(
-        'assets/models/milo.onnx',
-        '${dir.path}/milo.onnx',
-        force: !sameBuild,
-      ),
-      _copyAsset(
-        'assets/models/milo_fp16.onnx',
-        '${dir.path}/milo_fp16.onnx',
-        force: !sameBuild,
-      ),
-      if (Platform.isAndroid)
-        _copyAsset(
-          'assets/models/milo_cnn.onnx',
-          '${dir.path}/milo_cnn.onnx',
-          force: !sameBuild,
-        ),
-      if (Platform.isIOS) _copyMiloCoreML(dir, force: !sameBuild),
-      _ensureGallery(dir.path, gallery, force: !sameBuild),
-    ]);
-    if (!sameBuild) {
-      for (final name in [
-        'milo_qnn_gpu_ctx.onnx',
-        'milo_qnn_gpu.skip',
-        'milo_qnn_gpu.pending',
-        'milo_qnn_gpu.prep',
-      ]) {
-        final stale = File('${dir.path}/$name');
-        if (stale.existsSync()) stale.deleteSync();
-      }
-    }
-    await stampFile.writeAsString(stamp, flush: true);
+    final status = ScanAssetStore.inspectRoot(dir, gallery: gallery);
+    if (!status.ready) throw StateError(status.message);
     await ScanDebugLog.attach(dir);
-    identity = await _readIdentity('${dir.path}/western/manifest.json');
+    identity = await _readIdentity('${dir.path}/$gallery/manifest.json');
     final result = await _channel.invokeMapMethod<String, dynamic>('init', {
       'dir': dir.path,
       'gallery': gallery,
@@ -282,17 +241,36 @@ class ScanEngine {
     throw StateError('Scan engine failed to load Milo');
   }
 
+  static Future<ScanAssetStatus> assetStatus({
+    String gallery = 'western',
+  }) {
+    return ScanAssetStore.inspect(gallery: gallery);
+  }
+
+  static Future<ScanAssetStatus> downloadAssets({
+    required String gallery,
+    required Map<String, Uri> files,
+    void Function(String path, int received, int? total)? onProgress,
+  }) {
+    return ScanAssetStore.download(
+      gallery: gallery,
+      files: files,
+      onProgress: onProgress,
+    );
+  }
+
   static Future<void> setGallery(String name) async {
     await init();
     if (!galleries.contains(name) || name == gallery) return;
     final dir = _supportDir;
     if (dir == null) return;
-    final stamp = await _bundleStamp();
-    final stampFile = File('$dir/bundle.stamp');
-    final sameBuild =
-        stampFile.existsSync() && stampFile.readAsStringSync() == stamp;
-    await _ensureGallery(dir, name, force: !sameBuild);
-    final result = await _channel.invokeMapMethod<String, dynamic>('setCatalog', {
+    final status = ScanAssetStore.inspectRoot(
+      Directory(dir),
+      gallery: name,
+    );
+    if (!status.ready) throw StateError(status.message);
+    final result =
+        await _channel.invokeMapMethod<String, dynamic>('setCatalog', {
       'dir': dir,
       'gallery': name,
     });
@@ -307,7 +285,8 @@ class ScanEngine {
   static Future<String> setGpuOwner(String owner) async {
     await init();
     if (!Platform.isAndroid) return gpuOwner;
-    final result = await _channel.invokeMapMethod<String, dynamic>('setGpuOwner', {
+    final result =
+        await _channel.invokeMapMethod<String, dynamic>('setGpuOwner', {
       'owner': owner,
     });
     gpuOwner = '${result?['gpuOwner'] ?? owner}';
@@ -324,7 +303,8 @@ class ScanEngine {
     await init();
     if (!Platform.isAndroid) return yoloBackend;
     if (gpuOwner == 'milo') return yoloBackend;
-    final result = await _channel.invokeMapMethod<String, dynamic>('setYoloAccel', {
+    final result =
+        await _channel.invokeMapMethod<String, dynamic>('setYoloAccel', {
       'gpu': gpu,
     });
     yoloBackend = '${result?['yoloBackend'] ?? yoloBackend}';
@@ -409,7 +389,8 @@ class ScanEngine {
     int sensorOrientation = 0,
   }) async {
     await init();
-    final raw = await _channel.invokeMapMethod<String, dynamic>('identifyFrame', {
+    final raw =
+        await _channel.invokeMapMethod<String, dynamic>('identifyFrame', {
       'format': format,
       'width': width,
       'height': height,
@@ -508,100 +489,6 @@ class ScanEngine {
       hits: hits,
       boxes: boxes,
     );
-  }
-
-  static Future<void> _copyMiloCoreML(Directory dir, {bool force = false}) async {
-    const files = [
-      'Manifest.json',
-      'Data/com.apple.CoreML/model.mlmodel',
-      'Data/com.apple.CoreML/weights/weight.bin',
-    ];
-    try {
-      final destRoot = Directory('${dir.path}/milo.mlpackage');
-      var copied = 0;
-      var changed = false;
-      for (final rel in files) {
-        final asset = 'assets/models/milo.mlpackage/$rel';
-        final destPath = '${destRoot.path}/$rel';
-        final dest = File(destPath);
-        await dest.parent.create(recursive: true);
-        final before = dest.existsSync() ? dest.lengthSync() : -1;
-        await _copyAsset(asset, destPath, force: force);
-        copied++;
-        if (!dest.existsSync() || dest.lengthSync() != before) {
-          changed = true;
-        }
-      }
-      if (changed) {
-        final compiled = Directory('${dir.path}/milo.mlmodelc');
-        if (compiled.existsSync()) {
-          await compiled.delete(recursive: true);
-        }
-        final stamp = File('${dir.path}/milo.mlmodelc.stamp');
-        if (stamp.existsSync()) await stamp.delete();
-      }
-      ScanDebugLog.i('coreml asset files=$copied changed=$changed');
-    } catch (error) {
-      ScanDebugLog.i('coreml copy skip $error');
-    }
-  }
-
-  static Future<void> _ensureGallery(
-    String root,
-    String name, {
-    bool force = false,
-  }) async {
-    if (!galleries.contains(name)) {
-      throw ArgumentError.value(name, 'name', 'unknown gallery');
-    }
-    final dest = Directory('$root/$name');
-    await dest.create(recursive: true);
-    final assetRoot = Platform.isAndroid
-        ? 'assets/milo_cnn_index/$name'
-        : 'assets/milo_index/$name';
-    await Future.wait([
-      _copyAsset(
-        '$assetRoot/embeddings.bin',
-        '${dest.path}/embeddings.bin',
-        force: force,
-      ),
-      _copyAsset(
-        '$assetRoot/metadata.jsonl',
-        '${dest.path}/metadata.jsonl',
-        force: force,
-      ),
-      _copyAsset(
-        '$assetRoot/manifest.json',
-        '${dest.path}/manifest.json',
-        force: force,
-      ),
-    ]);
-  }
-
-  static Future<String> _bundleStamp() async {
-    try {
-      final raw = await _channel.invokeMethod<dynamic>('bundleStamp');
-      if (raw != null && '$raw'.isNotEmpty) return '$raw';
-    } catch (_) {}
-    return '0';
-  }
-
-  static Future<void> _copyAsset(
-    String asset,
-    String destPath, {
-    bool force = false,
-  }) async {
-    final dest = File(destPath);
-    if (!force && dest.existsSync() && dest.lengthSync() > 0) {
-      return;
-    }
-    final data = await rootBundle.load(asset);
-    final bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
-    if (!force && dest.existsSync() && dest.lengthSync() == bytes.length) {
-      return;
-    }
-    await dest.parent.create(recursive: true);
-    await dest.writeAsBytes(bytes, flush: true);
   }
 
   static Future<String> _readIdentity(String path) async {

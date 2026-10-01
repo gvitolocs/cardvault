@@ -219,6 +219,38 @@
     "family": "cardtrader"
   },
   {
+    "path": "/api/ingest/:game",
+    "file": "cardtrader-game-ingest.js",
+    "methods": [
+      "GET",
+      "POST",
+      "OPTIONS"
+    ],
+    "purpose": "List or run an isolated non-Pokemon CardTrader game ingest on the Oracle 15T service. Pokemon remains on pi-home.",
+    "auth": "GET status is public. POST requires CARDTRADER_INGEST_SECRET, a daily refresh secret, or CRON_SECRET.",
+    "params": {
+      "query": "`game` route parameter or query value; bounded importer controls are accepted for POST.",
+      "body": "`game`, `apply`, `discoverOnly`, and bounded import controls for POST."
+    },
+    "dependencies": {
+      "env": [
+        "CARDTRADER_AUTH_TOKEN",
+        "CARDTRADER_API_TOKEN",
+        "CARDTRADER_INGEST_SECRET",
+        "CARDTRADER_DAILY_LISTINGS_SECRET",
+        "CARDTRADER_DAILY_REFRESH_SECRET",
+        "CRON_SECRET",
+        "POKOIN_API_SERVICE_NAME",
+        "*_MARKETPLACE_DATABASE_URL"
+      ],
+      "services": [
+        "CardTrader API",
+        "isolated non-Pokemon Oracle/Postgres game databases on nezopt 15T"
+      ]
+    },
+    "family": "cardtrader"
+  },
+  {
     "path": "/api/cardtrader-disconnect",
     "file": "cardtrader-disconnect.js",
     "methods": [
@@ -333,6 +365,30 @@
       ]
     },
     "family": "payments"
+  },
+  {
+    "path": "/api/chat",
+    "file": "chat.js",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "purpose": "List and read canonical direct conversations, post messages, transfer PKN, and update read state.",
+    "auth": "Required Firebase bearer token; conversation membership is rechecked server-side.",
+    "params": {
+      "query": "`action=list|get` and `peer` for GET.",
+      "body": "`peer` plus message, payment, or read fields for POST actions `message`, `pay`, and `read`."
+    },
+    "dependencies": {
+      "env": [
+        "FIREBASE_*"
+      ],
+      "services": [
+        "Firebase Admin",
+        "Firestore"
+      ]
+    },
+    "family": "other"
   },
   {
     "path": "/api/crypto-pkn-purchase/:action",
@@ -674,7 +730,7 @@
         "MARKETPLACE_SEARCH_ENGINE"
       ],
       "services": [
-        "Meilisearch on pokoin-marketplace localhost :7700"
+        "Meilisearch on pi-home localhost :7700"
       ]
     },
     "family": "search"
@@ -763,7 +819,7 @@
       "GET",
       "OPTIONS"
     ],
-    "purpose": "React BFF: one card-detail payload (card, versions, offers, cheapest, artist, canonicalPath).",
+    "purpose": "React BFF: one card-detail payload (card, versions, versionCount, offers, cheapest, artist, canonicalPath).",
     "auth": "Public.",
     "params": {
       "query": "`cardId` required (public id). `lang`, `slug`, `includeSales`, `includeOffers`, `includeSameAs` (off by default), `liveOffers` optional."
@@ -806,10 +862,10 @@
     "methods": [
       "GET"
     ],
-    "purpose": "Daily sold-median series from CardTrader inferred comps. Pi reads stored condition/language/reverse/first-edition/graded slices; default payload is series + available filter keys, not observation rows.",
+    "purpose": "Daily sold-median series from CardTrader inferred comps. Pi aggregates the requested language/condition slice; default payload is series + available filter keys, not observation rows.",
     "auth": "Public.",
     "params": {
-      "query": "`cardId` required. Optional `condition` / `cond` (NM, SP, MP, PL, Poor), `language` / `lang` (EN, IT, JP, …), `reverse`, `firstEdition` / `first_edition`, and `graded` (`0`/`1`, omit = All). `includeRows=1` returns a capped observation sample; omit it for series-only. `limit` only applies with includeRows."
+      "query": "`cardId` required. Optional `condition` / `cond` (NM, SP, MP, PL, Poor) and `language` / `lang` (EN, IT, JP, …). Series includes `sampleCount` (observations in the current slice) and per-day `sampleCount`. `includeRows=1` returns a capped observation sample; omit it for series-only. `limit` only applies with includeRows."
     },
     "dependencies": {
       "env": [
@@ -822,6 +878,28 @@
     "family": "card"
   },
   {
+    "path": "/api/marketplace-sales-pulse",
+    "file": "marketplace-sales-pulse.js",
+    "methods": [
+      "GET",
+      "OPTIONS"
+    ],
+    "purpose": "Return the latest completed daily marketplace sales leaders plus a bounded activity trend.",
+    "auth": "Public.",
+    "params": {
+      "query": "`metric=sales` (default, observed samples) or diagnostic `metric=quantity`; `limit` (max 24) and `days` (max 30) are optional."
+    },
+    "dependencies": {
+      "env": [
+        "MARKETPLACE_DATABASE_URL"
+      ],
+      "services": [
+        "Pi/Postgres marketplace DB"
+      ]
+    },
+    "family": "other"
+  },
+  {
     "path": "/api/marketplace-card-last-median",
     "file": "marketplace-card-last-median.js",
     "methods": [
@@ -830,7 +908,7 @@
     "purpose": "Return the latest UTC-day median inferred sold PKN for one or more marketplace cards from CardTrader removed-sale comps.",
     "auth": "Public.",
     "params": {
-      "query": "`cardId` or comma-separated `cardIds` (max 40). `blueprintId` is accepted as an alias of `cardId`. Optional `condition` / `cond`, `language` / `lang`, `reverse`, `firstEdition`, and `graded` slice the last-day median the same way as marketplace-card-sales."
+      "query": "`cardId` or comma-separated `cardIds` (max 40). `blueprintId` is accepted as an alias of `cardId`. Optional `condition` / `cond` and `language` / `lang` slice the last-day median the same way as marketplace-card-sales."
     },
     "dependencies": {
       "env": [
@@ -896,6 +974,28 @@
     "auth": "Public.",
     "params": {
       "query": "`cardId`, `sameAsCardId`, `cardSlug`, `expansionName`, `query`, `limit`, `productType`, and `language` are supported."
+    },
+    "dependencies": {
+      "env": [
+        "MARKETPLACE_DATABASE_URL"
+      ],
+      "services": [
+        "Oracle/Postgres marketplace DB"
+      ]
+    },
+    "family": "card"
+  },
+  {
+    "path": "/api/marketplace-version-set",
+    "file": "marketplace-version-set.js",
+    "methods": [
+      "GET",
+      "OPTIONS"
+    ],
+    "purpose": "Return the pokoin_version_sets key, member_count, and printings for one public card id.",
+    "auth": "Public.",
+    "params": {
+      "query": "`cardId` (public marketplace id)."
     },
     "dependencies": {
       "env": [
@@ -1219,6 +1319,50 @@
     "family": "other"
   },
   {
+    "path": "/api/marketplace-rails",
+    "file": "marketplace-rails.js",
+    "methods": [
+      "GET",
+      "OPTIONS"
+    ],
+    "purpose": "Pi browse rails. Public card_id only. No Supabase.",
+    "auth": "Public.",
+    "params": {
+      "query": "`id` rail id (`new_cards`, `set:destined-rivals`)."
+    },
+    "dependencies": {
+      "env": [
+        "MARKETPLACE_DATABASE_URL"
+      ],
+      "services": [
+        "Pi Postgres"
+      ]
+    },
+    "family": "other"
+  },
+  {
+    "path": "/api/marketplace-card-tiles",
+    "file": "marketplace-card-tiles.js",
+    "methods": [
+      "GET",
+      "OPTIONS"
+    ],
+    "purpose": "Pi card tiles by public id. No Supabase.",
+    "auth": "Public.",
+    "params": {
+      "query": "`ids` comma-separated public card ids."
+    },
+    "dependencies": {
+      "env": [
+        "MARKETPLACE_DATABASE_URL"
+      ],
+      "services": [
+        "Pi Postgres"
+      ]
+    },
+    "family": "other"
+  },
+  {
     "path": "/api/marketplace-home-page",
     "file": "marketplace-home-page.js",
     "methods": [
@@ -1307,6 +1451,48 @@
       ]
     },
     "family": "commerce"
+  },
+  {
+    "path": "/api/marketplace-collection-summary",
+    "file": "marketplace-collection-summary.js",
+    "methods": [
+      "GET"
+    ],
+    "purpose": "Authenticated owned-card totals for dashboard Portfolio. Admin Firestore read; uid only from verified bearer.",
+    "auth": "Firebase bearer token required. Never accepts a client uid.",
+    "params": {
+      "query": "None. Owner is decoded.uid from the Authorization bearer."
+    },
+    "dependencies": {
+      "env": [
+        "FIREBASE_*"
+      ],
+      "services": [
+        "Firebase Admin"
+      ]
+    },
+    "family": "other"
+  },
+  {
+    "path": "/api/marketplace-collection",
+    "file": "marketplace-collection.js",
+    "methods": [
+      "GET"
+    ],
+    "purpose": "Authenticated owned holdings rows for /collection (physical + NFT). Admin Firestore read; uid only from verified bearer.",
+    "auth": "Firebase bearer token required. Never accepts a client uid.",
+    "params": {
+      "query": "None. Owner is decoded.uid from the Authorization bearer."
+    },
+    "dependencies": {
+      "env": [
+        "FIREBASE_*"
+      ],
+      "services": [
+        "Firebase Admin"
+      ]
+    },
+    "family": "other"
   },
   {
     "path": "/api/marketplace-portfolio",
@@ -1408,6 +1594,34 @@
     "family": "search"
   },
   {
+    "path": "/api/marketplace-recents",
+    "file": "marketplace-recents.js",
+    "methods": [
+      "GET",
+      "PUT",
+      "POST",
+      "OPTIONS"
+    ],
+    "purpose": "Signed-in recently seen public card ids. Writer is nezopt 15T. Tile JSON is not stored.",
+    "auth": "Firebase bearer token required.",
+    "params": {
+      "body": "`cardIds` array (PUT/POST), optional `cardId` prepended. Max 24 unique public ids."
+    },
+    "dependencies": {
+      "env": [
+        "MARKETPLACE_DATABASE_URL",
+        "MARKETPLACE_WRITER_DATABASE_URL",
+        "FIREBASE_*"
+      ],
+      "services": [
+        "nezopt 15T writer",
+        "Pi replica reads",
+        "Firebase Admin"
+      ]
+    },
+    "family": "commerce"
+  },
+  {
     "path": "/api/marketplace-watchlist",
     "file": "marketplace-watchlist.js",
     "methods": [
@@ -1429,6 +1643,30 @@
       ]
     },
     "family": "commerce"
+  },
+  {
+    "path": "/api/money-request",
+    "file": "money-request.js",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "purpose": "Create and manage canonical PKN money requests, their chat events, ledger transfers, and notifications.",
+    "auth": "Required Firebase bearer token; request participants and state transitions are enforced server-side.",
+    "params": {
+      "query": "`action=list|notifications` for GET; POST actions include `create`, `pay`, `decline`, `cancel`, and `read-notifications`.",
+      "body": "Creation accepts recipient username, amount, optional note/client token; mutations accept a request ID."
+    },
+    "dependencies": {
+      "env": [
+        "FIREBASE_*"
+      ],
+      "services": [
+        "Firebase Admin",
+        "Firestore"
+      ]
+    },
+    "family": "other"
   },
   {
     "path": "/api/pokoin-assistant",
@@ -1589,17 +1827,18 @@
     "methods": [
       "POST"
     ],
-    "purpose": "Start email/password signup by storing pending signup data and sending verification mail.",
+    "purpose": "Start email/password signup by storing pending signup data and sending verification mail, or resend a pending verification (resend: true) with per-email rate limiting.",
     "auth": "Public.",
     "params": {
-      "body": "`email`, password fields, and optional requested username/profile fields."
+      "body": "`email`, `password`, optional `username` and `redirectPath`; or `resend: true` with `email` only."
     },
     "dependencies": {
       "env": [
         "FIREBASE_*",
         "RESEND_API_KEY",
         "PUBLIC_SITE_URL",
-        "PENDING_SIGNUP_SECRET"
+        "SIGNUP_ENCRYPTION_SECRET",
+        "POKOIN_REQUIRE_VERIFIED_PASSWORD"
       ],
       "services": [
         "Firebase Admin",
@@ -1657,6 +1896,132 @@
       ]
     },
     "family": "other"
+  },
+  {
+    "path": "/api/scan-batch",
+    "file": "scan-batch.js",
+    "methods": [
+      "GET",
+      "POST",
+      "OPTIONS"
+    ],
+    "purpose": "Scan Connect staged batch: snapshot, Batch Defaults, row edits (duplicate, merge undo), idempotent submit to marketplace_user_listings.",
+    "auth": "Required Firebase bearer token; rows are scoped to the seller uid.",
+    "params": {
+      "query": "`batchId`; `list=open`; `action=image&itemId=` returns the scan JPEG.",
+      "body": "`action` = defaults | item | add | remove | restore | duplicate | unmerge | submit | discard (pokoin-web docs/SCAN_LISTING_WORKFLOW.md)."
+    },
+    "dependencies": {
+      "env": [
+        "MARKETPLACE_WRITER_DATABASE_URL",
+        "MARKETPLACE_DATABASE_URL",
+        "FIREBASE_*"
+      ],
+      "services": [
+        "Oracle/Postgres marketplace writer",
+        "Firebase Admin"
+      ]
+    },
+    "family": "scan"
+  },
+  {
+    "path": "/api/scan-pair",
+    "file": "scan-pair.js",
+    "methods": [
+      "POST",
+      "OPTIONS"
+    ],
+    "purpose": "Phone claims a 4-digit Scan Connect pairing code or QR secret and receives a session-scoped phone token.",
+    "auth": "Public. Postgres-backed per-IP and global failure limits; identical error for wrong, expired and used codes.",
+    "params": {
+      "body": "`pin` (4 digits) or `qr`, optional `device` label."
+    },
+    "dependencies": {
+      "env": [
+        "MARKETPLACE_WRITER_DATABASE_URL",
+        "MARKETPLACE_DATABASE_URL"
+      ],
+      "services": [
+        "Oracle/Postgres marketplace writer"
+      ]
+    },
+    "family": "scan"
+  },
+  {
+    "path": "/api/scan-phone",
+    "file": "scan-phone.js",
+    "methods": [
+      "POST",
+      "OPTIONS"
+    ],
+    "purpose": "Paired phone heartbeat, idempotent scan events (scanEventId), and leave.",
+    "auth": "`Authorization: Scan <phoneToken>` from /api/scan-pair. No Firebase.",
+    "params": {
+      "query": "`action` = heartbeat | scan | leave.",
+      "body": "scan: `scanEventId`, `clientSequence`, `capturedAt`, `clockOffsetMs`, `recognition.hits`, optional `image` (base64 JPEG ≤ 45 KB), `timings`."
+    },
+    "dependencies": {
+      "env": [
+        "MARKETPLACE_WRITER_DATABASE_URL",
+        "MARKETPLACE_DATABASE_URL"
+      ],
+      "services": [
+        "Oracle/Postgres marketplace writer"
+      ]
+    },
+    "family": "scan"
+  },
+  {
+    "path": "/api/scan-session",
+    "file": "scan-session.js",
+    "methods": [
+      "GET",
+      "POST",
+      "OPTIONS"
+    ],
+    "purpose": "Desktop Scan Session: start/resume with pairing code, regenerate code, disconnect phone, pause, end.",
+    "auth": "Required Firebase bearer token.",
+    "params": {
+      "query": "`sessionId` (GET), `action` = start | pairing | disconnect | pause | end (POST).",
+      "body": "`batchId`, `sessionId`, `paused`, `reason`."
+    },
+    "dependencies": {
+      "env": [
+        "MARKETPLACE_WRITER_DATABASE_URL",
+        "MARKETPLACE_DATABASE_URL",
+        "FIREBASE_*"
+      ],
+      "services": [
+        "Oracle/Postgres marketplace writer",
+        "Firebase Admin"
+      ]
+    },
+    "family": "scan"
+  },
+  {
+    "path": "/api/scan-stream",
+    "file": "scan-stream.js",
+    "methods": [
+      "GET",
+      "OPTIONS"
+    ],
+    "purpose": "Server-sent change stream for one Scan Batch (rows, defaults, session) with cursor replay; closes after 55 s.",
+    "auth": "Required Firebase bearer token.",
+    "params": {
+      "query": "`batchId`, `after` cursor."
+    },
+    "dependencies": {
+      "env": [
+        "MARKETPLACE_WRITER_DATABASE_URL",
+        "MARKETPLACE_DATABASE_URL",
+        "FIREBASE_*"
+      ],
+      "services": [
+        "Oracle/Postgres marketplace writer",
+        "Firebase Admin"
+      ]
+    },
+    "family": "scan"
   },
   {
     "path": "/api/search-recipient-emails",
@@ -1932,16 +2297,17 @@
     "methods": [
       "POST"
     ],
-    "purpose": "Verify a pending email signup token, create/claim the Firebase user, and send welcome/notification emails.",
+    "purpose": "Idempotently finalize a verified email signup into an ACTIVE Pokoin account (Firebase user, pok_email_verified claim, username claim, balances) and return a sign-in custom token.",
     "auth": "Public token verification.",
     "params": {
-      "body": "Signup verification token and matching email/password verification fields."
+      "body": "Signup verification `token`."
     },
     "dependencies": {
       "env": [
         "FIREBASE_*",
         "RESEND_API_KEY",
-        "PENDING_SIGNUP_SECRET"
+        "SIGNUP_ENCRYPTION_SECRET",
+        "POKOIN_REQUIRE_VERIFIED_PASSWORD"
       ],
       "services": [
         "Firebase Admin",

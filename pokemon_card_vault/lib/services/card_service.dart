@@ -22,16 +22,13 @@ const String _competitiveApiBaseUrl = String.fromEnvironment(
     defaultValue: 'https://api.pokoin.com');
 const int _marketplaceArtistSnapshotLimit = 300;
 
-/// Resolve `/api/...` against the browser origin on web, else api.pokoin.com.
+/// Resolve marketplace API requests against Pokoin's production API by
+/// default. A dart-define keeps local/staging environments configurable:
+/// `--dart-define=MARKETPLACE_API_BASE_URL=https://...`.
 Uri _marketplaceApiUri(String path, {Map<String, String>? queryParameters}) {
   final normalized = path.startsWith('/') ? path : '/$path';
-  final base = Uri.base;
-  final Uri resolved;
-  if (kIsWeb && base.hasScheme && base.host.isNotEmpty) {
-    resolved = base.resolve(normalized);
-  } else {
-    resolved = Uri.parse('$_marketplaceApiBaseUrl$normalized');
-  }
+  final baseUrl = _marketplaceApiBaseUrl.replaceFirst(RegExp(r'/$'), '');
+  final resolved = Uri.parse('$baseUrl$normalized');
   if (queryParameters == null || queryParameters.isEmpty) {
     return resolved;
   }
@@ -997,6 +994,11 @@ class SearchCandidateLabel {
     this.setName = '',
     this.number = '',
     this.trainerName = '',
+    this.ctId = '',
+    this.imageUrl = '',
+    this.previewImageUrl = '',
+    this.homepageImageUrl = '',
+    this.expansionSymbolUrl = '',
   });
 
   factory SearchCandidateLabel.fromJson(Map<String, dynamic> json) {
@@ -1010,6 +1012,13 @@ class SearchCandidateLabel {
       number: '${json['number'] ?? json['card_number'] ?? ''}'.trim(),
       trainerName:
           '${json['trainerName'] ?? json['trainer_name'] ?? ''}'.trim(),
+      ctId: '${json['ctId'] ?? json['ct_id'] ?? ''}'.trim(),
+      imageUrl: '${json['imageUrl'] ?? json['image_url'] ?? ''}'.trim(),
+      previewImageUrl:
+          '${json['previewImageUrl'] ?? json['preview_image_url'] ?? ''}'.trim(),
+      homepageImageUrl: '${json['homepageImageUrl'] ?? json['homepage_image_url'] ?? ''}'.trim(),
+      expansionSymbolUrl:
+          '${json['expansionSymbolUrl'] ?? json['expansion_symbol_url'] ?? ''}'.trim(),
     );
   }
 
@@ -1020,6 +1029,11 @@ class SearchCandidateLabel {
   final String setName;
   final String number;
   final String trainerName;
+  final String ctId;
+  final String imageUrl;
+  final String previewImageUrl;
+  final String homepageImageUrl;
+  final String expansionSymbolUrl;
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -1029,6 +1043,12 @@ class SearchCandidateLabel {
         if (setName.isNotEmpty) 'set_name': setName,
         if (number.isNotEmpty) 'card_number': number,
         if (trainerName.isNotEmpty) 'trainer_name': trainerName,
+        if (ctId.isNotEmpty) 'ct_id': ctId,
+        if (imageUrl.isNotEmpty) 'image_url': imageUrl,
+        if (previewImageUrl.isNotEmpty) 'preview_image_url': previewImageUrl,
+        if (homepageImageUrl.isNotEmpty) 'homepage_image_url': homepageImageUrl,
+        if (expansionSymbolUrl.isNotEmpty)
+          'expansion_symbol_url': expansionSymbolUrl,
       };
 }
 
@@ -1793,35 +1813,7 @@ class CardService {
   MarketplaceHomeSnapshot _homeSnapshotFromMap(Map<String, dynamic> data) {
     final cards = (data['cards'] as List<dynamic>? ?? const [])
         .whereType<Map>()
-        .map((row) {
-          final map = Map<String, dynamic>.from(row);
-          final id = '${map['id'] ?? map['card_id'] ?? ''}'.trim();
-          final ctId = '${map['ct_id'] ?? map['ctId'] ?? ''}'.trim();
-          map['imageUrl'] = _normalizeImageUrl(
-            map['imageUrl'] ?? map['image_url'],
-            cardId: id,
-            ctId: ctId,
-          );
-          map['previewImageUrl'] = _normalizeImageUrl(
-            map['previewImageUrl'] ??
-                map['preview_image_url'] ??
-                map['imageUrl'] ??
-                map['image_url'],
-            cardId: id,
-            ctId: ctId,
-          );
-          map['homepageImageUrl'] = _normalizeImageUrl(
-            map['homepageImageUrl'] ??
-                map['homepage_image_url'] ??
-                map['previewImageUrl'] ??
-                map['preview_image_url'] ??
-                map['imageUrl'] ??
-                map['image_url'],
-            cardId: id,
-            ctId: ctId,
-          );
-          return PokemonCard.fromJson(map);
-        })
+        .map((row) => _pokemonCardFromApiMap(Map<String, dynamic>.from(row)))
         .toList();
     final sectionData =
         Map<String, dynamic>.from(data['sections'] as Map? ?? {});
@@ -1832,8 +1824,42 @@ class CardService {
         bestSellerIds: _stringList(sectionData['bestSellerIds']),
         featuredIds: _stringList(sectionData['featuredIds']),
         newArrivalIds: _stringList(sectionData['newArrivalIds']),
+        spotlightIds: _stringList(sectionData['spotlightIds']),
+        topSoldIds: _stringList(sectionData['topSoldIds']),
       ),
     );
+  }
+
+  PokemonCard _pokemonCardFromApiMap(Map<String, dynamic> raw) {
+    final map = Map<String, dynamic>.from(raw);
+    final id = '${map['id'] ?? map['card_id'] ?? ''}'.trim();
+    final ctId = '${map['ct_id'] ?? map['ctId'] ?? ''}'.trim();
+    map['imageUrl'] = _normalizeImageUrl(
+      map['imageUrl'] ?? map['image_url'],
+      cardId: id,
+      ctId: ctId,
+    );
+    map['previewImageUrl'] = _normalizeImageUrl(
+      map['previewImageUrl'] ??
+          map['preview_image_url'] ??
+          map['imageUrl'] ??
+          map['image_url'],
+      cardId: id,
+      ctId: ctId,
+    );
+    map['homepageImageUrl'] = _normalizeImageUrl(
+      map['homepageImageUrl'] ??
+          map['homepage_image_url'] ??
+          map['tileImageUrl'] ??
+          map['tile_image_url'] ??
+          map['previewImageUrl'] ??
+          map['preview_image_url'] ??
+          map['imageUrl'] ??
+          map['image_url'],
+      cardId: id,
+      ctId: ctId,
+    );
+    return PokemonCard.fromJson(map);
   }
 
   Future<void> _saveMarketplaceHomeSnapshot(
@@ -1886,21 +1912,23 @@ class CardService {
   }
 
   Future<http.Response?> _getMarketplaceHomeResponse() async {
-    // Prefer the classic hydrate snapshot; fall back to the fast React BFF when
-    // marketplace-home times out (cache-first SQL deploy lag / DB load).
-    for (final path in const [
-      '/api/marketplace-home',
-      '/api/marketplace-home-page',
-    ]) {
+    final requests = <Uri>[
+      _marketplaceApiUri(
+        '/api/marketplace-home-page',
+        queryParameters: {'limit': '48'},
+      ),
+      _marketplaceApiUri('/api/marketplace-home'),
+    ];
+    for (final uri in requests) {
       try {
         final response = await http
-            .get(_marketplaceApiUri(path))
+            .get(uri)
             .timeout(const Duration(seconds: 12));
         if (response.statusCode < 400) {
           return response;
         }
       } catch (error) {
-        debugPrint('Marketplace home GET $path failed: $error');
+        debugPrint('Marketplace home GET $uri failed: $error');
       }
     }
     return null;
@@ -2126,7 +2154,7 @@ class CardService {
 
   Future<List<PokemonCard>> _getMarketplaceCards() async {
     try {
-      final uri = Uri.base.resolve('/api/marketplace-cards').replace(
+      final uri = _marketplaceApiUri('/api/marketplace-cards',
         queryParameters: {'limit': '$catalogPageSize'},
       );
       final response = await http.get(uri).timeout(const Duration(seconds: 8));
@@ -2812,7 +2840,7 @@ class CardService {
         if (trimmedCardId.isNotEmpty) 'cardId': trimmedCardId,
         if (trimmedPath.isNotEmpty) 'path': trimmedPath,
       };
-      final uri = Uri.base.resolve('/api/marketplace-card-url').replace(
+      final uri = _marketplaceApiUri('/api/marketplace-card-url',
             queryParameters: queryParameters,
           );
       final response = await http.get(uri).timeout(const Duration(seconds: 6));
@@ -2841,7 +2869,7 @@ class CardService {
     }
 
     try {
-      final uri = Uri.base.resolve('/api/marketplace-card-sales').replace(
+      final uri = _marketplaceApiUri('/api/marketplace-card-sales',
         queryParameters: {
           'cardId': trimmedId,
           'limit': '160',
@@ -2880,7 +2908,7 @@ class CardService {
     }
 
     try {
-      final uri = Uri.base.resolve('/api/marketplace-blueprint-price').replace(
+      final uri = _marketplaceApiUri('/api/marketplace-blueprint-price',
         queryParameters: {
           'cardId': trimmedId,
           'source': 'cardtrader',
@@ -2963,7 +2991,7 @@ class CardService {
     }
 
     try {
-      final uri = Uri.base.resolve('/api/marketplace-card-versions').replace(
+      final uri = _marketplaceApiUri('/api/marketplace-card-versions',
         queryParameters: {
           'cardId': trimmedId,
           'limit': '1',
@@ -2993,7 +3021,7 @@ class CardService {
     }
 
     try {
-      final uri = Uri.base.resolve('/api/marketplace-card-versions').replace(
+      final uri = _marketplaceApiUri('/api/marketplace-card-versions',
         queryParameters: {
           'cardSlug': normalizedSlug,
           'limit': '120',
@@ -3036,7 +3064,7 @@ class CardService {
     final cached = await _cachedCardList(cacheKey);
 
     try {
-      final uri = Uri.base.resolve('/api/marketplace-card-versions').replace(
+      final uri = _marketplaceApiUri('/api/marketplace-card-versions',
         queryParameters: {
           'sameAsCardId': trimmedId,
           'productType': 'card',
@@ -3151,7 +3179,7 @@ class CardService {
     String? slug,
   }) async {
     try {
-      final uri = Uri.base.resolve('/api/marketplace-expansions').replace(
+      final uri = _marketplaceApiUri('/api/marketplace-expansions',
         queryParameters: {
           if (slug?.trim().isNotEmpty == true) 'slug': slug!.trim(),
           'limit': '1000',
@@ -3184,7 +3212,7 @@ class CardService {
     String slug,
   ) async {
     try {
-      final uri = Uri.base.resolve('/api/marketplace-expansions').replace(
+      final uri = _marketplaceApiUri('/api/marketplace-expansions',
         queryParameters: {
           'slug': slug.trim(),
           'includeCards': '1',
@@ -3225,7 +3253,7 @@ class CardService {
     final cacheKey = 'artist:$normalizedSlug:$limit';
     final cached = await _cachedCardList(cacheKey);
     try {
-      final uri = Uri.base.resolve('/api/marketplace-artist-cards').replace(
+      final uri = _marketplaceApiUri('/api/marketplace-artist-cards',
         queryParameters: {
           'artistSlug': normalizedSlug,
           'limit': '$limit',
@@ -3293,7 +3321,7 @@ class CardService {
 
   Future<List<MarketplaceArtistSummary>> getMarketplaceArtistSummaries() async {
     try {
-      final uri = Uri.base.resolve('/api/marketplace-artist-cards').replace(
+      final uri = _marketplaceApiUri('/api/marketplace-artist-cards',
         queryParameters: {
           'summaries': '1',
           'limit': '1000',
@@ -3350,7 +3378,7 @@ class CardService {
       ).replace(queryParameters: queryParameters);
       final response = await _getCompetitiveSnapshotResponse(
         directUri,
-        Uri.base.resolve('/api/marketplace-competitive').replace(
+        _marketplaceApiUri('/api/marketplace-competitive',
               queryParameters: queryParameters,
             ),
       );
@@ -3388,7 +3416,7 @@ class CardService {
     final cached = await _cachedCardList(cacheKey);
 
     try {
-      final uri = Uri.base.resolve('/api/marketplace-card-versions').replace(
+      final uri = _marketplaceApiUri('/api/marketplace-card-versions',
         queryParameters: {
           'expansionName': normalizedExpansion,
           'productType': 'card',
@@ -3709,14 +3737,25 @@ class CardService {
       return _dedupeCards(results).take(pageSize).toList();
     }
 
-    final rows = await _searchMarketplaceCandidateRows(
+    final rows = await _searchMarketplaceCardRows(
       normalizedQuery,
       limit: pageSize,
       offset: offset < 0 ? 0 : offset,
       searchLanguage: queryLanguage,
       searchSessionId: searchSessionId,
     );
-    return _dedupeCards(rows).take(pageSize).toList();
+    if (rows.isNotEmpty) {
+      return _dedupeCards(rows).take(pageSize).toList();
+    }
+
+    final fallbackRows = await _searchMarketplaceCandidateRows(
+      normalizedQuery,
+      limit: pageSize,
+      offset: offset < 0 ? 0 : offset,
+      searchLanguage: queryLanguage,
+      searchSessionId: searchSessionId,
+    );
+    return _dedupeCards(fallbackRows).take(pageSize).toList();
   }
 
   Future<List<PokemonCard>> _searchMarketplaceCandidateRows(
@@ -3733,7 +3772,7 @@ class CardService {
       );
       final response = await http
           .post(
-            Uri.base.resolve('/api/marketplace-search-candidates'),
+            _marketplaceApiUri('/api/marketplace-search-candidates'),
             headers: {
               'content-type': 'application/json',
               ...authHeaders,
@@ -3784,7 +3823,7 @@ class CardService {
     }
 
     try {
-      final uri = Uri.base.resolve('/api/deck-card-version-lookup').replace(
+      final uri = _marketplaceApiUri('/api/deck-card-version-lookup',
         queryParameters: {
           if (normalizedName.isNotEmpty) 'name': normalizedName,
           if (normalizedSetCode.isNotEmpty) 'setCode': normalizedSetCode,
@@ -3877,9 +3916,10 @@ class CardService {
       if (_tcgdexLanguage(searchLanguage) != 'en') {
         queryParameters['search_language'] = _tcgdexLanguage(searchLanguage);
       }
-      final uri = Uri.base.resolve('/api/marketplace-cards').replace(
-            queryParameters: queryParameters,
-          );
+      final uri = _marketplaceApiUri(
+        '/api/marketplace-cards',
+        queryParameters: queryParameters,
+      );
       final response = await http.get(uri).timeout(const Duration(seconds: 4));
       if (response.statusCode >= 400) {
         return const [];
@@ -3902,7 +3942,7 @@ class CardService {
     String window = '24h',
   }) async {
     try {
-      final uri = Uri.base.resolve('/api/marketplace-hot-blueprints').replace(
+      final uri = _marketplaceApiUri('/api/marketplace-hot-blueprints',
         queryParameters: {
           'window': window,
           'limit': '$limit',
@@ -4008,7 +4048,7 @@ class CardService {
         final normalizedLanguage = _tcgdexLanguage(searchLanguage);
         final response = await http
             .post(
-              Uri.base.resolve('/api/marketplace-autocomplete'),
+              _marketplaceApiUri('/api/marketplace-autocomplete'),
               headers: {
                 'content-type': 'application/json',
                 ...authHeaders,
@@ -4171,7 +4211,7 @@ class CardService {
       });
       final response = await http
           .post(
-            Uri.base.resolve('/api/searchbar-token-predict'),
+            _marketplaceApiUri('/api/searchbar-token-predict'),
             headers: const {'content-type': 'application/json'},
             body: jsonEncode({
               'query': normalizedQuery,
@@ -4232,7 +4272,8 @@ class CardService {
         'limit': cleanLimit,
         'language': normalizedLanguage,
       });
-      final uri = Uri.base.resolve('/api/searchbar-token-predict').replace(
+      final uri = _marketplaceApiUri(
+        '/api/searchbar-token-predict',
         queryParameters: {
           'warmup': '1',
           'limit': '$cleanLimit',
@@ -4673,13 +4714,17 @@ class CardService {
   Future<List<PokemonCard>> _searchMarketplaceCardRows(
     String normalizedQuery, {
     required int limit,
+    int offset = 0,
     String? productType,
     bool productSearchOnly = false,
     String searchLanguage = 'en',
     String? searchSessionId,
   }) async {
     try {
-      final queryParameters = <String, String>{'limit': '$limit'};
+      final queryParameters = <String, String>{
+        'limit': '$limit',
+        if (offset > 0) 'offset': '$offset',
+      };
       final normalizedProductType = productType?.trim();
       if (normalizedProductType != null && normalizedProductType.isNotEmpty) {
         queryParameters['productType'] = normalizedProductType;
@@ -4687,7 +4732,7 @@ class CardService {
         queryParameters['productSearchOnly'] = '1';
       }
       if (normalizedQuery.isNotEmpty) {
-        queryParameters['query'] = normalizedQuery;
+        queryParameters['q'] = normalizedQuery;
       }
       if (_tcgdexLanguage(searchLanguage) != 'en') {
         queryParameters['search_language'] = _tcgdexLanguage(searchLanguage);
@@ -4695,19 +4740,26 @@ class CardService {
       if (searchSessionId?.trim().isNotEmpty == true) {
         queryParameters['search_session_id'] = searchSessionId!.trim();
       }
-      final uri = Uri.base.resolve('/api/marketplace-cards').replace(
-            queryParameters: queryParameters,
-          );
+      final uri = _marketplaceApiUri(
+        '/api/marketplace-search-page',
+        queryParameters: queryParameters,
+      );
       final response = await http.get(uri).timeout(const Duration(seconds: 6));
 
       if (response.statusCode >= 400) {
         return const [];
       }
 
-      final rows = jsonDecode(response.body) as List<dynamic>;
+      final decoded = jsonDecode(response.body);
+      final rows = decoded is Map
+          ? (decoded['cards'] as List<dynamic>? ?? const [])
+          : decoded is List
+              ? decoded
+              : const <dynamic>[];
       final cards = rows
           .whereType<Map>()
-          .map((row) => _cardFromMarketplaceRow(Map<String, dynamic>.from(row)))
+          .map((row) =>
+              _pokemonCardFromApiMap(Map<String, dynamic>.from(row)))
           .toList();
       return _dedupeCards(cards).take(limit).toList();
     } catch (error) {
@@ -4744,9 +4796,10 @@ class CardService {
       if (searchSessionId?.trim().isNotEmpty == true) {
         queryParameters['search_session_id'] = searchSessionId!.trim();
       }
-      final uri = Uri.base.resolve('/api/marketplace-card-versions').replace(
-            queryParameters: queryParameters,
-          );
+      final uri = _marketplaceApiUri(
+        '/api/marketplace-card-versions',
+        queryParameters: queryParameters,
+      );
       final response = await http.get(uri).timeout(const Duration(seconds: 6));
 
       if (response.statusCode >= 400) {
@@ -4783,7 +4836,7 @@ class CardService {
       );
       await http
           .post(
-            Uri.base.resolve('/api/marketplace-event'),
+            _marketplaceApiUri('/api/marketplace-event'),
             headers: {
               'content-type': 'application/json',
               ...authHeaders,
@@ -4812,7 +4865,7 @@ class CardService {
     try {
       await http
           .post(
-            Uri.base.resolve('/api/searchbar-cancel'),
+            _marketplaceApiUri('/api/searchbar-cancel'),
             headers: {'content-type': 'application/json'},
             body: jsonEncode(_searchCancelPayload(
               sessionId: sessionId,
@@ -6103,12 +6156,16 @@ class MarketplaceHomeSections {
     required this.bestSellerIds,
     required this.featuredIds,
     this.newArrivalIds = const [],
+    this.spotlightIds = const [],
+    this.topSoldIds = const [],
   });
 
   final List<String> recentlySeenIds;
   final List<String> bestSellerIds;
   final List<String> featuredIds;
   final List<String> newArrivalIds;
+  final List<String> spotlightIds;
+  final List<String> topSoldIds;
 
   Map<String, dynamic> toJson() {
     return {
@@ -6116,6 +6173,8 @@ class MarketplaceHomeSections {
       'bestSellerIds': bestSellerIds,
       'featuredIds': featuredIds,
       'newArrivalIds': newArrivalIds,
+      'spotlightIds': spotlightIds,
+      'topSoldIds': topSoldIds,
     };
   }
 }

@@ -39,9 +39,10 @@ This document is generated from \`server/api-route-manifest.js\` so the route
 list stays tied to the standalone server configuration.
 
 **Canonical React/JS contract:** \`docs/react-api-architecture.md\` and live
-\`GET /api/__contract\`. Production host is \`pokoin-marketplace\` (\`130.61.251.250\`),
-Docker \`pokoin-oracle-api\`, Caddy \`https://api.pokoin.com\`. The old Always Free
-peer3 (\`141.147.62.244\`) is dead — do not deploy there.
+\`GET /api/__contract\`. The public API runs as Docker \`pokoin-oracle-api\` on
+**pi-home**, exposed by the Cloudflare tunnel as \`https://api.pokoin.com\`.
+Oracle \`pokoin-marketplace\` (\`130.61.251.250\`) is the CardTrader dump/Postgres
+writer only. The old Always Free peer3 (\`141.147.62.244\`) is dead — do not deploy there.
 
 ## Architecture
 
@@ -57,9 +58,10 @@ peer3 (\`141.147.62.244\`) is dead — do not deploy there.
 
 ## Host Discovery
 
-Live API VM is **pokoin-marketplace** (\`130.61.251.250\`), SSH host
-\`pokoin-marketplace\`. Bind-mount: \`/home/ubuntu/pokoin-oracle-api/current\`.
-Do not use \`deploy-oracle-api-peer3.sh\` against dead \`141.147.62.244\`.
+Live API host is **pi-home**. Bind-mount: \`/srv/pokoin/api/current\`.
+The API reads the local Postgres streaming replica at \`127.0.0.1:5432\`; never
+run dump imports or migrations there. Use \`pokoin-marketplace\` only for writer
+operations. Do not use \`deploy-oracle-api-peer3.sh\` against dead \`141.147.62.244\`.
 
 ## Running Locally
 
@@ -109,9 +111,9 @@ landing page. \`https://api.pokoin.com/marketplace-suggest\` (no \`/api\`) 404s.
 
 ## Production Deployment Commands
 
-Live API is Docker \`pokoin-oracle-api\` on **pokoin-marketplace**
-(\`130.61.251.250\`), Caddy TLS on \`api.pokoin.com\`. \`pokoin.com\` is Vercel;
-every \`/api/*\` request rewrites here.
+Live API is Docker \`pokoin-oracle-api\` on **pi-home**, exposed through the
+Cloudflare tunnel as \`api.pokoin.com\`. \`pokoin.com\` is Vercel; every
+\`/api/*\` request rewrites here.
 
 Before switching production, verify the backend directly:
 
@@ -139,8 +141,9 @@ curl -fsS https://pokoin.com/api/healthz
 curl -fsS https://pokoin.com/api/__routes
 \`\`\`
 
-DNS target: \`api.pokoin.com\` → \`130.61.251.250\` (pokoin-marketplace Caddy).
-Do **not** point DNS or deploys at dead peer3 \`141.147.62.244\`.
+Cloudflare tunnel target: \`api.pokoin.com\` → \`pi-home\` →
+\`pokoin-oracle-api:18080\`. Do **not** point DNS or deploys at Oracle or dead
+peer3 \`141.147.62.244\`.
 \`pokoin.com\` should point at Vercel for the frontend.
 
 Backend landing page:
@@ -154,23 +157,21 @@ Ship handler/server files into the existing bind-mount, then restart the
 running container (do not \`docker rm\` / recreate; do not \`npm run peer3:deploy\`):
 
 \`\`\`bash
-rsync -av api/*.js server/*.js \\
-  pokoin-marketplace:/home/ubuntu/pokoin-oracle-api/current/
-ssh pokoin-marketplace 'docker restart pokoin-oracle-api'
+rsync -av api/*.js server/*.js pi-home:/srv/pokoin/api/current/
+ssh pi-home 'docker restart pokoin-oracle-api'
 \`\`\`
 
-If \`api.pokoin.com\` is reachable at DNS but HTTP/S times out, check Caddy on
-**pokoin-marketplace** before deploying production:
+If \`api.pokoin.com\` resolves but HTTP/S times out, check the Cloudflare tunnel
+and the API container on **pi-home** before deploying production:
 
 \`\`\`bash
 sudo ss -ltnp | grep -E ':(80|443|18080)\\\\b'
-sudo systemctl status caddy --no-pager
+sudo systemctl status cloudflared --no-pager
 curl -fsS http://127.0.0.1:18080/healthz
 \`\`\`
 
-OCI ingress must allow public TCP \`80\` and \`443\` to the VM. The API
-container should stay bound to \`127.0.0.1:18080\` behind Caddy; avoid exposing
-the internal API port publicly unless it is an intentional temporary diagnostic.
+The API container should stay bound to \`127.0.0.1:18080\` behind the tunnel;
+avoid exposing the internal API port publicly.
 
 The rsync deliberately does not copy \`.env.local\`; production env stays in the
 existing Docker env-file on the host.

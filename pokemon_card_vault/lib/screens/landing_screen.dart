@@ -623,12 +623,10 @@ class _AccessCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 10),
-              Expanded(
-                child: Text(
-                  body,
-                  style:
-                      const TextStyle(color: Color(0xFFB8C4E6), height: 1.45),
-                ),
+              Text(
+                body,
+                style:
+                    const TextStyle(color: Color(0xFFB8C4E6), height: 1.45),
               ),
               const SizedBox(height: 14),
               Row(
@@ -758,7 +756,7 @@ class _MarketplacePanel extends StatelessWidget {
               _RouteButton(
                   label: 'Marketplace signal', path: '/marketplace/signal'),
               _RouteButton(label: 'Wallet', path: '/wallet'),
-              _RouteButton(label: 'Pokoin Scan', path: '/scan'),
+              _RouteButton(label: 'Network explorer', path: '/scan'),
             ],
           ),
           SizedBox(height: 20),

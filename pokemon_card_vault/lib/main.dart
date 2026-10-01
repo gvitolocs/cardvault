@@ -367,7 +367,7 @@ class _PokoinAppState extends ConsumerState<PokoinApp> {
     _attachRouterDebugListener(router);
     _recordCurrentRouterDebugSnapshot(router, reason: 'build');
     return MaterialApp.router(
-      title: 'Pokoin Official - PKN Card Reserve Marketplace, Wallet and Scan',
+      title: 'Pokoin app - PKN Card Reserve Marketplace, Wallet and Network',
       scaffoldMessengerKey: _scaffoldMessengerKey,
       debugShowCheckedModeBanner: false,
       scrollBehavior: const _WebScrollBehavior(),

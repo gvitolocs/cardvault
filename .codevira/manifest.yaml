@@ -1,10 +1,14 @@
 schema_version: 1
-generated_at: '2026-09-16T11:11:25.882200+00:00'
-total_decisions: 31
-active_decisions: 24
+generated_at: '2026-09-24T20:20:10.213090+00:00'
+total_decisions: 36
+active_decisions: 29
 tags:
   api:
   - D00000C
+  api-contract:
+  - D00000W
+  architecture:
+  - D00000Y
   backup:
   - D000009
   card-url:
@@ -30,15 +34,21 @@ tags:
   - D00000Q
   - D00000R
   - D00000S
+  components:
+  - D000010
   deskew:
   - D00000S
   do-not-revert:
   - D00000O
   - D00000U
+  documentation:
+  - D00000W
   dp:
   - D00000N
   errors:
   - D00000V
+  feature-flags:
+  - D000010
   flareon:
   - D000002
   - D000003
@@ -47,13 +57,19 @@ tags:
   gold:
   - D00000P
   - D00000R
+  guidelines:
+  - D00000W
   hermes:
   - D000002
   honcho:
   - D000001
   - D00000B
+  invariant:
+  - D00000Z
   local:
   - D00000Q
+  local-first:
+  - D00000Y
   marketplace:
   - D00000B
   - D00000C
@@ -74,11 +90,15 @@ tags:
   - D000003
   nezopt:
   - D00000K
+  observability:
+  - D000010
   oracle:
   - D000006
   - D000009
   - D00000K
   - D00000U
+  outbox:
+  - D00000Y
   pi:
   - D00000T
   - D00000U
@@ -93,6 +113,11 @@ tags:
   - D00000T
   - D00000U
   - D00000V
+  - D00000W
+  - D00000X
+  - D00000Y
+  - D00000Z
+  - D000010
   postgres:
   - D000009
   - D00000K
@@ -101,14 +126,20 @@ tags:
   - D00000M
   pricing:
   - D00000O
+  product:
+  - D00000X
   production:
   - D00000T
+  progressive-disclosure:
+  - D00000X
   qwen:
   - D00000J
   r2:
   - D00000E
   react:
   - D00000C
+  reconciliation:
+  - D00000Z
   sanitize:
   - D00000E
   - D00000F
@@ -119,6 +150,8 @@ tags:
   - D00000P
   - D00000R
   - D00000S
+  scanner:
+  - D00000X
   search:
   - D00000T
   secrets:
@@ -128,14 +161,25 @@ tags:
   - D00000K
   security:
   - D000006
+  - D00000W
+  shadow-mode:
+  - D000010
   sold:
   - D00000M
+  state-management:
+  - D00000Y
   strangler:
   - D00000C
+  sync:
+  - D00000Z
   topology:
   - D00000U
+  transactions:
+  - D00000Z
   uptime:
   - D00000V
+  ux:
+  - D00000X
 files:
   .env.honcho.local:
   - D000001
@@ -198,3 +242,8 @@ do_not_revert_ids:
 - D00000T
 - D00000U
 - D00000V
+- D00000W
+- D00000X
+- D00000Y
+- D00000Z
+- D000010

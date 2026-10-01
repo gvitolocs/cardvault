@@ -5,7 +5,7 @@
  * Served at GET /api/__contract. Keep in sync with docs/react-api-architecture.md.
  */
 const CLIENT_CONTRACT = {
-  "version": "2026-09-05.6",
+  "version": "2026-09-22.1",
   "title": "Pokoin marketplace client contract for React / Flutter / JS",
   "hosts": {
     "api": "https://api.pokoin.com",
@@ -87,7 +87,7 @@ const CLIENT_CONTRACT = {
   },
   "search": {
     "engine": "meili",
-    "host": "127.0.0.1:7700 on pokoin-marketplace only",
+    "host": "127.0.0.1:7700 on pi-home next to the public API",
     "indexes": [
       "marketplace_cards",
       "marketplace_name_tokens"

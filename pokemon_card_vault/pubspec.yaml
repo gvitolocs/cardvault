@@ -96,31 +96,8 @@ flutter:
     - assets/icons/
     - assets/animations/
     - assets/sounds/
-    - assets/models/card_detector.tflite
-    - assets/models/milo.onnx
-    - assets/models/milo_fp16.onnx
-    - assets/models/milo_cnn.onnx
-    - assets/milo_index/western/embeddings.bin
-    - assets/milo_index/western/metadata.jsonl
-    - assets/milo_index/western/manifest.json
-    - assets/milo_index/japanese/embeddings.bin
-    - assets/milo_index/japanese/metadata.jsonl
-    - assets/milo_index/japanese/manifest.json
-    - assets/milo_index/chinese/embeddings.bin
-    - assets/milo_index/chinese/metadata.jsonl
-    - assets/milo_index/chinese/manifest.json
-    - assets/milo_cnn_index/western/embeddings.bin
-    - assets/milo_cnn_index/western/metadata.jsonl
-    - assets/milo_cnn_index/western/manifest.json
-    - assets/milo_cnn_index/japanese/embeddings.bin
-    - assets/milo_cnn_index/japanese/metadata.jsonl
-    - assets/milo_cnn_index/japanese/manifest.json
-    - assets/milo_cnn_index/chinese/embeddings.bin
-    - assets/milo_cnn_index/chinese/metadata.jsonl
-    - assets/milo_cnn_index/chinese/manifest.json
     - assets/pokoin-icon.png
     - assets/pokoin-icon-opaque.png
-    - assets/pokoin_tcg_ids.json
   
   # fonts:
   #   - family: Pokemon

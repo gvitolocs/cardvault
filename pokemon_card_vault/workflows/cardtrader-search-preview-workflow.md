@@ -5,6 +5,26 @@ search, Oracle marketplace schema, or CDN preview thumbnails.
 
 ## Goal
 
+### Flutter fixes verified locally on 2026-09-29
+
+- Candidate labels preserve optional artwork for the first 20 ranked entries.
+  Flutter renders those URLs while full rows are pending, and an imaged
+  duplicate replaces an image-less row without changing backend order. See
+  `docs/marketplace-card-image-pipeline.md` for the data fields and tests.
+- On `/marketplace/search` below 880 logical pixels wide, the filter panel
+  starts collapsed behind a `Filters` button. Clicking it reveals products,
+  expansions, rarity, applied filters, and the existing clear action. Clicking
+  again closes it, retaining selections. The button displays the number of
+  active product/expansion/rarity selections. Wider layouts keep the sidebar.
+- The toggle is implemented by `_filtersExpanded`, `AnimatedSize`, and
+  `_SearchFiltersToggle` in `lib/screens/home_screen.dart`. Local Flutter web
+  reload and browser inspection confirmed the closed results view and the
+  expanded filter panel.
+- Searching for `Reshiram & Zekrom-GX` exposed Cosmic Eclipse with three facet
+  matches, but broad fallback results also appeared. This is not evidence
+  that the public-number detail error (`226324`) has been fixed. Do not mark
+  the exact card-market route as verified based only on a facet count.
+
 The marketplace search should behave like CardTrader:
 
 - Typing in `/marketplace` starts debounced remote autocomplete after 1

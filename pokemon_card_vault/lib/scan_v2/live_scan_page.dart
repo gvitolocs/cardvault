@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
@@ -50,7 +49,6 @@ class _CameraScanPageState extends State<CameraScanPage>
   bool _sendingFrame = false;
   bool _detecting = false;
   bool _identifying = false;
-  bool _identifyBusy = false;
   bool _opening = false;
   bool _handedOffToBrowser = false;
   bool _engineReady = false;
@@ -73,7 +71,6 @@ class _CameraScanPageState extends State<CameraScanPage>
   Uint8List? _lastJpeg;
   bool _torchOn = false;
   ScanBox? _lockedBox;
-  double _lockedScore = 0;
   ScanBox? _followBox;
   int _identifyMisses = 0;
   int _boxMisses = 0;
@@ -83,6 +80,7 @@ class _CameraScanPageState extends State<CameraScanPage>
     if (sensor != null) return sensor;
     return Platform.isAndroid ? 90 : 0;
   }
+
   _FrozenFrame? _latestFrame;
   List<ScanBox> _latestIdentifyBoxes = const [];
 
@@ -129,7 +127,6 @@ class _CameraScanPageState extends State<CameraScanPage>
       _sendingFrame = false;
       _detecting = false;
       _identifying = false;
-      _identifyBusy = false;
       if (_opening) _handedOffToBrowser = true;
       final controller = _controller;
       _controller = null;
@@ -148,7 +145,6 @@ class _CameraScanPageState extends State<CameraScanPage>
       );
       if (wasOpening) {
         _lockedBox = null;
-        _lockedScore = 0;
         _followBox = null;
         _identifyMisses = 0;
         _boxMisses = 0;
@@ -221,7 +217,8 @@ class _CameraScanPageState extends State<CameraScanPage>
     _startScan();
   }
 
-  Future<void> _initializeCamera({bool start = false, bool force = false}) async {
+  Future<void> _initializeCamera(
+      {bool start = false, bool force = false}) async {
     if (_appPaused) {
       ScanDebugLog.i('camera init skipped, app paused');
       return;
@@ -255,7 +252,8 @@ class _CameraScanPageState extends State<CameraScanPage>
       );
       // ignore: avoid_print
       print('pokoin.scan cameras pick=$pick');
-      final selectedCamera = selectBackCamera(cameras, preferredId: preferredId);
+      final selectedCamera =
+          selectBackCamera(cameras, preferredId: preferredId);
       if (selectedCamera == null) {
         throw CameraException('no_camera', 'No camera is available.');
       }
@@ -272,9 +270,11 @@ class _CameraScanPageState extends State<CameraScanPage>
         await controller.initialize();
       } catch (error) {
         if (!Platform.isAndroid || selectedCamera.name == '0') rethrow;
-        ScanDebugLog.i('camera ${selectedCamera.name} failed $error, falling back to 0');
+        ScanDebugLog.i(
+            'camera ${selectedCamera.name} failed $error, falling back to 0');
         await _disposeController(controller);
-        final fallback = selectBackCamera(cameras, preferredId: '0') ?? selectedCamera;
+        final fallback =
+            selectBackCamera(cameras, preferredId: '0') ?? selectedCamera;
         final retry = CameraController(
           fallback,
           Platform.isAndroid ? ResolutionPreset.high : ResolutionPreset.medium,
@@ -310,7 +310,8 @@ class _CameraScanPageState extends State<CameraScanPage>
         'preview=${active.value.previewSize} torch=$_torchOn',
       );
       // ignore: avoid_print
-      print('pokoin.scan camera ready ${active.description.name} preview=${active.value.previewSize}');
+      print(
+          'pokoin.scan camera ready ${active.description.name} preview=${active.value.previewSize}');
       // CameraX/Camera2 on Samsung often stays black if ImageAnalysis
       // binds before the preview surface is attached.
       await Future<void>.delayed(const Duration(milliseconds: 400));
@@ -368,6 +369,7 @@ class _CameraScanPageState extends State<CameraScanPage>
   Future<void> _setGallery(String name) async {
     final next = _gallery == name ? 'western' : name;
     if (next == _gallery || _opening) return;
+    final previous = _gallery;
     _stopScan();
     setState(() => _gallery = next);
     try {
@@ -375,7 +377,11 @@ class _CameraScanPageState extends State<CameraScanPage>
     } catch (error) {
       ScanDebugLog.i('catalog switch failed $error');
       if (!mounted) return;
-      setState(() => _error = error.toString());
+      setState(() {
+        _gallery = previous;
+        _error = error.toString();
+      });
+      _maybeStartScan();
       return;
     }
     if (!mounted) return;
@@ -411,7 +417,9 @@ class _CameraScanPageState extends State<CameraScanPage>
     final selected = _gallery == gallery;
     return IconButton.filledTonal(
       tooltip: tooltip,
-      onPressed: !_engineReady || _opening ? null : () => unawaited(_setGallery(gallery)),
+      onPressed: !_engineReady || _opening
+          ? null
+          : () => unawaited(_setGallery(gallery)),
       visualDensity: VisualDensity.compact,
       style: IconButton.styleFrom(
         backgroundColor: selected ? const Color(0xFFFACC15) : null,
@@ -433,7 +441,6 @@ class _CameraScanPageState extends State<CameraScanPage>
       _sendingFrame = false;
       _detecting = false;
       _identifying = false;
-      _identifyBusy = false;
       _error = null;
       _framesSent = 0;
       _matches.clear();
@@ -441,7 +448,6 @@ class _CameraScanPageState extends State<CameraScanPage>
       _boxes = const [];
     });
     _lockedBox = null;
-    _lockedScore = 0;
     _followBox = null;
     _identifyMisses = 0;
     _latestFrame = null;
@@ -570,8 +576,8 @@ class _CameraScanPageState extends State<CameraScanPage>
     final boxes = _latestIdentifyBoxes;
     if (frame == null || boxes.isEmpty) return;
     _identifying = true;
-    _identifyBusy = true;
-    ScanDebugLog.i('identify start ${_boxSummary(boxes.first)} backend=${ScanEngine.miloBackend}');
+    ScanDebugLog.i(
+        'identify start ${_boxSummary(boxes.first)} backend=${ScanEngine.miloBackend}');
     unawaited(_classifyIdentify(frame, List<ScanBox>.from(boxes), epoch));
   }
 
@@ -614,7 +620,6 @@ class _CameraScanPageState extends State<CameraScanPage>
       if (!mounted || epoch != _captureEpoch) return;
       setState(() => _error = error.toString());
     } finally {
-      _identifyBusy = false;
       _identifying = false;
     }
   }
@@ -634,8 +639,10 @@ class _CameraScanPageState extends State<CameraScanPage>
     _sendingFrame = true;
     final started = DateTime.now();
     try {
-      final file = await controller.takePicture().timeout(const Duration(seconds: 5));
-      if (controller.value.flashMode != (_torchOn ? FlashMode.torch : FlashMode.off)) {
+      final file =
+          await controller.takePicture().timeout(const Duration(seconds: 5));
+      if (controller.value.flashMode !=
+          (_torchOn ? FlashMode.torch : FlashMode.off)) {
         await _applyFlashMode(controller);
       }
       if (epoch != _captureEpoch) return;
@@ -675,7 +682,8 @@ class _CameraScanPageState extends State<CameraScanPage>
       imgW: result.imgW,
       imgH: result.imgH,
     );
-    final overlay = _overlayForLock(ranked, imgW: result.imgW, imgH: result.imgH);
+    final overlay =
+        _overlayForLock(ranked, imgW: result.imgW, imgH: result.imgH);
     setState(() {
       _yoloLive = true;
       _imgW = result.imgW;
@@ -711,7 +719,6 @@ class _CameraScanPageState extends State<CameraScanPage>
     );
     if (!identical(follow, _lockedBox ?? _followBox)) {
       _lockedBox = null;
-      _lockedScore = 0;
       _followBox = follow;
     }
     final picked = stickyOverlayBox(
@@ -725,7 +732,6 @@ class _CameraScanPageState extends State<CameraScanPage>
         !isYoloLockObject(picked, imgW: imgW, imgH: imgH)) {
       _followBox = null;
       _lockedBox = null;
-      _lockedScore = 0;
       return const [];
     }
     _followBox = picked;
@@ -750,7 +756,7 @@ class _CameraScanPageState extends State<CameraScanPage>
             top != null &&
             _lookup.hasLiveUrl(top, result.hits);
         stable = [
-          if (instant && top != null) top,
+          if (instant) top,
         ];
       } else {
         final canOpen = top != null &&
@@ -767,8 +773,9 @@ class _CameraScanPageState extends State<CameraScanPage>
     } else {
       stable = const [];
     }
-    final listed =
-        _mode == ScanMode.multi ? rankedSeenCards(result.cards) : const <ScanHit>[];
+    final listed = _mode == ScanMode.multi
+        ? rankedSeenCards(result.cards)
+        : const <ScanHit>[];
     final reason = _debugReason(result, stable, instant: instant);
     ScanDebugLog.i(
       'frame=${_framesSent + 1} mode=$_mode jpeg=$jpegBytes captureMs=$captureMs '
@@ -799,7 +806,6 @@ class _CameraScanPageState extends State<CameraScanPage>
           final box = boxForHit(result, top);
           if (box != null) {
             _lockedBox = box;
-            _lockedScore = top.score;
           }
         } else {
           _identifyMisses++;
@@ -807,7 +813,6 @@ class _CameraScanPageState extends State<CameraScanPage>
               top.score < 0.45 ||
               _identifyMisses >= _identifyMissesBeforeRetarget) {
             _lockedBox = null;
-            _lockedScore = 0;
             _followBox = null;
             _identifyMisses = 0;
             ScanDebugLog.i(
@@ -854,8 +859,7 @@ class _CameraScanPageState extends State<CameraScanPage>
     );
     if (w <= 0 || h <= 0) return picked;
     return [
-      for (final box in picked)
-        overlayPaintBox(box, imgW: w, imgH: h),
+      for (final box in picked) overlayPaintBox(box, imgW: w, imgH: h),
     ];
   }
 
@@ -925,9 +929,7 @@ class _CameraScanPageState extends State<CameraScanPage>
 
   String _yoloConfSummary(ScanResult result) {
     if (result.yoloConfs.isEmpty) return '-';
-    return result.yoloConfs
-        .map((c) => c.toStringAsFixed(2))
-        .join(',');
+    return result.yoloConfs.map((c) => c.toStringAsFixed(2)).join(',');
   }
 
   String _debugHits(ScanResult result) {
@@ -968,14 +970,16 @@ class _CameraScanPageState extends State<CameraScanPage>
     if (hits.isEmpty || _opening) return;
     final extras = alsoTry.isEmpty ? hits : alsoTry;
     if (liveFast && !_lookup.hasLiveUrl(hits.first, extras)) {
-      ScanDebugLog.i('open skipped unmapped ${hits.first.id} ${hits.first.name}');
+      ScanDebugLog.i(
+          'open skipped unmapped ${hits.first.id} ${hits.first.name}');
       return;
     }
     _stopScan();
     setState(() {
       _opening = true;
     });
-    ScanDebugLog.i('open ${hits.map((h) => '${h.id} ${h.name} ${h.score.toStringAsFixed(3)}').join(' | ')} vit=$confirmWithVit liveFast=$liveFast');
+    ScanDebugLog.i(
+        'open ${hits.map((h) => '${h.id} ${h.name} ${h.score.toStringAsFixed(3)}').join(' | ')} vit=$confirmWithVit liveFast=$liveFast');
     try {
       final hit = hits.first;
       String? vitBlueprintId;
@@ -1099,7 +1103,8 @@ class _CameraScanPageState extends State<CameraScanPage>
         return;
       }
       final hits = result.hits.take(1).toList();
-      final certain = hits.where((h) => h.score >= _galleryCertainScore).toList();
+      final certain =
+          hits.where((h) => h.score >= _galleryCertainScore).toList();
       final usable = certain.isNotEmpty
           ? certain
           : hits.where((h) => h.score >= _acceptScore).toList();
@@ -1159,15 +1164,16 @@ class _CameraScanPageState extends State<CameraScanPage>
                   animation: _pulse,
                   builder: (context, _) {
                     final preview = controller?.value.previewSize;
-                    final portrait =
-                        MediaQuery.orientationOf(context) == Orientation.portrait;
+                    final portrait = MediaQuery.orientationOf(context) ==
+                        Orientation.portrait;
                     final layout = preview == null
                         ? const Size(480, 640)
                         : previewLayoutSize(preview, portrait: portrait);
                     final imageSize = _imgW > 0 && _imgH > 0
                         ? Size(_imgW.toDouble(), _imgH.toDouble())
                         : layout;
-                    final boxes = _boxes.isNotEmpty ? _boxes : const <ScanBox>[];
+                    final boxes =
+                        _boxes.isNotEmpty ? _boxes : const <ScanBox>[];
                     return CustomPaint(
                       painter: LiveCardBoxesPainter(
                         boxes: boxes,
@@ -1208,7 +1214,8 @@ class _CameraScanPageState extends State<CameraScanPage>
                               horizontal: 12,
                               vertical: 8,
                             ),
-                            itemCount: _listedCards.length.clamp(0, maxMultiCards),
+                            itemCount:
+                                _listedCards.length.clamp(0, maxMultiCards),
                             separatorBuilder: (context, index) => const Divider(
                               height: 8,
                               color: Color(0x33FACC15),
@@ -1247,92 +1254,94 @@ class _CameraScanPageState extends State<CameraScanPage>
                       ),
                     ),
                   Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
-                child: Row(
-                  children: [
-                    Flexible(
-                      child: SegmentedButton<ScanMode>(
-                        showSelectedIcon: false,
-                        style: const ButtonStyle(
-                          visualDensity: VisualDensity.compact,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          padding: WidgetStatePropertyAll(
-                            EdgeInsets.symmetric(horizontal: 10),
+                    padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+                    child: Row(
+                      children: [
+                        Flexible(
+                          child: SegmentedButton<ScanMode>(
+                            showSelectedIcon: false,
+                            style: const ButtonStyle(
+                              visualDensity: VisualDensity.compact,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              padding: WidgetStatePropertyAll(
+                                EdgeInsets.symmetric(horizontal: 10),
+                              ),
+                            ),
+                            segments: const [
+                              ButtonSegment(
+                                value: ScanMode.fast,
+                                label: Text(
+                                  'Single',
+                                  maxLines: 1,
+                                  softWrap: false,
+                                ),
+                              ),
+                              ButtonSegment(
+                                value: ScanMode.multi,
+                                label: Text(
+                                  'Multi',
+                                  maxLines: 1,
+                                  softWrap: false,
+                                ),
+                              ),
+                            ],
+                            selected: {_mode},
+                            onSelectionChanged: _opening
+                                ? null
+                                : (value) {
+                                    if (value.isNotEmpty) _setMode(value.first);
+                                  },
                           ),
                         ),
-                        segments: const [
-                          ButtonSegment(
-                            value: ScanMode.fast,
-                            label: Text(
-                              'Single',
-                              maxLines: 1,
-                              softWrap: false,
+                        IconButton.filledTonal(
+                          tooltip: _torchOn ? 'Flash on' : 'Flash off',
+                          onPressed: !ready || _opening ? null : _toggleTorch,
+                          icon:
+                              Icon(_torchOn ? Icons.flash_on : Icons.flash_off),
+                        ),
+                        if (Platform.isAndroid)
+                          IconButton.filledTonal(
+                            tooltip: _gpuOwner == 'milo'
+                                ? 'GPU: identify (MobileNet CNN). Overlay on CPU. Tap restarts.'
+                                : 'GPU: overlay (YOLO) — tap restarts',
+                            onPressed:
+                                !_engineReady || _opening || _switchingAccel
+                                    ? null
+                                    : () => unawaited(_toggleGpuOwner()),
+                            visualDensity: VisualDensity.compact,
+                            style: IconButton.styleFrom(
+                              backgroundColor: const Color(0xFFFACC15),
+                            ),
+                            icon: Text(
+                              _gpuOwner == 'milo' ? 'MILO' : 'YOLO',
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
                           ),
-                          ButtonSegment(
-                            value: ScanMode.multi,
-                            label: Text(
-                              'Multi',
-                              maxLines: 1,
-                              softWrap: false,
-                            ),
-                          ),
-                        ],
-                        selected: {_mode},
-                        onSelectionChanged: _opening
-                            ? null
-                            : (value) {
-                                if (value.isNotEmpty) _setMode(value.first);
-                              },
-                      ),
-                    ),
-                    IconButton.filledTonal(
-                      tooltip: _torchOn ? 'Flash on' : 'Flash off',
-                      onPressed: !ready || _opening ? null : _toggleTorch,
-                      icon: Icon(_torchOn ? Icons.flash_on : Icons.flash_off),
-                    ),
-                    if (Platform.isAndroid)
-                      IconButton.filledTonal(
-                        tooltip: _gpuOwner == 'milo'
-                            ? 'GPU: identify (MobileNet CNN). Overlay on CPU. Tap restarts.'
-                            : 'GPU: overlay (YOLO) — tap restarts',
-                        onPressed: !_engineReady || _opening || _switchingAccel
-                            ? null
-                            : () => unawaited(_toggleGpuOwner()),
-                        visualDensity: VisualDensity.compact,
-                        style: IconButton.styleFrom(
-                          backgroundColor: const Color(0xFFFACC15),
+                        IconButton.filledTonal(
+                          tooltip: 'Gallery',
+                          onPressed: _opening ? null : _pickFromGallery,
+                          icon: const Icon(Icons.photo_library_outlined),
                         ),
-                        icon: Text(
-                          _gpuOwner == 'milo' ? 'MILO' : 'YOLO',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                          ),
+                        _galleryFlag(
+                          gallery: 'japanese',
+                          emoji: '🇯🇵',
+                          tooltip: 'Japanese catalog',
                         ),
-                      ),
-                    IconButton.filledTonal(
-                      tooltip: 'Gallery',
-                      onPressed: _opening ? null : _pickFromGallery,
-                      icon: const Icon(Icons.photo_library_outlined),
+                        _galleryFlag(
+                          gallery: 'chinese',
+                          emoji: '🇨🇳',
+                          tooltip: 'Chinese catalog',
+                        ),
+                      ],
                     ),
-                    _galleryFlag(
-                      gallery: 'japanese',
-                      emoji: '🇯🇵',
-                      tooltip: 'Japanese catalog',
-                    ),
-                    _galleryFlag(
-                      gallery: 'chinese',
-                      emoji: '🇨🇳',
-                      tooltip: 'Chinese catalog',
-                    ),
-                  ],
-                ),
                   ),
                 ],
               ),
             ),
-            ),
+          ),
           if (ready && !_yoloLive && !_showBoot)
             const Positioned(
               top: 0,
