@@ -4,6 +4,7 @@
 // Spec: pokoin-web docs/SCAN_CONNECT.md, docs/SCAN_LISTING_WORKFLOW.md.
 
 const crypto = require('crypto');
+const { printBucket } = require('./_print_bucket');
 
 const PAIRING_TTL_MS = 120_000;
 /** Abandoned waiting/desk session (pairing idle, no phone). */
@@ -28,6 +29,7 @@ const LANGUAGES = ['EN', 'IT', 'FR', 'DE', 'ES', 'JP', 'PT', 'NL', 'PL', 'RU', '
 const FINISHES = ['standard', 'holo', 'reverse', 'stamped', 'promo', 'other'];
 
 const DEFAULT_BATCH_DEFAULTS = Object.freeze({
+  game: 'pokemon',
   language: 'EN',
   condition: 'NM',
   foilState: 'standard',
@@ -35,6 +37,11 @@ const DEFAULT_BATCH_DEFAULTS = Object.freeze({
   signed: false,
   altered: false,
   location: '',
+  /** Divider stack inside the box. */
+  stack: 1,
+  /** Cards per stack (BCW-style). Size 1 hides Position on the desk. */
+  stackSize: 1,
+  /** Position inside the current stack (1..stackSize). */
   startPosition: 1,
   quantity: 1,
   mergeRepeats: true,
@@ -98,7 +105,27 @@ function clampInt(value, min, max, fallback) {
 function normalizeDefaults(input = {}, base = DEFAULT_BATCH_DEFAULTS) {
   const src = input && typeof input === 'object' ? input : {};
   const has = (key) => Object.prototype.hasOwnProperty.call(src, key);
+  const stackSize = has('stackSize')
+    ? clampInt(src.stackSize, 1, 9999, base.stackSize ?? 1)
+    : (base.stackSize ?? 1);
+  let stack = has('stack')
+    ? clampInt(src.stack, 1, 9999, base.stack ?? 1)
+    : (base.stack ?? 1);
+  let startPosition = has('startPosition')
+    ? clampInt(src.startPosition, 1, 9999, base.startPosition ?? 1)
+    : (base.startPosition ?? 1);
+  if (stackSize === 1) {
+    // Legacy clients only sent startPosition as the flat box counter.
+    if (has('startPosition') && !has('stack')) {
+      stack = clampInt(src.startPosition, 1, 9999, stack);
+    }
+    startPosition = 1;
+  } else {
+    startPosition = Math.min(stackSize, startPosition);
+  }
+  const GAMES = ['pokemon', 'one_piece', 'riftbound'];
   return {
+    game: has('game') ? pick(GAMES, src.game, base.game || 'pokemon') : (base.game || 'pokemon'),
     language: has('language') ? pick(LANGUAGES, src.language, base.language) : base.language,
     condition: has('condition') ? pick(CONDITIONS, src.condition, base.condition) : base.condition,
     foilState: has('foilState') ? pick(FINISHES, src.foilState, base.foilState) : base.foilState,
@@ -106,10 +133,107 @@ function normalizeDefaults(input = {}, base = DEFAULT_BATCH_DEFAULTS) {
     signed: has('signed') ? src.signed === true : base.signed,
     altered: has('altered') ? src.altered === true : base.altered,
     location: has('location') ? cleanText(src.location, 64) : base.location,
-    startPosition: has('startPosition') ? clampInt(src.startPosition, 1, 9999, base.startPosition ?? 1) : (base.startPosition ?? 1),
+    stack,
+    stackSize,
+    startPosition,
     quantity: has('quantity') ? clampInt(src.quantity, 1, 99, base.quantity) : base.quantity,
     mergeRepeats: has('mergeRepeats') ? src.mergeRepeats !== false : base.mergeRepeats,
   };
+}
+
+/** Absolute card index ↔ stack/position for a fixed stack size. */
+function indexToStackPos(index, stackSize) {
+  const size = Math.max(1, Math.trunc(Number(stackSize)) || 1);
+  const i = Math.max(1, Math.trunc(Number(index)) || 1);
+  if (size === 1) return { stack: i, position: 1 };
+  return {
+    stack: Math.floor((i - 1) / size) + 1,
+    position: ((i - 1) % size) + 1,
+  };
+}
+
+function stackPosToIndex(stack, position, stackSize) {
+  const size = Math.max(1, Math.trunc(Number(stackSize)) || 1);
+  const s = Math.max(1, Math.trunc(Number(stack)) || 1);
+  const p = Math.max(1, Math.trunc(Number(position)) || 1);
+  if (size === 1) return Math.max(s, Math.min(9999, p));
+  return (s - 1) * size + Math.min(size, p);
+}
+
+/** Location chip: size 1 → box·N; larger → box·stack·pos. */
+function locationDefaultsText(d = DEFAULT_BATCH_DEFAULTS) {
+  const loc = String(d.location || '').trim();
+  if (!loc) return '';
+  const size = Math.max(1, Math.trunc(Number(d.stackSize)) || 1);
+  const stack = Math.max(1, Math.trunc(Number(d.stack)) || 1);
+  if (size === 1) return `${loc}·${stack}`;
+  const pos = Math.max(1, Math.trunc(Number(d.startPosition)) || 1);
+  return `${loc}·${stack}·${pos}`;
+}
+
+/**
+ * Listing suffix for a computed slot.
+ * size 1 → ·2 / ·2-4; larger → ·2·5 / ·2·5-7 / ·2·5–3·2 (cross-stack).
+ */
+function slotText(slot) {
+  if (!slot) return '';
+  const size = slot.stackSize || 1;
+  if (size === 1) {
+    const a = slot.stack || slot.start;
+    const b = slot.endStack || slot.stack || slot.end;
+    return b > a ? `·${a}-${b}` : `·${a}`;
+  }
+  const stack = slot.stack || 1;
+  if ((slot.endStack || stack) !== stack) {
+    return `·${stack}·${slot.start}–${slot.endStack}·${slot.end}`;
+  }
+  return `·${stack}·${slot.start}${slot.end > slot.start ? `-${slot.end}` : ''}`;
+}
+
+/**
+ * Walk queue order and assign slots. Snapshot may be camelCase (API) or
+ * already on the row as defaults_snapshot. Quantity spills across stacks.
+ */
+function boxSlots(rows) {
+  const counters = new Map();
+  const slots = new Map();
+  for (const row of rows || []) {
+    const loc = String(row.location || '').trim();
+    if (!loc) continue;
+    const snap = row.defaults_snapshot || row.defaultsSnapshot || {};
+    const size = Math.max(1, Math.trunc(Number(snap.stackSize)) || 1);
+    const stack = Math.max(1, Math.trunc(Number(snap.stack)) || 1);
+    // Legacy: only startPosition was set (flat absolute counter).
+    const posRaw = Math.max(1, Math.trunc(Number(snap.startPosition)) || 1);
+    const anchor = snap.stack != null || snap.stackSize != null
+      ? stackPosToIndex(stack, size === 1 ? 1 : posRaw, size)
+      : posRaw;
+    const startAbs = Math.max((counters.get(loc) || 0) + 1, anchor);
+    const endAbs = startAbs + (Number(row.quantity) || 1) - 1;
+    const start = indexToStackPos(startAbs, size);
+    const end = indexToStackPos(endAbs, size);
+    const filledStack = size > 1 && (end.stack > start.stack || end.position === size);
+    slots.set(row.id, {
+      stack: start.stack,
+      start: start.position,
+      end: end.position,
+      endStack: end.stack,
+      stackSize: size,
+      filledStack,
+      absStart: startAbs,
+      absEnd: endAbs,
+    });
+    counters.set(loc, endAbs);
+  }
+  return slots;
+}
+
+
+function scanPhoneCatalog(gameId) {
+  const id = String(gameId || 'pokemon');
+  if (id === 'one_piece') return { family: 'one_piece', variant: 'singles', catalogId: 'one_piece_singles' };
+  if (id === 'riftbound') return { family: 'riftbound', variant: 'western', catalogId: 'riftbound_western' };
+  return { family: 'pokemon', variant: 'generic', catalogId: 'pokemon_generic' };
 }
 
 function defaultsLabel(defaults = DEFAULT_BATCH_DEFAULTS) {
@@ -122,7 +246,7 @@ function defaultsLabel(defaults = DEFAULT_BATCH_DEFAULTS) {
     d.firstEdition ? '1st' : '',
     d.signed ? 'Signed' : '',
     d.altered ? 'Altered' : '',
-    d.location ? `${d.location}·${d.startPosition}` : '',
+    d.location ? locationDefaultsText(d) : '',
     d.quantity > 1 ? `Qty ${d.quantity}` : '',
   ].filter(Boolean).join(' · ');
 }
@@ -164,7 +288,7 @@ function capturedAtServer({ capturedAt, clockOffsetMs, receivedAtMs, floorMs = 0
   return Math.min(receivedAtMs, Math.max(floorMs, Math.round(phone + offset)));
 }
 
-function candidatesFromHits(hits) {
+function candidatesFromHits(hits, limit = MAX_CANDIDATES) {
   const seen = new Set();
   const out = [];
   const list = Array.isArray(hits) ? hits.slice(0, MAX_HITS) : [];
@@ -182,7 +306,7 @@ function candidatesFromHits(hits) {
     });
   }
   out.sort((a, b) => b.score - a.score);
-  return out.slice(0, MAX_CANDIDATES);
+  return out.slice(0, limit);
 }
 
 function classifyRecognition(hits) {
@@ -198,6 +322,230 @@ function classifyRecognition(hits) {
     return { state: 'matched', candidates: plausible, topScore: top.score, margin };
   }
   return { state: 'ambiguous', candidates: plausible, topScore: top.score, margin };
+}
+
+// ---- Printing choice (pokoin-web docs/SCAN_CONNECT.md#printing-choice) ----
+// Layer A: the hits identify an *artwork*, the CLIP same-illustration key
+// (`marketplace_search_candidates.version`). The 0.80 / 0.08 rule is applied
+// between artworks, so two printings of one painting are not recognition doubt.
+// Layer B: the batch language picks the print family, and inside it the
+// printings the camera cannot tell apart are offered to the seller on the
+// phone. Nothing here knows a set or a program by name.
+
+// Siblings offered when the camera only saw another region's printing. Basic
+// energies share one painting across ~50 western sets: that is not a choice,
+// so it stays a desk review.
+const MAX_SIBLING_PRINTINGS = 8;
+// Desk expansion marks (pokoin-web market/src/set-logos.js expansionSymbolSrc):
+// same CDN path and cache key, so phone tiles and desk circles are one asset.
+const SYMBOL_BASE = 'https://cdn.pokoin.com/expansions/symbols/';
+const SYMBOL_CACHE = 'cm1';
+const KIND_ORDER = ['official', 'subset', 'promo', 'side_product', 'sealed', 'unmatched'];
+// Printed n/m inside a catalog card_number: "Rare | 076/203", "Holo Promo 88/95", "TG01/TG30".
+const PRINTED_NUMBER = /([A-Z]{0,5})-?(\d{1,4})[a-z]?\s*\/\s*([A-Z]{0,5})-?(\d{1,4})/i;
+// Promo ids without a set size: "SVP 135", "BW-P 140", "SWSH050".
+const PROMO_NUMBER = /^[A-Z][A-Za-z]{0,5}(?:-[A-Z])?\s?\d{1,4}$/;
+
+/**
+ * Batch listing language → print buckets (`_print_bucket.js`), most specific
+ * tier first. Western never reaches Asian prints and vice versa; JP/KO keep
+ * the desk's japanese|korean pool but prefer their own print.
+ */
+function printFamily(language) {
+  const lang = String(language || '').trim().toUpperCase();
+  if (lang === 'JP') return { id: 'japanese', tiers: [['japanese'], ['korean']] };
+  if (lang === 'KO') return { id: 'korean', tiers: [['korean'], ['japanese']] };
+  if (lang === 'ZH' || lang === 'ZHT') return { id: 'chinese', tiers: [['chinese']] };
+  if (lang === 'ID') return { id: 'indonesian', tiers: [['indonesian', 'idth']] };
+  if (lang === 'TH') return { id: 'thai', tiers: [['thai', 'idth']] };
+  if (lang === 'VI') return { id: 'vietnamese', tiers: [] };
+  return { id: 'western', tiers: [['western']] };
+}
+
+/** Same slug as the desk's setSlug (pokoin-web market/src/api.js). */
+function expansionSlug(name) {
+  return String(name || '')
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 140);
+}
+
+/**
+ * Split a catalog card_number into the printed number and its qualifiers.
+ * `key` compares printed numbers ("076/203" = "76/203"). Nothing is dropped:
+ * every non-number segment stays in `detail` ("WCD 2022 · Ondrej Skubal").
+ */
+function printedNumber(cardNumber) {
+  const parts = String(cardNumber || '').split('|').map((part) => part.trim()).filter(Boolean);
+  // An n/m anywhere wins over a promo-looking segment ("WCD 2022 | … | 076/203").
+  const at = parts.findIndex((part) => PRINTED_NUMBER.test(part));
+  if (at >= 0) {
+    const part = parts[at];
+    const m = part.match(PRINTED_NUMBER);
+    const left = `${part.slice(0, m.index)} ${part.slice(m.index + m[0].length)}`.trim();
+    const rest = parts.filter((_, i) => i !== at);
+    if (left) rest.splice(at, 0, left);
+    return {
+      number: m[0].trim(),
+      key: `${m[1]}${Number(m[2])}/${m[3]}${Number(m[4])}`.toUpperCase(),
+      detail: rest.join(' · '),
+    };
+  }
+  const promo = parts.findIndex((part) => PROMO_NUMBER.test(part));
+  if (promo >= 0) {
+    return {
+      number: parts[promo],
+      key: parts[promo].toUpperCase().replace(/\s+/g, ''),
+      detail: parts.filter((_, i) => i !== promo).join(' · '),
+    };
+  }
+  return { number: '', key: '', detail: parts.join(' · ') };
+}
+
+function rowCardId(row) {
+  return cleanCardId(row?.card_id ?? row?.cardId);
+}
+
+function kindRank(row) {
+  const i = KIND_ORDER.indexOf(String(row?.kind || '').toLowerCase());
+  return i < 0 ? KIND_ORDER.length : i;
+}
+
+/** What the phone tile shows. Symbol first, then the set code as text. */
+function printingTile(row) {
+  const setName = cleanText(row.set_name ?? row.setName, 160);
+  const printed = printedNumber(row.card_number ?? row.number);
+  const slug = expansionSlug(setName);
+  const stored = cleanText(row.symbol_image_url, 500);
+  const symbolUrl = slug ? `${SYMBOL_BASE}${slug}.png?v=${SYMBOL_CACHE}` : '';
+  // Subset expansions carry their variant after " - " ("… - Master Ball Reverse Holo").
+  const dash = String(row.kind || '').toLowerCase() === 'subset' ? setName.lastIndexOf(' - ') : -1;
+  const variant = dash > 0 ? setName.slice(dash + 3).trim() : '';
+  const detail = [variant, printed.detail].filter(Boolean).join(' · ');
+  const number = printed.number;
+  return {
+    cardId: rowCardId(row),
+    name: cleanText(row.name, 160),
+    setName,
+    setCode: cleanText(row.code, 24).toUpperCase(),
+    number,
+    detail,
+    symbolUrl,
+    symbolAltUrl: /^https:\/\//.test(stored) && !stored.startsWith(`${SYMBOL_BASE}${slug}.png`) ? stored : '',
+    nationality: printBucket(row.nationality),
+    label: [setName, number ? `card ${number}` : '', detail].filter(Boolean).join(', '),
+  };
+}
+
+/** Row recognition candidate: the shape classifyRecognition already stores. */
+function printingCandidate(row, score) {
+  return {
+    cardId: rowCardId(row),
+    score: score == null ? null : score,
+    name: cleanText(row.name, 160),
+    setName: cleanText(row.set_name ?? row.setName, 160),
+    number: cleanText(row.card_number ?? row.number, 80),
+    imageUrl: cleanText(row.image_url ?? row.imageUrl, 500),
+    nationality: String(row.nationality || '').trim().toLowerCase(),
+  };
+}
+
+/**
+ * Layer A + B for one scan.
+ *
+ * `rows`: catalog printings (card_id, name, set_name, card_number, version,
+ * nationality, kind, code, symbol_image_url, image_url) for the hit ids plus
+ * every member of the top hit's artwork. `language`: the batch language in
+ * force at capture. `choice`: the printing the seller tapped on the phone.
+ *
+ * Returns null when this layer has nothing to add, so the caller keeps
+ * `classifyRecognition`: the artwork itself is not a confident match, the top
+ * hit has no artwork key, or the batch's print family has no printing of it.
+ *
+ * Printings offered = in-family hits of the artwork the camera cannot tell
+ * apart (within MATCH_MARGIN of the best), plus family members of the artwork
+ * with the same printed number that the camera never scored (stamped reprints
+ * missing from the recognition gallery, e.g. Trick or Trade). A member the
+ * camera scored and ruled out is not offered.
+ */
+function resolvePrintings({ hits, rows, language, choice } = {}) {
+  const scored = candidatesFromHits(hits, MAX_HITS);
+  const top = scored[0];
+  if (!top || top.score < MATCH_SCORE) return null;
+  const byId = new Map();
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const id = rowCardId(row);
+    if (id && !byId.has(id)) byId.set(id, row);
+  }
+  const art = String(byId.get(top.cardId)?.version || '');
+  if (!art) return null;
+  const artworkOf = (id) => String(byId.get(id)?.version || '') || `card:${id}`;
+  const rival = scored.find((c) => artworkOf(c.cardId) !== art);
+  const margin = rival ? Math.round((top.score - rival.score) * 10000) / 10000 : 1;
+  if (margin < MATCH_MARGIN) return null;
+
+  const family = printFamily(language);
+  const members = [...byId.values()].filter((row) => String(row.version || '') === art);
+  const tier = family.tiers.find((buckets) => members.some((row) => buckets.includes(printBucket(row.nationality))));
+  if (!tier) return null;
+  const inTier = (row) => Boolean(row) && tier.includes(printBucket(row.nationality));
+
+  const scoreOf = new Map(scored.map((c) => [c.cardId, c.score]));
+  const seen = scored.filter((c) => artworkOf(c.cardId) === art && inTier(byId.get(c.cardId)));
+  let picked;
+  if (seen.length) {
+    const floor = seen[0].score - MATCH_MARGIN;
+    const tied = seen.filter((c) => c.score >= floor).map((c) => byId.get(c.cardId));
+    const scoredIds = new Set(seen.map((c) => c.cardId));
+    const keys = new Set(tied.map((row) => printedNumber(row.card_number).key).filter(Boolean));
+    const unseen = members.filter((row) => inTier(row)
+      && !scoredIds.has(rowCardId(row))
+      && keys.has(printedNumber(row.card_number).key));
+    picked = [...tied, ...unseen];
+  } else {
+    picked = members.filter(inTier);
+    if (picked.length > MAX_SIBLING_PRINTINGS) return null;
+  }
+  picked.sort((a, b) => kindRank(a) - kindRank(b) || Number(rowCardId(a)) - Number(rowCardId(b)));
+
+  const ids = picked.map(rowCardId);
+  const wanted = cleanCardId(choice);
+  const chosen = wanted && ids.includes(wanted) ? wanted : '';
+  const choose = picked.length > 1;
+  // Unchosen doubt keeps the best-scored printing as the provisional card, like
+  // today's ambiguous rows; the desk must still confirm it.
+  const provisional = seen.length ? seen[0].cardId : ids[0];
+  return {
+    state: choose && !chosen ? 'ambiguous' : 'matched',
+    cardId: chosen || (choose ? provisional : ids[0]),
+    choose,
+    chosen,
+    family: family.id,
+    artwork: art,
+    topScore: top.score,
+    margin,
+    printings: picked,
+    candidates: picked.map((row) => printingCandidate(row, scoreOf.get(rowCardId(row)))),
+  };
+}
+
+/**
+ * A row waiting for review still shows one printing. When recognition is in
+ * doubt that provisional card comes from the batch's print family if any
+ * candidate is in it (a western batch never preselects the Japanese print);
+ * the seller still has to confirm it.
+ */
+function provisionalCandidate(candidates, language) {
+  const list = Array.isArray(candidates) ? candidates : [];
+  for (const tier of printFamily(language).tiers) {
+    const hit = list.find((c) => tier.includes(printBucket(c.nationality)));
+    if (hit) return hit;
+  }
+  return list[0] || null;
 }
 
 // PowerTools identity key mapped to Pokoin columns + location. Used for
@@ -286,6 +634,19 @@ function parseScanEvent(body = {}) {
     hits,
     image: decodeImage(body.image),
     timings,
+    // The printing the seller tapped on the phone; checked against the
+    // server's own resolution before it is used.
+    printingChoice: cleanCardId(body.printing?.cardId),
+  };
+}
+
+/** Body of POST /api/scan-phone?action=printings: the hits of a scan not yet sent. */
+function parsePrintingRequest(body = {}) {
+  const recognition = body && typeof body.recognition === 'object' && body.recognition ? body.recognition : {};
+  return {
+    capturedAt: Number(body?.capturedAt),
+    clockOffsetMs: Number(body?.clockOffsetMs),
+    hits: Array.isArray(recognition.hits) ? recognition.hits.slice(0, MAX_HITS) : [],
   };
 }
 
@@ -507,6 +868,7 @@ module.exports = {
   MATCH_SCORE,
   MATCH_MARGIN,
   CANDIDATE_FLOOR,
+  MAX_SIBLING_PRINTINGS,
   MAX_IMAGE_BYTES,
   CONDITIONS,
   LANGUAGES,
@@ -523,15 +885,27 @@ module.exports = {
   cleanCardId,
   normalizeDefaults,
   defaultsLabel,
+  scanPhoneCatalog,
+  locationDefaultsText,
+  indexToStackPos,
+  stackPosToIndex,
+  slotText,
+  boxSlots,
   pickDefaults,
   appendDefaults,
   capturedAtServer,
   candidatesFromHits,
   classifyRecognition,
+  printFamily,
+  printedNumber,
+  printingTile,
+  resolvePrintings,
+  provisionalCandidate,
   stackKey,
   shouldMerge,
   decodeImage,
   parseScanEvent,
+  parsePrintingRequest,
   parseItemPatch,
   submitProblem,
   sessionView,

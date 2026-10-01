@@ -1,7 +1,12 @@
 const { getFirebaseAdmin, verifyBearerToken } = require('./_firebase');
 const { parseEncryptionKey } = require('./_cardtrader_crypto');
-const { validateCardTraderToken } = require('./_cardtrader_client');
 const {
+  cardTraderWebhookUrlForUid,
+  updateAppWebhookUrl,
+  validateCardTraderToken,
+} = require('./_cardtrader_client');
+const {
+  decryptIntegrationToken,
   disconnectIntegration,
   readIntegrationDoc,
   safeStatusFromDoc,
@@ -10,6 +15,21 @@ const {
 
 function setNoStore(res) {
   res.setHeader('Cache-Control', 'no-store');
+}
+
+async function registerSellerWebhook(token, uid) {
+  const webhookUrl = cardTraderWebhookUrlForUid(uid);
+  if (!webhookUrl) return null;
+  return updateAppWebhookUrl(token, webhookUrl);
+}
+
+async function clearSellerWebhook(token) {
+  try {
+    return await updateAppWebhookUrl(token, '');
+  } catch (error) {
+    console.error('cardtrader clear webhook failed', { message: error.message });
+    return null;
+  }
 }
 
 async function connect(req, decoded, admin, firestore) {
@@ -24,6 +44,29 @@ async function connect(req, decoded, admin, firestore) {
     token,
     info,
   });
+  try {
+    await registerSellerWebhook(token, decoded.uid);
+  } catch (error) {
+    console.error('cardtrader webhook registration failed', {
+      uid: decoded.uid,
+      message: error.message,
+    });
+  }
+  const doc = await readIntegrationDoc(firestore, decoded.uid);
+  return safeStatusFromDoc(doc);
+}
+
+async function disconnect(decoded, admin, firestore) {
+  try {
+    const token = await decryptIntegrationToken(firestore, decoded.uid);
+    await clearSellerWebhook(token);
+  } catch (error) {
+    console.error('cardtrader disconnect webhook clear skipped', {
+      uid: decoded.uid,
+      message: error.message,
+    });
+  }
+  await disconnectIntegration({ admin, firestore, uid: decoded.uid });
   const doc = await readIntegrationDoc(firestore, decoded.uid);
   return safeStatusFromDoc(doc);
 }
@@ -41,9 +84,8 @@ module.exports = async function handler(req, res) {
     }
 
     if (req.method === 'DELETE') {
-      await disconnectIntegration({ admin, firestore, uid: decoded.uid });
-      const doc = await readIntegrationDoc(firestore, decoded.uid);
-      return res.status(200).json({ ok: true, status: safeStatusFromDoc(doc) });
+      const status = await disconnect(decoded, admin, firestore);
+      return res.status(200).json({ ok: true, status });
     }
 
     res.setHeader('Allow', 'POST, DELETE');
@@ -61,4 +103,4 @@ module.exports = async function handler(req, res) {
   }
 };
 
-module.exports._test = { connect };
+module.exports._test = { connect, disconnect, registerSellerWebhook, clearSellerWebhook };

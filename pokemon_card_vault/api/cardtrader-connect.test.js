@@ -198,5 +198,35 @@ test('CardTrader linked listing cleanup is scoped to CardTrader sources', () => 
   assert.match(predicate, /source/);
   assert.match(predicate, /source_listing_id/);
   assert.match(predicate, /cardtrader/);
+  assert.match(predicate, /ct:%/);
   assert.doesNotMatch(predicate, /pokoin_user_listing/);
+});
+
+test('CardTrader webhook URL registration uses seller uid', async (t) => {
+  const originalFetch = global.fetch;
+  const calls = [];
+  t.after(() => {
+    global.fetch = originalFetch;
+  });
+  global.fetch = async (url, options) => {
+    calls.push({ url, method: options?.method, body: options?.body });
+    return {
+      ok: true,
+      status: 200,
+      text: async () => '{"webhook_url":"https://api.pokoin.com/api/cardtrader-webhook/uid"}',
+    };
+  };
+  const { registerSellerWebhook } = require('./cardtrader-connect')._test;
+  const original = process.env.CARDTRADER_WEBHOOK_BASE_URL;
+  process.env.CARDTRADER_WEBHOOK_BASE_URL = 'https://api.pokoin.com';
+  try {
+    await registerSellerWebhook('ct_token', 'uid');
+  } finally {
+    if (original === undefined) delete process.env.CARDTRADER_WEBHOOK_BASE_URL;
+    else process.env.CARDTRADER_WEBHOOK_BASE_URL = original;
+  }
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, 'https://api.cardtrader.com/api/v2/app');
+  assert.equal(calls[0].method, 'PATCH');
+  assert.match(calls[0].body, /cardtrader-webhook\/uid/);
 });

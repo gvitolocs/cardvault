@@ -4,6 +4,42 @@ import 'package:pokoin/providers/card_provider.dart';
 import 'package:pokoin/widgets/pokoin_assistant.dart';
 
 void main() {
+  group('Pokontact responsive overlay', () {
+    test('never shows the floating chat popup on mobile widths', () {
+      expect(
+        shouldShowPokoinAssistantOverlay(
+          viewportWidth: 390,
+          routePath: '/marketplace/en',
+        ),
+        isFalse,
+      );
+      expect(
+        shouldShowPokoinAssistantOverlay(
+          viewportWidth: 959,
+          routePath: '/marketplace/en/cards/123/test-card',
+        ),
+        isFalse,
+      );
+    });
+
+    test('desktop overlay stays hidden on the full Pokontact route', () {
+      expect(
+        shouldShowPokoinAssistantOverlay(
+          viewportWidth: 1440,
+          routePath: '/pokontact',
+        ),
+        isFalse,
+      );
+      expect(
+        shouldShowPokoinAssistantOverlay(
+          viewportWidth: 1440,
+          routePath: '/marketplace/en',
+        ),
+        isTrue,
+      );
+    });
+  });
+
   group('Pokontact internal links', () {
     test('accepts Pokoin absolute URLs as app routes', () {
       expect(

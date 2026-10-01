@@ -8,7 +8,7 @@ const {
 const PROVIDER = 'cardtrader';
 const PKNRESERVE_SELLER_USERNAME = 'pknreserve';
 const PKN_USDT_REFERENCE_PRICE = 0.005;
-const CARDTRADER_MARKUP_PKN = 200;
+const CARDTRADER_MARKUP_PKN = 0; // market reference PKN matches dump (EUR/0.005); no shipping pad
 const CARDTRADER_MARKETPLACE_PRODUCTS_PATH = '/api/v2/marketplace/products';
 const MAX_EXPLICIT_LIMIT = 1000;
 const CACHE_TTL_MS = 45_000;
@@ -265,9 +265,9 @@ function cardTraderDisplayPricePkn(price, currency, env = process.env) {
   if (!Number.isFinite(amount) || amount <= 0) return null;
   const normalizedCurrency = cleanText(currency || 'EUR', 12).toUpperCase();
   if (normalizedCurrency === 'PKN' || normalizedCurrency === 'POKOIN') {
-    return amount + CARDTRADER_MARKUP_PKN;
+    return amount;
   }
-  return (amount / pknReferencePrice(env)) + CARDTRADER_MARKUP_PKN;
+  return amount / pknReferencePrice(env);
 }
 
 function textIncludesOneDayReady(...values) {

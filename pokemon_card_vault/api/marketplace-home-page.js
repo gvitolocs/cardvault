@@ -104,7 +104,7 @@ function createHandler(deps = {}) {
 
   return async function handler(req, res) {
     setCorsHeaders(res);
-    res.setHeader('Cache-Control', 'public, max-age=15, s-maxage=60, stale-while-revalidate=120');
+    res.setHeader('Cache-Control', 'public, max-age=15, s-maxage=30, stale-while-revalidate=60');
     if (req.method === 'OPTIONS') {
       return res.status(204).end();
     }

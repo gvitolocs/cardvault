@@ -73,6 +73,16 @@
         "api/pokoin-checkout-deploy-layout.test.js"
       ]
     },
+    "chat.js": {
+      "path": "/api/chat",
+      "reason": "Direct-conversation invariants are covered by the pure chat core tests; manifest/package/smoke checks guard the Firebase HTTP adapter until handler fixtures are added.",
+      "coveredBy": [
+        "_chat_core.test.js",
+        "api:check",
+        "api:smoke",
+        "api/pokoin-checkout-deploy-layout.test.js"
+      ]
+    },
     "cardmarket-redirect.js": {
       "path": "/api/cardmarket-redirect",
       "reason": "Legacy redirect route with DB-backed behavior; manifest loading, fallback packaging, and smoke safe-error paths are enforced until redirect fixture tests are added.",
@@ -130,6 +140,15 @@
     "cardtrader-status.js": {
       "path": "/api/cardtrader-status",
       "reason": "Legacy authenticated CardTrader status route; integration helper tests plus manifest/package/smoke checks cover the route until handler auth tests are added.",
+      "coveredBy": [
+        "api:check",
+        "api:smoke",
+        "api/pokoin-checkout-deploy-layout.test.js"
+      ]
+    },
+    "cardtrader-webhook.js": {
+      "path": "/api/cardtrader-webhook/:uid",
+      "reason": "Raw-body CardTrader webhook verification and seller inventory writes require signed provider fixtures; manifest/package/smoke checks guard the adapter until those fixtures are added.",
       "coveredBy": [
         "api:check",
         "api:smoke",
@@ -249,6 +268,69 @@
         "api:smoke",
         "api/pokoin-checkout-deploy-layout.test.js"
       ]
+    },
+    "marketplace-collection-summary.js": {
+      "path": "/api/marketplace-collection-summary",
+      "reason": "Authenticated ownership summary requires Firebase fixtures; manifest/package/smoke checks guard uid scoping and module loading until handler fixtures are added.",
+      "coveredBy": [
+        "api:check",
+        "api:smoke",
+        "api/pokoin-checkout-deploy-layout.test.js"
+      ]
+    },
+    "marketplace-collection.js": {
+      "path": "/api/marketplace-collection",
+      "reason": "Authenticated collection reads require Firebase fixtures; manifest/package/smoke checks guard uid scoping and module loading until handler fixtures are added.",
+      "coveredBy": [
+        "api:check",
+        "api:smoke",
+        "api/pokoin-checkout-deploy-layout.test.js"
+      ]
+    },
+    "marketplace-listings-csv.js": {
+      "path": "/api/marketplace-listings-csv",
+      "reason": "CSV parsing, normalization, and export formats are directly tested in the stock helper; manifest/package/smoke checks guard the authenticated database adapter.",
+      "coveredBy": [
+        "_stock_csv.test.js",
+        "api:check",
+        "api:smoke",
+        "api/pokoin-checkout-deploy-layout.test.js"
+      ]
+    },
+    "money-request.js": {
+      "path": "/api/money-request",
+      "reason": "Money-request state transitions and validation are covered by the pure core tests; manifest/package/smoke checks guard the transactional Firebase adapter.",
+      "coveredBy": [
+        "_money_request_core.test.js",
+        "api:check",
+        "api:smoke",
+        "api/pokoin-checkout-deploy-layout.test.js"
+      ]
+    },
+    "scan-batch.js": {
+      "path": "/api/scan-batch",
+      "reason": "Scan batch intent and submit invariants are covered by shared scan-store tests; manifest/package/smoke checks guard the authenticated HTTP adapter.",
+      "coveredBy": ["_scan_store_submit_intent.test.js", "_scan_submit_intent.test.js", "api:check", "api:smoke"]
+    },
+    "scan-pair.js": {
+      "path": "/api/scan-pair",
+      "reason": "Pair-code and token invariants are covered by scan-connect tests; manifest/package/smoke checks guard the HTTP adapter.",
+      "coveredBy": ["_scan_connect.test.js", "api:check", "api:smoke"]
+    },
+    "scan-phone.js": {
+      "path": "/api/scan-phone",
+      "reason": "Phone pairing authorization is covered by scan-connect helper tests; manifest/package/smoke checks guard the streaming HTTP adapter.",
+      "coveredBy": ["_scan_connect.test.js", "api:check", "api:smoke"]
+    },
+    "scan-session.js": {
+      "path": "/api/scan-session",
+      "reason": "Session token and expiry invariants are covered by scan-connect tests; manifest/package/smoke checks guard the authenticated HTTP adapter.",
+      "coveredBy": ["_scan_connect.test.js", "api:check", "api:smoke"]
+    },
+    "scan-stream.js": {
+      "path": "/api/scan-stream",
+      "reason": "Stream authorization and session invariants are covered by scan-connect tests; manifest/package/smoke checks guard the SSE adapter.",
+      "coveredBy": ["_scan_connect.test.js", "api:check", "api:smoke"]
     },
     "social-autopost.js": {
       "path": "/api/social-autopost",

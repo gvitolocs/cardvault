@@ -4491,6 +4491,7 @@ class _CountingCardService extends CardService {
   Future<List<PokemonCard>> searchMarketplaceCards(
     String query, {
     int limit = 120,
+    int offset = 0,
     String? productType,
     String searchLanguage = 'en',
     String? searchSessionId,

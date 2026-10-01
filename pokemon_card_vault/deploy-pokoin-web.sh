@@ -113,7 +113,7 @@ else
 rm -rf "$ROOT_DIR/build/web/api"
 mkdir -p "$ROOT_DIR/build/web/api"
 mkdir -p "$ROOT_DIR/build/web/server"
-for helper in _artist_display _bitcoin_payout _cardtrader_client _cardtrader_crypto _cardtrader_daily_listings_refresh _cardtrader_integration _crypto_pkn_purchase _email _firebase _firebase_roles _marketplace_canonical_path _marketplace_card_emoji _marketplace_card_rarity _marketplace_cart_analytics _marketplace_db _marketplace_react_card _marketplace_row _marketplace_sale_notifications _marketplace_search_engine _marketplace_watchlist_analytics _meili_client _meili_document _meili_marketplace _meili_suggest _native_pkn _pending_signup _pkn_checkout_pricing _pkn_purchase _r2 _search_debug_auth _searchbar_session _seller_comment_filter _slug _social_autoposter _supabase _username _wpkn_exchange _wpkn_pkn_market_quote; do
+for helper in _artist_display _bitcoin_payout _cardtrader_client _cardtrader_crypto _cardtrader_daily_listings_refresh _cardtrader_game_ingest _cardtrader_integration _crypto_pkn_purchase _email _firebase _firebase_roles _marketplace_canonical_path _marketplace_card_emoji _marketplace_card_rarity _marketplace_cart_analytics _marketplace_db _marketplace_game _marketplace_react_card _marketplace_react_sql _marketplace_row _marketplace_sale_notifications _marketplace_search_engine _marketplace_watchlist_analytics _meili_client _meili_document _meili_marketplace _meili_suggest _native_pkn _pending_signup _pkn_checkout_pricing _pkn_purchase _r2 _search_debug_auth _searchbar_session _seller_comment_filter _slug _social_autoposter _stock_csv _supabase _username _wpkn_exchange _wpkn_pkn_market_quote; do
   cp "$ROOT_DIR/api/${helper}.js" "$ROOT_DIR/build/web/server/${helper}.js"
 done
 for colocated_helper in _meili_document _meili_suggest _marketplace_react_card _marketplace_row _marketplace_canonical_path; do
@@ -133,6 +133,7 @@ for endpoint in \
   cardtrader-live-listings \
   cardtrader-redirect \
   cardtrader-status \
+  cardtrader-webhook \
   create-pkn-checkout-session \
   deck-card-version-lookup \
   crypto-pkn-purchase \
@@ -165,6 +166,7 @@ for endpoint in \
   marketplace-debug-refinement \
   marketplace-event \
   marketplace-listings \
+  marketplace-listings-csv \
   marketplace-expansion-symbols \
   marketplace-expansions \
   marketplace-autocomplete \
@@ -210,7 +212,7 @@ for endpoint in \
 do
   cp "$ROOT_DIR/api/${endpoint}.js" "$ROOT_DIR/build/web/api/${endpoint}.js"
 done
-for marketplace_endpoint in cardmarket-redirect cardmarket-scrape-observation cardtrader-blueprint-listings cardtrader-clean-listings cardtrader-connect cardtrader-daily-listings-refresh cardtrader-disconnect cardtrader-import-dry-run cardtrader-live-listings cardtrader-status deck-card-version-lookup extension-card-search flutter-debug-logs limitless-expansion-blueprints marketplace-artist-cards marketplace-artist-suggestions marketplace-autocomplete marketplace-suggest marketplace-home-page marketplace-search-page marketplace-card-page marketplace-expansion-page marketplace-blueprint-price marketplace-card-cheapest-price marketplace-card-sales marketplace-card-last-median marketplace-card-seo marketplace-card-shortlink marketplace-card-url marketplace-card-versions marketplace-cart marketplace-cards marketplace-cardmarket-guess-review marketplace-competitive marketplace-debug-cardtrader-blueprints marketplace-debug-artists marketplace-debug-events marketplace-debug-refinement marketplace-event marketplace-listings marketplace-orders marketplace-expansion-symbols marketplace-expansions marketplace-hot-blueprints marketplace-home marketplace-image-log marketplace-search-candidates marketplace-watchlist marketplace-recents searchbar-cards searchbar-token-predict user-current-page; do
+for marketplace_endpoint in cardmarket-redirect cardmarket-scrape-observation cardtrader-blueprint-listings cardtrader-clean-listings cardtrader-connect cardtrader-daily-listings-refresh cardtrader-disconnect cardtrader-import-dry-run cardtrader-live-listings cardtrader-status deck-card-version-lookup extension-card-search flutter-debug-logs limitless-expansion-blueprints marketplace-artist-cards marketplace-artist-suggestions marketplace-autocomplete marketplace-suggest marketplace-home-page marketplace-search-page marketplace-card-page marketplace-expansion-page marketplace-blueprint-price marketplace-card-cheapest-price marketplace-card-sales marketplace-card-last-median marketplace-card-seo marketplace-card-shortlink marketplace-card-url marketplace-card-versions marketplace-cart marketplace-cards marketplace-cardmarket-guess-review marketplace-competitive marketplace-debug-cardtrader-blueprints marketplace-debug-artists marketplace-debug-events marketplace-debug-refinement marketplace-event marketplace-listings marketplace-listings-csv marketplace-orders marketplace-expansion-symbols marketplace-expansions marketplace-hot-blueprints marketplace-home marketplace-image-log marketplace-search-candidates marketplace-watchlist marketplace-recents searchbar-cards searchbar-token-predict user-current-page; do
   sed -i.bak "s|require('./_marketplace_db')|require('../server/_marketplace_db')|" \
     "$ROOT_DIR/build/web/api/${marketplace_endpoint}.js"
   sed -i.bak 's|require("./_marketplace_db")|require("../server/_marketplace_db")|' \
@@ -262,6 +264,14 @@ for marketplace_endpoint in cardmarket-redirect cardmarket-scrape-observation ca
   sed -i.bak "s|require('./_marketplace_row')|require('../server/_marketplace_row')|" \
     "$ROOT_DIR/build/web/api/${marketplace_endpoint}.js"
   sed -i.bak 's|require("./_marketplace_row")|require("../server/_marketplace_row")|' \
+    "$ROOT_DIR/build/web/api/${marketplace_endpoint}.js"
+  sed -i.bak "s|require('./_marketplace_react_sql')|require('../server/_marketplace_react_sql')|" \
+    "$ROOT_DIR/build/web/api/${marketplace_endpoint}.js"
+  sed -i.bak 's|require("./_marketplace_react_sql")|require("../server/_marketplace_react_sql")|' \
+    "$ROOT_DIR/build/web/api/${marketplace_endpoint}.js"
+  sed -i.bak "s|require('./_stock_csv')|require('../server/_stock_csv')|" \
+    "$ROOT_DIR/build/web/api/${marketplace_endpoint}.js"
+  sed -i.bak 's|require("./_stock_csv")|require("../server/_stock_csv")|' \
     "$ROOT_DIR/build/web/api/${marketplace_endpoint}.js"
   sed -i.bak "s|require('./_firebase')|require('../server/_firebase')|" \
     "$ROOT_DIR/build/web/api/${marketplace_endpoint}.js"

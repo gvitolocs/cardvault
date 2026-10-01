@@ -55,43 +55,30 @@ test('search debug reads configured admin and debug email allowlists', () => {
   }
 });
 
-test('search debug authorizer allows Firestore admin profiles', async () => {
-  const { authorizeSearchDebugRequest } = loadSearchDebugAuthWithFirebaseStub({
+test('search debug authorizer allows a custom-claim admin and rejects a Firestore admin profile', async () => {
+  const claimed = loadSearchDebugAuthWithFirebaseStub({
     verifyBearerToken: async () => ({
       uid: 'admin-uid',
       email: 'admin-user@example.com',
-    }),
-    getFirebaseAdmin: () => ({
-      firestore: () => ({
-        collection: (name) => {
-          assert.equal(name, 'users');
-          return {
-            doc: (uid) => {
-              assert.equal(uid, 'admin-uid');
-              return {
-                get: async () => ({
-                  data: () => ({
-                    username: 'admin-user',
-                    role: 'admin',
-                  }),
-                }),
-              };
-            },
-          };
-        },
-      }),
+      admin: true,
     }),
   });
-
-  const user = await authorizeSearchDebugRequest({
+  const user = await claimed.authorizeSearchDebugRequest({
     headers: { authorization: 'Bearer token' },
   });
+  assert.equal(user.uid, 'admin-uid');
 
-  assert.deepEqual(user, {
-    uid: 'admin-uid',
-    email: 'admin-user@example.com',
-    username: 'admin-user',
+  const profile = loadSearchDebugAuthWithFirebaseStub({
+    verifyBearerToken: async () => ({
+      uid: 'admin-uid',
+      email: 'admin-user@example.com',
+      username: 'vitologiuseppe17',
+    }),
   });
+  await assert.rejects(
+    () => profile.authorizeSearchDebugRequest({ headers: { authorization: 'Bearer token' } }),
+    (error) => error.statusCode === 403,
+  );
 });
 
 test('search debug authorizer rejects non-admin profiles', async () => {
@@ -133,3 +120,50 @@ function restoreEnv(name, value) {
   }
   process.env[name] = value;
 }
+
+function profileStub(profile) {
+  return () => ({
+    firestore: () => ({
+      collection: () => ({
+        doc: () => ({ get: async () => ({ data: () => profile }) }),
+      }),
+    }),
+  });
+}
+
+async function assertDenied(authorize) {
+  await assert.rejects(
+    () => authorize({ headers: { authorization: 'Bearer token' } }),
+    (error) => error.statusCode === 403,
+  );
+}
+
+test('search debug ignores a display name or profile username set to the operator handle', async () => {
+  const { authorizeSearchDebugRequest } = loadSearchDebugAuthWithFirebaseStub({
+    verifyBearerToken: async () => ({
+      uid: 'attacker-uid',
+      email: 'attacker@example.com',
+      email_verified: true,
+      name: 'vitologiuseppe17',
+    }),
+    getFirebaseAdmin: profileStub({ username: 'vitologiuseppe17' }),
+  });
+  await assertDenied(authorizeSearchDebugRequest);
+});
+
+test('search debug requires a verified token email for the operator allowlist', async () => {
+  const unverified = loadSearchDebugAuthWithFirebaseStub({
+    verifyBearerToken: async () => ({ uid: 'x', email: 'pokoinpos@gmail.com', email_verified: false }),
+    getFirebaseAdmin: profileStub({}),
+  });
+  await assertDenied(unverified.authorizeSearchDebugRequest);
+
+  const verified = loadSearchDebugAuthWithFirebaseStub({
+    verifyBearerToken: async () => ({ uid: 'op', email: 'PokoinPOS@gmail.com', email_verified: true }),
+    getFirebaseAdmin: () => {
+      throw new Error('profile lookup not needed');
+    },
+  });
+  const user = await verified.authorizeSearchDebugRequest({ headers: { authorization: 'Bearer token' } });
+  assert.equal(user.uid, 'op');
+});

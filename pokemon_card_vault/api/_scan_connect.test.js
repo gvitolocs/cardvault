@@ -101,10 +101,13 @@ test('defaults normalize to Pokoin values and keep the base for missing keys', (
   assert.equal(partial.signed, true);
   // Start position rides beside the box: the label shows where the pile continues.
   assert.equal(rules.defaultsLabel(d), 'IT · NM · Reverse · Box A12·1 · Qty 99');
-  assert.equal(rules.normalizeDefaults({ startPosition: 3000 }).startPosition, 3000);
-  assert.equal(rules.normalizeDefaults({ startPosition: 0 }, d).startPosition, 1);
-  assert.equal(rules.normalizeDefaults({ startPosition: 99999 }, d).startPosition, 9999);
+  // Size 1: startPosition is legacy flat counter → lands on stack.
+  assert.equal(rules.normalizeDefaults({ startPosition: 3000 }).stack, 3000);
+  assert.equal(rules.normalizeDefaults({ startPosition: 3000 }).startPosition, 1);
+  assert.equal(rules.normalizeDefaults({ startPosition: 0 }, d).stack, 1);
+  assert.equal(rules.normalizeDefaults({ startPosition: 99999 }, d).stack, 9999);
   assert.equal(rules.normalizeDefaults({ signed: true }, d).startPosition, 1);
+  assert.equal(rules.normalizeDefaults({ signed: true }, d).stack, 1);
 });
 
 test('stack key: PowerTools identity mapped to Pokoin plus location', () => {
@@ -244,4 +247,36 @@ test('client IP prefers Cloudflare header', () => {
   assert.equal(http.clientIp({ headers: {}, socket: { remoteAddress: '127.0.0.1' } }), '127.0.0.1');
   assert.equal(http.phoneToken({ headers: { authorization: 'Scan abc' } }), 'abc');
   assert.equal(http.phoneToken({ headers: { authorization: 'Bearer abc' } }), '');
+});
+
+test('stack defaults: size 1 hides position in label; size >1 shows stack·pos', () => {
+  const d1 = rules.normalizeDefaults({ location: 'box1', stack: 3, stackSize: 1, startPosition: 9 });
+  assert.equal(d1.startPosition, 1);
+  assert.equal(d1.stack, 3);
+  assert.equal(rules.locationDefaultsText(d1), 'box1·3');
+  const d10 = rules.normalizeDefaults({ location: 'box1', stack: 2, stackSize: 10, startPosition: 5 });
+  assert.equal(rules.locationDefaultsText(d10), 'box1·2·5');
+});
+
+test('boxSlots size 1: legacy flat startPosition still yields box·N', () => {
+  const rows = [
+    { id: 'a', location: 'box1', quantity: 1, defaults_snapshot: { startPosition: 47 } },
+    { id: 'b', location: 'box1', quantity: 3, defaults_snapshot: { startPosition: 47 } },
+  ];
+  const slots = rules.boxSlots(rows);
+  assert.equal(rules.slotText(slots.get('a')), '·47');
+  assert.equal(rules.slotText(slots.get('b')), '·48-50');
+});
+
+test('boxSlots sized stacks: listing uses stack·pos and flags filledStack', () => {
+  const rows = [
+    { id: 'a', location: 'box1', quantity: 1, defaults_snapshot: { stack: 1, stackSize: 5, startPosition: 4 } },
+    { id: 'b', location: 'box1', quantity: 2, defaults_snapshot: { stack: 1, stackSize: 5, startPosition: 4 } },
+  ];
+  const slots = rules.boxSlots(rows);
+  assert.equal(rules.slotText(slots.get('a')), '·1·4');
+  assert.equal(slots.get('a').filledStack, false);
+  // b starts at max(5,4)=5 then takes 2 → abs 5-6 → stack1 pos5 + spill stack2 pos1
+  assert.equal(slots.get('b').filledStack, true);
+  assert.ok(rules.slotText(slots.get('b')).includes('·'));
 });

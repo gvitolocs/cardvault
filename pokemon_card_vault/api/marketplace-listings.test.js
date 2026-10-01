@@ -899,3 +899,58 @@ test('marketplace listings rejects updates to existing reserve listing without r
   assert.equal(res.statusCode, 403);
   assert.equal(res.body.error, 'Reserve listing access required.');
 });
+
+test('marketplace listings decrement is refused for a listing the caller does not own', async () => {
+  const writes = [];
+  const handler = loadMarketplaceListingsWithStubs({
+    verifyBearerToken: async () => ({ uid: 'attacker-uid' }),
+    marketplaceQuery: async (sql) => {
+      if (/from public\.marketplace_user_listings where id = \$1/.test(sql)) {
+        return { rows: [{ seller_uid: 'seller-uid', card_id: '548832', quantity_available: 3 }] };
+      }
+      return { rows: [] };
+    },
+    marketplaceWriteQuery: async (sql, values) => {
+      writes.push({ sql, values });
+      return { rows: [] };
+    },
+  });
+  const res = responseRecorder();
+  await handler({
+    method: 'POST',
+    url: '/api/marketplace-listings?action=decrement&id=11111111-2222-4333-8444-555555555555',
+    headers: { host: 'pokoin.com', authorization: 'Bearer token' },
+    body: { quantity: 3 },
+  }, res);
+  assert.equal(res.statusCode, 404);
+  assert.equal(writes.length, 0);
+});
+
+test('marketplace listings decrement by the owner is scoped to seller_uid', async () => {
+  const writes = [];
+  const handler = loadMarketplaceListingsWithStubs({
+    verifyBearerToken: async () => ({ uid: 'seller-uid' }),
+    getFirebaseAdmin: () => ({ firestore: () => ({ collection: () => ({ doc: () => ({ get: async () => ({ exists: false, data: () => ({}) }) }) }) }) }),
+    marketplaceQuery: async (sql) => {
+      if (/from public\.marketplace_user_listings where id = \$1/.test(sql)) {
+        return { rows: [{ seller_uid: 'seller-uid', card_id: '548832', quantity_available: 3 }] };
+      }
+      return { rows: [] };
+    },
+    marketplaceWriteQuery: async (sql, values) => {
+      writes.push({ sql, values });
+      return { rows: [] };
+    },
+  });
+  const res = responseRecorder();
+  await handler({
+    method: 'POST',
+    url: '/api/marketplace-listings?action=decrement&id=11111111-2222-4333-8444-555555555555',
+    headers: { host: 'pokoin.com', authorization: 'Bearer token' },
+    body: { quantity: 1 },
+  }, res);
+  assert.equal(res.statusCode, 200);
+  const update = writes.find((write) => /update public\.marketplace_user_listings/.test(write.sql));
+  assert.match(update.sql, /seller_uid = \$3/);
+  assert.deepEqual(update.values, ['11111111-2222-4333-8444-555555555555', 1, 'seller-uid']);
+});

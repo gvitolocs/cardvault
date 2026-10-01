@@ -190,7 +190,7 @@ begin
         snapshot.price,
         snapshot.price_cents,
         snapshot.currency
-      ) + 200 as price_pkn,
+      ) as price_pkn,
       snapshot.quantity,
       case
         when lower(coalesce(snapshot.properties->>'shipping_mode', '')) = 'one_day_ready'

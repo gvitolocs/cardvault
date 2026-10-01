@@ -172,8 +172,16 @@ function isCardTraderRateLimitError(error) {
   return error && error.statusCode === 502 && /HTTP 429\b/.test(String(error.message || ''));
 }
 
+function isCardTraderAuthenticationRejection(error) {
+  // `_cardtrader_client` deliberately maps CardTrader's 401/403 response to
+  // a user-safe status 400. Once a refresh has successfully started, a later
+  // rejection is an intermittent upstream session failure, not bad local config.
+  return error && error.statusCode === 400
+    && String(error.message || '') === 'CardTrader rejected this API token.';
+}
+
 function isTransientCardTraderFetchError(error) {
-  if (isCardTraderRateLimitError(error)) return true;
+  if (isCardTraderRateLimitError(error) || isCardTraderAuthenticationRejection(error)) return true;
   const message = String(error && error.message ? error.message : '');
   const code = String((error && error.cause && error.cause.code) || error.code || '');
   return message === 'fetch failed'
@@ -786,6 +794,12 @@ async function fetchMarketplaceProductsWithRetry(token, params, options) {
       if (!isTransientCardTraderFetchError(error) || attempt === MAX_RATE_LIMIT_RETRIES) {
         throw error;
       }
+      emitRefreshProgress(options, 'marketplace_fetch_retry', {
+        attempt: attempt + 1,
+        params,
+        reason: isCardTraderAuthenticationRejection(error) ? 'authentication_rejected' : 'transient_fetch_error',
+        message: String(error && error.message ? error.message : error),
+      });
       await sleep(RATE_LIMIT_DELAY_MS * (attempt + 1));
     }
   }
@@ -1223,17 +1237,34 @@ async function runCatalogExpansionRefresh(token, options, env) {
     });
   }
 
+  // A failing expansion (e.g. CardTrader rejecting the API token) must not
+  // abort the others mid-write: stop handing out new expansions, let the
+  // in-flight ones finish persisting, finalize what was written, then fail.
+  // Promise.all used to reject at the first error, skip finalize (stale
+  // sold stats) and let the pool close under running population upserts.
+  let firstError = null;
   async function expansionWorker() {
-    while (nextIndex < expansions.length && totals.fetchedProducts < options.maxProducts) {
+    while (!firstError && nextIndex < expansions.length && totals.fetchedProducts < options.maxProducts) {
       const index = nextIndex;
       nextIndex += 1;
-      await refreshOneExpansion(index);
+      try {
+        await refreshOneExpansion(index);
+      } catch (error) {
+        if (!firstError) {
+          firstError = error;
+          emitRefreshProgress(options, 'expansion_refresh_failed', {
+            expansionId: expansions[index] && expansions[index].expansionId,
+            message: String(error && error.message ? error.message : error),
+            stoppingAfterInFlight: true,
+          });
+        }
+      }
     }
   }
 
   await Promise.all(Array.from({ length: workerCount }, expansionWorker));
 
-  if (wanted.size === 0 && totals.fetchedProducts < options.maxProducts) {
+  if (!firstError && wanted.size === 0 && totals.fetchedProducts < options.maxProducts) {
     const ungroupedIds = await readUngroupedBlueprintIdsFromOracle(
       Math.min(options.maxBlueprints, 5_000),
     );
@@ -1258,9 +1289,18 @@ async function runCatalogExpansionRefresh(token, options, env) {
 
   let finalized = null;
   if (!options.dryRun && options.finalize) {
-    emitRefreshProgress(options, 'finalize_start', { removedDay: options.removedDay });
+    // Finalize only rebuilds from what was persisted, so it is safe and
+    // needed even after a partial run: it keeps sold stats in step with the
+    // retractions/confirmations this run wrote.
+    emitRefreshProgress(options, 'finalize_start', { removedDay: options.removedDay, partialRun: Boolean(firstError) });
     finalized = await finalizeDailyRefresh({ removedDay: options.removedDay, env });
     emitRefreshProgress(options, 'finalize_done', finalized);
+  }
+
+  if (firstError) {
+    firstError.partialTotals = totals;
+    firstError.finalized = finalized;
+    throw firstError;
   }
 
   return {
@@ -1342,6 +1382,8 @@ module.exports = {
   fetchMarketplaceRowsForExpansion,
   finalizeDailyRefresh,
   integerOrNull,
+  isCardTraderAuthenticationRejection,
+  isTransientCardTraderFetchError,
   normalizeCardTraderMarketProduct,
   normalizeRefreshOptions,
   parseIntegerList,

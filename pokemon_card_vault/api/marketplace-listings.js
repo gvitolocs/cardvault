@@ -1,4 +1,5 @@
 const { marketplaceQuery, marketplaceWriteQuery } = require('./_marketplace_db');
+const { runWithGame } = require('./_marketplace_game');
 const { getFirebaseAdmin, verifyBearerToken } = require('./_firebase');
 const { requireReserveAccess } = require('./_firebase_roles');
 const { publicSellerComment } = require('./_seller_comment_filter');
@@ -8,6 +9,12 @@ const {
     PKNRESERVE_SELLER_USERNAME,
   },
 } = require('./cardtrader-live-listings');
+const {
+  destroyLinkedCardTraderProduct,
+  normalizeTargets,
+  pushAndLinkListing,
+  pushListingToCardTrader,
+} = require('./_cardtrader_seller_listings');
 
 function cleanLimit(value, fallback = 500) {
   if (value === undefined || value === null || value === '') return fallback;
@@ -261,7 +268,7 @@ function syntheticCardTraderListingRow({ listing, seller, fallbackCardId }) {
       sellerComment: publicSellerComment(listing.sellerComment),
       sourcePrice: listing.price == null ? null : Number(listing.price),
       sourceCurrency: cleanText(listing.currency, 12) || 'EUR',
-      markupPkn: 200,
+      markupPkn: 0,
       nftTag: true,
     },
     status: 'active',
@@ -568,7 +575,10 @@ async function readListings(url, decoded) {
   }
   values.push(cleanLimit(url.searchParams.get('limit')));
   const qualifiedWhere = addListingTableAlias(where);
-  const result = await marketplaceQuery(
+  // marketplace_user_listings lives in the central marketplace DB; a game
+  // scope (AsyncLocalStorage) points marketplaceQuery at the game catalog
+  // DB, which has no listings table — pin the read to pokemon (central).
+  const result = await runWithGame('pokemon', () => marketplaceQuery(
     `
       select
         listings.*
@@ -578,7 +588,7 @@ async function readListings(url, decoded) {
       limit $${values.length}
     `,
     values,
-  );
+  ));
   const enrichedRows = sellerUsername
     ? result.rows
     : await enrichListingRowsWithSellerProfiles(result.rows);
@@ -618,6 +628,7 @@ function isReserveListingRow(row = {}) {
 
 async function createListing(req, decoded) {
   const body = req.body || {};
+  const targets = normalizeTargets(body.targets || {});
   const pricePkn = Number(body.pricePkn);
   const quantityAvailable = Number(body.quantityAvailable);
   const reserveListing = isReserveListingBody(body);
@@ -640,6 +651,38 @@ async function createListing(req, decoded) {
   if (reserveListing) {
     await requireReserveAccess(decoded);
   }
+
+  let cardtrader = { ok: true, skipped: true, reason: 'not_requested' };
+
+  // CardTrader-only: push to CT without a Pokoin sellable row.
+  if (!targets.pokoin && targets.cardtrader) {
+    const firestore = getFirebaseAdmin().firestore();
+    try {
+      const pushed = await pushListingToCardTrader({
+        firestore,
+        uid: decoded.uid,
+        listing: {
+          cardId: cleanText(body.cardId, 80),
+          pricePkn,
+          quantityAvailable,
+          condition: cleanText(body.condition, 20) || 'NM',
+          language: cleanText(body.language, 10) || 'EN',
+          signed: body.signed === true,
+          reverse: body.reverse === true,
+          firstEdition: body.firstEdition === true,
+          foilState: cleanText(body.foilState, 40) || (body.reverse === true ? 'reverse' : 'standard'),
+          graded: body.graded === true,
+          altered: body.altered === true,
+          sellerComment: cleanText(body.sellerComment, 500),
+        },
+      });
+      cardtrader = { ok: true, productId: pushed.productId, sourceListingId: pushed.sourceListingId };
+    } catch (error) {
+      cardtrader = { ok: false, error: error.message || 'CardTrader create failed.' };
+    }
+    return { listing: null, cardtrader, targets };
+  }
+
   await verifyOwnedNftForListing({
     uid: decoded.uid,
     body,
@@ -705,9 +748,39 @@ async function createListing(req, decoded) {
     values,
   );
   const [row] = await enrichListingRowsWithSellerProfiles(result.rows);
-  const listing = listingRow(row || result.rows[0], { owner: true });
+  let listing = listingRow(row || result.rows[0], { owner: true });
   await refreshPriceSummary(listing.cardId);
-  return listing;
+
+  if (targets.cardtrader) {
+    const firestore = getFirebaseAdmin().firestore();
+    try {
+      const pushed = await pushAndLinkListing({
+        firestore,
+        uid: decoded.uid,
+        listing: {
+          id: listing.id,
+          cardId: listing.cardId,
+          pricePkn: listing.pricePkn,
+          quantityAvailable: listing.quantityAvailable,
+          condition: listing.condition,
+          language: listing.language,
+          signed: listing.signed,
+          reverse: listing.reverse,
+          firstEdition: listing.firstEdition,
+          foilState: listing.foilState,
+          graded: listing.graded,
+          altered: listing.altered,
+          sellerComment: listing.sellerComment,
+        },
+      });
+      cardtrader = { ok: true, productId: pushed.productId, sourceListingId: pushed.sourceListingId };
+      listing = { ...listing, sourceListingId: pushed.sourceListingId };
+    } catch (error) {
+      cardtrader = { ok: false, error: error.message || 'CardTrader create failed.' };
+    }
+  }
+
+  return { ...listing, cardtrader, targets };
 }
 
 async function updateListing(req, decoded, id) {
@@ -798,14 +871,37 @@ async function updateListing(req, decoded, id) {
   const [row] = await enrichListingRowsWithSellerProfiles(result.rows);
   const listing = listingRow(row || result.rows[0], { owner: true });
   await refreshPriceSummary(listing.cardId);
+
+  const becameInactive = status === 'inactive' || status === 'sold_out'
+    || (quantityValue !== undefined && Number(quantityValue) === 0);
+  if (becameInactive && existingListing.source_listing_id) {
+    try {
+      const firestore = getFirebaseAdmin().firestore();
+      await destroyLinkedCardTraderProduct({
+        firestore,
+        uid: decoded.uid,
+        sourceListingId: existingListing.source_listing_id,
+        quantity: Number(existingListing.quantity_available) || 0,
+      });
+    } catch (error) {
+      console.error('linked CardTrader destroy on cancel failed', {
+        listingId: id,
+        message: error.message,
+      });
+    }
+  }
+
   return listing;
 }
 
-async function decrementListing(req, id) {
+// Seller-only manual stock decrement. Checkout decrements through
+// marketplace-orders; nobody else may reduce another seller's stock.
+async function decrementListing(req, decoded, id) {
   const quantity = Number(req.body?.quantity || 0);
   if (!Number.isSafeInteger(quantity) || quantity <= 0) {
     return null;
   }
+  await readListingForOwner(id, decoded.uid);
   const result = await marketplaceWriteQuery(
     `
       update public.marketplace_user_listings
@@ -814,9 +910,10 @@ async function decrementListing(req, id) {
         status = case when greatest(quantity_available - $2, 0) = 0 then 'sold_out' else status end,
         updated_at = now()
       where id = $1
+        and seller_uid = $3
       returning *
     `,
-    [id, quantity],
+    [id, quantity, decoded.uid],
   );
   const enrichedRows = result.rows[0]
     ? await enrichListingRowsWithSellerProfiles(result.rows)
@@ -834,6 +931,11 @@ async function readPublicOffersForCard(cardId, limit = 40, options = {}) {
   url.searchParams.set('limit', String(limit));
   if (options.nativeOnly) {
     url.searchParams.set('nativeOnly', '1');
+  }
+  // The edge defaults to the pokemon game scope; game card desks must forward
+  // their game or the listings filter hides every tagged row.
+  if (options.game) {
+    url.searchParams.set('game', String(options.game));
   }
   return readListings(url, null);
 }
@@ -859,12 +961,17 @@ module.exports = async function handler(req, res) {
     const action = cleanText(url.searchParams.get('action'), 40);
 
     if (req.method === 'POST' && action === 'decrement' && id) {
-      const listing = await decrementListing(req, id);
+      const listing = await decrementListing(req, decoded, id);
       return res.status(200).json({ listing });
     }
     if (req.method === 'POST') {
-      const listing = await createListing(req, decoded);
-      return res.status(200).json(listing);
+      const created = await createListing(req, decoded);
+      // Back-compat: desk clients that expect a bare listing still get listing fields
+      // at the top level when a Pokoin row was created.
+      if (created && created.listing === null) {
+        return res.status(200).json(created);
+      }
+      return res.status(200).json(created);
     }
     if (req.method === 'PATCH' && id) {
       const listing = await updateListing(req, decoded, id);

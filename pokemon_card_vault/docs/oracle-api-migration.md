@@ -245,11 +245,12 @@ Do not move `api/*.js` into subfolders — the server maps `/api/foo` to
 - `GET` `/api/marketplace-competitive` — Return Limitless-backed competitive deck metagame, deck detail, tournament, standings, and pairings data for the marketplace competitive page.
 - `GET` `/api/marketplace-hot-blueprints` — Return hot marketplace blueprint rows and rolling interaction counts.
 
-### Listings / cart / orders (`commerce`, 6)
+### Listings / cart / orders (`commerce`, 7)
 
 - `POST` `/api/marketplace-cart` — Record marketplace cart add/remove analytics with optional verified user context.
 - `POST` `/api/marketplace-event` — Record public marketplace interaction/search events and refresh hot-card aggregates opportunistically.
 - `GET|POST|PATCH` `/api/marketplace-listings` — Read public active listings and create/update/decrement authenticated seller listings.
+- `GET|POST` `/api/marketplace-listings-csv` — Export authenticated seller inventory or preview/import PowerTools, Cardmarket, and CardTrader stock CSV files.
 - `POST` `/api/marketplace-orders` — Create paid marketplace orders, decrement listings, credit sellers, and send seller notifications.
 - `GET|PUT|POST|OPTIONS` `/api/marketplace-recents` — Signed-in recently seen public card ids. Writer is nezopt 15T. Tile JSON is not stored.
 - `POST` `/api/marketplace-watchlist` — Record marketplace watchlist add/remove analytics with optional verified user context.
@@ -262,7 +263,7 @@ Do not move `api/*.js` into subfolders — the server maps `/api/foo` to
 - `GET|POST|OPTIONS` `/api/scan-session` — Desktop Scan Session: start/resume with pairing code, regenerate code, disconnect phone, pause, end.
 - `GET|OPTIONS` `/api/scan-stream` — Server-sent change stream for one Scan Batch (rows, defaults, session) with cursor replay; closes after 55 s.
 
-### CardTrader (`cardtrader`, 11)
+### CardTrader (`cardtrader`, 13)
 
 - `GET|OPTIONS` `/api/cardtrader-blueprint-listings` — Return historical/daily CardTrader marketplace listing snapshots for one blueprint/card ID from Oracle.
 - `GET|OPTIONS` `/api/cardtrader-live-listings` — Return live on-demand CardTrader marketplace listings for one blueprint/card ID without persisting results.
@@ -270,7 +271,9 @@ Do not move `api/*.js` into subfolders — the server maps `/api/foo` to
 - `POST|DELETE` `/api/cardtrader-connect` — Connect, replace, or disconnect an authenticated seller CardTrader token.
 - `GET|POST` `/api/cardtrader-daily-listings-refresh` — Manual/admin diagnostic trigger for global CardTrader marketplace listing snapshots; scheduled ingestion is owned by the Oracle/peer4 host script.
 - `GET|POST|OPTIONS` `/api/ingest/:game` — List or run an isolated non-Pokemon CardTrader game ingest on the Oracle 15T service. Pokemon remains on pi-home.
+- `GET|POST|OPTIONS` `/api/cardtrader-game-ingest` — List isolated satellite-game ingest services, inspect one game, or run a bounded authorized CardTrader ingest.
 - `POST` `/api/cardtrader-disconnect` — Disconnect the authenticated seller CardTrader integration.
+- `POST` `/api/cardtrader-webhook/:uid` — Receive CardTrader order webhooks for a connected seller and decrement linked Pokoin inventory.
 - `POST` `/api/cardtrader-import-dry-run` — Read the authenticated seller CardTrader export and return a redacted import summary without writing inventory.
 - `GET` `/api/cardtrader-redirect` — Redirect a public card id or leftover ct_id to the CardTrader leftover blueprint page.
 - `GET` `/api/cardtrader-status` — Return safe CardTrader integration status for the authenticated seller.
@@ -282,11 +285,12 @@ Do not move `api/*.js` into subfolders — the server maps `/api/foo` to
 - `POST|OPTIONS` `/api/cardmarket-scrape-observation` — Record Cardmarket scrape/association observations used by marketplace import review tooling.
 - `GET` `/api/marketplace-cardmarket-guess-review` — Return protected Cardmarket guess review data for search/debug operators.
 
-### Auth (`auth`, 3)
+### Auth (`auth`, 4)
 
 - `POST|OPTIONS` `/api/auth-login` — Validate the current Firebase bearer token and return safe auth metadata.
 - `POST` `/api/cache-google-profile-picture` — Download the authenticated user Google avatar, optimize it, and store it in R2.
 - `GET|POST` `/api/user-current-page` — Store or read the current internal Pokoin page for an assistant browser session.
+- `POST` `/api/ensure-username` — Return the caller username registered in usernames/{name} (repairing or assigning it), or claim a new exact username.
 
 ### PKN / Stripe (`payments`, 8)
 
@@ -318,8 +322,9 @@ Do not move `api/*.js` into subfolders — the server maps `/api/foo` to
 - `GET|POST` `/api/marketplace-debug-refinement` — Inspect and update marketplace search refinement/debug data.
 - `GET|POST|OPTIONS` `/api/marketplace-image-log` — Ring-buffer exact marketplace image URLs served or failed during navigation.
 
-### Other (`other`, 28)
+### Other (`other`, 29)
 
+- `GET|POST` `/api/chat` — List and read authenticated direct conversations, send messages, and create atomic PKN payment events.
 - `GET|POST` `/api/chat` — List and read canonical direct conversations, post messages, transfer PKN, and update read state.
 - `GET|POST|OPTIONS` `/api/deck-card-version-lookup` — Return ranked marketplace card versions for structured decklist card fields.
 - `GET` `/api/forum` — Read forum categories, topic lists, or a single topic with posts.
@@ -333,7 +338,7 @@ Do not move `api/*.js` into subfolders — the server maps `/api/foo` to
 - `GET|OPTIONS` `/api/marketplace-card-tiles` — Pi card tiles by public id. No Supabase.
 - `GET` `/api/marketplace-collection-summary` — Authenticated owned-card totals for dashboard Portfolio. Admin Firestore read; uid only from verified bearer.
 - `GET` `/api/marketplace-collection` — Authenticated owned holdings rows for /collection (physical + NFT). Admin Firestore read; uid only from verified bearer.
-- `GET|POST` `/api/money-request` — Create and manage canonical PKN money requests, their chat events, ledger transfers, and notifications.
+- `GET|POST` `/api/money-request` — Create, list, pay, decline, cancel, and mark notifications for authenticated PKN requests.
 - `POST` `/api/register-email` — Start email/password signup by storing pending signup data and sending verification mail, or resend a pending verification (resend: true) with per-email rate limiting.
 - `POST` `/api/remove-profile-picture` — Remove the authenticated user custom profile picture and delete old R2 object when present.
 - `POST` `/api/request-pkn-withdraw` — Withdraw PKN from site balance to a linked native PKN address.
@@ -362,6 +367,19 @@ Do not move `api/*.js` into subfolders — the server maps `/api/foo` to
 - body: No required JSON body fields.
 - Notable env vars: `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`
 - External dependencies: Firebase Admin
+
+### /api/chat
+
+- File: `api/chat.js`
+- Methods: `GET`, `POST`
+- Purpose: List and read authenticated direct conversations, send messages, and create atomic PKN payment events.
+- Auth: Required Firebase bearer token; conversation membership is rechecked for every action.
+- Migration status: Hosted by `server/oracle-api-server.js`; Vercel fallback remains available until the proxy rewrite is enabled.
+- Required query/body/path params:
+- query: `action` is `list`, `get`, `message`, `pay`, or `read`; `peer` is used by GET conversation reads.
+- body: `peer` plus `text`, `amountPkn`, or read/payment fields according to action.
+- Notable env vars: `FIREBASE_*`
+- External dependencies: Firebase Admin / Firestore
 
 ### /api/cache-google-profile-picture
 
@@ -465,13 +483,26 @@ Do not move `api/*.js` into subfolders — the server maps `/api/foo` to
 - File: `api/cardtrader-game-ingest.js`
 - Methods: `GET`, `POST`, `OPTIONS`
 - Purpose: List or run an isolated non-Pokemon CardTrader game ingest on the Oracle 15T service. Pokemon remains on pi-home.
-- Auth: GET status is public. POST requires CARDTRADER_INGEST_SECRET, a daily refresh secret, or CRON_SECRET.
+- Auth: Status and writes for a selected game require the configured CardTrader ingest service secret.
 - Migration status: Hosted by `server/oracle-api-server.js`; Vercel fallback remains available until the proxy rewrite is enabled.
 - Required query/body/path params:
 - query: `game` route parameter or query value; bounded importer controls are accepted for POST.
 - body: `game`, `apply`, `discoverOnly`, and bounded import controls for POST.
-- Notable env vars: `CARDTRADER_AUTH_TOKEN`, `CARDTRADER_API_TOKEN`, `CARDTRADER_INGEST_SECRET`, `CARDTRADER_DAILY_LISTINGS_SECRET`, `CARDTRADER_DAILY_REFRESH_SECRET`, `CRON_SECRET`, `POKOIN_API_SERVICE_NAME`, `*_MARKETPLACE_DATABASE_URL`
+- Notable env vars: `CARDTRADER_GAME_INGEST_SECRET`, `CARDTRADER_AUTH_TOKEN`, `ONE_PIECE_MARKETPLACE_DATABASE_URL`, `RIFTBOUND_MARKETPLACE_DATABASE_URL`
 - External dependencies: CardTrader API, isolated non-Pokemon Oracle/Postgres game databases on nezopt 15T
+
+### /api/cardtrader-game-ingest
+
+- File: `api/cardtrader-game-ingest.js`
+- Methods: `GET`, `POST`, `OPTIONS`
+- Purpose: List isolated satellite-game ingest services, inspect one game, or run a bounded authorized CardTrader ingest.
+- Auth: Status and writes for a selected game require the configured CardTrader ingest service secret.
+- Migration status: Hosted by `server/oracle-api-server.js`; Vercel fallback remains available until the proxy rewrite is enabled.
+- Required query/body/path params:
+- query: `game` selects One Piece or Riftbound for GET status.
+- body: `game` plus bounded discover/apply importer controls for POST.
+- Notable env vars: `CARDTRADER_GAME_INGEST_SECRET`, `CARDTRADER_AUTH_TOKEN`, `ONE_PIECE_MARKETPLACE_DATABASE_URL`, `RIFTBOUND_MARKETPLACE_DATABASE_URL`
+- External dependencies: CardTrader API, isolated Oracle/Postgres game databases
 
 ### /api/cardtrader-disconnect
 
@@ -484,6 +515,20 @@ Do not move `api/*.js` into subfolders — the server maps `/api/foo` to
 - body: No required fields.
 - Notable env vars: `FIREBASE_*`
 - External dependencies: Firebase Admin
+
+### /api/cardtrader-webhook/:uid
+
+- File: `api/cardtrader-webhook.js`
+- Methods: `POST`
+- Purpose: Receive CardTrader order webhooks for a connected seller and decrement linked Pokoin inventory.
+- Auth: CardTrader Signature HMAC using the seller shared_secret.
+- Migration status: Hosted by `server/oracle-api-server.js`; Vercel fallback remains available until the proxy rewrite is enabled.
+- Required query/body/path params:
+- path: `uid` Firebase seller uid registered as the webhook URL suffix.
+- body: Raw CardTrader webhook JSON (order.create / order.update / order.destroy).
+- Notable env vars: `CARDTRADER_TOKEN_ENCRYPTION_KEY`, `FIREBASE_*`, `MARKETPLACE_DATABASE_URL`, `MARKETPLACE_WRITER_DATABASE_URL`
+- External dependencies: Firebase Admin, Oracle/Postgres marketplace writer, CardTrader webhooks
+- Raw body: required. The standalone server does not pre-parse this route so Stripe signature verification receives the original bytes.
 
 ### /api/cardtrader-import-dry-run
 
@@ -1098,6 +1143,19 @@ Do not move `api/*.js` into subfolders — the server maps `/api/foo` to
 - Notable env vars: `MARKETPLACE_DATABASE_URL`, `FIREBASE_*`
 - External dependencies: Oracle/Postgres marketplace DB, Firebase Admin
 
+### /api/marketplace-listings-csv
+
+- File: `api/marketplace-listings-csv.js`
+- Methods: `GET`, `POST`
+- Purpose: Export authenticated seller inventory or preview/import PowerTools, Cardmarket, and CardTrader stock CSV files.
+- Auth: Required Firebase bearer token; all reads and writes are scoped to the decoded seller uid.
+- Migration status: Hosted by `server/oracle-api-server.js`; Vercel fallback remains available until the proxy rewrite is enabled.
+- Required query/body/path params:
+- query: `format` selects `powertools`, `cardmarket`, or `cardtrader` for GET export.
+- body: `csv`, optional `format`, `stackSize`, `priceMode`, and `dryRun` for POST import.
+- Notable env vars: `MARKETPLACE_DATABASE_URL`, `MARKETPLACE_WRITER_DATABASE_URL`, `FIREBASE_*`
+- External dependencies: Oracle/Postgres marketplace DB, Firebase Admin
+
 ### /api/marketplace-collection-summary
 
 - File: `api/marketplace-collection-summary.js`
@@ -1199,14 +1257,14 @@ Do not move `api/*.js` into subfolders — the server maps `/api/foo` to
 
 - File: `api/money-request.js`
 - Methods: `GET`, `POST`
-- Purpose: Create and manage canonical PKN money requests, their chat events, ledger transfers, and notifications.
-- Auth: Required Firebase bearer token; request participants and state transitions are enforced server-side.
+- Purpose: Create, list, pay, decline, cancel, and mark notifications for authenticated PKN requests.
+- Auth: Required Firebase bearer token; request parties and status transitions are enforced server-side.
 - Migration status: Hosted by `server/oracle-api-server.js`; Vercel fallback remains available until the proxy rewrite is enabled.
 - Required query/body/path params:
-- query: `action=list|notifications` for GET; POST actions include `create`, `pay`, `decline`, `cancel`, and `read-notifications`.
-- body: Creation accepts recipient username, amount, optional note/client token; mutations accept a request ID.
+- query: `action` selects list, notifications, create, pay, decline, cancel, or read-notifications.
+- body: Create uses `recipientUsername`, `amountPkn`, optional `note` and `clientToken`; mutations use `requestId`.
 - Notable env vars: `FIREBASE_*`
-- External dependencies: Firebase Admin, Firestore
+- External dependencies: Firebase Admin / Firestore
 
 ### /api/pokoin-assistant
 
@@ -1368,6 +1426,18 @@ Do not move `api/*.js` into subfolders — the server maps `/api/foo` to
 - query: `batchId`, `after` cursor.
 - Notable env vars: `MARKETPLACE_WRITER_DATABASE_URL`, `MARKETPLACE_DATABASE_URL`, `FIREBASE_*`
 - External dependencies: Oracle/Postgres marketplace writer, Firebase Admin
+
+### /api/ensure-username
+
+- File: `api/ensure-username.js`
+- Methods: `POST`
+- Purpose: Return the caller username registered in usernames/{name} (repairing or assigning it), or claim a new exact username.
+- Auth: Required Firebase bearer token.
+- Migration status: Hosted by `server/oracle-api-server.js`; Vercel fallback remains available until the proxy rewrite is enabled.
+- Required query/body/path params:
+- body: Optional `username` (3-32 a-z0-9) to claim; empty body ensures the current one.
+- Notable env vars: `FIREBASE_*`
+- External dependencies: Firebase Admin
 
 ### /api/search-recipient-emails
 

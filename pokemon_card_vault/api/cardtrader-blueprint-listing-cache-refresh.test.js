@@ -113,13 +113,13 @@ test('CardTrader listing cache filters true Zero flags and explicit 1-Day Ready'
   assert.deepEqual(rows.map((row) => row.shippingMode), ['one_day_ready', 'zero', 'zero']);
 });
 
-test('CardTrader listing cache computes PKN with existing +200 markup', () => {
+test('CardTrader listing cache computes PKN at dump rate without shipping pad', () => {
   const refresh = loadRefreshModuleWithStubs();
   assert.equal(
-    refresh.marketplacePricePknFromCardTrader(4, null, 'EUR', { PKN_CHECKOUT_USDT_PRICE: '0.01' }) +
-      refresh.CARDTRADER_MARKUP_PKN,
-    600,
+    refresh.marketplacePricePknFromCardTrader(4, null, 'EUR', { PKN_CHECKOUT_USDT_PRICE: '0.01' }),
+    400,
   );
+  assert.equal(refresh.CARDTRADER_MARKUP_PKN, 0);
 });
 
 test('CardTrader listing cache upsert writes cache only and clears scoped misses', async () => {
@@ -146,6 +146,8 @@ test('CardTrader listing cache upsert writes cache only and clears scoped misses
 
   assert.equal(result.deletedCount, 1);
   assert.match(calls[0].sql, /insert into public\.cardtrader_blueprint_listing_cache/);
+  assert.doesNotMatch(calls[0].sql, /\+\s*200\s+as\s+price_pkn/);
+  assert.match(calls[0].sql, /marketplace_price_pkn_from_cardtrader\([\s\S]*?\)\s+as\s+price_pkn/);
   assert.match(calls[0].sql, /delete from public\.cardtrader_blueprint_listing_cache/);
   assert.doesNotMatch(calls[0].sql, /insert into public\.cardtrader_market_listing_snapshots/);
   assert.doesNotMatch(calls[0].sql, /refresh_cardtrader_market_listing_snapshots/);

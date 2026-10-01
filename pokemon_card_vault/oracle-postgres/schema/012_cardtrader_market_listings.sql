@@ -210,7 +210,7 @@ begin
         snapshot.price,
         snapshot.price_cents,
         snapshot.currency
-      ) + 200 as price_pkn,
+      ) as price_pkn,
       snapshot.quantity,
       'zero'::text as shipping_mode,
       snapshot.seller_country,

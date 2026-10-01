@@ -86,15 +86,23 @@
     "085_leftover_artwork_identity.sql",
     "086_disappearance_inferred_sales.sql",
     "087_sold_episode_dedup.sql",
-    "088_seller_stack_continuity.sql"
+    "088_seller_stack_continuity.sql",
+    "089_remove_cardtrader_cache_pkn_shipping_pad.sql",
+    "092_native_cheapest_blueprint_key.sql",
+    "093_cardtrader_confirm_three_complete_dumps.sql",
+    "094_continuity_residual_respects_confirmation.sql",
+    "101_listing_min_age_three_days.sql",
+    "102_sold_daily_set_based_rebuild.sql",
+    "103_seller_store_withdrawal_not_sale.sql",
+    "104_store_withdrawal_set_based_survivors.sql"
   ],
   "allowedDuplicatePrefixes": {
     "003": "Historical split between CardTrader listing cache and marketplace search RPC work; preserve apply order until renumbered in a planned migration cleanup.",
     "013": "Historical split between assistant current-page storage and cheapest homepage cache compatibility view; preserve apply order until renumbered in a planned migration cleanup.",
-    "026": "CardTrader expansion refresh and multigame marketplace projections landed as separate 026 files; preserve their lexical apply order.",
+    "026": "CardTrader expansion refresh and multigame projection support landed independently under the same historical prefix; preserve sorted apply order.",
     "043": "Sold-daily sample count and JP Megalo Cannon nationality pin landed as separate 043 files; preserve apply order until renumbered.",
     "050": "JP Eevee GX nationality and sales sanitization landed as separate 050 files; preserve apply order until renumbered.",
     "051": "Sales cutover sanitization and search aliases landed as separate 051 files; preserve apply order until renumbered.",
-    "070": "Listing quantity diff support and leftover art shading landed as separate 070 files; preserve their lexical apply order."
+    "070": "Listing quantity-diff tracking and leftover art shades are independent migrations that share the historical 070 prefix; preserve sorted apply order."
   }
 }

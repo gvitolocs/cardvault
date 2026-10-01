@@ -98,6 +98,55 @@ async function purchaseCart(token) {
   });
 }
 
+async function createProduct(token, payload = {}) {
+  return cardTraderRequest('/products', cleanToken(token), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+async function updateProduct(token, productId, payload = {}) {
+  const id = cleanText(productId, 80);
+  return cardTraderRequest(`/products/${encodeURIComponent(id)}`, cleanToken(token), {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+async function destroyProduct(token, productId) {
+  const id = cleanText(productId, 80);
+  return cardTraderRequest(`/products/${encodeURIComponent(id)}`, cleanToken(token), {
+    method: 'DELETE',
+  });
+}
+
+async function updateAppWebhookUrl(token, webhookUrl) {
+  return cardTraderRequest('/app', cleanToken(token), {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      webhook_url: webhookUrl == null ? '' : String(webhookUrl),
+    }),
+  });
+}
+
+function cardTraderWebhookUrlForUid(uid) {
+  const base = String(process.env.CARDTRADER_WEBHOOK_BASE_URL || 'https://api.pokoin.com')
+    .trim()
+    .replace(/\/+$/, '');
+  const cleanUid = cleanText(uid, 160);
+  if (!cleanUid) return '';
+  return `${base}/api/cardtrader-webhook/${encodeURIComponent(cleanUid)}`;
+}
+
 function normalizeInfo(info = {}) {
   const user = info.user && typeof info.user === 'object' ? info.user : {};
   const app = info.app && typeof info.app === 'object' ? info.app : {};
@@ -153,7 +202,10 @@ function safeProductSample(row = {}) {
 module.exports = {
   addProductToCart,
   cardTraderRequest,
+  cardTraderWebhookUrlForUid,
   cleanToken,
+  createProduct,
+  destroyProduct,
   fetchCart,
   fetchMarketplaceProducts,
   fetchProductsExport,
@@ -161,5 +213,7 @@ module.exports = {
   normalizeInfo,
   purchaseCart,
   safeInfoMetadata,
+  updateAppWebhookUrl,
+  updateProduct,
   validateCardTraderToken,
 };

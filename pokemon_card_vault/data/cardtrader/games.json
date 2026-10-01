@@ -11,8 +11,8 @@
   },
   {
     "id": 5,
-    "display_name": "Pokémon",
-    "name": "Pokémon"
+    "display_name": "Pok\u00e9mon",
+    "name": "Pok\u00e9mon"
   },
   {
     "id": 6,
@@ -68,5 +68,13 @@
     "id": 24,
     "display_name": "Sorcery: Contested Realm",
     "name": "Sorcery"
+  },
+  {
+    "id": 26,
+    "name": "Palworld"
+  },
+  {
+    "id": 27,
+    "name": "Cyberpunk"
   }
 ]
