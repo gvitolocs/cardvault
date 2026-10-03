@@ -13,6 +13,24 @@ Use this file for notable incidents and verified fixes. Link to PRs/commits when
 - **Risk area** (payments / auth / wallet / migrations / blockchain):
 ```
 
+### 2026-10-01 — Local preview quick suggestions restored
+- **Symptom**: Full search worked locally, but typing in the home search bar showed no quick matches.
+- **Root cause**: The development gateway allowed candidate POSTs but rejected autocomplete and token prediction POSTs with 405. The public autocomplete itself returned 8 Pikachu rows with HTTP 200.
+- **Fix**: Allow these two read-only routes with bounded public inputs; do not forward authorization, debug, personalization or session fields. Other POSTs remain rejected.
+- **Verify**: New HTTP regression passes; live LAN relay returns 8 Pikachu suggestions and 5 token predictions. Browser shows the quick dropdown with real artwork without pressing Enter. A second Flutter preview is served on the PC Wi-Fi address, using the matching LAN API relay; actual Android access awaits the user's check. No APK/device, scanner, production deployment or firewall changes were performed.
+
+### 2026-10-01 — Card search returns rows and accepts browser fallback requests
+- **Symptom**: Browser searches for Pikachu and Reshiram returned zero cards. Public search-page reported positive totals (1552 and 8) but no cards; direct candidate POST returned 8 Reshiram versions with artwork.
+- **Root cause**: `rowsForSearchTerm` wrapped the asynchronous `attachThemePacks` result inside `{ rows, total }` without awaiting it. Search-page discarded the Promise because it was not an array. Candidate fallback rejected browser OPTIONS with 405 and omitted CORS headers.
+- **Fix**: Await theme enrichment in both total-bearing return paths; allow OPTIONS/204 and CORS headers on candidate responses; align the route manifest and generated contract docs. The home AppBar now always retains its 1px bottom slot: conditionally inserting/removing it reparented the search field and immediately dropped input focus. No change to card identity, ranking, or data writes.
+- **Verify**: Regression covers actual Meili hydration/theme wrapper flowing through search-page serialization and candidate browser preflight. 24 focused Node tests, API checks, targeted Dart analysis, and Flutter web compilation passed. Browser: typing Pikachu on the home page retains focus; Enter opens 100 real results with art and prices. Reshiram & Zekrom returns 8 versions with art, including 3 Cosmic Eclipse printings. A loopback-only preview service reads real public candidate data when no local DB is configured; it does not publish these production fixes. Flutter preview uses `MARKETPLACE_API_BASE_URL=http://127.0.0.1:5001`; the public API still needs the patch deployed.
+
+### 2026-10-01 — Marketplace discovery home and fixed utility navigation
+- **Change**: Home search and cart stay at the top; recent expansion artwork and backend-ranked best sellers use horizontal sliders. The fixed bottom utility bar opens search, card scanner (`/cardscan`), the requested public dashboard (`https://pokoin.com/dashboard`), and profile/auth. Mobile no longer shows the featured/recent-card lists or the large footer panel; desktop retains the existing catalog below discovery.
+- **Data**: Expansion index and expansion-filtered search use the existing CORS-enabled `marketplace-expansion-page` BFF (up to 400 cards per expansion query). The legacy versions endpoint returned no cards in the local browser; the BFF was verified with 44/44 cards for CSVNC: Land of Kitakami Special Pack. Live new-arrival set hints, optional real release dates, then the bundled CardTrader catalog order provide recency; catalog insertion IDs are only a fallback, not release timestamps. Best sellers use backend section IDs, never an expensive-card fallback.
+- **Build repair**: Main had removed `user_card_collection_service.dart` while active providers still imported it. Restore only the read methods required to compile; no collection mutation helpers or permission changes were added.
+- **Verify**: Ten ranking/navigation/responsive widget tests passed in an isolated harness with the exact new component/model sources. The full app test command is blocked by the missing Windows C++ toolchain; targeted Dart analysis and actual Flutter web compilation passed. Preview served at `http://127.0.0.1:5000/marketplace`; no production deploy.
+
 ### 2026-10-01 — Client API contract and generated docs match the installed manifest
 - **Symptom**: Local `/api/__contract` and JSON documentation were version `2026-09-22.1` with a frozen count of 83, despite 107 routes in the local manifest. The inspected public release had version `2026-10-01.1` and 130 routes.
 - **Root cause**: `_client_contract.js` contained a manually maintained reference and route count; generated docs reproduced that stale value.

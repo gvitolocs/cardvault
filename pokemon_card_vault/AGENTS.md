@@ -1,5 +1,44 @@
 # Agent instructions (Pokoin / CardVault)
 
+## Mobile app working branch (user workflow)
+
+- `AppMobile` is the user-requested working branch for this mobile app checkout.
+- It replaces `codex/search-images-mobile-filters`; keep local work tracking
+  `origin/AppMobile` after the GitHub branch rename.
+- Do not merge into `main`, force-push, publish releases or deploy production
+  unless the user explicitly requests it.
+- Keep APKs, generated caches and machine-local Android SDK configuration out
+  of source commits. Continue the local APK and Obsidian workflows below.
+
+## Local Android emulator APK (user workflow)
+
+- After changes affecting the Flutter app, Android configuration, dependencies or
+  bundled assets, rebuild the debug emulator APK before handing off the work.
+- On this Windows checkout, run `./scripts/build-emulator-apk.ps1` from
+  `pokemon_card_vault/`. It builds for `android-x64`, checks the packaged Flutter
+  ABI and copies the APK to
+  `C:\Users\raffa\ApkProjects\pokoin-debug-emulator-x86_64\pokoin-debug-emulator-x86_64.apk`.
+- The script backs up the previous APK under `build/emulator-apk-backups/`.
+  Only replace the APK; do not edit the APK Analyzer's extracted `lib/`, `smali/`,
+  manifest or Android Studio project files in that destination directory.
+- Request execution/write approval when the sandbox requires it. If the build or
+  copy fails, report the failure and do not claim the destination is updated.
+- This is a local debug artifact, not a release or production deployment. It
+  does not install the APK on the emulator unless the user asks for installation.
+
+## Local Obsidian updates (user workflow)
+
+- Update the user's local Obsidian documentation after every project change set,
+  before handing off. The existing vault is
+  `C:\Users\raffa\Documents\Obsidian\Pokoin Collaborator\Pokoin`.
+- Read the current hub and relevant notes, update existing claims rather than
+  duplicating them, and keep the file-map MOC and dated Events linked.
+- Preserve existing notes, back up overwritten files, and request write approval
+  when required. Report if an update remains pending; staged notes alone do not
+  count as updating the vault.
+- Follow `../memory/obsidian-documentation.md` for note structure. This local
+  workflow does not synchronize or replace the canonical Pi vault.
+
 ## Production deploy
 
 - **Always** use `./deploy-pokoin-web.sh` for `pokoin.com` production.

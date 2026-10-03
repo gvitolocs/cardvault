@@ -1242,7 +1242,8 @@
     {
       "path": "/api/marketplace-search-candidates",
       "methods": [
-        "POST"
+        "POST",
+        "OPTIONS"
       ],
       "family": "search",
       "purpose": "Return split/search candidate rows for marketplace search diagnostics and clients.",

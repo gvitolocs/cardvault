@@ -1,5 +1,7 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
+const candidateHandler = require('./marketplace-search-candidates');
+const { createHandler: createSearchPage } = require('./marketplace-search-page');
 const {
   nonNameCategoryPlan,
   buildNonNameContext,
@@ -27,6 +29,67 @@ function row({ id, name, set = 'Test Set', number = '001/100', rarity = 'Card', 
     search_rank: rank,
   };
 }
+
+function responseMock() {
+  return {
+    headers: {}, statusCode: 200, body: null,
+    setHeader(key, value) { this.headers[key] = value; },
+    status(code) { this.statusCode = code; return this; },
+    json(body) { this.body = body; return this; },
+    end() { return this; },
+  };
+}
+
+test('browser search fallback accepts JSON POST preflight and exposes CORS on responses', async () => {
+  const preflight = responseMock();
+  await candidateHandler({ method: 'OPTIONS', headers: { origin: 'http://127.0.0.1:5000' } }, preflight);
+  assert.equal(preflight.statusCode, 204);
+  assert.equal(preflight.headers['Access-Control-Allow-Origin'], '*');
+  assert.match(preflight.headers['Access-Control-Allow-Methods'], /POST/);
+  assert.match(preflight.headers['Access-Control-Allow-Headers'], /Content-Type/);
+  assert.match(preflight.headers['Access-Control-Allow-Headers'], /Authorization/);
+  const post = responseMock();
+  await candidateHandler({ method: 'POST', body: { search_term: '' } }, post);
+  assert.equal(post.statusCode, 200);
+  assert.deepEqual(post.body, []);
+  assert.equal(post.headers['Access-Control-Allow-Origin'], '*');
+});
+
+test('search page serializes hydrated Meili cards after asynchronous theme enrichment', async () => {
+  const savedEngine = process.env.MARKETPLACE_SEARCH_ENGINE;
+  const modulePaths = ['./_marketplace_db', './_meili_marketplace', './_marketplace_react_sql', './marketplace-search-candidates'].map(require.resolve);
+  const savedModules = modulePaths.map((path) => require.cache[path]);
+  const card = { ...row({ id: '226324', name: 'Reshiram & Zekrom GX', set: 'Cosmic Eclipse' }), image_url: 'https://cdn.pokoin.com/226324_card.jpg' };
+  try {
+    process.env.MARKETPLACE_SEARCH_ENGINE = 'meili';
+    require.cache[modulePaths[0]] = { exports: { ...savedModules[0].exports, marketplaceQuery: async () => ({ rows: [card] }) } };
+    require.cache[modulePaths[1]] = { exports: { ...savedModules[1].exports, meiliMarketplaceCandidates: async () => ({ hits: [{ card_id: '226324' }], estimatedTotalHits: 8 }) } };
+    require.cache[modulePaths[2]] = { exports: { ...savedModules[2].exports, readCardThemePacks: async () => { await Promise.resolve(); return new Map(); } } };
+    delete require.cache[modulePaths[3]];
+    const isolated = require('./marketplace-search-candidates');
+    const handler = createSearchPage({
+      rowsForCards: ({ query, limit, offset, searchLanguage, ...options }) => isolated.rowsForSearchTerm(query, limit, offset, searchLanguage, null, null, options),
+      overlayCheapestOnRows: async (rows) => rows,
+      attachTitleLanguageOnRows: null,
+      productFacetRows: async () => [],
+    });
+    const res = responseMock();
+    await handler({ method: 'GET', url: '/api/marketplace-search-page?q=Reshiram&includeFacets=0', headers: { host: 'api.pokoin.com' } }, res);
+    const json = JSON.parse(JSON.stringify(res.body));
+    assert.equal(json.total, 8);
+    assert.equal(json.count, 1);
+    assert.equal(json.cards[0].name, 'Reshiram & Zekrom GX');
+    assert.equal(json.cards[0].set, 'Cosmic Eclipse');
+    assert.ok(json.cards[0].imageUrl);
+    const legacy = await isolated.rowsForSearchTerm('Reshiram', 20, 0, 'en');
+    assert.ok(Array.isArray(legacy));
+    assert.equal(legacy[0].card_id, '226324');
+  } finally {
+    modulePaths.forEach((path, index) => { require.cache[path] = savedModules[index]; });
+    if (savedEngine === undefined) delete process.env.MARKETPLACE_SEARCH_ENGINE;
+    else process.env.MARKETPLACE_SEARCH_ENGINE = savedEngine;
+  }
+});
 
 function categoryQueryMock(fixtures) {
   return async (sql, values) => {

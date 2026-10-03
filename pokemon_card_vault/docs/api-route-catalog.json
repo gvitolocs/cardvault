@@ -1682,7 +1682,8 @@
     "path": "/api/marketplace-search-candidates",
     "file": "marketplace-search-candidates.js",
     "methods": [
-      "POST"
+      "POST",
+      "OPTIONS"
     ],
     "purpose": "Return split/search candidate rows for marketplace search diagnostics and clients.",
     "auth": "Public for normal search; debug output requires authorized debug/admin Firebase bearer token.",

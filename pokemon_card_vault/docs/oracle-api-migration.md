@@ -220,7 +220,7 @@ Do not move `api/*.js` into subfolders — the server maps `/api/foo` to
 - `GET|OPTIONS` `/api/marketplace-suggest` — Meili-only typeahead for pokoin-web: grouped printings, no SQL listing hydrate.
 - `POST|OPTIONS` `/api/marketplace-autocomplete` — Return ranked marketplace autocomplete/search suggestions with optional debug metadata.
 - `GET` `/api/marketplace-cards` — Return searchable marketplace card and product rows.
-- `POST` `/api/marketplace-search-candidates` — Return split/search candidate rows for marketplace search diagnostics and clients.
+- `POST|OPTIONS` `/api/marketplace-search-candidates` — Return split/search candidate rows for marketplace search diagnostics and clients.
 - `GET|POST` `/api/searchbar-cancel` — Mark a searchbar session as cancelled for in-process search cancellation checks.
 - `GET|POST` `/api/searchbar-cards` — Stable wrapper around marketplace autocomplete ranking for searchbar experiments and clients.
 - `GET|POST|OPTIONS` `/api/searchbar-token-predict` — Return lightweight card-name token predictions for active typed fragments.
@@ -1220,7 +1220,7 @@ Do not move `api/*.js` into subfolders — the server maps `/api/foo` to
 ### /api/marketplace-search-candidates
 
 - File: `api/marketplace-search-candidates.js`
-- Methods: `POST`
+- Methods: `POST`, `OPTIONS`
 - Purpose: Return split/search candidate rows for marketplace search diagnostics and clients.
 - Auth: Public for normal search; debug output requires authorized debug/admin Firebase bearer token.
 - Migration status: Hosted by `server/oracle-api-server.js`; Vercel fallback remains available until the proxy rewrite is enabled.

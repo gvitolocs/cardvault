@@ -6,6 +6,8 @@ import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:http/http.dart' as http;
 import '../models/pokemon_card.dart';
+import '../models/marketplace_expansion.dart';
+export '../models/marketplace_expansion.dart';
 import '../utils/card_url.dart';
 import 'pokoin_api_auth.dart';
 import 'search_debug_trace.dart';
@@ -83,35 +85,6 @@ class MarketplaceCardCanonicalUrl {
   final String canonicalPath;
   final String language;
   final String publicNumber;
-}
-
-class MarketplaceExpansion {
-  const MarketplaceExpansion({
-    required this.name,
-    required this.slug,
-    required this.cardCount,
-    required this.symbolImageUrl,
-    required this.logoImageUrl,
-    required this.defaultSymbolUrl,
-  });
-
-  factory MarketplaceExpansion.fromJson(Map<String, dynamic> json) {
-    return MarketplaceExpansion(
-      name: '${json['name'] ?? ''}',
-      slug: '${json['slug'] ?? ''}',
-      cardCount: (json['cardCount'] as num?)?.toInt() ?? 0,
-      symbolImageUrl: '${json['symbolImageUrl'] ?? ''}',
-      logoImageUrl: '${json['logoImageUrl'] ?? ''}',
-      defaultSymbolUrl: '${json['defaultSymbolUrl'] ?? ''}',
-    );
-  }
-
-  final String name;
-  final String slug;
-  final int cardCount;
-  final String symbolImageUrl;
-  final String logoImageUrl;
-  final String defaultSymbolUrl;
 }
 
 class MarketplaceExpansionSnapshot {
@@ -3177,9 +3150,13 @@ class CardService {
 
   Future<List<MarketplaceExpansion>> getMarketplaceExpansions({
     String? slug,
+    bool usePageApi = false,
   }) async {
     try {
-      final uri = _marketplaceApiUri('/api/marketplace-expansions',
+      final uri = _marketplaceApiUri(
+        usePageApi
+            ? '/api/marketplace-expansion-page'
+            : '/api/marketplace-expansions',
         queryParameters: {
           if (slug?.trim().isNotEmpty == true) 'slug': slug!.trim(),
           'limit': '1000',
@@ -3190,7 +3167,9 @@ class CardService {
         return const [];
       }
       final payload = jsonDecode(response.body) as Map<String, dynamic>;
-      return (payload['expansions'] as List<dynamic>? ?? const [])
+      final rows = payload['expansions'] as List<dynamic>? ??
+          (payload['expansion'] is Map ? [payload['expansion']] : const []);
+      return rows
           .whereType<Map>()
           .map((row) =>
               MarketplaceExpansion.fromJson(Map<String, dynamic>.from(row)))
@@ -3407,20 +3386,27 @@ class CardService {
     }
   }
 
-  Future<List<PokemonCard>> getCardsByExpansion(String expansionName) async {
+  Future<List<PokemonCard>> getCardsByExpansion(
+    String expansionName, {
+    bool usePageApi = false,
+  }) async {
     final normalizedExpansion = expansionName.trim();
     if (normalizedExpansion.isEmpty) {
       return const [];
     }
-    final cacheKey = 'expansion:${normalizedExpansion.toLowerCase()}';
+    final cacheKey = '${usePageApi ? 'expansion-page' : 'expansion'}:'
+        '${normalizedExpansion.toLowerCase()}';
     final cached = await _cachedCardList(cacheKey);
 
     try {
-      final uri = _marketplaceApiUri('/api/marketplace-card-versions',
+      final uri = _marketplaceApiUri(
+        usePageApi
+            ? '/api/marketplace-expansion-page'
+            : '/api/marketplace-card-versions',
         queryParameters: {
           'expansionName': normalizedExpansion,
           'productType': 'card',
-          'limit': '1000',
+          'limit': usePageApi ? '400' : '1000',
         },
       );
       final response = await http.get(uri).timeout(const Duration(seconds: 6));
@@ -3428,10 +3414,16 @@ class CardService {
       if (response.statusCode >= 400) {
         return const [];
       }
-      final rows = jsonDecode(response.body) as List<dynamic>;
+      final payload = jsonDecode(response.body);
+      final rows = usePageApi
+          ? ((payload as Map<String, dynamic>)['cards'] as List<dynamic>? ??
+              const [])
+          : payload as List<dynamic>;
       final cards = rows
           .whereType<Map>()
-          .map((row) => _cardFromVersionRow(Map<String, dynamic>.from(row)))
+          .map((row) => usePageApi
+              ? _pokemonCardFromApiMap(Map<String, dynamic>.from(row))
+              : _cardFromVersionRow(Map<String, dynamic>.from(row)))
           .toList();
       final sorted = _sortCardsByCollectorNumber(_dedupeCards(cards));
       await _saveCardList(cacheKey, sorted);

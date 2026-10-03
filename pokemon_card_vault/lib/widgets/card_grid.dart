@@ -366,12 +366,33 @@ class CardItem extends ConsumerWidget {
                               ],
                             )
                           : ElevatedButton.icon(
-                              onPressed: null,
-                              icon:
-                                  const Icon(Icons.add_shopping_cart, size: 16),
-                              label: const Text('Unavailable'),
+                              onPressed: card.isMarketAvailable
+                                  ? () async {
+                                      final added = await ref
+                                          .read(cartProvider.notifier)
+                                          .addBestAvailableListingToCart(card);
+                                      if (!context.mounted) return;
+                                      final error = ref.read(cartProvider).error;
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        SnackBar(
+                                          content: Text(added
+                                              ? '${card.name} added to cart'
+                                              : error ??
+                                                  '${card.name} is currently unavailable'),
+                                        ),
+                                      );
+                                    }
+                                  : null,
+                              icon: const Icon(Icons.add_shopping_cart,
+                                  size: 16),
+                              label: Text(card.isMarketAvailable
+                                  ? 'Add to cart'
+                                  : 'Unavailable'),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.grey,
+                                backgroundColor: card.isMarketAvailable
+                                    ? AppColors.primary
+                                    : Colors.grey,
                                 foregroundColor: Colors.white,
                                 padding:
                                     const EdgeInsets.symmetric(vertical: 8),

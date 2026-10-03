@@ -35,6 +35,7 @@ import '../utils/price_format.dart';
 import '../widgets/artist_suggestion_field.dart';
 import '../widgets/listing_metadata_chips.dart';
 import '../widgets/marketplace_network_image.dart';
+import '../widgets/marketplace_mobile_listing.dart';
 import 'home_screen.dart'
     show
         MarketplaceLogoButton,
@@ -5851,36 +5852,24 @@ class _ListingsHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final header = Container(
-      width: compact ? 520 : null,
+    return Container(
+      width: double.infinity,
       padding: EdgeInsets.symmetric(
-        horizontal: compact ? 10 : 16,
+        horizontal: compact ? 12 : 16,
         vertical: 12,
       ),
       color: const Color(0xFF111B3F),
-      child: Row(
-        children: compact
-            ? const [
-                SizedBox(width: 112, child: _HeaderText('Seller')),
-                SizedBox(width: 100, child: _HeaderText('Product')),
-                SizedBox(width: 96, child: _HeaderText('Price / Qty')),
-                SizedBox(width: 132, child: _HeaderText('Actions')),
-              ]
-            : const [
+      child: compact
+          ? const _HeaderText('Seller · Product · Price / Qty')
+          : const Row(
+              children: [
                 Expanded(flex: 3, child: _HeaderText('Seller')),
                 Expanded(flex: 3, child: _HeaderText('Product')),
                 Expanded(flex: 2, child: _HeaderText('Price')),
                 Expanded(child: _HeaderText('Qty')),
                 SizedBox(width: 146, child: _HeaderText('Actions')),
               ],
-      ),
-    );
-    if (!compact) {
-      return header;
-    }
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: header,
+            ),
     );
   }
 }
@@ -5911,17 +5900,14 @@ class _ListingRow extends ConsumerWidget {
       fallbackUserName: currentUser?.displayName ?? currentUser?.email,
     );
     if (compact) {
-      return SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: _CompactListingRow(
-          card: card,
-          listing: listing,
-          sellerName: sellerName,
-          inCart: inCart,
-          isOwner: isOwner,
-          showCardTraderLink: showCardTraderLink,
-          sellerComment: sellerComment,
-        ),
+      return _CompactListingRow(
+        card: card,
+        listing: listing,
+        sellerName: sellerName,
+        inCart: inCart,
+        isOwner: isOwner,
+        showCardTraderLink: showCardTraderLink,
+        sellerComment: sellerComment,
       );
     }
     return Container(
@@ -6127,125 +6113,104 @@ class _CompactListingRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Container(
-      width: 520,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-      decoration: BoxDecoration(
-        border: Border(
-          top: BorderSide(color: Colors.white.withValues(alpha: 0.06)),
-        ),
-      ),
-      child: Row(
+    return MarketplaceMobileListingLayout(
+      seller: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 112,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        sellerName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Color(0xFF67E8F9),
-                          fontWeight: FontWeight.w900,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                    if (showCardTraderLink) ...[
-                      const SizedBox(width: 4),
-                      const _CardTraderLinkedIcon(size: 14),
-                    ],
-                    if (sellerComment.isNotEmpty) ...[
-                      const SizedBox(width: 4),
-                      _SellerCommentIcon(
-                        comment: sellerComment,
-                        size: 14,
-                        compact: true,
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  '${listingCountryFlag(listing.sellerCountry)} ★ ${listing.sellerReputationLabel}',
+          Row(
+            children: [
+              Flexible(
+                child: Text(
+                  sellerName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: Color(0xFF93A4C8),
-                    fontSize: 11,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(
-            width: 100,
-            child: Wrap(
-              spacing: 5,
-              runSpacing: 5,
-              children: [
-                ListingConditionChip(condition: listing.condition),
-                ListingMetaChip(text: _listingLanguageLabel(listing.language)),
-                if (listing.reverse)
-                  ListingMetaChip(
-                    text: listingFoilBadgeLabel('reverse', compact: true),
-                  ),
-                if (listing.reserveAvailable)
-                  const ListingMetaChip(text: 'RES'),
-                if (listing.nftAvailable && !listing.isCardTraderLinked)
-                  const ListingMetaChip(text: 'NFT'),
-                if (listing.sealed) const ListingMetaChip(text: 'SEALED'),
-                if (listing.signed) const ListingMetaChip(text: 'SIG'),
-                if (listing.graded) const ListingMetaChip(text: 'GRD'),
-              ],
-            ),
-          ),
-          SizedBox(
-            width: 96,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  formatPkn(listing.pricePkn),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
+                    color: Color(0xFF67E8F9),
                     fontWeight: FontWeight.w900,
                     fontSize: 12,
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  '${listing.quantityAvailable} avail.',
-                  style: const TextStyle(
-                    color: Color(0xFF93A4C8),
-                    fontSize: 11,
-                  ),
+              ),
+              if (showCardTraderLink) ...[
+                const SizedBox(width: 4),
+                const _CardTraderLinkedIcon(size: 14),
+              ],
+              if (sellerComment.isNotEmpty) ...[
+                const SizedBox(width: 4),
+                _SellerCommentIcon(
+                  comment: sellerComment,
+                  size: 14,
+                  compact: true,
                 ),
               ],
+            ],
+          ),
+          const SizedBox(height: 3),
+          Text(
+            '${listingCountryFlag(listing.sellerCountry)} ★ ${listing.sellerReputationLabel}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Color(0xFF93A4C8), fontSize: 11),
+          ),
+        ],
+      ),
+      product: Wrap(
+        spacing: 5,
+        runSpacing: 5,
+        children: [
+          ListingConditionChip(condition: listing.condition),
+          ListingMetaChip(text: _listingLanguageLabel(listing.language)),
+          if (listing.reverse)
+            ListingMetaChip(
+              text: listingFoilBadgeLabel('reverse', compact: true),
+            ),
+          if (listing.reserveAvailable) const ListingMetaChip(text: 'RES'),
+          if (listing.nftAvailable && !listing.isCardTraderLinked)
+            const ListingMetaChip(text: 'NFT'),
+          if (listing.sealed) const ListingMetaChip(text: 'SEALED'),
+          if (listing.signed) const ListingMetaChip(text: 'SIG'),
+          if (listing.graded) const ListingMetaChip(text: 'GRD'),
+        ],
+      ),
+      price: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(
+            formatPkn(listing.pricePkn),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xFFFACC15),
+              fontWeight: FontWeight.w900,
+              fontSize: 14,
             ),
           ),
-          SizedBox(
-            width: 132,
-            child: Align(
+          const SizedBox(height: 2),
+          Text(
+            '${listing.quantityAvailable} avail.',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Color(0xFF93A4C8), fontSize: 11),
+          ),
+        ],
+      ),
+      actions: isOwner
+          ? Align(
               alignment: Alignment.centerRight,
-              child: isOwner
-                  ? _OwnerListingActions(
-                      card: card,
-                      listing: listing,
-                      compact: true,
-                    )
-                  : Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        _DarkCircleButton(
-                          onPressed: () {
+              child: _OwnerListingActions(
+                card: card,
+                listing: listing,
+                compact: true,
+              ),
+            )
+          : Row(
+              children: [
+                Expanded(
+                  child: MarketplaceListingCartButton(
+                    inCart: inCart,
+                    onPressed: !inCart && listing.quantityAvailable <= 0
+                        ? null
+                        : () {
                             if (inCart) {
                               ref
                                   .read(cartProvider.notifier)
@@ -6263,31 +6228,18 @@ class _CompactListingRow extends ConsumerWidget {
                                   );
                             }
                           },
-                          icon: Icon(
-                            inCart
-                                ? Icons.remove_shopping_cart
-                                : Icons.shopping_cart_outlined,
-                          ),
-                          tooltip: inCart ? 'Remove from cart' : 'Add to cart',
-                          foregroundColor: inCart
-                              ? const Color(0xFFFACC15)
-                              : const Color(0xFFCBD5E1),
-                          backgroundColor: inCart
-                              ? const Color(0xFFFACC15).withValues(alpha: 0.14)
-                              : const Color(0xFFBAE6FD).withValues(alpha: 0.36),
-                        ),
-                        const SizedBox(width: 8),
-                        _NftListingButton(
-                          enabled: listing.nftAvailable,
-                          compact: true,
-                          onPressed: () => _addListingAsNft(ref, card, listing),
-                        ),
-                      ],
-                    ),
+                  ),
+                ),
+                if (listing.nftAvailable) ...[
+                  const SizedBox(width: 8),
+                  _NftListingButton(
+                    enabled: true,
+                    compact: true,
+                    onPressed: () => _addListingAsNft(ref, card, listing),
+                  ),
+                ],
+              ],
             ),
-          ),
-        ],
-      ),
     );
   }
 }

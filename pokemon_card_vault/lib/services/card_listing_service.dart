@@ -6,6 +6,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/card_listing.dart';
+import 'marketplace_api_uri.dart';
 import 'pokoin_api_auth.dart';
 import 'pokoin_api_client.dart';
 
@@ -32,6 +33,13 @@ class CardListingService {
 
   Stream<List<CardListing>> activeListingsForCard(String cardId) {
     return Stream.fromFuture(_getListings(cardId: cardId));
+  }
+
+  Future<List<CardListing>> activeListingsForCardOnce(String cardId) {
+    if (cardId.trim().isEmpty) {
+      return Future.value(const <CardListing>[]);
+    }
+    return _getListings(cardId: cardId);
   }
 
   Stream<List<CardListing>> listingsForSeller(String sellerUid) {
@@ -156,9 +164,10 @@ class CardListingService {
       if (sellerUsername != null && sellerUsername.trim().isNotEmpty)
         'sellerUsername': sellerUsername.trim().toLowerCase(),
     };
-    final uri = Uri.base.resolve('/api/marketplace-listings').replace(
-          queryParameters: query,
-        );
+    final uri = marketplaceApiUri(
+      '/api/marketplace-listings',
+      queryParameters: query,
+    );
     final response = await _apiClient.get(
       uri,
       requireAuth: sellerUid != null,
@@ -185,7 +194,8 @@ class CardListingService {
     if (auth?.currentUser == null) {
       throw StateError('Sign in before updating marketplace listings.');
     }
-    final uri = Uri.base.resolve('/api/marketplace-listings').replace(
+    final uri = marketplaceApiUri(
+      '/api/marketplace-listings',
       queryParameters: {
         if (listingId != null && listingId.isNotEmpty) 'id': listingId,
         if (action != null && action.isNotEmpty) 'action': action,

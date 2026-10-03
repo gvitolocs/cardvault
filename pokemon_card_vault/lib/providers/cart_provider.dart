@@ -12,11 +12,20 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/card_listing.dart';
 import '../models/pokemon_card.dart';
 import '../services/card_listing_service.dart';
+import '../services/marketplace_api_uri.dart';
 import '../services/pokoin_api_auth.dart';
 
 final cartProvider = StateNotifierProvider<CartNotifier, CartState>((ref) {
   return CartNotifier();
 });
+
+CardListing? bestAvailableCartListing(Iterable<CardListing> listings) {
+  final available = listings
+      .where((listing) => listing.isActive && listing.pricePkn > 0)
+      .toList()
+    ..sort((left, right) => left.pricePkn.compareTo(right.pricePkn));
+  return available.isEmpty ? null : available.first;
+}
 
 const double temporaryFixedCheckoutShippingPkn = 2000;
 
@@ -513,6 +522,29 @@ class CartNotifier extends StateNotifier<CartState> {
     await _persist(items, fulfillmentMode: fulfillmentMode);
   }
 
+  Future<bool> addBestAvailableListingToCart(
+    PokemonCard card, {
+    int quantity = 1,
+  }) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final listings = await _listingService.activeListingsForCardOnce(card.id);
+      final listing = bestAvailableCartListing(listings);
+      if (listing == null) {
+        state = state.copyWith(
+          isLoading: false,
+          error: '${card.name} is currently unavailable',
+        );
+        return false;
+      }
+      await addListingToCart(card, listing, quantity: quantity);
+      return state.isListingInCart(listing.id);
+    } catch (error) {
+      state = state.copyWith(isLoading: false, error: error.toString());
+      return false;
+    }
+  }
+
   Future<void> removeFromCart(String cardId) async {
     await _persist(state.items
         .where((item) => item.card.id != cardId && item.cartKey != cardId)
@@ -623,7 +655,7 @@ class CartNotifier extends StateNotifier<CartState> {
         final anonymousId = await _cartAnalyticsHolderId();
         await _httpClient
             .post(
-              Uri.base.resolve('/api/marketplace-cart'),
+              marketplaceApiUri('/api/marketplace-cart'),
               headers: {
                 'content-type': 'application/json',
                 ...authHeaders,

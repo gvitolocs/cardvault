@@ -126,4 +126,52 @@ void main() {
 
     expect(item.sellerName, 'Giuseppe');
   });
+
+  test('quick add selects the cheapest active listing', () {
+    final expensive = CardListing.fromJson('listing-expensive', {
+      'cardId': 'test-card',
+      'sellerUid': 'seller-1',
+      'pricePkn': 250,
+      'quantityAvailable': 2,
+      'status': 'active',
+    });
+    final cheapest = CardListing.fromJson('listing-cheapest', {
+      'cardId': 'test-card',
+      'sellerUid': 'seller-2',
+      'pricePkn': 100,
+      'quantityAvailable': 1,
+      'status': 'active',
+    });
+
+    expect(
+      bestAvailableCartListing([expensive, cheapest])?.id,
+      'listing-cheapest',
+    );
+  });
+
+  test('quick add ignores inactive, empty, and zero-price listings', () {
+    final inactive = CardListing.fromJson('listing-inactive', {
+      'cardId': 'test-card',
+      'sellerUid': 'seller-1',
+      'pricePkn': 50,
+      'quantityAvailable': 1,
+      'status': 'inactive',
+    });
+    final empty = CardListing.fromJson('listing-empty', {
+      'cardId': 'test-card',
+      'sellerUid': 'seller-2',
+      'pricePkn': 75,
+      'quantityAvailable': 0,
+      'status': 'active',
+    });
+    final free = CardListing.fromJson('listing-free', {
+      'cardId': 'test-card',
+      'sellerUid': 'seller-3',
+      'pricePkn': 0,
+      'quantityAvailable': 1,
+      'status': 'active',
+    });
+
+    expect(bestAvailableCartListing([inactive, empty, free]), isNull);
+  });
 }

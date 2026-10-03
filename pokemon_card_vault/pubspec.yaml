@@ -92,6 +92,7 @@ flutter:
   assets:
     - web/pokoin.svg
     - assets/brand/
+    - assets/data/marketplace-expansion-order.json
     - assets/images/
     - assets/icons/
     - assets/animations/

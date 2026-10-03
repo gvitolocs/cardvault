@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -32,6 +33,8 @@ import '../utils/marketplace_image_log.dart';
 import '../utils/price_format.dart';
 import '../utils/public_home.dart';
 import '../widgets/marketplace_network_image.dart';
+import '../widgets/marketplace_home_discovery.dart';
+import '../widgets/marketplace_navigation_bar.dart';
 import '../widgets/site_footer.dart';
 
 const double topBarActionSize = 44;
@@ -247,7 +250,7 @@ class _MarketplaceSearchScreenState
         }
       }
       final results = expansion != null && expansion.isNotEmpty
-          ? await _cardService.getCardsByExpansion(expansion)
+          ? await _cardService.getCardsByExpansion(expansion, usePageApi: true)
           : await _loadSearchResults(
               normalizedQuery,
               productType: productType,
@@ -1073,6 +1076,30 @@ class _MarketplaceHomeSession {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   late final CardNotifier _cardNotifier;
   final CardService _cardService = CardService();
+  List<MarketplaceExpansion> _homeExpansions = const [];
+  Map<String, int> _expansionCatalogOrder = const {};
+  bool _expansionsLoading = true;
+
+  Future<void> _loadHomeExpansions() async {
+    setState(() => _expansionsLoading = true);
+    final registryFuture = rootBundle
+        .loadString('assets/data/marketplace-expansion-order.json')
+        .then<Map<String, int>>((source) {
+      final decoded = jsonDecode(source) as Map<String, dynamic>;
+      return decoded.map((key, value) => MapEntry(key, (value as num).toInt()));
+    }).catchError((_) => <String, int>{});
+    final expansions =
+        await _cardService.getMarketplaceExpansions(usePageApi: true);
+    // A missing registry must not block browsing live expansion metadata.
+    final catalogOrder = await registryFuture;
+    if (!mounted) return;
+    setState(() {
+      _homeExpansions = expansions;
+      _expansionCatalogOrder = catalogOrder;
+      _expansionsLoading = false;
+    });
+  }
+
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   late final ScrollController _scrollController;
@@ -1125,6 +1152,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         return;
       }
       _cardNotifier.refreshCards();
+      unawaited(_loadHomeExpansions());
       if (widget.returnToRecentTop) {
         _scrollHomeToRecentTop();
       }
@@ -1476,9 +1504,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final cardState = ref.watch(cardProvider);
     final cartState = ref.watch(cartProvider);
     _syncSearchDebugAuthorization(ref.watch(userProfileProvider).valueOrNull);
-    final cachedBalance = ref.watch(cachedPknBalanceProvider).valueOrNull;
-    final balance =
-        ref.watch(pknBalanceProvider).valueOrNull ?? cachedBalance ?? 0;
+
     final cards = cardState.filteredCards;
     final activeListings =
         ref.watch(activeCardListingsProvider).valueOrNull ?? const [];
@@ -1515,18 +1541,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       cheapestPricesByCardId: recentCheapestPrices,
     );
     final compactTopBar = MediaQuery.sizeOf(context).width < 760;
-    final compactSearchExpanded =
-        compactTopBar && (_searchFocused || _searchController.text.isNotEmpty);
+    final expansions = recentHomeExpansions(
+      _homeExpansions,
+      catalogOrder: _expansionCatalogOrder,
+      newArrivalSets: sections.newArrivals.map((card) => card.set).toList(),
+    );
+    final bestSellers = marketplaceBestSellers(
+      catalog,
+      cardState.homeSections?.bestSellerIds ?? const [],
+    );
     _scheduleSpotlightImagePrecache(
       personalizedCards,
       enabled:
           !compactTopBar && !cardState.isLoading && cardState.error == null,
     );
     final renderedWarmupCards = [
-      ...sections.newArrivals,
-      ...sections.recentlySeen,
-      ...sections.bestSellers,
-      ...sections.featured,
+      ...bestSellers,
       if (_spotlightRevealStarted) ...visibleCards,
     ];
     if (!cardState.isLoading && cardState.error == null) {
@@ -1544,47 +1574,56 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             toolbarHeight: marketplaceTopBarHeight,
             elevation: 0,
             titleSpacing: 16,
-            title: MarketplaceTopBar(
-              compactExpanded: compactSearchExpanded,
-              logo: MarketplaceLogoButton(
-                onTap: compactTopBar
-                    ? () => showMarketplaceSideMenu(context)
-                    : () => context.go('/marketplace'),
-              ),
-              search: MarketplaceTopBarSearch(
-                controller: _searchController,
-                focusNode: _searchFocusNode,
-                compactTopBar: compactTopBar,
-                onEmptyFocus: _showEmptyFocusSearchPreviews,
-                onSearchFocusedChanged: _handleTopBarSearchFocusChanged,
-                onSelected: (selection) {
-                  final card = selection.card;
-                  ref.read(cardProvider.notifier).recordCardInteraction(
-                        card,
-                        'click',
-                        source: 'search_preview',
-                      );
-                  _goToCardDetail(ref, context, card,
-                      heroTag: selection.heroTag);
-                  Future<void>.delayed(_searchPreviewHeroHoldDuration, () {
-                    if (mounted) {
-                      _resetTransientSearch();
-                    }
-                  });
-                },
-              ),
-              languageMenu: SearchLanguageMenu(
-                value: cardState.searchLanguage,
-                onChanged: (language) =>
-                    ref.read(cardProvider.notifier).setSearchLanguage(language),
-              ),
-              actions: marketplaceTopBarActions(
-                context: context,
-                balance: balance,
-                itemCount: cartState.itemCount,
-                compactTopBar: compactTopBar,
-                compactSearchExpanded: compactSearchExpanded,
-                keyValue: 'marketplace-actions',
+            automaticallyImplyLeading: false,
+            title: Row(
+              children: [
+                if (!compactTopBar) ...[
+                  MarketplaceLogoButton(
+                      onTap: () => showMarketplaceSideMenu(context)),
+                  const SizedBox(width: 16),
+                ],
+                Expanded(
+                  child: MarketplaceTopBarSearch(
+                    controller: _searchController,
+                    focusNode: _searchFocusNode,
+                    compactTopBar: false,
+                    hintText: 'Cerca carte, espansioni...',
+                    onEmptyFocus: _showEmptyFocusSearchPreviews,
+                    onSearchFocusedChanged: _handleTopBarSearchFocusChanged,
+                    onSelected: (selection) {
+                      final card = selection.card;
+                      ref.read(cardProvider.notifier).recordCardInteraction(
+                            card,
+                            'click',
+                            source: 'search_preview',
+                          );
+                      _goToCardDetail(ref, context, card,
+                          heroTag: selection.heroTag);
+                      Future<void>.delayed(_searchPreviewHeroHoldDuration, () {
+                        if (mounted) _resetTransientSearch();
+                      });
+                    },
+                  ),
+                ),
+                const SizedBox(width: 10),
+                MarketplaceCartButton(
+                  itemCount: cartState.itemCount,
+                  compact: true,
+                  onTap: () => context.go('/cart'),
+                ),
+              ],
+            ),
+            // Keep the toolbar in the same AppBar subtree when focus changes.
+            // Adding/removing bottom reparents the text field and drops focus.
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(1),
+              child: SizedBox(
+                height: 1,
+                child: ColoredBox(
+                  color: _searchFocused
+                      ? const Color(0xFF8B5CF6)
+                      : Colors.transparent,
+                ),
               ),
             ),
           ),
@@ -1607,36 +1646,40 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                     )
                   else ...[
-                    if (sections.recentlySeen.isNotEmpty ||
-                        recentViewsState.isLoading) ...[
-                      _CardCarouselSection(
-                        title: 'Recently seen',
-                        cards: sections.recentlySeen,
-                        seeMoreQuery: '',
-                        isLoading: recentViewsState.isLoading &&
-                            sections.recentlySeen.isEmpty,
+                    RecentExpansionsCarousel(
+                      expansions: expansions,
+                      isLoading: _expansionsLoading,
+                      onRetry: () => unawaited(_loadHomeExpansions()),
+                      onSelected: (expansion) => context.go(
+                        Uri(path: '/marketplace/search', queryParameters: {
+                          'q': expansion.name,
+                          'expansion': expansion.name,
+                        }).toString(),
                       ),
-                      const SizedBox(height: 24),
-                    ],
-                    if (sections.newArrivals.isNotEmpty) ...[
+                    ),
+                    const SizedBox(height: 28),
+                    if (bestSellers.isNotEmpty)
                       _CardCarouselSection(
-                        title: 'New cards',
-                        cards: sections.newArrivals,
+                        title: 'Articoli più venduti',
+                        cards: bestSellers,
+                        alwaysHorizontal: true,
+                        isLoading: cardState.isLoading,
                         seeMoreQuery: '',
+                      )
+                    else
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 22),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _SectionHeading(title: 'Articoli più venduti'),
+                            SizedBox(height: 14),
+                            Text(
+                                'I più venduti non sono disponibili al momento.',
+                                style: TextStyle(color: Color(0xFF9CAAC9))),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 24),
-                    ],
-                    _CardCarouselSection(
-                      title: 'Best sellers',
-                      cards: sections.bestSellers,
-                      seeMoreQuery: '',
-                    ),
-                    const SizedBox(height: 24),
-                    _CardCarouselSection(
-                      title: 'Featured',
-                      cards: sections.featured,
-                      seeMoreQuery: '',
-                    ),
                     const SizedBox(height: 24),
                     Center(
                       child: ConstrainedBox(
@@ -1731,7 +1774,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               KeyedSubtree(
                                 key: _footerSectionKey,
                                 child: compactTopBar
-                                    ? const SiteFooter()
+                                    ? const SizedBox.shrink()
                                     : AnimatedSwitcher(
                                         duration:
                                             const Duration(milliseconds: 260),
@@ -1762,6 +1805,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ],
       ),
+      bottomNavigationBar: const MarketplaceNavigationBar(),
       floatingActionButton:
           SearchDebugTrace.instance.enabled ? const _SearchDebugPanel() : null,
     );
@@ -2194,6 +2238,7 @@ class MarketplaceTopBarSearch extends ConsumerWidget {
     this.searchQueryParameters = const {},
     this.onEmptyFocus,
     this.holdOverlayForHero = true,
+    this.hintText = 'Search cards, sets, products...',
   });
 
   final TextEditingController controller;
@@ -2209,6 +2254,7 @@ class MarketplaceTopBarSearch extends ConsumerWidget {
   final ValueChanged<String>? onShowAll;
   final VoidCallback? onEmptyFocus;
   final bool holdOverlayForHero;
+  final String hintText;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -2223,7 +2269,7 @@ class MarketplaceTopBarSearch extends ConsumerWidget {
       completionText: cardState.searchCompletion,
       completionConfidence: cardState.searchCompletionConfidence,
       completionSource: cardState.searchCompletionSource,
-      hintText: 'Search cards, sets, products...',
+      hintText: hintText,
       onEmptyFocus: enablePreviews
           ? onEmptyFocus ?? () => _showDefaultEmptyFocus(ref)
           : null,
@@ -4542,6 +4588,7 @@ class _CardCarouselSection extends StatefulWidget {
     this.seeMoreQuery,
     this.isLoading = false,
     this.isSkeleton = false,
+    this.alwaysHorizontal = false,
   });
 
   final String title;
@@ -4549,6 +4596,7 @@ class _CardCarouselSection extends StatefulWidget {
   final String? seeMoreQuery;
   final bool isLoading;
   final bool isSkeleton;
+  final bool alwaysHorizontal;
 
   @override
   State<_CardCarouselSection> createState() => _CardCarouselSectionState();
@@ -4619,7 +4667,7 @@ class _CardCarouselSectionState extends State<_CardCarouselSection> {
     }
     final screenWidth = MediaQuery.sizeOf(context).width;
     final isDesktop = screenWidth >= 900;
-    final isMobile = screenWidth < 760;
+    final isMobile = screenWidth < 760 && !widget.alwaysHorizontal;
     final useDesktopControls = isDesktop && hasDesktopPointer();
     final cardWidth =
         screenWidth < 560 ? math.min(screenWidth - 44, 316).toDouble() : 360.0;
@@ -4730,7 +4778,7 @@ class _CardCarouselSectionState extends State<_CardCarouselSection> {
                     return tile;
                   },
                 ),
-                if (useDesktopControls &&
+                if ((useDesktopControls || widget.alwaysHorizontal) &&
                     !showSkeletonCards &&
                     widget.cards.length > 2) ...[
                   if (_canScrollBack)
@@ -5510,23 +5558,19 @@ class _MarketplaceSkeletonShell extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const _CardCarouselSection(
-            title: 'Recently seen',
-            cards: [],
-            isSkeleton: true,
+          RecentExpansionsCarousel(
+            expansions: const [],
+            isLoading: true,
+            onSelected: (_) {},
           ),
           const SizedBox(height: 24),
           const _CardCarouselSection(
-            title: 'Best sellers',
+            title: 'Articoli più venduti',
             cards: [],
             isSkeleton: true,
+            alwaysHorizontal: true,
           ),
           const SizedBox(height: 24),
-          const _CardCarouselSection(
-            title: 'Featured',
-            cards: [],
-            isSkeleton: true,
-          ),
           if (!compact) ...[
             const SizedBox(height: 24),
             Center(

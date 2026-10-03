@@ -1201,6 +1201,36 @@ Content-Type: application/json
 
 Only the owning seller UID can update the listing.
 
+### Adding marketplace items to the cart
+
+The client cart must add a concrete active listing, not a catalog card alone.
+Load the offers for the public Pokoin card ID, select an active listing with a
+positive price and quantity, and persist its `id`, seller, price, condition,
+language, quantity, and source fields in the cart snapshot:
+
+```text
+GET /api/marketplace-listings?cardId=<public-card-id>&limit=500
+```
+
+Flutter uses the lowest-priced active listing for the grid quick-add action.
+The card-detail buy box may instead use the language and condition selected by
+the user. Both paths call `CartNotifier.addListingToCart`; catalog-only cart
+items without `listingId` and `sellerUid` are not checkout-valid.
+
+After local/user cart persistence, the client records membership analytics:
+
+```text
+POST /api/marketplace-cart
+Content-Type: application/json
+
+{"cardId": 548832, "action": "add", "anonymousId": "..."}
+```
+
+`POST /api/marketplace-cart` records idempotent add/remove analytics only. It
+does not create or persist the purchasable cart item. Authentication is
+optional; a valid Firebase bearer token scopes the analytics holder to the
+signed-in user, otherwise `anonymousId` or `sessionId` is required.
+
 `reserveAvailable` is a public Reserve tag for cards available in the Pokoin
 reserve. It is distinct from `shippingAvailable` and should not be used as a
 shipping flag. `nftAvailable` marks listings sold as NFT-backed inventory; UI

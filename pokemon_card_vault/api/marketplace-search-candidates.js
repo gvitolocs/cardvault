@@ -1188,9 +1188,9 @@ async function rowsForSearchTerm(
     // predicate as rows (Meili estimatedTotalHits for the candidates query,
     // null when only the legacy SQL engine ran).
     if (loaded && !Array.isArray(loaded)) {
-      return { rows: attachThemePacks(loaded.rows || []), total: Number(loaded.total) || 0 };
+      return { rows: await attachThemePacks(loaded.rows || []), total: Number(loaded.total) || 0 };
     }
-    return { rows: attachThemePacks(Array.isArray(loaded) ? loaded : []), total: null };
+    return { rows: await attachThemePacks(Array.isArray(loaded) ? loaded : []), total: null };
   }
   return attachThemePacks(loaded);
 }
@@ -1352,8 +1352,15 @@ async function rowsForMeiliSearchTerm(
 }
 
 module.exports = async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Max-Age', '86400');
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
   if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST');
+    res.setHeader('Allow', 'POST, OPTIONS');
     return res.status(405).json({ error: 'Method not allowed.' });
   }
 

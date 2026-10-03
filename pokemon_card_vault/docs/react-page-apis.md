@@ -149,6 +149,32 @@ the full-search SQL fallback applies to suggest. Successful suggest reads use
 Expansion browse is **not** `?expansion=Mega+Evolution` on search.
 That param is ignored. Use the expansion page API.
 
+Search row enrichment must finish before returning `{ rows, total }`:
+`rows` is an array, never a Promise. The 2026-10-01 correction awaits
+asynchronous theme enrichment, which otherwise produced empty `cards`
+despite a positive total. The legacy `POST /api/marketplace-search-candidates`
+fallback supports CORS preflight (`OPTIONS`, 204) and JSON/Authorization headers.
+
+For a local browser preview without database credentials, start
+`node scripts/marketplace-search-preview-server.js`, then run Flutter with
+`--dart-define=MARKETPLACE_API_BASE_URL=http://127.0.0.1:5001`.
+This loopback-only development service composes the search page from real
+public candidate reads and proxies public GET data; it does not deploy the API
+patch or provide authenticated writes. Its search total is null because the
+candidate endpoint returns a page, not a total. Production uses the normal
+database-backed handler.
+
+The preview also permits read-only POSTs to `/api/marketplace-autocomplete`
+and `/api/searchbar-token-predict`. It forwards bounded public query inputs
+only, never auth/debug/session fields; unlisted POSTs remain rejected.
+Without these routes full search works but the quick dropdown and live
+completion return 405. Run its regression with
+`node --test scripts/marketplace-search-preview-server.test.js`.
+For a phone on the same Wi-Fi, serve Flutter on the PC's LAN address and
+use a temporary LAN relay to this loopback API, with a matching
+`MARKETPLACE_API_BASE_URL`. Loopback addresses on a phone refer to the phone.
+This HTTP browser preview is not a native APK test or an HTTPS camera test.
+
 ## 3. Card detail
 
 ```http

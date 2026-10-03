@@ -1003,7 +1003,7 @@ const routeDefinitions = [
   {
     path: '/api/marketplace-search-candidates',
     file: 'marketplace-search-candidates.js',
-    methods: ['POST'],
+    methods: ['POST', 'OPTIONS'],
     purpose: 'Return split/search candidate rows for marketplace search diagnostics and clients.',
     auth: 'Public for normal search; debug output requires authorized debug/admin Firebase bearer token.',
     params: {

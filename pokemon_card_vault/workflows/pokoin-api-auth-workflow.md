@@ -38,16 +38,23 @@ On browser refresh the expected account path is:
    then continue with their Firestore snapshot stream.
 6. `cartProvider` hydrates the user-scoped Hive cart box immediately, then
    reconciles with `user_carts/{uid}` in the background.
+7. Cart additions resolve a concrete active `/api/marketplace-listings` row
+   before persistence. `/api/marketplace-cart` is best-effort analytics and is
+   not the cart storage API.
 
 Use `PokoinApiClient` for authenticated API calls:
 
 ```dart
 final client = PokoinApiClient(auth: ref.read(pokoinApiAuthServiceProvider));
 final response = await client.postJson(
-  Uri.base.resolve('/api/example'),
+  marketplaceApiUri('/api/example'),
   body: {'example': true},
 );
 ```
+
+Use `marketplaceApiUri` for `/api/...` routes so browser builds keep the
+same-origin rewrite while Android and iOS call `https://api.pokoin.com` (or the
+`MARKETPLACE_API_BASE_URL` compile-time override).
 
 For optional auth, pass `requireAuth: false`. For required auth, the default behavior throws before sending if there is no signed-in Firebase user.
 

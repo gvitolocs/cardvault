@@ -13,7 +13,7 @@ import '../providers/marketplace_account_provider.dart';
 import '../utils/price_format.dart';
 import '../utils/public_home.dart';
 import '../wallet/wallet_bridge_stub.dart';
-import '../widgets/site_footer.dart';
+import '../widgets/marketplace_navigation_bar.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -211,13 +211,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       );
                     },
                   ),
-                  const SiteFooter(),
                 ],
               ),
             ),
           ),
         ),
       ),
+      bottomNavigationBar: const MarketplaceNavigationBar(selectedIndex: 3),
     );
   }
 
