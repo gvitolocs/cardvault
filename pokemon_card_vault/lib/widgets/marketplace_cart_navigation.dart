@@ -5,6 +5,7 @@ class MarketplaceUtilityBar extends StatelessWidget {
     super.key,
     required this.onSearch,
     required this.onScanner,
+    required this.onWallet,
     required this.onListings,
     required this.onProfile,
     this.selectedIndex = 0,
@@ -12,6 +13,7 @@ class MarketplaceUtilityBar extends StatelessWidget {
 
   final VoidCallback onSearch;
   final VoidCallback onScanner;
+  final VoidCallback onWallet;
   final VoidCallback onListings;
   final VoidCallback onProfile;
   final int selectedIndex;
@@ -36,11 +38,14 @@ class MarketplaceUtilityBar extends StatelessWidget {
           labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
           selectedIndex: selectedIndex,
           onDestinationSelected: (index) =>
-              [onSearch, onScanner, onListings, onProfile][index](),
+              [onSearch, onScanner, onWallet, onListings, onProfile][index](),
           destinations: const [
             NavigationDestination(icon: Icon(Icons.search), label: 'Ricerca'),
             NavigationDestination(
                 icon: Icon(Icons.document_scanner_outlined), label: 'Scanner'),
+            NavigationDestination(
+                icon: Icon(Icons.account_balance_wallet_outlined),
+                label: 'Wallet'),
             NavigationDestination(
                 icon: Icon(Icons.inventory_2_outlined), label: 'Elenco'),
             NavigationDestination(

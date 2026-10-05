@@ -221,7 +221,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
           ),
         ),
       ),
-      bottomNavigationBar: const MarketplaceNavigationBar(selectedIndex: 3),
+      bottomNavigationBar: const MarketplaceNavigationBar(selectedIndex: 4),
     );
   }
 

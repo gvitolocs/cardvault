@@ -217,7 +217,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
         ),
       ),
-      bottomNavigationBar: const MarketplaceNavigationBar(selectedIndex: 3),
+      bottomNavigationBar: const MarketplaceNavigationBar(selectedIndex: 4),
     );
   }
 

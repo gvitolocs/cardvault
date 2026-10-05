@@ -68,9 +68,10 @@ class _LoginFixture {
             ),
           ),
           bottomNavigationBar: MarketplaceUtilityBar(
-            selectedIndex: 3,
+            selectedIndex: 4,
             onSearch: () {},
             onScanner: () {},
+            onWallet: () {},
             onListings: () {},
             onProfile: () {},
           ),
@@ -99,7 +100,7 @@ void main() {
             tester
                 .widget<NavigationBar>(find.byType(NavigationBar))
                 .selectedIndex,
-            3);
+            4);
         final before = tester.getRect(find.byType(NavigationBar));
         await tester.drag(
             find.byType(SingleChildScrollView), const Offset(0, -500));

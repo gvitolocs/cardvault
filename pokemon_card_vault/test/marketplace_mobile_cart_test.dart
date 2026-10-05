@@ -158,7 +158,7 @@ void main() {
   });
 
   for (final width in [320.0, 390.0, 600.0]) {
-    testWidgets('utility bar retains four destinations at width $width',
+    testWidgets('utility bar retains five destinations at width $width',
         (tester) async {
       tester.view.physicalSize = Size(width, 800);
       tester.view.devicePixelRatio = 1;
@@ -170,18 +170,30 @@ void main() {
           bottomNavigationBar: MarketplaceUtilityBar(
             onSearch: () => tapped.add('search'),
             onScanner: () => tapped.add('scanner'),
+            onWallet: () => tapped.add('wallet'),
             onListings: () => tapped.add('listings'),
             onProfile: () => tapped.add('profile'),
           ),
         ),
       ));
       expect(find.text('Carrello'), findsNothing);
-      expect(find.byType(NavigationDestination), findsNWidgets(4));
-      for (final label in ['Ricerca', 'Scanner', 'Elenco', 'Profilo']) {
+      expect(find.byType(NavigationDestination), findsNWidgets(5));
+      final destinations = tester
+          .widgetList<NavigationDestination>(find.byType(NavigationDestination))
+          .map((destination) => destination.label);
+      expect(
+          destinations, ['Ricerca', 'Scanner', 'Wallet', 'Elenco', 'Profilo']);
+      for (final label in [
+        'Ricerca',
+        'Scanner',
+        'Wallet',
+        'Elenco',
+        'Profilo'
+      ]) {
         await tester.tap(find.text(label));
         await tester.pump();
       }
-      expect(tapped, ['search', 'scanner', 'listings', 'profile']);
+      expect(tapped, ['search', 'scanner', 'wallet', 'listings', 'profile']);
       expect(tester.takeException(), isNull);
     });
   }

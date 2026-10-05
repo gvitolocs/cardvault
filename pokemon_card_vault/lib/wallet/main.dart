@@ -11,6 +11,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'auth_service.dart';
 import 'wallet_bridge_stub.dart';
+import 'guest_wallet_screen.dart';
+import '../widgets/marketplace_navigation_bar.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -146,6 +148,7 @@ class _WalletScreenState extends State<WalletScreen> {
   bool _swapTokenCatalogLoading = false;
   String? _address;
   WalletUser? _user;
+  StreamSubscription<WalletUser?>? _authSubscription;
   String? _username;
   String? _linkedAddress;
   String _balance = '0';
@@ -165,6 +168,7 @@ class _WalletScreenState extends State<WalletScreen> {
 
   @override
   void dispose() {
+    _authSubscription?.cancel();
     _toController.dispose();
     _amountController.dispose();
     _exchangeAmountController.dispose();
@@ -206,24 +210,31 @@ class _WalletScreenState extends State<WalletScreen> {
         unawaited(_loadSwapTokenCatalog());
       });
     }
-    _auth.authState.listen((user) async {
+    _authSubscription = _auth.authState.listen((user) async {
       if (mounted) {
         setState(() {
           _authResolved = true;
           _user = user;
+          _accountBalanceReady = false;
+          _accountBalance = 0;
+          _username = null;
+          _linkedAddress = null;
+          _activity.clear();
         });
         if (user == null) {
-          _redirectToAuth();
+          if (widget.initialSwapOpen) _redirectToAuth();
           return;
         }
         final cached = await _auth.cachedAccountBalance(user.uid);
-        if (mounted) {
+        if (mounted && _user?.uid == user.uid) {
           setState(() {
             if (cached != null) {
               _accountBalance = cached;
             }
             _accountBalanceReady = true;
           });
+        } else {
+          return;
         }
         _loadUsername();
         _loadLinkedWallet();
@@ -293,16 +304,20 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   Future<void> _loadLinkedWallet() async {
+    final uid = _user?.uid;
+    if (uid == null) return;
     final address = await _auth.linkedWalletAddress();
-    if (!mounted || address == _linkedAddress) {
+    if (!mounted || _user?.uid != uid || address == _linkedAddress) {
       return;
     }
     setState(() => _linkedAddress = address);
   }
 
   Future<void> _loadUsername() async {
+    final uid = _user?.uid;
+    if (uid == null) return;
     final username = await _auth.ensureUsername();
-    if (!mounted || username == null || username == _username) {
+    if (!mounted || _user?.uid != uid || username == null || username == _username) {
       return;
     }
     setState(() => _username = username);
@@ -382,12 +397,15 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   Future<void> _loadAccountBalance() async {
-    final cached = await _auth.cachedAccountBalance(_user?.uid);
-    if (mounted && cached != null && cached != _accountBalance) {
+    final uid = _user?.uid;
+    if (uid == null) return;
+    final cached = await _auth.cachedAccountBalance(uid);
+    if (!mounted || _user?.uid != uid) return;
+    if (cached != null && cached != _accountBalance) {
       setState(() => _accountBalance = cached);
     }
     final balance = await _auth.accountBalance();
-    if (!mounted) {
+    if (!mounted || _user?.uid != uid) {
       return;
     }
     setState(() => _accountBalance = balance);
@@ -1915,6 +1933,8 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   Future<void> _loadActivity() async {
+    final uid = _user?.uid;
+    if (uid == null) return;
     final address = _address?.trim();
     final results = await Future.wait<List<ActivityItem>>([
       _loadLedgerActivityItems(),
@@ -1924,7 +1944,7 @@ class _WalletScreenState extends State<WalletScreen> {
       else
         Future.value(const <ActivityItem>[]),
     ]);
-    if (!mounted) {
+    if (!mounted || _user?.uid != uid) {
       return;
     }
     final byKey = <String, ActivityItem>{};
@@ -2355,11 +2375,22 @@ class _WalletScreenState extends State<WalletScreen> {
   @override
   Widget build(BuildContext context) {
     final wide = MediaQuery.sizeOf(context).width > 860;
+    if (_authResolved && _user == null && !widget.initialSwapOpen) {
+      return GuestWalletScreen(
+        onConnectWallet: () {
+          if (_wallet.hasProvider) {
+            // Linking an EVM wallet to a Pokoin account still needs sign-in.
+            _redirectToAuth();
+          } else {
+            _showMessage('Per collegare un wallet EVM, apri pokoin.com/wallet '
+                'in un browser compatibile con MetaMask.');
+          }
+        },
+      );
+    }
     if (!_authResolved || _user == null || !_accountBalanceReady) {
-      if (_authResolved) {
-        _redirectToAuth();
-      }
       return const Scaffold(
+        bottomNavigationBar: MarketplaceNavigationBar(selectedIndex: 2),
         body: Center(child: CircularProgressIndicator()),
       );
     }
@@ -2368,6 +2399,7 @@ class _WalletScreenState extends State<WalletScreen> {
     }
 
     return Scaffold(
+      bottomNavigationBar: const MarketplaceNavigationBar(selectedIndex: 2),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _refreshAll,

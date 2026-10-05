@@ -16,10 +16,17 @@ import 'scan_verify.dart';
 import 'vit_classifier.dart';
 
 class CameraScanPage extends StatefulWidget {
-  const CameraScanPage({super.key, this.onOpenMarketplaceUri});
+  const CameraScanPage({
+    super.key,
+    this.onOpenMarketplaceUri,
+    this.pageBuilder,
+  });
 
   /// If set and returns true, skip external browser open.
   final bool Function(Uri uri)? onOpenMarketplaceUri;
+
+  /// Optional app navigation around the preview; standalone callers stay full-screen.
+  final Widget Function(BuildContext context, Widget body)? pageBuilder;
 
   @override
   State<CameraScanPage> createState() => _CameraScanPageState();
@@ -99,16 +106,14 @@ class _CameraScanPageState extends State<CameraScanPage>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
+    _captureEpoch++;
+    _scanning = false;
+    _appPaused = true;
     _pulse.dispose();
     final controller = _controller;
     _controller = null;
     if (controller != null) {
-      unawaited(() async {
-        if (controller.value.isStreamingImages) {
-          await controller.stopImageStream();
-        }
-        await controller.dispose();
-      }());
+      unawaited(_disposeController(controller));
     }
     super.dispose();
   }
@@ -245,6 +250,7 @@ class _CameraScanPageState extends State<CameraScanPage>
       final cameras = await availableCameras();
       if (_appPaused || !mounted) return;
       final pick = await ScanEngine.pickBackCamera();
+      if (_appPaused || !mounted) return;
       final preferredId = pick?['id']?.toString();
       ScanDebugLog.i(
         'cameras=${cameras.map((camera) => '${camera.name}:${camera.lensDirection.name}').join(' ')} '
@@ -473,8 +479,10 @@ class _CameraScanPageState extends State<CameraScanPage>
       if (!controller.value.isStreamingImages) {
         await controller.startImageStream(_onStreamFrame);
       }
+      if (!mounted || !_scanning || _appPaused) return;
       ScanDebugLog.i('capture stream ${Platform.isIOS ? "bgra" : "yuv420"}');
     } catch (error) {
+      if (!mounted || !_scanning || _appPaused) return;
       ScanDebugLog.i('stream failed $error, stills');
       _captureAndClassify();
       _timer = Timer.periodic(_scanInterval, (_) => _captureAndClassify());
@@ -1018,7 +1026,7 @@ class _CameraScanPageState extends State<CameraScanPage>
       final inApp = widget.onOpenMarketplaceUri?.call(uri) == true;
       if (inApp) {
         ScanDebugLog.i('open in_app url=$uri');
-        setState(() => _opening = false);
+        if (mounted) setState(() => _opening = false);
         return;
       }
       final launched = await ScanEngine.openInDefaultBrowser(uri).timeout(
@@ -1068,6 +1076,7 @@ class _CameraScanPageState extends State<CameraScanPage>
         imageQuality: 92,
         maxWidth: 1600,
       );
+      if (!mounted) return;
       if (image == null) {
         _startScan();
         return;
@@ -1134,245 +1143,242 @@ class _CameraScanPageState extends State<CameraScanPage>
     final controller = _controller;
     final ready = controller?.value.isInitialized == true;
 
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          if (ready)
-            _CameraSensorPreview(controller: controller!)
-          else
-            ColoredBox(
-              color: Colors.black,
-              child: Center(
-                child: _initializing
-                    ? const CircularProgressIndicator()
-                    : Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Text(
-                          _error ?? 'Camera not available.',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(color: Color(0xFFFCA5A5)),
-                        ),
-                      ),
-              ),
-            ),
-          if (ready)
-            Positioned.fill(
-              child: IgnorePointer(
-                child: AnimatedBuilder(
-                  animation: _pulse,
-                  builder: (context, _) {
-                    final preview = controller?.value.previewSize;
-                    final portrait = MediaQuery.orientationOf(context) ==
-                        Orientation.portrait;
-                    final layout = preview == null
-                        ? const Size(480, 640)
-                        : previewLayoutSize(preview, portrait: portrait);
-                    final imageSize = _imgW > 0 && _imgH > 0
-                        ? Size(_imgW.toDouble(), _imgH.toDouble())
-                        : layout;
-                    final boxes =
-                        _boxes.isNotEmpty ? _boxes : const <ScanBox>[];
-                    return CustomPaint(
-                      painter: LiveCardBoxesPainter(
-                        boxes: boxes,
-                        imageSize: imageSize,
-                        pulse: _pulse.value,
-                        fit: BoxFit.contain,
-                      ),
-                      child: const SizedBox.expand(),
-                    );
-                  },
-                ),
-              ),
-            ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: SafeArea(
-              top: false,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (_mode == ScanMode.multi && _listedCards.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: const Color(0xCC0B0B0B),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxHeight: 280),
-                          child: ListView.separated(
-                            shrinkWrap: true,
-                            physics: const ClampingScrollPhysics(),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                            itemCount:
-                                _listedCards.length.clamp(0, maxMultiCards),
-                            separatorBuilder: (context, index) => const Divider(
-                              height: 8,
-                              color: Color(0x33FACC15),
-                            ),
-                            itemBuilder: (context, index) {
-                              final hit = _listedCards[index];
-                              return Row(
-                                children: [
-                                  Text(
-                                    '${(hit.score * 100).round()}%',
-                                    style: const TextStyle(
-                                      color: Color(0xFFFACC15),
-                                      fontWeight: FontWeight.w700,
-                                      fontFeatures: [
-                                        FontFeature.tabularFigures(),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      hit.title,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              );
-                            },
-                          ),
-                        ),
+    final body = Stack(
+      fit: StackFit.expand,
+      children: [
+        if (ready)
+          _CameraSensorPreview(controller: controller!)
+        else
+          ColoredBox(
+            color: Colors.black,
+            child: Center(
+              child: _initializing
+                  ? const CircularProgressIndicator()
+                  : Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        _error ?? 'Camera not available.',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Color(0xFFFCA5A5)),
                       ),
                     ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
-                    child: Row(
-                      children: [
-                        Flexible(
-                          child: SegmentedButton<ScanMode>(
-                            showSelectedIcon: false,
-                            style: const ButtonStyle(
-                              visualDensity: VisualDensity.compact,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              padding: WidgetStatePropertyAll(
-                                EdgeInsets.symmetric(horizontal: 10),
-                              ),
-                            ),
-                            segments: const [
-                              ButtonSegment(
-                                value: ScanMode.fast,
-                                label: Text(
-                                  'Single',
-                                  maxLines: 1,
-                                  softWrap: false,
-                                ),
-                              ),
-                              ButtonSegment(
-                                value: ScanMode.multi,
-                                label: Text(
-                                  'Multi',
-                                  maxLines: 1,
-                                  softWrap: false,
-                                ),
-                              ),
-                            ],
-                            selected: {_mode},
-                            onSelectionChanged: _opening
-                                ? null
-                                : (value) {
-                                    if (value.isNotEmpty) _setMode(value.first);
-                                  },
-                          ),
-                        ),
-                        IconButton.filledTonal(
-                          tooltip: _torchOn ? 'Flash on' : 'Flash off',
-                          onPressed: !ready || _opening ? null : _toggleTorch,
-                          icon:
-                              Icon(_torchOn ? Icons.flash_on : Icons.flash_off),
-                        ),
-                        if (Platform.isAndroid)
-                          IconButton.filledTonal(
-                            tooltip: _gpuOwner == 'milo'
-                                ? 'GPU: identify (MobileNet CNN). Overlay on CPU. Tap restarts.'
-                                : 'GPU: overlay (YOLO) — tap restarts',
-                            onPressed:
-                                !_engineReady || _opening || _switchingAccel
-                                    ? null
-                                    : () => unawaited(_toggleGpuOwner()),
-                            visualDensity: VisualDensity.compact,
-                            style: IconButton.styleFrom(
-                              backgroundColor: const Color(0xFFFACC15),
-                            ),
-                            icon: Text(
-                              _gpuOwner == 'milo' ? 'MILO' : 'YOLO',
-                              style: const TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                        IconButton.filledTonal(
-                          tooltip: 'Gallery',
-                          onPressed: _opening ? null : _pickFromGallery,
-                          icon: const Icon(Icons.photo_library_outlined),
-                        ),
-                        _galleryFlag(
-                          gallery: 'japanese',
-                          emoji: '🇯🇵',
-                          tooltip: 'Japanese catalog',
-                        ),
-                        _galleryFlag(
-                          gallery: 'chinese',
-                          emoji: '🇨🇳',
-                          tooltip: 'Chinese catalog',
-                        ),
-                      ],
+            ),
+          ),
+        if (ready)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: AnimatedBuilder(
+                animation: _pulse,
+                builder: (context, _) {
+                  final preview = controller?.value.previewSize;
+                  final portrait =
+                      MediaQuery.orientationOf(context) == Orientation.portrait;
+                  final layout = preview == null
+                      ? const Size(480, 640)
+                      : previewLayoutSize(preview, portrait: portrait);
+                  final imageSize = _imgW > 0 && _imgH > 0
+                      ? Size(_imgW.toDouble(), _imgH.toDouble())
+                      : layout;
+                  final boxes = _boxes.isNotEmpty ? _boxes : const <ScanBox>[];
+                  return CustomPaint(
+                    painter: LiveCardBoxesPainter(
+                      boxes: boxes,
+                      imageSize: imageSize,
+                      pulse: _pulse.value,
+                      fit: BoxFit.contain,
                     ),
-                  ),
-                ],
+                    child: const SizedBox.expand(),
+                  );
+                },
               ),
             ),
           ),
-          if (ready && !_yoloLive && !_showBoot)
-            const Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: SafeArea(
-                bottom: false,
-                child: Padding(
-                  padding: EdgeInsets.only(top: 12),
-                  child: Center(
-                    child: Text(
-                      'Warming up',
-                      style: TextStyle(
-                        color: Color(0xFFFACC15),
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (_mode == ScanMode.multi && _listedCards.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: const Color(0xCC0B0B0B),
+                        borderRadius: BorderRadius.circular(12),
                       ),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 280),
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          physics: const ClampingScrollPhysics(),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          itemCount:
+                              _listedCards.length.clamp(0, maxMultiCards),
+                          separatorBuilder: (context, index) => const Divider(
+                            height: 8,
+                            color: Color(0x33FACC15),
+                          ),
+                          itemBuilder: (context, index) {
+                            final hit = _listedCards[index];
+                            return Row(
+                              children: [
+                                Text(
+                                  '${(hit.score * 100).round()}%',
+                                  style: const TextStyle(
+                                    color: Color(0xFFFACC15),
+                                    fontWeight: FontWeight.w700,
+                                    fontFeatures: [
+                                      FontFeature.tabularFigures(),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    hit.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+                  child: Row(
+                    children: [
+                      Flexible(
+                        child: SegmentedButton<ScanMode>(
+                          showSelectedIcon: false,
+                          style: const ButtonStyle(
+                            visualDensity: VisualDensity.compact,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            padding: WidgetStatePropertyAll(
+                              EdgeInsets.symmetric(horizontal: 10),
+                            ),
+                          ),
+                          segments: const [
+                            ButtonSegment(
+                              value: ScanMode.fast,
+                              label: Text(
+                                'Single',
+                                maxLines: 1,
+                                softWrap: false,
+                              ),
+                            ),
+                            ButtonSegment(
+                              value: ScanMode.multi,
+                              label: Text(
+                                'Multi',
+                                maxLines: 1,
+                                softWrap: false,
+                              ),
+                            ),
+                          ],
+                          selected: {_mode},
+                          onSelectionChanged: _opening
+                              ? null
+                              : (value) {
+                                  if (value.isNotEmpty) _setMode(value.first);
+                                },
+                        ),
+                      ),
+                      IconButton.filledTonal(
+                        tooltip: _torchOn ? 'Flash on' : 'Flash off',
+                        onPressed: !ready || _opening ? null : _toggleTorch,
+                        icon: Icon(_torchOn ? Icons.flash_on : Icons.flash_off),
+                      ),
+                      if (Platform.isAndroid)
+                        IconButton.filledTonal(
+                          tooltip: _gpuOwner == 'milo'
+                              ? 'GPU: identify (MobileNet CNN). Overlay on CPU. Tap restarts.'
+                              : 'GPU: overlay (YOLO) — tap restarts',
+                          onPressed:
+                              !_engineReady || _opening || _switchingAccel
+                                  ? null
+                                  : () => unawaited(_toggleGpuOwner()),
+                          visualDensity: VisualDensity.compact,
+                          style: IconButton.styleFrom(
+                            backgroundColor: const Color(0xFFFACC15),
+                          ),
+                          icon: Text(
+                            _gpuOwner == 'milo' ? 'MILO' : 'YOLO',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      IconButton.filledTonal(
+                        tooltip: 'Gallery',
+                        onPressed: _opening ? null : _pickFromGallery,
+                        icon: const Icon(Icons.photo_library_outlined),
+                      ),
+                      _galleryFlag(
+                        gallery: 'japanese',
+                        emoji: '🇯🇵',
+                        tooltip: 'Japanese catalog',
+                      ),
+                      _galleryFlag(
+                        gallery: 'chinese',
+                        emoji: '🇨🇳',
+                        tooltip: 'Chinese catalog',
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (ready && !_yoloLive && !_showBoot)
+          const Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: EdgeInsets.only(top: 12),
+                child: Center(
+                  child: Text(
+                    'Warming up',
+                    style: TextStyle(
+                      color: Color(0xFFFACC15),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
                     ),
                   ),
                 ),
               ),
             ),
-          if (_showBoot)
-            const Positioned.fill(
-              child: IgnorePointer(
-                child: PokoinBootOverlay(),
-              ),
+          ),
+        if (_showBoot)
+          const Positioned.fill(
+            child: IgnorePointer(
+              child: PokoinBootOverlay(),
             ),
-        ],
-      ),
+          ),
+      ],
     );
+    return widget.pageBuilder?.call(context, body) ??
+        Scaffold(backgroundColor: Colors.black, body: body);
   }
 }
 

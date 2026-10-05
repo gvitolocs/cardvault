@@ -57,8 +57,31 @@ List<MarketplaceExpansion> recentHomeExpansions(
 List<PokemonCard> marketplaceBestSellers(
   List<PokemonCard> cards,
   List<String> rankedIds,
+) =>
+    marketplaceCardsForRankedIds(cards, rankedIds);
+
+/// Keep only the records needed by the two mobile discovery rails.
+List<PokemonCard> marketplaceDiscoverySourceCards(
+  List<PokemonCard> cards,
+  Iterable<String> wantedIds,
 ) {
-  final byId = {for (final card in cards) card.id: card};
+  final wanted = wantedIds.toSet();
+  if (wanted.isEmpty) return const [];
+  return cards
+      .where((card) => wanted.contains(card.id))
+      .toList(growable: false);
+}
+
+List<PokemonCard> marketplaceCardsForRankedIds(
+  List<PokemonCard> cards,
+  List<String> rankedIds,
+) {
+  if (rankedIds.isEmpty) return const [];
+  final wanted = rankedIds.toSet();
+  final byId = {
+    for (final card in cards)
+      if (wanted.contains(card.id)) card.id: card,
+  };
   final seen = <String>{};
   return rankedIds
       .where(seen.add)
@@ -67,7 +90,6 @@ List<PokemonCard> marketplaceBestSellers(
       .take(12)
       .toList(growable: false);
 }
-
 
 class RecentExpansionsCarousel extends StatefulWidget {
   const RecentExpansionsCarousel({

@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pokoin/models/pokemon_card.dart';
-import 'package:pokoin/models/marketplace_expansion.dart';
-import 'package:pokoin/widgets/marketplace_home_discovery.dart';
+// These imports also exercise the real source in the Flutter-only harness.
+// ignore: avoid_relative_lib_imports
+import '../lib/models/pokemon_card.dart';
+// ignore: avoid_relative_lib_imports
+import '../lib/models/marketplace_expansion.dart';
+// ignore: avoid_relative_lib_imports
+import '../lib/widgets/marketplace_home_discovery.dart';
 
 MarketplaceExpansion expansion(
   String name, {
@@ -46,6 +50,39 @@ PokemonCard card(String id, {double price = 1}) => PokemonCard(
     );
 
 void main() {
+  test('mobile discovery retains only backend-selected cards', () {
+    final cards = List.generate(1000, (index) => card('$index'));
+    final selected =
+        marketplaceDiscoverySourceCards(cards, ['12', '24', 'missing', '12']);
+    expect(selected.map((card) => card.id), ['12', '24']);
+    expect(cards.length, 1000);
+    expect(marketplaceDiscoverySourceCards(cards, const []), isEmpty);
+  });
+
+  test('bounded discovery retains backend ranking and new-arrival set hints',
+      () {
+    final cards = [card('a'), card('b'), card('c')];
+    final selected = marketplaceDiscoverySourceCards(cards, ['b', 'c']);
+    expect(
+        marketplaceBestSellers(selected, ['c', 'missing', 'b'])
+            .map((card) => card.id),
+        ['c', 'b']);
+    expect(
+        marketplaceCardsForRankedIds(selected, ['b', 'b', 'missing'])
+            .map((card) => card.set),
+        ['Test']);
+  });
+
+  test('ranked discovery caps visible cards without changing catalog records',
+      () {
+    final cards = List.generate(100, (index) => card('$index'));
+    final ids = List.generate(100, (index) => '${99 - index}');
+    final ranked = marketplaceCardsForRankedIds(cards, ids);
+    expect(ranked.map((card) => card.id),
+        List.generate(12, (index) => '${99 - index}'));
+    expect(cards.first.id, '0');
+  });
+
   test('legacy expansions use catalog order rather than alphabetical order',
       () {
     final result = recentHomeExpansions(
@@ -113,7 +150,7 @@ void main() {
         isNull);
   });
 
-  testWidgets('utility bar exposes and invokes all four destinations',
+  testWidgets('utility bar exposes and invokes all five destinations',
       (tester) async {
     final tapped = <String>[];
     await tester.pumpWidget(MaterialApp(
@@ -121,15 +158,16 @@ void main() {
       bottomNavigationBar: MarketplaceUtilityBar(
         onSearch: () => tapped.add('search'),
         onScanner: () => tapped.add('scanner'),
+        onWallet: () => tapped.add('wallet'),
         onListings: () => tapped.add('dashboard'),
         onProfile: () => tapped.add('profile'),
       ),
     )));
-    for (final label in ['Ricerca', 'Scanner', 'Elenco', 'Profilo']) {
+    for (final label in ['Ricerca', 'Scanner', 'Wallet', 'Elenco', 'Profilo']) {
       await tester.tap(find.text(label));
       await tester.pump();
     }
-    expect(tapped, ['search', 'scanner', 'dashboard', 'profile']);
+    expect(tapped, ['search', 'scanner', 'wallet', 'dashboard', 'profile']);
     expect(tester.takeException(), isNull);
   });
 

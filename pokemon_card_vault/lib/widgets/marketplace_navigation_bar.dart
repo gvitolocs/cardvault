@@ -16,8 +16,9 @@ class MarketplaceNavigationBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return MarketplaceUtilityBar(
       selectedIndex: selectedIndex,
-      onSearch: () => context.go('/marketplace/search'),
+      onSearch: () => context.go('/marketplace'),
       onScanner: () => context.go('/cardscan'),
+      onWallet: () => context.go('/wallet'),
       onListings: () => unawaited(_openDashboard(context)),
       // The router preserves /profile as the return path for signed-out users.
       onProfile: () => context.go('/profile'),

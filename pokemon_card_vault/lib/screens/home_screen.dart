@@ -1505,7 +1505,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final cartState = ref.watch(cartProvider);
     _syncSearchDebugAuthorization(ref.watch(userProfileProvider).valueOrNull);
 
-    final cards = cardState.filteredCards;
+    final compactTopBar = MediaQuery.sizeOf(context).width < 760;
+    final bestSellerIds =
+        cardState.homeSections?.bestSellerIds ?? const <String>[];
+    final newArrivalIds =
+        cardState.homeSections?.newArrivalIds ?? const <String>[];
     final activeListings =
         ref.watch(activeCardListingsProvider).valueOrNull ?? const [];
     final hasMarketplaceData = cardState.cards.isNotEmpty ||
@@ -1514,41 +1518,43 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final showMarketplaceSkeleton = cardState.error == null &&
         !hasMarketplaceData &&
         cardState.searchQuery.trim().isEmpty;
-    final catalog = _cardsWithActiveListings(cardState.cards, activeListings);
-    final listingAwareCards = _cardsWithActiveListings(cards, activeListings);
-    final listingAwareSpotlightCards =
-        _cardsWithActiveListings(cardState.spotlightCards, activeListings);
-    final singles = listingAwareCards.where(_isSingleCard).toList();
-    final warmedSpotlightSingles =
-        listingAwareSpotlightCards.where(_isSingleCard).toList();
-    final recentViewsState = ref.watch(recentViewsProvider);
-    final recentViews = recentViewsState.views;
-    _scheduleRecentCheapestPriceHydration(recentViews);
-    final recentCheapestPrices = _mergeRecentCheapestPrices(
-      _recentCheapestPricesForViews(recentViews),
-      _recentCheapestPrices,
+    final catalog = _cardsWithActiveListings(
+      compactTopBar
+          ? marketplaceDiscoverySourceCards(
+              cardState.cards, [...bestSellerIds, ...newArrivalIds])
+          : cardState.cards,
+      activeListings,
     );
-    final spotlightSource =
-        warmedSpotlightSingles.isNotEmpty ? warmedSpotlightSingles : singles;
-    final personalizedCards = cardState.searchQuery.trim().isEmpty
-        ? _rankCardsByRecentViews(spotlightSource, recentViews)
-        : singles;
+    // Mobile renders only discovery rails: don't rank hidden desktop sections,
+    // fetch recent-view prices, or hydrate offscreen details during startup.
+    List<PokemonCard> personalizedCards = const [];
+    if (!compactTopBar) {
+      final listingAwareCards =
+          _cardsWithActiveListings(cardState.filteredCards, activeListings);
+      final listingAwareSpotlightCards =
+          _cardsWithActiveListings(cardState.spotlightCards, activeListings);
+      final singles = listingAwareCards.where(_isSingleCard).toList();
+      final warmedSpotlightSingles =
+          listingAwareSpotlightCards.where(_isSingleCard).toList();
+      final recentViews = ref.watch(recentViewsProvider).views;
+      _scheduleRecentCheapestPriceHydration(recentViews);
+      final spotlightSource =
+          warmedSpotlightSingles.isNotEmpty ? warmedSpotlightSingles : singles;
+      personalizedCards = cardState.searchQuery.trim().isEmpty
+          ? _rankCardsByRecentViews(spotlightSource, recentViews)
+          : singles;
+    }
     final visibleCards = personalizedCards.take(_visibleCount).toList();
-    final sections = _MarketplaceSections.fromCards(
-      catalog,
-      cachedSections: cardState.homeSections,
-      recentViews: recentViews,
-      cheapestPricesByCardId: recentCheapestPrices,
-    );
-    final compactTopBar = MediaQuery.sizeOf(context).width < 760;
     final expansions = recentHomeExpansions(
       _homeExpansions,
       catalogOrder: _expansionCatalogOrder,
-      newArrivalSets: sections.newArrivals.map((card) => card.set).toList(),
+      newArrivalSets: marketplaceCardsForRankedIds(catalog, newArrivalIds)
+          .map((card) => card.set)
+          .toList(),
     );
     final bestSellers = marketplaceBestSellers(
       catalog,
-      cardState.homeSections?.bestSellerIds ?? const [],
+      bestSellerIds,
     );
     _scheduleSpotlightImagePrecache(
       personalizedCards,
@@ -1559,7 +1565,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ...bestSellers,
       if (_spotlightRevealStarted) ...visibleCards,
     ];
-    if (!cardState.isLoading && cardState.error == null) {
+    if (!compactTopBar && !cardState.isLoading && cardState.error == null) {
       _scheduleRenderedDetailWarmup(renderedWarmupCards);
     }
 

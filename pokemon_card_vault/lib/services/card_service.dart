@@ -11,6 +11,8 @@ export '../models/marketplace_expansion.dart';
 import '../utils/card_url.dart';
 import 'pokoin_api_auth.dart';
 import 'search_debug_trace.dart';
+import '../utils/single_flight.dart';
+import 'marketplace_card_cache.dart';
 
 const String _cardImageProxyOrigin = 'https://pokoin.com';
 const String _cardImageProxyPrefix = '/card-images';
@@ -1589,6 +1591,7 @@ class SearchAutocompleteResult {
 }
 
 class CardService {
+  final _homeSnapshotRequest = SingleFlight<MarketplaceHomeSnapshot?>();
   // Local storage
   static const String _cardsBoxName = 'pokemon_cards';
   static const String _homeSnapshotBoxName = 'marketplace_home_snapshot';
@@ -1763,7 +1766,10 @@ class CardService {
     return _cachedCardList(_spotlightCardsKey);
   }
 
-  Future<MarketplaceHomeSnapshot?> getMarketplaceHomeSnapshot() async {
+  Future<MarketplaceHomeSnapshot?> getMarketplaceHomeSnapshot() =>
+      _homeSnapshotRequest.run(_loadMarketplaceHomeSnapshot);
+
+  Future<MarketplaceHomeSnapshot?> _loadMarketplaceHomeSnapshot() async {
     try {
       final response = await _getMarketplaceHomeResponse();
       if (response == null || response.statusCode >= 400) {
@@ -3540,15 +3546,7 @@ class CardService {
     try {
       await _initHive();
       final box = await Hive.openBox<PokemonCard>(_cardsBoxName);
-      final key = box.keys.firstWhere(
-        (key) => box.get(key)?.id == card.id,
-        orElse: () => null,
-      );
-      if (key == null) {
-        await box.add(card);
-      } else {
-        await box.put(key, card);
-      }
+      await upsertMarketplaceCardCache(box, [card]);
       await _writeCacheMetadata('cards');
     } catch (error) {
       debugPrint('Error caching card by id: $error');
@@ -3562,20 +3560,7 @@ class CardService {
     try {
       await _initHive();
       final box = await Hive.openBox<PokemonCard>(_cardsBoxName);
-      final byId = <String, PokemonCard>{
-        for (final card in box.values)
-          if (card.id.isNotEmpty) card.id: card,
-      };
-      for (final card in cards) {
-        if (card.id.isNotEmpty) {
-          byId[card.id] = card;
-        }
-      }
-      await box.clear();
-      var index = 0;
-      for (final card in byId.values) {
-        await box.put(index++, card);
-      }
+      await upsertMarketplaceCardCache(box, cards);
       await _writeCacheMetadata('cards');
     } catch (error) {
       debugPrint('Error merging cards to local cache: $error');

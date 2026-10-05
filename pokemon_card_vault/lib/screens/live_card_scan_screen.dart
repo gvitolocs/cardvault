@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../scan_v2/live_scan_page.dart';
+import '../widgets/scanner_navigation_shell.dart';
 
 /// Android V2 / iOS Fast scan from pokoin-cardapp, embedded in CardVault.
 class LiveCardScanScreen extends StatelessWidget {
@@ -10,6 +11,7 @@ class LiveCardScanScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CameraScanPage(
+      pageBuilder: (context, body) => ScannerNavigationShell(body: body),
       onOpenMarketplaceUri: (uri) {
         final parts = uri.pathSegments;
         // /marketplace/en/cards/{publicId}/...

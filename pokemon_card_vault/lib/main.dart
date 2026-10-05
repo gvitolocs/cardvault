@@ -15,7 +15,6 @@ import 'screens/inventory_screen.dart';
 import 'screens/landing_screen.dart';
 import 'screens/health_screen.dart';
 import 'screens/scan_screen.dart';
-import 'screens/card_scan_screen.dart';
 import 'screens/live_card_scan_screen.dart';
 import 'screens/cart_screen.dart';
 import 'screens/profile_screen.dart';
@@ -50,6 +49,8 @@ import 'providers/marketplace_account_provider.dart';
 import 'services/card_service.dart';
 import 'services/flutter_debug_log.dart';
 import 'utils/browser_location.dart';
+import 'utils/app_home_route.dart';
+import 'utils/account_route_policy.dart';
 import 'utils/card_url.dart';
 import 'wallet/wallet_bridge_stub.dart';
 import 'widgets/pokoin_assistant.dart';
@@ -60,8 +61,10 @@ void main() {
     _installFlutterDebugErrorHooks();
     usePathUrlStrategy();
 
-    await _initializeFirebase();
-    await _initializeLocalServices();
+    await Future.wait([
+      _initializeFirebase(),
+      _initializeLocalServices(),
+    ]);
 
     runApp(
       const ProviderScope(
@@ -484,17 +487,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isCloseOnAuth = _isCloseOnAuthRequest(state.uri.queryParameters);
       final isSignupVerification =
           state.uri.queryParameters['signupToken']?.isNotEmpty == true;
-      final isProtectedRoute = {
-        '/wallet',
-        '/swap',
-        '/profile',
-        '/inventory',
-        '/collection',
-        '/nft',
-        '/checkout',
-        '/orders',
-        '/marketplace/connect',
-      }.contains(state.matchedLocation);
+      final isProtectedRoute = requiresAccountForRoute(state.matchedLocation);
 
       if (!isLoggedIn && isProtectedRoute) {
         final from = Uri.encodeComponent(state.uri.toString());
@@ -514,6 +507,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(
         path: '/',
+        redirect: (context, state) => nativeHomeRedirect(state.uri),
         pageBuilder: (context, state) {
           final host = Uri.base.host;
           if (host == 'explorer.pokoin.com') {
