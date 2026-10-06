@@ -58,6 +58,26 @@ same-origin rewrite while Android and iOS call `https://api.pokoin.com` (or the
 
 For optional auth, pass `requireAuth: false`. For required auth, the default behavior throws before sending if there is no signed-in Firebase user.
 
+## Email signup on mobile
+
+`AuthService.registerWithEmail` posts to
+`marketplaceApiUri('/api/register-email')` through `PokoinApiClient` with
+`requireAuth: false`. `verifyEmailSignupToken` uses the same policy for
+`/api/verify-email-signup`; neither public signup endpoint requires an existing
+account. Do not pass a raw relative `Uri.parse('/api/...')` to native HTTP:
+Android has no browser origin to resolve it and fails with "No host specified".
+The subsequent `/api/ensure-username` call also uses `marketplaceApiUri`, but
+retains the client's default required Firebase bearer token.
+
+Registration remains pending until the email token is verified by the server.
+Firebase Auth owns the identity, and the server creates the Firestore profile
+and balances; no PostgreSQL or Firebase Admin credentials belong in the APK.
+The existing email link opens `https://pokoin.com/auth?signupToken=...` (or the
+configured server `PUBLIC_SITE_URL`). Android App Links are not configured in
+this checkout: confirm the email in the browser, then return to the app and
+sign in with the same email/password. This URL fix does not add automatic
+return-to-app or replace the server-side email verification policy.
+
 ## Server Flow
 
 Vercel functions validate the bearer token with Firebase Admin:

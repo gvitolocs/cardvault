@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -251,7 +252,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Check your email to verify your account.'),
+              content: Text(kIsWeb
+                  ? 'Check your email to verify your account.'
+                  : 'Check your email to verify your account, then return '
+                      'to the app and sign in.'),
             ),
           );
         }

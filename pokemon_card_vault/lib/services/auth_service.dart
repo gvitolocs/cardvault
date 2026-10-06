@@ -10,6 +10,7 @@ import 'dart:convert';
 import '../models/app_user_profile.dart';
 import 'pokoin_api_auth.dart';
 import 'pokoin_api_client.dart';
+import 'marketplace_api_uri.dart';
 
 class AuthService {
   static const inactivityLogoutAfter = Duration(days: 30);
@@ -137,15 +138,15 @@ class AuthService {
     if (kIsWeb) {
       await _auth.setPersistence(Persistence.LOCAL);
     }
-    final response = await http.post(
-      Uri.parse('/api/register-email'),
-      headers: const {'Content-Type': 'application/json'},
-      body: jsonEncode({
+    final response = await _pokoinApiClient.postJson(
+      marketplaceApiUri('/api/register-email'),
+      requireAuth: false,
+      body: {
         'email': cleanEmail,
         'password': password,
         'username': cleanUsername,
         'redirectPath': redirectPath,
-      }),
+      },
     );
     final payload = _decodeJsonResponse(response.body);
     if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -157,10 +158,10 @@ class AuthService {
     if (kIsWeb) {
       await _auth.setPersistence(Persistence.LOCAL);
     }
-    final response = await http.post(
-      Uri.parse('/api/verify-email-signup'),
-      headers: const {'Content-Type': 'application/json'},
-      body: jsonEncode({'token': signupToken.trim()}),
+    final response = await _pokoinApiClient.postJson(
+      marketplaceApiUri('/api/verify-email-signup'),
+      requireAuth: false,
+      body: {'token': signupToken.trim()},
     );
     final payload = _decodeJsonResponse(response.body);
     if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -457,7 +458,7 @@ class AuthService {
       return null;
     }
     final response = await _pokoinApiClient.postJson(
-      Uri.parse('/api/ensure-username'),
+      marketplaceApiUri('/api/ensure-username'),
     );
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
     if (response.statusCode < 200 || response.statusCode >= 300) {
