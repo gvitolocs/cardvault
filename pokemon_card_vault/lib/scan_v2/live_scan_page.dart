@@ -20,6 +20,7 @@ class CameraScanPage extends StatefulWidget {
     super.key,
     this.onOpenMarketplaceUri,
     this.pageBuilder,
+    this.initialGallery = 'western',
   });
 
   /// If set and returns true, skip external browser open.
@@ -27,6 +28,7 @@ class CameraScanPage extends StatefulWidget {
 
   /// Optional app navigation around the preview; standalone callers stay full-screen.
   final Widget Function(BuildContext context, Widget body)? pageBuilder;
+  final String initialGallery;
 
   @override
   State<CameraScanPage> createState() => _CameraScanPageState();
@@ -51,6 +53,7 @@ class _CameraScanPageState extends State<CameraScanPage>
 
   CameraController? _controller;
   Timer? _timer;
+  Timer? _warmupTimer;
   bool _initializing = true;
   bool _scanning = false;
   bool _sendingFrame = false;
@@ -64,6 +67,7 @@ class _CameraScanPageState extends State<CameraScanPage>
   String _gpuOwner = 'yolo';
   bool _showBoot = true;
   String? _error;
+  String? _engineError;
   int _framesSent = 0;
   ScanMode _mode = ScanMode.fast;
   String _gallery = 'western';
@@ -94,6 +98,7 @@ class _CameraScanPageState extends State<CameraScanPage>
   @override
   void initState() {
     super.initState();
+    _gallery = widget.initialGallery;
     WidgetsBinding.instance.addObserver(this);
     _pulse = AnimationController(
       vsync: this,
@@ -106,6 +111,7 @@ class _CameraScanPageState extends State<CameraScanPage>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
+    _warmupTimer?.cancel();
     _captureEpoch++;
     _scanning = false;
     _appPaused = true;
@@ -128,6 +134,7 @@ class _CameraScanPageState extends State<CameraScanPage>
         'lifecycle $state opening=$_opening scanning=$_scanning',
       );
       _timer?.cancel();
+      _warmupTimer?.cancel();
       _captureEpoch++;
       _sendingFrame = false;
       _detecting = false;
@@ -191,7 +198,7 @@ class _CameraScanPageState extends State<CameraScanPage>
   Future<void> _initEngine() async {
     try {
       final lookup = _lookup.load();
-      await ScanEngine.init();
+      await ScanEngine.init(selectedGallery: _gallery);
       await lookup;
       if (!mounted) return;
       ScanDebugLog.i(
@@ -202,6 +209,7 @@ class _CameraScanPageState extends State<CameraScanPage>
       );
       setState(() {
         _engineReady = true;
+        _engineError = null;
         _gpuOwner = ScanEngine.gpuOwner;
       });
     } catch (error) {
@@ -209,7 +217,9 @@ class _CameraScanPageState extends State<CameraScanPage>
       if (!mounted) return;
       setState(() {
         _engineReady = false;
-        _error = error.toString();
+        _engineError = error is TimeoutException
+            ? 'Il motore non ha risposto entro 60 secondi. Riavvia l’app e riprova.'
+            : error.toString();
       });
     }
     _maybeStartScan();
@@ -450,6 +460,7 @@ class _CameraScanPageState extends State<CameraScanPage>
       _error = null;
       _framesSent = 0;
       _matches.clear();
+      _yoloLive = false;
       _listedCards = const [];
       _boxes = const [];
     });
@@ -460,11 +471,19 @@ class _CameraScanPageState extends State<CameraScanPage>
     _latestIdentifyBoxes = const [];
     ScanDebugLog.i('scan start mode=$_mode epoch=$_captureEpoch');
     _timer?.cancel();
+    _warmupTimer?.cancel();
+    _warmupTimer = Timer(const Duration(seconds: 30), () {
+      if (!mounted || !_scanning || _yoloLive) return;
+      _stopScan();
+      setState(() => _error =
+          'Il rilevamento non ha risposto entro 30 secondi. Esci dallo scanner e riprova.');
+    });
     unawaited(_startCapturing());
   }
 
   void _stopScan() {
     _timer?.cancel();
+    _warmupTimer?.cancel();
     final controller = _controller;
     if (controller != null && controller.value.isStreamingImages) {
       unawaited(controller.stopImageStream());
@@ -1157,7 +1176,7 @@ class _CameraScanPageState extends State<CameraScanPage>
                   : Padding(
                       padding: const EdgeInsets.all(24),
                       child: Text(
-                        _error ?? 'Camera not available.',
+                        _engineError ?? _error ?? 'Camera not available.',
                         textAlign: TextAlign.center,
                         style: const TextStyle(color: Color(0xFFFCA5A5)),
                       ),
@@ -1347,7 +1366,12 @@ class _CameraScanPageState extends State<CameraScanPage>
             ),
           ),
         ),
-        if (ready && !_yoloLive && !_showBoot)
+        if (ready &&
+            _engineReady &&
+            _scanning &&
+            !_yoloLive &&
+            _error == null &&
+            !_showBoot)
           const Positioned(
             top: 0,
             left: 0,
@@ -1365,6 +1389,35 @@ class _CameraScanPageState extends State<CameraScanPage>
                       fontSize: 14,
                     ),
                   ),
+                ),
+              ),
+            ),
+          ),
+        if (ready && !_engineReady && _engineError == null && !_showBoot)
+          const Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: Text('Caricamento del motore scanner…',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Color(0xFFFACC15))),
+              ),
+            ),
+          ),
+        if (ready && (_engineError != null || _error != null))
+          Positioned.fill(
+            child: ColoredBox(
+              color: const Color(0xCC070B18),
+              child: Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(
+                      'Scanner non disponibile: ${_engineError ?? _error}',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Color(0xFFFCA5A5))),
                 ),
               ),
             ),

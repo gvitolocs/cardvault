@@ -130,7 +130,9 @@ class ScanEnginePlugin(private val appContext: Context) : MethodChannel.MethodCa
                     @Suppress("DEPRECATION")
                     info.versionCode.toLong()
                 }
-                result.success(code.toString())
+                // Debug APKs can share a version code. Refresh provisioned
+                // models after reinstalling a new build of that same version.
+                result.success("$code:${info.lastUpdateTime}")
             }
             "init" -> {
                 val dir = call.argument<String>("dir") ?: ""

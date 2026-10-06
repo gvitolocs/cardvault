@@ -186,6 +186,7 @@ class ScanEngine {
   static const _channel = MethodChannel('pokoin.scan/engine');
   static const galleries = ['western', 'japanese', 'chinese'];
   static bool _ready = false;
+  static Future<void>? _initialization;
   static int miloN = 0;
   static String identity = 'ct_id';
   static String miloBackend = 'none';
@@ -206,19 +207,45 @@ class ScanEngine {
     }
   }
 
-  static Future<void> init() async {
-    if (_ready) return;
+  static Future<void> init({String? selectedGallery}) async {
+    if (_ready) {
+      if (selectedGallery != null) await setGallery(selectedGallery);
+      return;
+    }
+    final operation =
+        _initialization ??= _initialize(selectedGallery ?? gallery);
+    try {
+      // A timeout reports failure without pretending to cancel native work.
+      // Keep the shared native operation until it actually completes.
+      await operation.timeout(const Duration(seconds: 60));
+      if (selectedGallery != null && selectedGallery != gallery) {
+        await setGallery(selectedGallery);
+      }
+    } finally {
+      operation.then((_) {
+        if (identical(_initialization, operation)) _initialization = null;
+      }, onError: (Object _, StackTrace __) {
+        if (identical(_initialization, operation)) _initialization = null;
+      });
+    }
+  }
+
+  static Future<void> _initialize(String selectedGallery) async {
     final support = await getApplicationSupportDirectory();
     final dir = Directory('${support.path}/fast_scan');
     await dir.create(recursive: true);
     _supportDir = dir.path;
-    final status = ScanAssetStore.inspectRoot(dir, gallery: gallery);
+    final status = Platform.isAndroid
+        ? await ScanAssetStore.prepareAndroidBundle(
+            gallery: selectedGallery, destinationRoot: dir)
+        : ScanAssetStore.inspectRoot(dir, gallery: selectedGallery);
     if (!status.ready) throw StateError(status.message);
     await ScanDebugLog.attach(dir);
-    identity = await _readIdentity('${dir.path}/$gallery/manifest.json');
+    identity =
+        await _readIdentity('${dir.path}/$selectedGallery/manifest.json');
     final result = await _channel.invokeMapMethod<String, dynamic>('init', {
       'dir': dir.path,
-      'gallery': gallery,
+      'gallery': selectedGallery,
     });
     miloN = (result?['miloN'] as num?)?.toInt() ?? 0;
     miloBackend = '${result?['miloBackend'] ?? 'none'}';
@@ -226,7 +253,7 @@ class ScanEngine {
     gpuOwner = '${result?['gpuOwner'] ?? gpuOwner}';
     warmupMs = (result?['warmupMs'] as num?)?.toInt() ?? 0;
     predictMs = (result?['predictMs'] as num?)?.toInt() ?? 0;
-    gallery = '${result?['gallery'] ?? gallery}';
+    gallery = '${result?['gallery'] ?? selectedGallery}';
     final yolo = result?['yolo'] == true;
     final milo = result?['milo'] == true;
     ScanDebugLog.i(
@@ -264,10 +291,10 @@ class ScanEngine {
     if (!galleries.contains(name) || name == gallery) return;
     final dir = _supportDir;
     if (dir == null) return;
-    final status = ScanAssetStore.inspectRoot(
-      Directory(dir),
-      gallery: name,
-    );
+    final status = Platform.isAndroid
+        ? await ScanAssetStore.prepareAndroidBundle(
+            gallery: name, destinationRoot: Directory(dir))
+        : ScanAssetStore.inspectRoot(Directory(dir), gallery: name);
     if (!status.ready) throw StateError(status.message);
     final result =
         await _channel.invokeMapMethod<String, dynamic>('setCatalog', {

@@ -99,6 +99,13 @@ flutter:
     - assets/sounds/
     - assets/pokoin-icon.png
     - assets/pokoin-icon-opaque.png
+    # Original Android CNN pack, supplied separately (gitignored binaries).
+    # Do not bundle the iOS Core ML package or substitute other embedders.
+    - assets/models/card_detector.tflite
+    - assets/models/milo_cnn.onnx
+    - assets/milo_cnn_index/western/
+    - assets/milo_cnn_index/japanese/
+    - assets/milo_cnn_index/chinese/
   
   # fonts:
   #   - family: Pokemon
