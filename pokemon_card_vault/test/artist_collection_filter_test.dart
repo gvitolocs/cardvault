@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pokoin/models/pokemon_card.dart';
-import 'package:pokoin/screens/artist_collection_screen.dart';
+import 'package:pokoin/old/models/pokemon_card.dart';
+import 'package:pokoin/old/screens/artist_collection_screen.dart';
 
 PokemonCard _artistCard({
   required String id,

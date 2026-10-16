@@ -1,0 +1,155 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
+import '../model/cardex.dart';
+import '../model/marketplace_home.dart';
+import '../service/cardex_service.dart';
+import '../service/collection_service.dart';
+
+class CardexController extends ChangeNotifier {
+  CardexController({CardexService? catalog, CollectionService? collection})
+      : _catalog = catalog ?? CardexService(),
+        _ownsCatalog = catalog == null,
+        _collection = collection ?? CollectionService();
+  final CardexService _catalog;
+  final bool _ownsCatalog;
+  final CollectionService _collection;
+  StreamSubscription<CardCollection>? _subscription;
+  bool _disposed = false, _started = false, _catalogStarted = false;
+  int _generation = 0, _nextOffset = 0;
+  List<MarketplaceExpansion> expansions = const [];
+  List<MarketplaceCardPreview> cards = const [];
+  MarketplaceExpansion? expansion;
+  CardCollection collection = CardCollection(status: CollectionStatus.loading);
+  CardexFilter filter = CardexFilter.all;
+  bool loadingExpansions = false, expansionsError = false;
+  bool loadingPage = false, pageError = false, hasMore = false;
+  int total = 0;
+
+  bool get ownershipKnown => collection.status == CollectionStatus.ready;
+  bool collectionAlbum = true;
+  bool get viewingCollection => collectionAlbum && ownershipKnown;
+  List<MarketplaceCardPreview> get visibleCards => viewingCollection
+      ? collection.cards
+      : !ownershipKnown
+          ? cards
+          : List.unmodifiable(cards.where((card) => switch (filter) {
+                CardexFilter.all => true,
+                CardexFilter.owned => collection.owns(card.id),
+                CardexFilter.missing => !collection.owns(card.id),
+              }));
+
+  void start({bool loadCatalog = true}) {
+    if (_disposed) return;
+    if (!_started) {
+      _started = true;
+      retryCollection();
+    }
+    if (loadCatalog && !_catalogStarted) {
+      _catalogStarted = true;
+      unawaited(loadExpansions());
+    }
+  }
+
+  void retryCollection() {
+    if (_disposed) return;
+    unawaited(_subscription?.cancel());
+    collection = CardCollection(status: CollectionStatus.loading);
+    _notify();
+    _subscription = _collection.watch().listen((value) {
+      if (_disposed) return;
+      collection = value;
+      if (!ownershipKnown) filter = CardexFilter.all;
+      _notify();
+    }, onError: (Object error, StackTrace stack) {
+      if (_disposed) return;
+      collection = CardCollection(status: CollectionStatus.unavailable);
+      _notify();
+    });
+  }
+
+  Future<void> loadExpansions() async {
+    if (loadingExpansions || _disposed) return;
+    loadingExpansions = true;
+    expansionsError = false;
+    _notify();
+    try {
+      final result = await _catalog.loadExpansions();
+      if (_disposed) return;
+      expansions = result;
+      if (expansion == null && result.isNotEmpty) {
+        unawaited(selectExpansion(result.first, showCatalog: false));
+      }
+    } catch (_) {
+      if (!_disposed) expansionsError = true;
+    } finally {
+      if (!_disposed) {
+        loadingExpansions = false;
+        _notify();
+      }
+    }
+  }
+
+  Future<void> selectExpansion(MarketplaceExpansion value,
+      {bool showCatalog = true}) async {
+    if (_disposed) return;
+    if (showCatalog) collectionAlbum = false;
+    ++_generation;
+    expansion = value;
+    cards = const [];
+    _nextOffset = 0;
+    total = value.cardCount;
+    hasMore = true;
+    loadingPage = false;
+    pageError = false;
+    await loadMore();
+  }
+
+  Future<void> loadMore() async {
+    if (_disposed || loadingPage || !hasMore || expansion == null) return;
+    final request = _generation;
+    final selected = expansion!;
+    loadingPage = true;
+    pageError = false;
+    _notify();
+    try {
+      final page = await _catalog.loadPage(selected.slug, offset: _nextOffset);
+      if (_disposed || request != _generation) return;
+      cards = _catalog.mergeCards(cards, page.cards);
+      _nextOffset = page.offset + page.cards.length;
+      total = page.total;
+      hasMore = page.hasMore;
+    } catch (_) {
+      if (!_disposed && request == _generation) pageError = true;
+    } finally {
+      if (!_disposed && request == _generation) {
+        loadingPage = false;
+        _notify();
+      }
+    }
+  }
+
+  void setFilter(CardexFilter value) {
+    if (!ownershipKnown || filter == value) return;
+    filter = value;
+    _notify();
+  }
+
+  void showCollection() {
+    if (!ownershipKnown || _disposed) return;
+    collectionAlbum = true;
+    filter = CardexFilter.all;
+    _notify();
+  }
+
+  void _notify() {
+    if (!_disposed) notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    unawaited(_subscription?.cancel());
+    if (_ownsCatalog) _catalog.dispose();
+    super.dispose();
+  }
+}

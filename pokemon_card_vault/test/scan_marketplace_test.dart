@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pokoin/models/pokemon_card.dart';
-import 'package:pokoin/utils/scan_marketplace.dart';
+import 'package:pokoin/old/models/pokemon_card.dart';
+import 'package:pokoin/old/utils/scan_marketplace.dart';
 
 PokemonCard _card({
   String id = '220962',

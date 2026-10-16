@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 // ignore: avoid_relative_lib_imports
-import '../lib/utils/single_flight.dart';
+import '../lib/old/utils/single_flight.dart';
 
 void main() {
   test('concurrent consumers share one request and the same future', () async {

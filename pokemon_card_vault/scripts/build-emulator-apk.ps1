@@ -1,13 +1,20 @@
 param(
     [string]$FlutterPath = 'C:\Users\raffa\develop\flutter\bin\flutter.bat',
-    [string]$OutputDirectory = 'C:\Users\raffa\ApkProjects\pokoin-debug-emulator-x86_64'
+    [string]$OutputDirectory = 'C:\Users\raffa\ApkProjects\pokoin-debug-emulator-x86_64',
+    [string]$Target = 'lib/main.dart',
+    [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9._-]*\.apk$')]
+    [string]$ApkFileName = 'pokoin-debug-emulator-x86_64.apk',
+    [ValidateSet('android-x64', 'android-arm64')]
+    [string]$TargetPlatform = 'android-x64',
+    [ValidateSet('debug', 'profile')]
+    [string]$BuildMode = 'debug'
 )
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$apkSource = Join-Path $projectRoot 'build\app\outputs\flutter-apk\app-debug.apk'
+$apkSource = Join-Path $projectRoot "build\app\outputs\flutter-apk\app-$BuildMode.apk"
 $outputRoot = [IO.Path]::GetFullPath($OutputDirectory)
-$apkDestination = Join-Path $outputRoot 'pokoin-debug-emulator-x86_64.apk'
+$apkDestination = Join-Path $outputRoot $ApkFileName
 
 if (!(Test-Path -LiteralPath $FlutterPath -PathType Leaf)) {
     throw "Flutter executable not found: $FlutterPath"
@@ -18,7 +25,7 @@ if (!(Test-Path -LiteralPath $outputRoot -PathType Container)) {
 
 Push-Location $projectRoot
 try {
-    & $FlutterPath build apk --debug --target-platform android-x64
+    & $FlutterPath build apk "--$BuildMode" --target-platform $TargetPlatform --target $Target
     if ($LASTEXITCODE -ne 0) {
         throw "Flutter APK build failed (exit $LASTEXITCODE). The previous APK is unchanged."
     }
@@ -31,12 +38,13 @@ if (!(Test-Path -LiteralPath $apkSource -PathType Leaf)) {
 }
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $archive = [IO.Compression.ZipFile]::OpenRead($apkSource)
+$expectedAbi = if ($TargetPlatform -eq 'android-arm64') { 'arm64-v8a' } else { 'x86_64' }
 try {
     $flutterLibraries = @($archive.Entries |
         Where-Object { $_.FullName -match '^lib/[^/]+/libflutter\.so$' } |
         ForEach-Object FullName)
     if ($flutterLibraries.Count -ne 1 -or
-        $flutterLibraries[0] -ne 'lib/x86_64/libflutter.so') {
+        $flutterLibraries[0] -ne "lib/$expectedAbi/libflutter.so") {
         throw "Unexpected Flutter engine ABI: $($flutterLibraries -join ', '). Destination unchanged."
     }
 } finally {
@@ -49,7 +57,8 @@ if (Test-Path -LiteralPath $apkDestination -PathType Leaf) {
     if ($previousHash -ne $sourceHash) {
         $backupDirectory = Join-Path $projectRoot 'build\emulator-apk-backups'
         New-Item -ItemType Directory -Path $backupDirectory -Force | Out-Null
-        $backupPath = Join-Path $backupDirectory "pokoin-debug-emulator-x86_64-$previousHash.apk"
+        $apkBaseName = [IO.Path]::GetFileNameWithoutExtension($ApkFileName)
+        $backupPath = Join-Path $backupDirectory "$apkBaseName-$previousHash.apk"
         if (!(Test-Path -LiteralPath $backupPath)) {
             Copy-Item -LiteralPath $apkDestination -Destination $backupPath
         }

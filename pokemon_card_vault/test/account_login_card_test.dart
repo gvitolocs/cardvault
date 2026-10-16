@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 // Test the real components in the Flutter-only Windows test harness as well.
 // ignore: avoid_relative_lib_imports
-import '../lib/widgets/account_login_card.dart';
+import '../lib/old/widgets/account_login_card.dart';
 // ignore: avoid_relative_lib_imports
-import '../lib/widgets/marketplace_cart_navigation.dart';
+import '../lib/old/widgets/marketplace_cart_navigation.dart';
 
 class _LoginFixture {
   final formKey = GlobalKey<FormState>();

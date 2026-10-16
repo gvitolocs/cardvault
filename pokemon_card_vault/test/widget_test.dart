@@ -14,9 +14,9 @@ import 'package:go_router/go_router.dart';
 import 'package:hive/hive.dart';
 
 import 'package:pokoin/main.dart';
-import 'package:pokoin/models/pokemon_card.dart';
-import 'package:pokoin/providers/card_provider.dart';
-import 'package:pokoin/screens/home_screen.dart';
+import 'package:pokoin/old/models/pokemon_card.dart';
+import 'package:pokoin/old/providers/card_provider.dart';
+import 'package:pokoin/old/screens/home_screen.dart';
 
 PokemonCard _card(int index) {
   return PokemonCard(

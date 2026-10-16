@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pokoin/services/forum_service.dart';
+import 'package:pokoin/old/services/forum_service.dart';
 
 void main() {
   test('Forum models parse Supabase API rows', () {

@@ -10,7 +10,7 @@ const {
 } = require('../api/marketplace-autocomplete');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
-const OUTPUT_PATH = path.join(ROOT_DIR, 'lib/constants/first_char_token_suggestions.dart');
+const OUTPUT_PATH = path.join(ROOT_DIR, 'lib/old/constants/first_char_token_suggestions.dart');
 const DEFAULT_CHARACTERS = 'abcdefghijklmnopqrstuvwxyz0123456789'.split('');
 const SPECIAL_START_QUERY = `
   select distinct left(compact_name, 1) as start

@@ -9,6 +9,7 @@ class DefaultFirebaseOptions {
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
+        return android;
       case TargetPlatform.iOS:
       case TargetPlatform.macOS:
       case TargetPlatform.windows:
@@ -27,5 +28,15 @@ class DefaultFirebaseOptions {
     authDomain: 'pokoin.firebaseapp.com',
     storageBucket: 'pokoin.firebasestorage.app',
     measurementId: 'G-6H4VHXX1PX',
+  );
+
+  // Configurazione dell'app Android com.vitologic.pokoin nel medesimo progetto.
+  // Mantenerla allineata ad android/app/google-services.json.
+  static const FirebaseOptions android = FirebaseOptions(
+    apiKey: 'AIzaSyCu1pg84O8C_EeFHDukCLbuq137BLK-N40',
+    appId: '1:36941064114:android:b21dbb3efb235aa471e6ab',
+    messagingSenderId: '36941064114',
+    projectId: 'pokoin',
+    storageBucket: 'pokoin.firebasestorage.app',
   );
 }

@@ -7,7 +7,7 @@ import 'package:http/testing.dart';
 
 // The isolated scanner harness imports this same test and the real source.
 // ignore: avoid_relative_lib_imports
-import '../lib/scan_v2/scan_assets.dart';
+import '../lib/old/scan_v2/scan_assets.dart';
 
 void main() {
   test('runtime scan pack reports only the selected gallery as missing', () {

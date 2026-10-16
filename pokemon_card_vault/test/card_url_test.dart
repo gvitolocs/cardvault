@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pokoin/models/card_listing.dart';
-import 'package:pokoin/models/pokemon_card.dart';
-import 'package:pokoin/utils/card_navigation.dart';
-import 'package:pokoin/utils/card_url.dart';
+import 'package:pokoin/old/models/card_listing.dart';
+import 'package:pokoin/old/models/pokemon_card.dart';
+import 'package:pokoin/old/utils/card_navigation.dart';
+import 'package:pokoin/old/utils/card_url.dart';
 
 PokemonCard _card({
   String id = '633200',

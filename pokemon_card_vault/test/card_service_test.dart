@@ -1,9 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:pokoin/models/pokemon_card.dart';
-import 'package:pokoin/providers/card_provider.dart';
-import 'package:pokoin/providers/recent_views_provider.dart';
-import 'package:pokoin/services/card_service.dart';
+import 'package:pokoin/old/models/pokemon_card.dart';
+import 'package:pokoin/old/providers/card_provider.dart';
+import 'package:pokoin/old/providers/recent_views_provider.dart';
+import 'package:pokoin/old/services/card_service.dart';
 
 PokemonCard _searchCard({
   required String id,

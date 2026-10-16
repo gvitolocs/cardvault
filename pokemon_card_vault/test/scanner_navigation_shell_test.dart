@@ -4,11 +4,11 @@ import 'package:go_router/go_router.dart';
 
 // The isolated harness imports the real app widgets, not copies.
 // ignore: avoid_relative_lib_imports
-import '../lib/widgets/marketplace_cart_navigation.dart';
+import '../lib/old/widgets/marketplace_cart_navigation.dart';
 // ignore: avoid_relative_lib_imports
-import '../lib/widgets/scanner_navigation_shell.dart';
+import '../lib/old/widgets/scanner_navigation_shell.dart';
 // ignore: avoid_relative_lib_imports
-import '../lib/utils/account_route_policy.dart';
+import '../lib/old/utils/account_route_policy.dart';
 
 GoRouter _router({
   String initialLocation = '/cardscan',

@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "36941064114",
+    "project_id": "pokoin",
+    "storage_bucket": "pokoin.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:36941064114:android:b21dbb3efb235aa471e6ab",
+        "android_client_info": {
+          "package_name": "com.vitologic.pokoin"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "36941064114-5v46sopt0rj4ut6l8sblinacqllist93.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.vitologic.pokoin",
+            "certificate_hash": "eaeae13d2c4229a73eb249b8660d1b89daf4e40e"
+          }
+        },
+        {
+          "client_id": "36941064114-t9tcju3rjaesd8q6nkttm36ver3qaktb.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCu1pg84O8C_EeFHDukCLbuq137BLK-N40"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "36941064114-2m9bskfkg3nq8ch1ud1rih4nt4qdhlj1.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "36941064114-8novjugph3h1d307nflntqmph1orl068.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.vitologic.pokoin"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

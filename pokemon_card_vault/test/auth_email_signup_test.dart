@@ -6,13 +6,13 @@ import 'package:http/testing.dart';
 
 // Import the actual app services in the isolated native test harness too.
 // ignore: avoid_relative_lib_imports
-import '../lib/services/auth_service.dart';
+import '../lib/old/services/auth_service.dart';
 // ignore: avoid_relative_lib_imports
-import '../lib/services/marketplace_api_uri.dart';
+import '../lib/old/services/marketplace_api_uri.dart';
 // ignore: avoid_relative_lib_imports
-import '../lib/services/pokoin_api_auth.dart';
+import '../lib/old/services/pokoin_api_auth.dart';
 // ignore: avoid_relative_lib_imports
-import '../lib/services/pokoin_api_client.dart';
+import '../lib/old/services/pokoin_api_client.dart';
 
 class _SignedOutApiAuth extends PokoinApiAuthService {
   final requirements = <bool>[];

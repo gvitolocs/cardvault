@@ -7,12 +7,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hive/hive.dart';
-import 'package:pokoin/models/pokemon_card.dart';
-import 'package:pokoin/providers/card_listing_provider.dart';
-import 'package:pokoin/providers/card_provider.dart';
-import 'package:pokoin/providers/recent_views_provider.dart';
-import 'package:pokoin/screens/home_screen.dart';
-import 'package:pokoin/services/card_service.dart';
+import 'package:pokoin/old/models/pokemon_card.dart';
+import 'package:pokoin/old/providers/card_listing_provider.dart';
+import 'package:pokoin/old/providers/card_provider.dart';
+import 'package:pokoin/old/providers/recent_views_provider.dart';
+import 'package:pokoin/old/screens/home_screen.dart';
+import 'package:pokoin/old/services/card_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 PokemonCard _previewCard({

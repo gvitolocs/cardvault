@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pokoin/screens/scan_screen.dart';
+import 'package:pokoin/old/screens/scan_screen.dart';
 
 void main() {
   test('validator display prefers higher stake duplicate identity', () {

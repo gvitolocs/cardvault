@@ -4,9 +4,9 @@ import 'package:go_router/go_router.dart';
 
 // These imports exercise the app's real guest UI and route policy.
 // ignore: avoid_relative_lib_imports
-import '../lib/wallet/guest_wallet_screen.dart';
+import '../lib/old/wallet/guest_wallet_screen.dart';
 // ignore: avoid_relative_lib_imports
-import '../lib/utils/account_route_policy.dart';
+import '../lib/old/utils/account_route_policy.dart';
 
 GoRouter _router({VoidCallback? onConnectWallet}) => GoRouter(
       initialLocation: '/wallet',

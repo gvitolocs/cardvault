@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pokoin/widgets/artist_suggestion_field.dart';
+import 'package:pokoin/old/widgets/artist_suggestion_field.dart';
 
 void main() {
   testWidgets('selecting an artist suggestion enables immediate save',

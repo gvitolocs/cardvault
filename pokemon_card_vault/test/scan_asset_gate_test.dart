@@ -5,11 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 // ignore: avoid_relative_lib_imports
-import '../lib/widgets/scanner_navigation_shell.dart';
+import '../lib/old/widgets/scanner_navigation_shell.dart';
 // ignore: avoid_relative_lib_imports
-import '../lib/scan_v2/scan_asset_gate.dart';
+import '../lib/old/scan_v2/scan_asset_gate.dart';
 // ignore: avoid_relative_lib_imports
-import '../lib/scan_v2/scan_assets.dart';
+import '../lib/old/scan_v2/scan_assets.dart';
 
 ScanAssetStatus status(String gallery, {bool ready = false}) => ScanAssetStatus(
       root: Directory('unused'),

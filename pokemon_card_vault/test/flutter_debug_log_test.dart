@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:pokoin/services/flutter_debug_log.dart';
-import 'package:pokoin/services/pokoin_api_auth.dart';
+import 'package:pokoin/old/services/flutter_debug_log.dart';
+import 'package:pokoin/old/services/pokoin_api_auth.dart';
 
 class _TestApiAuthService extends PokoinApiAuthService {
   _TestApiAuthService();

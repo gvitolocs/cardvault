@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pokoin/models/card_listing.dart';
-import 'package:pokoin/models/pokemon_card.dart';
-import 'package:pokoin/providers/cart_provider.dart';
+import 'package:pokoin/old/models/card_listing.dart';
+import 'package:pokoin/old/models/pokemon_card.dart';
+import 'package:pokoin/old/providers/cart_provider.dart';
 
 PokemonCard _card({required double price}) {
   return PokemonCard(

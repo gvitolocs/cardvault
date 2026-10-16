@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pokoin/models/pokemon_card.dart';
-import 'package:pokoin/providers/card_provider.dart';
-import 'package:pokoin/widgets/pokoin_assistant.dart';
+import 'package:pokoin/old/models/pokemon_card.dart';
+import 'package:pokoin/old/providers/card_provider.dart';
+import 'package:pokoin/old/widgets/pokoin_assistant.dart';
 
 void main() {
   group('Pokontact responsive overlay', () {

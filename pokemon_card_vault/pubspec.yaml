@@ -8,6 +8,8 @@ environment:
   sdk: '>=3.6.0 <4.0.0'
 
 dependencies:
+  pokoin_suggest:
+    path: lib/rebuild/packages/pokoin_suggest
   flutter:
     sdk: flutter
   flutter_web_plugins:
@@ -22,7 +24,7 @@ dependencies:
   flutter_riverpod: ^2.4.9
   
   # HTTP & API
-  http: ^1.1.2
+  http: ^1.6.0
   connectivity_plus: ^7.1.1
   
   # Local Storage
@@ -39,6 +41,8 @@ dependencies:
   
   # Image & Media
   cached_network_image: ^3.3.0
+  flutter_cache_manager: ^3.4.0
+  file: ^7.0.0
   crop_your_image: ^2.0.0
   image_picker: ^1.2.2
   image: ^4.8.0
@@ -93,6 +97,7 @@ flutter:
     - web/pokoin.svg
     - assets/brand/
     - assets/data/marketplace-expansion-order.json
+    - assets/suggest/dictionary.pkd1
     - assets/images/
     - assets/icons/
     - assets/animations/

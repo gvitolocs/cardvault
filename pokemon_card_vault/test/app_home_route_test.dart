@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 // Also run the real policy in the Flutter-only Windows test harness.
 // ignore: avoid_relative_lib_imports
-import '../lib/utils/app_home_route.dart';
+import '../lib/old/utils/app_home_route.dart';
 
 void main() {
   test('native root enters the marketplace', () {

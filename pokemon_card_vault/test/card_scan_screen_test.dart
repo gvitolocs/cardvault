@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:pokoin/screens/card_scan_screen.dart';
+import 'package:pokoin/old/screens/card_scan_screen.dart';
 
 void main() {
   testWidgets('card scan screen shows Scan and Library', (tester) async {

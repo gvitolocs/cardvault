@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 // These imports also exercise the real source in the Flutter-only harness.
 // ignore: avoid_relative_lib_imports
-import '../lib/models/pokemon_card.dart';
+import '../lib/old/models/pokemon_card.dart';
 // ignore: avoid_relative_lib_imports
-import '../lib/models/marketplace_expansion.dart';
+import '../lib/old/models/marketplace_expansion.dart';
 // ignore: avoid_relative_lib_imports
-import '../lib/widgets/marketplace_home_discovery.dart';
+import '../lib/old/widgets/marketplace_home_discovery.dart';
 
 MarketplaceExpansion expansion(
   String name, {

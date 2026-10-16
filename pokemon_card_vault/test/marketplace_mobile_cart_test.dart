@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 // Test the real widgets from a Flutter-only harness without Windows native hooks.
 // ignore: avoid_relative_lib_imports
-import '../lib/widgets/marketplace_cart_navigation.dart';
+import '../lib/old/widgets/marketplace_cart_navigation.dart';
 // ignore: avoid_relative_lib_imports
-import '../lib/widgets/marketplace_mobile_listing.dart';
+import '../lib/old/widgets/marketplace_mobile_listing.dart';
 
 void main() {
   for (final width in [260.0, 320.0, 390.0, 600.0]) {

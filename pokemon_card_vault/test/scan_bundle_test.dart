@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 // ignore: avoid_relative_lib_imports
-import '../lib/scan_v2/scan_assets.dart';
+import '../lib/old/scan_v2/scan_assets.dart';
 
 class _Bundle extends CachingAssetBundle {
   _Bundle(this.files);

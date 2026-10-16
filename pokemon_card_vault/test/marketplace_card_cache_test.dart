@@ -3,9 +3,9 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
 // ignore: avoid_relative_lib_imports
-import '../lib/models/pokemon_card.dart';
+import '../lib/old/models/pokemon_card.dart';
 // ignore: avoid_relative_lib_imports
-import '../lib/services/marketplace_card_cache.dart';
+import '../lib/old/services/marketplace_card_cache.dart';
 
 PokemonCard _card(String id, {String? name}) =>
     PokemonCard.fromJson({'id': id, 'name': name ?? 'Card $id'});

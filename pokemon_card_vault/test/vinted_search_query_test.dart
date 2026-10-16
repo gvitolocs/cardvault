@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pokoin/models/pokemon_card.dart';
-import 'package:pokoin/screens/card_detail_screen.dart';
+import 'package:pokoin/old/models/pokemon_card.dart';
+import 'package:pokoin/old/screens/card_detail_screen.dart';
 
 PokemonCard _card({
   required String name,

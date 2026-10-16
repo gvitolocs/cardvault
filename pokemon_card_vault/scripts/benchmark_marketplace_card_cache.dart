@@ -5,9 +5,9 @@ import 'package:hive/hive.dart';
 
 // Import the real implementation in the Flutter-only benchmark harness too.
 // ignore: avoid_relative_lib_imports
-import '../lib/models/pokemon_card.dart';
+import '../lib/old/models/pokemon_card.dart';
 // ignore: avoid_relative_lib_imports
-import '../lib/services/marketplace_card_cache.dart';
+import '../lib/old/services/marketplace_card_cache.dart';
 
 PokemonCard _card(int id, {bool updated = false}) => PokemonCard.fromJson({
       'id': '$id',
