@@ -13,7 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hive/hive.dart';
 
-import 'package:pokoin/main.dart';
+import 'package:pokoin/old/main.dart';
 import 'package:pokoin/old/models/pokemon_card.dart';
 import 'package:pokoin/old/providers/card_provider.dart';
 import 'package:pokoin/old/screens/home_screen.dart';

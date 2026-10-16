@@ -1,18 +1,25 @@
 # Previous application reference
 
-On the `AppMobile` branch, the previous application folders are archived here
-as reference for the active implementation in `lib/rebuild/`.
+On the `AppMobile` branch, the previous application is archived here as
+reference for the active implementation in `lib/rebuild/`.
 
-The original `constants`, `models`, `providers`, `scan_v2`, `screens`, `services`,
-`utils`, `wallet` and `widgets` folders keep their internal layout and contents.
-Their tests and tools now import `lib/old/...`.
+The previous application's entry point is `lib/old/main.dart`. Its `constants`,
+`models`, `providers`, `scan_v2`, `screens`, `services`, `utils`, `wallet` and
+`widgets` folders retain their internal layout. Legacy tests and tools use
+`lib/old/...` paths.
 
-`lib/main.dart` remains the previous application's entry point and imports this
-archive. `lib/firebase_options.dart` stays shared at the root of `lib` because
-Rebuild uses it as well.
+`lib/firebase_options.dart` stays shared at the root of `lib` because Rebuild
+uses it as well. There is no default `lib/main.dart` on this mobile branch;
+choose the target explicitly.
 
-Run the current mobile application with:
+Run the current mobile application:
 
 ```sh
 flutter run --target lib/rebuild/main_mobile_prototype.dart
+```
+
+Run the previous application:
+
+```sh
+flutter run --target lib/old/main.dart
 ```

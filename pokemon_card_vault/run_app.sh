@@ -25,4 +25,4 @@ echo "🚀 Starting the app..."
 echo "App will be available at: http://localhost:5000"
 echo "Press Ctrl+C to stop the app"
 
-flutter run -d chrome --web-port 5000
+flutter run --target lib/old/main.dart -d chrome --web-port 5000

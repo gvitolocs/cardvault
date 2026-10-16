@@ -2,6 +2,21 @@
 
 Pokoin is a Flutter web app for the Pokoin ecosystem. It combines a crypto-native Pokemon card marketplace with the Pokoin Wallet in one deployed web application.
 
+## AppMobile entry points
+
+On the `AppMobile` branch, choose the application target explicitly:
+
+| Application | Entry point | Run command |
+| --- | --- | --- |
+| Current mobile Rebuild | `lib/rebuild/main_mobile_prototype.dart` | `flutter run --target lib/rebuild/main_mobile_prototype.dart` |
+| Previous application reference | `lib/old/main.dart` | `flutter run --target lib/old/main.dart` |
+
+The previous application is contained in `lib/old/`. Firebase configuration
+remains shared at `lib/firebase_options.dart`; this branch has no root
+`lib/main.dart`. Existing web scripts and the APK script's default target
+continue to select the previous application; pass Rebuild's target explicitly
+for the current mobile app.
+
 ## Live App
 
 - Main site: `https://pokoin.com/`
@@ -89,7 +104,7 @@ NFTs, running nodes, and reporting bugs are documented in
 
 4. **Run the app**
    ```bash
-   flutter run
+   flutter run --target lib/old/main.dart
    ```
 
 ## Main Screens
@@ -200,7 +215,7 @@ class AppColors {
 ```
 
 ### Themes
-Modify the theme in `lib/main.dart`:
+Modify the previous application theme in `lib/old/main.dart`:
 ```dart
 theme: ThemeData(
   primarySwatch: Colors.green,
@@ -214,18 +229,18 @@ theme: ThemeData(
 ### Android
 1. Generate a signed APK:
    ```bash
-   flutter build apk --release
+   flutter build apk --target lib/old/main.dart --release
    ```
 
 2. Or build an App Bundle:
    ```bash
-   flutter build appbundle --release
+   flutter build appbundle --target lib/old/main.dart --release
    ```
 
 ### iOS
 1. Build for iOS:
    ```bash
-   flutter build ios --release
+   flutter build ios --target lib/old/main.dart --release
    ```
 
 ### Web

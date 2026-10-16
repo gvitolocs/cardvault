@@ -1,7 +1,7 @@
 param(
     [string]$FlutterPath = 'C:\Users\raffa\develop\flutter\bin\flutter.bat',
     [string]$OutputDirectory = 'C:\Users\raffa\ApkProjects\pokoin-debug-emulator-x86_64',
-    [string]$Target = 'lib/main.dart',
+    [string]$Target = 'lib/old/main.dart',
     [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9._-]*\.apk$')]
     [string]$ApkFileName = 'pokoin-debug-emulator-x86_64.apk',
     [ValidateSet('android-x64', 'android-arm64')]

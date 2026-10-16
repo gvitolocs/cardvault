@@ -14,8 +14,9 @@
 
 - On `AppMobile`, the previous application folders live under `lib/old/`.
 - Keep active mobile work under `lib/rebuild/`; use `lib/old/` as reference.
-- `lib/main.dart` retains the previous application's entry point, with imports
-  into `old/`. Shared `lib/firebase_options.dart` stays at the `lib/` root.
+- `lib/old/main.dart` is the previous application's entry point. Rebuild starts
+  from `lib/rebuild/main_mobile_prototype.dart`; choose the target explicitly.
+- Shared `lib/firebase_options.dart` stays at the `lib/` root.
 - Legacy tests and the first-character cache generator use the `old/` paths.
 
 ## Mobile Rebuild architecture (user preference)

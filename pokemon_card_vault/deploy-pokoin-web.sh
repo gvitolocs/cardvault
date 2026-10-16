@@ -91,7 +91,7 @@ if [[ "$USE_ORACLE_API_MODE" != "1" ]]; then
   require_vercel_env POKONTACT_SERVICE_TOKEN
 fi
 
-flutter build web --release --pwa-strategy=none "${FLUTTER_DEFINES[@]}"
+flutter build web --target lib/old/main.dart --release --pwa-strategy=none "${FLUTTER_DEFINES[@]}"
 
 # Vercel serves filesystem index.html at `/` before rewrites. Put the
 # static landing on index.html and keep the Flutter shell at app.html.

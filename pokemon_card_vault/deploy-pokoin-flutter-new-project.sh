@@ -66,7 +66,7 @@ if [[ -n "${SUPABASE_ANON_KEY:-}" ]]; then
   FLUTTER_DEFINES+=(--dart-define="SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY")
 fi
 
-flutter build web --release --pwa-strategy=none --no-wasm-dry-run "${FLUTTER_DEFINES[@]}"
+flutter build web --target lib/old/main.dart --release --pwa-strategy=none --no-wasm-dry-run "${FLUTTER_DEFINES[@]}"
 
 rm -rf "$ROOT_DIR/build/web/api" "$ROOT_DIR/build/web/server"
 if [[ -d "$ROOT_DIR/web/api" ]]; then
