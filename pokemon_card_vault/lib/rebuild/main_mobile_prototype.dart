@@ -12,9 +12,12 @@ import 'controller/account_controller.dart';
 import 'service/account_service.dart';
 import 'presentation/account/account_screen.dart';
 import 'service/profile_service.dart';
+import 'service/cart_service.dart';
+import 'provider/cart_local_provider.dart';
+import 'provider/cart_remote_provider.dart';
 
 /// Avvio indipendente: flutter run -t lib/rebuild/main_mobile_prototype.dart
-/// Apre il marketplace: discovery, ricerca e dettagli reali, carrello locale.
+/// Marketplace, account e carrello persistente locale/remoto.
 void main() => runApp(const MobileMarketplacePrototypeApp());
 
 class MobileMarketplacePrototypeApp extends StatefulWidget {
@@ -26,6 +29,7 @@ class MobileMarketplacePrototypeApp extends StatefulWidget {
       this.suggestionService,
       this.accountService,
       this.profileService,
+      this.cartService,
       this.autoLoadDiscovery = true,
       this.showDiscovery = true});
 
@@ -35,6 +39,7 @@ class MobileMarketplacePrototypeApp extends StatefulWidget {
   final MarketplaceSuggestionService? suggestionService;
   final AccountService? accountService;
   final ProfileService? profileService;
+  final CartService? cartService;
   final bool showDiscovery;
   final bool autoLoadDiscovery;
 
@@ -48,6 +53,8 @@ class _MobileMarketplacePrototypeAppState
     extends State<MobileMarketplacePrototypeApp> {
   late MarketplaceController _controller;
   late AccountController _account;
+  late CartService _cartService;
+  late bool _ownsCartService;
 
   @override
   void initState() {
@@ -57,13 +64,18 @@ class _MobileMarketplacePrototypeAppState
 
   void _createController() {
     _account = AccountController(service: widget.accountService)..initialize();
+    _ownsCartService = widget.cartService == null;
+    _cartService = widget.cartService ??
+        CartService(local: HiveCartProvider(), remote: FirestoreCartProvider());
     _controller = MarketplaceController(
+        cartService: _cartService,
         accountController: _account,
         profileService: widget.profileService,
         homeService: widget.homeService,
         cardService: widget.cardService,
         searchService: widget.searchService,
         suggestionService: widget.suggestionService);
+    _controller.cart.start(userIds: _account.watchUserId());
     if (widget.showDiscovery && widget.autoLoadDiscovery) {
       unawaited(_controller.loadDiscovery());
     }
@@ -77,14 +89,18 @@ class _MobileMarketplacePrototypeAppState
         oldWidget.searchService != widget.searchService ||
         oldWidget.suggestionService != widget.suggestionService ||
         oldWidget.accountService != widget.accountService ||
-        oldWidget.profileService != widget.profileService) {
+        oldWidget.profileService != widget.profileService ||
+        oldWidget.cartService != widget.cartService) {
       final previous = _controller;
       final previousAccount = _account;
+      final previousCart = _cartService;
+      final ownedCart = _ownsCartService;
       _createController();
       // I widget figli devono prima scollegarsi dai notifier precedenti.
       WidgetsBinding.instance.addPostFrameCallback((_) {
         previous.dispose();
         previousAccount.dispose();
+        if (ownedCart) previousCart.dispose();
       });
     } else if (widget.showDiscovery &&
         widget.autoLoadDiscovery &&
@@ -97,6 +113,7 @@ class _MobileMarketplacePrototypeAppState
   void dispose() {
     _controller.dispose();
     _account.dispose();
+    if (_ownsCartService) _cartService.dispose();
     super.dispose();
   }
 

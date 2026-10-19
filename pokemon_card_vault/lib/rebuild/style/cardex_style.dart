@@ -6,6 +6,11 @@ abstract final class CardexStyle {
   static const accent = Color(0xFFE9FF72);
   static const page = Color(0xFF3B4B65);
   static const pageEdge = Color(0xFF29364B);
+  static const cardAspectRatio = .716;
+  static const captionGradient = LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [Color(0x00000000), Color(0xD9000000)]);
   static const grayscale = ColorFilter.matrix([
     .2126,
     .7152,

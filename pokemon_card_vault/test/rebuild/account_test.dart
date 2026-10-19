@@ -1,3 +1,4 @@
+import 'fixtures/cart_fixtures.dart';
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -256,6 +257,7 @@ void main() {
       (tester) async {
     final provider = FakeAccountProvider(user: alice);
     await tester.pumpWidget(MobileMarketplacePrototypeApp(
+        cartService: memoryCartService(),
         showDiscovery: false,
         accountService: AccountService(provider: provider)));
     await tester.pumpAndSettle();
@@ -306,6 +308,7 @@ void main() {
     final provider = FakeAccountProvider();
     final profileData = ProfileSource();
     await tester.pumpWidget(MobileMarketplacePrototypeApp(
+        cartService: memoryCartService(),
         showDiscovery: false,
         accountService: AccountService(provider: provider),
         profileService: ProfileService(provider: profileData)));

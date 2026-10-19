@@ -11,12 +11,14 @@ class CardArtworkPanel extends StatelessWidget {
     this.rarity = '',
     this.demoPrice,
     this.onAddDemo,
+    this.purchase,
   });
   final String number, rarity;
   final Widget image;
   final VoidCallback onVersions;
   final double? demoPrice;
   final VoidCallback? onAddDemo;
+  final Widget? purchase;
 
   @override
   Widget build(BuildContext context) => CardDetailsPanel(
@@ -49,6 +51,10 @@ class CardArtworkPanel extends StatelessWidget {
           const SizedBox(height: 12),
           OutlinedButton(
               onPressed: onVersions, child: const Text('Altre versioni')),
+          if (purchase != null) ...[
+            const SizedBox(height: 12),
+            purchase!,
+          ],
           if (demoPrice != null) ...[
             const SizedBox(height: 12),
             Text(

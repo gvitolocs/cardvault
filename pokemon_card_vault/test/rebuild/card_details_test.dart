@@ -1,3 +1,4 @@
+import 'fixtures/cart_fixtures.dart';
 import 'dart:async';
 import 'fixtures/account_fixtures.dart';
 import 'dart:convert';
@@ -221,8 +222,7 @@ void main() {
     await loading;
   });
 
-  testWidgets(
-      'top seller opens metadata with demo market and preserves the shared cart',
+  testWidgets('top seller opens real offers and preserves the shared cart',
       (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(390, 844);
@@ -248,6 +248,7 @@ void main() {
     addTearDown(home.dispose);
     addTearDown(details.dispose);
     await tester.pumpWidget(MobileMarketplacePrototypeApp(
+        cartService: memoryCartService(),
         homeService: home,
         cardService: details,
         accountService: guestAccountService()));
@@ -264,7 +265,7 @@ void main() {
     expect(find.byType(CardDetails), findsOneWidget);
     expect(find.text('Carta vera'), findsOneWidget);
     expect(find.text('Set reale · 12/100 · Illustratore'), findsOneWidget);
-    expect(find.textContaining('123,50'), findsNothing);
+    expect(find.textContaining('123,50'), findsWidgets);
     await tester.tap(find.byTooltip('Informazioni carta'));
     await tester.pumpAndSettle();
     expect(find.text('Illustratore: Illustratore'), findsOneWidget);
@@ -277,21 +278,28 @@ void main() {
       await tester.pumpAndSettle();
     }
     expect(find.text('Shop').hitTestable(), findsOneWidget);
-    expect(find.text('Aggiungi al carrello'), findsNothing);
+    final addOffer = find.descendant(
+        of: find.byType(ListingDetails),
+        matching: find.byTooltip('Aggiungi al carrello'));
+    await tester.scrollUntilVisible(addOffer.hitTestable(), 220,
+        scrollable: find.byType(Scrollable).first);
+    await tester.pumpAndSettle();
+    await tester.tap(addOffer);
+    await tester.pumpAndSettle();
     final screen = tester.widget<CardDetails>(find.byType(CardDetails));
-    expect(screen.cart.itemCount, 0);
-    screen.cart.addCard(demoCards.first);
+    expect(screen.cart.itemCount, 1);
+    expect(screen.cart.listingItems.single.listing.id, 'a');
     await tester.tap(find.byTooltip('Apri carrello'));
     await tester.pumpAndSettle();
-    expect(find.text('Totale di esempio: 24,90 €'), findsOneWidget);
+    expect(find.text('Totale carte: 123,50 PKN'), findsOneWidget);
     expect(find.byType(RefreshIndicator), findsNothing);
-    Navigator.of(tester.element(find.text('Totale di esempio: 24,90 €'))).pop();
+    Navigator.of(tester.element(find.text('Totale carte: 123,50 PKN'))).pop();
     await tester.pumpAndSettle();
     await tester.pageBack();
     await tester.pumpAndSettle();
     expect(find.byTooltip('Carrello, 1 articoli'), findsOneWidget);
     expect(homeCalls, 2);
-    expect(detailCalls, 1);
+    expect(detailCalls, 2);
     expect(tester.takeException(), isNull);
   });
 
@@ -332,6 +340,8 @@ void main() {
               state: state,
               card: controller.info.value.card,
               cart: cart,
+              onLoadMore: controller.loadMoreListings,
+              onToggleGroup: controller.toggleListingGroup,
               onFilter: controller.filter,
               onRetry: controller.retryListings)),
     ]))));
@@ -339,12 +349,17 @@ void main() {
     expect(find.text('Venditore 79'), findsNothing);
     for (var step = 0;
         step < 20 &&
-            find.text('Aggiungi al carrello').hitTestable().evaluate().isEmpty;
+            find
+                .byTooltip('Aggiungi al carrello')
+                .hitTestable()
+                .evaluate()
+                .isEmpty;
         step++) {
       await tester.drag(find.byType(CustomScrollView), const Offset(0, -250));
       await tester.pumpAndSettle();
     }
-    await tester.tap(find.text('Aggiungi al carrello').hitTestable().first);
+    await tester
+        .tap(find.byTooltip('Aggiungi al carrello').hitTestable().first);
     await tester.pumpAndSettle();
     expect(cart.totalPkn, 100);
     controller.filter(language: 'EN');

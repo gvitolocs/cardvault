@@ -13,6 +13,9 @@ import 'package:pokoin/rebuild/controller/cardex_controller.dart';
 import 'package:pokoin/rebuild/presentation/cardex/cardex_screen.dart';
 import 'package:pokoin/rebuild/service/collection_service.dart';
 
+Finder albumCard(String id) => find
+    .byWidgetPredicate((widget) => widget is AlbumCard && widget.card.id == id);
+
 void main() {
   test(
       'private collection BFF sends Firebase bearer, no client UID, and parses variants',
@@ -169,6 +172,38 @@ void main() {
           expansion: 'Test',
           number: '${i + 1}/13'));
 
+  testWidgets('Cardex uses wider taller pockets with one-pixel row gaps',
+      (tester) async {
+    tester.view.physicalSize = const Size(360, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final controller = CardexController();
+    addTearDown(controller.dispose);
+    controller.collection = CardCollection(
+        status: CollectionStatus.ready,
+        items: [
+          for (final card in cards.take(6)) OwnedCard(card: card, quantity: 1)
+        ]);
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: CardexScreen(controller: controller, onOpen: (_) {}))));
+    await tester.pumpAndSettle();
+    final first = tester.getRect(albumCard('1'));
+    final second = tester.getRect(albumCard('2'));
+    final third = tester.getRect(albumCard('3'));
+    final album = tester.getRect(find.byType(PageView));
+    expect(album.left, 8);
+    expect(album.right, 352);
+    expect(album.height, greaterThan(420));
+    expect(first.width, greaterThanOrEqualTo(166));
+    expect(first.height, greaterThanOrEqualTo(136));
+    expect(second.left - first.right, closeTo(2, .001));
+    expect(third.top - first.bottom, closeTo(1, .001));
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('personal Cardex screen fits narrow phones with large text',
       (tester) async {
     tester.view.physicalSize = const Size(320, 900);
@@ -187,9 +222,9 @@ void main() {
             child: Scaffold(
                 body: CardexScreen(controller: controller, onOpen: (_) {})))));
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(find.text('Posseduta · ×3'), 200,
+    await tester.scrollUntilVisible(find.text('×3'), 200,
         scrollable: find.byType(Scrollable).first);
-    expect(find.text('Posseduta · ×3'), findsOneWidget);
+    expect(find.text('×3'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
@@ -212,8 +247,8 @@ void main() {
                           status: CollectionStatus.ready,
                           items: [OwnedCard(card: cards.first, quantity: 2)]),
                       onOpen: (card) => opened = card.id)))));
-      expect(find.text('Posseduta · ×2'), findsOneWidget);
-      await tester.tap(find.text('Carta 1'));
+      expect(find.text('×2'), findsOneWidget);
+      await tester.tap(albumCard('1'));
       expect(opened, '1');
       await tester.tap(find.byTooltip('Pagina successiva'));
       await tester.pump();
@@ -221,11 +256,11 @@ void main() {
       expect(tester.hasRunningAnimations, isTrue);
       await tester.pumpAndSettle();
       if (width < 700) {
-        expect(find.text('Carta 7'), findsOneWidget);
+        expect(albumCard('7'), findsOneWidget);
         await tester.drag(find.byType(PageView), const Offset(-350, 0));
         await tester.pumpAndSettle();
       }
-      expect(find.text('Carta 13'), findsOneWidget);
+      expect(albumCard('13'), findsOneWidget);
       expect(
           tester
               .widget<IconButton>(find.byWidgetPredicate((widget) =>
@@ -233,7 +268,7 @@ void main() {
                   widget.tooltip == 'Pagina successiva'))
               .onPressed,
           isNull);
-      await tester.tap(find.text('Carta 13'));
+      await tester.tap(albumCard('13'));
       expect(opened, '13');
       expect(tester.takeException(), isNull);
     });
@@ -287,8 +322,10 @@ void main() {
                             CardCollection(status: CollectionStatus.ready),
                         onOpen: (_) {})))));
     await tester.pumpWidget(album(cards));
+    await tester.ensureVisible(find.byTooltip('Pagina successiva'));
     await tester.tap(find.byTooltip('Pagina successiva'));
     await tester.pumpAndSettle();
+    expect(find.text('Pagina 2 di 3 · 13 carte'), findsOneWidget);
     await tester.pumpWidget(album(cards.take(1).toList()));
     await tester.pumpAndSettle();
     expect(find.text('Pagina 1 di 1 · 1 carte'), findsOneWidget);

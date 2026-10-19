@@ -1,3 +1,4 @@
+import 'fixtures/cart_fixtures.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -50,6 +51,7 @@ void main() {
         cache: MarketplaceHomeCache(storage: _MemoryCacheStorage()),
         loadCatalogOrder: () async => {});
     await tester.pumpWidget(MobileMarketplacePrototypeApp(
+        cartService: memoryCartService(),
         homeService: service,
         autoLoadDiscovery: false,
         accountService: guestAccountService()));
@@ -190,6 +192,7 @@ void main() {
     final suggestions = _NoSuggestions();
     addTearDown(suggestions.dispose);
     await tester.pumpWidget(MobileMarketplacePrototypeApp(
+        cartService: memoryCartService(),
         homeService: service,
         suggestionService: suggestions,
         accountService: guestAccountService()));

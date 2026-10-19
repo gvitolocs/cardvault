@@ -12,6 +12,7 @@ class MarketplaceThumbnail extends StatelessWidget {
     required this.height,
     this.fallbackIcon = Icons.style_outlined,
     this.gaplessPlayback = false,
+    this.decodeLogicalWidth,
   });
 
   final String imageUrl;
@@ -19,6 +20,10 @@ class MarketplaceThumbnail extends StatelessWidget {
   final double height;
   final IconData fallbackIcon;
   final bool gaplessPlayback;
+
+  /// Keep the pocket's decoding budget when its scan overflows for a UI crop.
+  /// Logical pixels, multiplied by DPR below and still capped at 768 pixels.
+  final double? decodeLogicalWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -31,7 +36,8 @@ class MarketplaceThumbnail extends StatelessWidget {
           ? placeholder
           : Image(
               image: ResizeImage.resizeIfNeeded(
-                  (width * MediaQuery.devicePixelRatioOf(context))
+                  ((decodeLogicalWidth ?? width) *
+                          MediaQuery.devicePixelRatioOf(context))
                       .round()
                       .clamp(1, 768),
                   null,

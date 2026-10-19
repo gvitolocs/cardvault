@@ -1,3 +1,4 @@
+import 'fixtures/cart_fixtures.dart';
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -149,6 +150,7 @@ void main() {
       (tester) async {
     final provider = FakeAccountProvider()..googlePending = Completer<void>();
     await tester.pumpWidget(MobileMarketplacePrototypeApp(
+        cartService: memoryCartService(),
         showDiscovery: false,
         accountService: AccountService(provider: provider)));
     await tester.pumpAndSettle();

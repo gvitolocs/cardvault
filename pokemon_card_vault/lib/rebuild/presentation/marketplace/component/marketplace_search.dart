@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../controller/marketplace_search_controller.dart';
 import '../../../model/marketplace_home.dart';
+import '../../../controller/cart_controller.dart';
 import '../atomics/search_card_tile.dart';
 import 'search_filters.dart';
 import 'marketplace_suggestions.dart';
@@ -13,8 +14,10 @@ class MarketplaceSearch extends StatefulWidget {
       required this.controller,
       required this.discovery,
       required this.onOpen,
+      this.cart,
       this.onPaletteOpen});
   final MarketplaceSearchController controller;
+  final CartController? cart;
   final Widget discovery;
   final ValueChanged<MarketplaceCardPreview> onOpen;
   final void Function(MarketplaceCardPreview card, Color? color)? onPaletteOpen;
@@ -211,6 +214,7 @@ class _MarketplaceSearchState extends State<MarketplaceSearch> {
                                               child: row * columns + column <
                                                       state.cards.length
                                                   ? SearchCardTile(
+                                                      cart: widget.cart,
                                                       key: ValueKey(state
                                                           .cards[row * columns +
                                                               column]

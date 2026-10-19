@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import '../../shared/price_format.dart';
 import '../../../controller/card_details_controller.dart';
 import '../../../controller/cart_controller.dart';
 import '../../../model/card.dart';
-import 'listing_row.dart';
+import 'listing_origin_group.dart';
 import '../atomics/listing_filter.dart';
+import '../atomics/listing_filter_button.dart';
 
 /// Sezione Shop mobile: filtri locali e righe costruite solo quando visibili.
 /// Inserire tra gli slivers di un CustomScrollView, senza liste shrinkWrap.
@@ -15,6 +15,8 @@ class ListingDetails extends StatelessWidget {
       required this.onFilter,
       required this.onRetry,
       required this.cart,
+      this.onLoadMore,
+      this.onToggleGroup,
       this.previewOnly = false,
       this.card});
   final ListingsState state;
@@ -24,6 +26,7 @@ class ListingDetails extends StatelessWidget {
   final CartController cart;
   final MarketplaceCard? card;
   final bool previewOnly;
+  final ValueChanged<String>? onLoadMore, onToggleGroup;
 
   @override
   Widget build(BuildContext context) {
@@ -76,9 +79,10 @@ class ListingDetails extends StatelessWidget {
                             '${state.visible.length} offerte${state.all.length >= 80 ? ' · prime 80 disponibili' : ''}'),
                         const SizedBox(height: 12),
                         // Il layout resta verticale anche con caratteri ingranditi.
-                        Column(children: [
-                          ListingFilter<String?>(
-                              label: 'Condizione',
+                        Wrap(spacing: 8, runSpacing: 8, children: [
+                          ListingFilterButton(
+                              label: 'Condizioni',
+                              icon: Icons.tune,
                               value: state.condition,
                               choices: {
                                 null: 'Qualsiasi condizione',
@@ -86,9 +90,9 @@ class ListingDetails extends StatelessWidget {
                               },
                               onChanged: (value) => onFilter(
                                   condition: value, language: state.language)),
-                          const SizedBox(height: 12),
-                          ListingFilter<String?>(
+                          ListingFilterButton(
                               label: 'Lingua',
+                              icon: Icons.language,
                               value: state.language,
                               choices: {
                                 null: 'Qualsiasi lingua',
@@ -96,19 +100,19 @@ class ListingDetails extends StatelessWidget {
                               },
                               onChanged: (value) => onFilter(
                                   condition: state.condition, language: value)),
-                          const SizedBox(height: 12),
-                          ListingFilter<ListingSort>(
-                              label: 'Ordina',
-                              value: state.sort,
-                              choices: const {
-                                ListingSort.lowestPrice: 'Prezzo crescente',
-                                ListingSort.highestPrice: 'Prezzo decrescente'
-                              },
-                              onChanged: (value) => onFilter(
-                                  condition: state.condition,
-                                  language: state.language,
-                                  sort: value)),
                         ]),
+                        const SizedBox(height: 12),
+                        ListingFilter<ListingSort>(
+                            label: 'Ordina',
+                            value: state.sort,
+                            choices: const {
+                              ListingSort.lowestPrice: 'Prezzo crescente',
+                              ListingSort.highestPrice: 'Prezzo decrescente'
+                            },
+                            onChanged: (value) => onFilter(
+                                condition: state.condition,
+                                language: state.language,
+                                sort: value)),
                         const SizedBox(height: 12),
                         if (state.all.isEmpty)
                           const Text('Nessuna offerta attiva per questa carta.')
@@ -118,22 +122,19 @@ class ListingDetails extends StatelessWidget {
                     ])),
           )),
       if (!state.loading && !state.hasError)
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-          sliver: SliverList(
-              delegate: SliverChildBuilderDelegate((context, index) {
-            final listing = state.visible[index];
-            return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: ListingRow(
-                    key: ValueKey(listing.id),
-                    listing: listing,
-                    priceLabel: pknPrice(listing.pricePkn),
-                    card: card,
-                    previewOnly: previewOnly,
-                    cart: cart));
-          }, childCount: state.visible.length)),
-        ),
+        for (final group in state.groups)
+          ListingOriginGroup(
+              key: ValueKey('listing-group:${group.origin.id}'),
+              group: group,
+              card: card,
+              cart: cart,
+              previewOnly: previewOnly,
+              onMore: onLoadMore == null
+                  ? null
+                  : () => onLoadMore!(group.origin.id),
+              onToggle: onToggleGroup == null
+                  ? null
+                  : () => onToggleGroup!(group.origin.id)),
     ]);
   }
 }

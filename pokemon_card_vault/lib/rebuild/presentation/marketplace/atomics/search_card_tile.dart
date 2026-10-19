@@ -4,15 +4,19 @@ import '../../../model/marketplace_home.dart';
 import 'card_palette_snapshot.dart';
 import '../../shared/atomics/marketplace_thumbnail.dart';
 import '../../shared/price_format.dart';
+import '../../../controller/cart_controller.dart';
+import '../../shared/component/quick_add_price.dart';
 
 class SearchCardTile extends StatelessWidget {
   const SearchCardTile(
       {super.key,
       required this.card,
       required this.onOpen,
+      this.cart,
       this.onPaletteOpen});
   final MarketplaceCardPreview card;
   final VoidCallback onOpen;
+  final CartController? cart;
   final ValueChanged<Color?>? onPaletteOpen;
 
   @override
@@ -54,13 +58,21 @@ class SearchCardTile extends StatelessWidget {
                           maxLines: 2, overflow: TextOverflow.ellipsis),
                       if (card.number.isNotEmpty) Text(card.number),
                       const SizedBox(height: 8),
-                      Text(
-                          card.pricePkn == null
-                              ? 'Prezzo non disponibile'
-                              : pknPrice(card.pricePkn!),
-                          style: TextStyle(
-                              color: Theme.of(context).colorScheme.primary,
-                              fontWeight: FontWeight.w700)),
+                      if (cart != null)
+                        QuickAddPrice(
+                            cardId: card.id,
+                            cart: cart!,
+                            price: card.pricePkn == null
+                                ? 'Prezzo non disponibile'
+                                : pknPrice(card.pricePkn!))
+                      else
+                        Text(
+                            card.pricePkn == null
+                                ? 'Prezzo non disponibile'
+                                : pknPrice(card.pricePkn!),
+                            style: TextStyle(
+                                color: Theme.of(context).colorScheme.primary,
+                                fontWeight: FontWeight.w700)),
                     ],
                   ),
                 )),

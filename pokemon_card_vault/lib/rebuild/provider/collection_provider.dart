@@ -1,9 +1,9 @@
-import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import '../../firebase_options.dart';
 import '../model/cardex.dart';
+import 'account_api_provider.dart';
 
 /// Lettura privata via BFF: Firestore non permette accesso client alla collezione.
 class CollectionProvider {
@@ -13,12 +13,10 @@ class CollectionProvider {
       Future<String?> Function(String uid)? idToken,
       Stream<String?> Function()? userIds})
       : _auth = auth,
-        _client = client,
-        _idToken = idToken,
+        _api = AccountApiProvider(auth: auth, client: client, idToken: idToken),
         _userIds = userIds;
   final FirebaseAuth? _auth;
-  final http.Client? _client;
-  final Future<String?> Function(String uid)? _idToken;
+  final AccountApiProvider _api;
   final Stream<String?> Function()? _userIds;
 
   Stream<String?> watchUserId() async* {
@@ -42,50 +40,33 @@ class CollectionProvider {
       Stream.fromFuture(fetchItems(uid));
 
   Future<List<OwnedCard>> fetchItems(String uid) async {
-    if (uid.trim().isEmpty) throw StateError('Authentication required');
-    final token = await (_idToken != null ? _idToken(uid) : _tokenFor(uid))
-        .timeout(const Duration(seconds: 12));
-    if (token == null || token.isEmpty) {
-      throw StateError('Authentication required');
+    final payload = await _api.get(uid, '/api/marketplace-collection');
+    if (payload['uid'] != uid || payload['items'] is! List) {
+      throw const FormatException('Invalid private collection');
     }
-    final client = _client ?? http.Client();
-    try {
-      final response = await client.get(
-          Uri.https('api.pokoin.com', '/api/marketplace-collection'),
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Accept': 'application/json'
-          }).timeout(const Duration(seconds: 12));
-      if (response.statusCode != 200) {
-        throw StateError('Collection unavailable (${response.statusCode})');
+    final result = <OwnedCard>[];
+    for (final row in payload['items'] as List) {
+      final quantity = row is Map ? num.tryParse('${row['quantity']}') : null;
+      if (row is! Map<String, dynamic> ||
+          row['uid'] != uid ||
+          '${row['cardId'] ?? row['blueprintId'] ?? ''}'.trim().isEmpty ||
+          quantity == null ||
+          !quantity.isFinite ||
+          quantity < 0 ||
+          quantity != quantity.truncateToDouble()) {
+        throw const FormatException('Invalid collection item');
       }
-      final payload = jsonDecode(response.body);
-      if (payload is! Map<String, dynamic> ||
-          payload['uid'] != uid ||
-          payload['items'] is! List) {
-        throw const FormatException('Invalid private collection');
-      }
-      final result = <OwnedCard>[];
-      for (final row in payload['items'] as List) {
-        if (row is! Map<String, dynamic> ||
-            row['uid'] != uid ||
-            '${row['cardId'] ?? row['blueprintId'] ?? ''}'.trim().isEmpty ||
-            num.tryParse('${row['quantity']}') == null) {
-          throw const FormatException('Invalid collection item');
-        }
-        result.add(OwnedCard.fromJson(row));
-      }
-      return List.unmodifiable(result);
-    } finally {
-      if (_client == null) client.close();
+      result.add(OwnedCard.fromJson(row));
     }
-  }
-
-  Future<String?> _tokenFor(String uid) async {
-    final user = (_auth ?? FirebaseAuth.instance).currentUser;
-    if (user == null || user.uid != uid) {
-      throw StateError('Session changed');
+    for (final entry in {
+      'itemCount': result.length,
+      'cardsOwned': result.fold<int>(0, (sum, row) => sum + row.quantity),
+    }.entries) {
+      if (payload.containsKey(entry.key) &&
+          num.tryParse('${payload[entry.key]}') != entry.value) {
+        throw const FormatException('Incomplete private collection');
+      }
     }
-    return user.getIdToken();
+    return List.unmodifiable(result);
   }
 }

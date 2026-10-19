@@ -15,6 +15,10 @@ import 'package:pokoin/rebuild/provider/cardex_provider.dart';
 import 'package:pokoin/rebuild/provider/collection_provider.dart';
 import 'package:pokoin/rebuild/service/cardex_service.dart';
 import 'package:pokoin/rebuild/service/collection_service.dart';
+import 'package:pokoin/rebuild/presentation/cardex/atomics/album_card.dart';
+
+Finder albumCard(String id) => find
+    .byWidgetPredicate((widget) => widget is AlbumCard && widget.card.id == id);
 
 const expansion =
     MarketplaceExpansion(name: 'Base Set', slug: 'base-set', cardCount: 3);
@@ -238,8 +242,8 @@ void main() {
     await tester.pump();
     source.records['alice']!.add([const OwnedCard(card: pikachu, quantity: 2)]);
     await tester.pumpAndSettle();
-    expect(find.text('Posseduta · ×2'), findsOneWidget);
-    expect(find.text('Raichu'), findsNothing);
+    expect(find.text('×2'), findsOneWidget);
+    expect(albumCard('52'), findsNothing);
     final selecting = controller.selectExpansion(expansion);
     catalog.pending.last.result.complete(page([pikachu, raichu]));
     await selecting;
@@ -247,9 +251,9 @@ void main() {
     expect(find.text('Mancante'), findsOneWidget);
     await tester.tap(find.text('Mancanti'));
     await tester.pumpAndSettle();
-    expect(find.text('Pikachu'), findsNothing);
-    expect(find.text('Raichu'), findsOneWidget);
-    await tester.tap(find.text('Raichu'));
+    expect(albumCard('116'), findsNothing);
+    expect(albumCard('52'), findsOneWidget);
+    await tester.tap(albumCard('52'));
     expect(opened, '52');
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());

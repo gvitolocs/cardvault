@@ -1,26 +1,45 @@
 param(
     [string]$FlutterPath = 'C:\Users\raffa\develop\flutter\bin\flutter.bat',
-    [string]$OutputDirectory = 'C:\Users\raffa\ApkProjects\pokoin-debug-emulator-x86_64',
-    [string]$Target = 'lib/old/main.dart',
+    [string]$OutputDirectory = '',
+    [string]$Target = 'lib/rebuild/main_mobile_prototype.dart',
     [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9._-]*\.apk$')]
-    [string]$ApkFileName = 'pokoin-debug-emulator-x86_64.apk',
+    [string]$ApkFileName = 'pokoin-profile-phone-arm64-Rebuild.apk',
     [ValidateSet('android-x64', 'android-arm64')]
-    [string]$TargetPlatform = 'android-x64',
+    [string]$TargetPlatform = 'android-arm64',
     [ValidateSet('debug', 'profile')]
-    [string]$BuildMode = 'debug'
+    [string]$BuildMode = 'profile'
 )
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$apkSource = Join-Path $projectRoot "build\app\outputs\flutter-apk\app-$BuildMode.apk"
-$outputRoot = [IO.Path]::GetFullPath($OutputDirectory)
+$flutterOutputRoot = Join-Path $projectRoot 'build\app\outputs\flutter-apk'
+$canonicalOutputRoot = Join-Path $flutterOutputRoot 'Rebuild'
+$backupDirectory = Join-Path $projectRoot 'build\emulator-apk-backups'
+if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
+    $OutputDirectory = $canonicalOutputRoot
+}
+$outputRoot = [IO.Path]::GetFullPath($OutputDirectory).TrimEnd('\', '/')
+if (![string]::Equals($outputRoot, $canonicalOutputRoot, [StringComparison]::OrdinalIgnoreCase)) {
+    throw "The single-APK workflow only saves to $canonicalOutputRoot."
+}
+$apkSource = Join-Path $flutterOutputRoot "app-$BuildMode.apk"
 $apkDestination = Join-Path $outputRoot $ApkFileName
 
+# Refuse linked output folders before promoting the generated APK.
+foreach ($generatedDirectory in @($flutterOutputRoot, $outputRoot, $backupDirectory)) {
+    if (Test-Path -LiteralPath $generatedDirectory) {
+        $directoryInfo = Get-Item -LiteralPath $generatedDirectory -Force
+        if (!$directoryInfo.PSIsContainer -or
+            ($directoryInfo.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+            throw "Expected a regular generated directory: $generatedDirectory"
+        }
+    }
+}
 if (!(Test-Path -LiteralPath $FlutterPath -PathType Leaf)) {
     throw "Flutter executable not found: $FlutterPath"
 }
 if (!(Test-Path -LiteralPath $outputRoot -PathType Container)) {
-    throw "APK destination directory not found: $outputRoot"
+    New-Item -ItemType Directory -Path $outputRoot -Force | Out-Null
 }
 
 Push-Location $projectRoot
@@ -32,7 +51,6 @@ try {
 } finally {
     Pop-Location
 }
-
 if (!(Test-Path -LiteralPath $apkSource -PathType Leaf)) {
     throw "Build output not found: $apkSource"
 }
@@ -52,27 +70,58 @@ try {
 }
 
 $sourceHash = (Get-FileHash -LiteralPath $apkSource -Algorithm SHA256).Hash
+$apkBaseName = [IO.Path]::GetFileNameWithoutExtension($ApkFileName)
 if (Test-Path -LiteralPath $apkDestination -PathType Leaf) {
     $previousHash = (Get-FileHash -LiteralPath $apkDestination -Algorithm SHA256).Hash
     if ($previousHash -ne $sourceHash) {
-        $backupDirectory = Join-Path $projectRoot 'build\emulator-apk-backups'
         New-Item -ItemType Directory -Path $backupDirectory -Force | Out-Null
-        $apkBaseName = [IO.Path]::GetFileNameWithoutExtension($ApkFileName)
         $backupPath = Join-Path $backupDirectory "$apkBaseName-$previousHash.apk"
         if (!(Test-Path -LiteralPath $backupPath)) {
             Copy-Item -LiteralPath $apkDestination -Destination $backupPath
         }
         if ((Get-FileHash -LiteralPath $backupPath -Algorithm SHA256).Hash -ne $previousHash) {
-            throw 'Backup verification failed. Destination unchanged.'
+            throw 'Previous APK backup verification failed. Destination unchanged.'
         }
-        Write-Output "Previous APK saved: $backupPath"
     }
+    # Same-volume replacement preserves the previous final file until promotion succeeds.
+    [IO.File]::Replace($apkSource, $apkDestination, [NullString]::Value)
+} else {
+    Move-Item -LiteralPath $apkSource -Destination $apkDestination
 }
-
-Copy-Item -LiteralPath $apkSource -Destination $apkDestination -Force
 if ((Get-FileHash -LiteralPath $apkDestination -Algorithm SHA256).Hash -ne $sourceHash) {
     throw 'Destination APK checksum does not match the build output.'
 }
-Write-Output "Updated APK: $apkDestination"
+
+# User policy: current APK plus at most three distinct preceding versions.
+# Only this helper's hash-named history is eligible; no recursive deletion.
+if (Test-Path -LiteralPath $backupDirectory -PathType Container) {
+    $seenVersions = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    [void]$seenVersions.Add($sourceHash)
+    $keptVersions = 0
+    $historyNamePattern = '^' + [regex]::Escape($apkBaseName) + '-([A-Fa-f0-9]{64})\.apk$'
+    $historyFiles = @(Get-ChildItem -LiteralPath $backupDirectory -File -Filter "$apkBaseName-*.apk" | Sort-Object LastWriteTime -Descending)
+    foreach ($historyFile in $historyFiles) {
+        if ($historyFile.Name -notmatch $historyNamePattern) { continue }
+        $historyHash = $Matches[1]
+        if ($historyFile.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+            throw "Unexpected historical APK link: $($historyFile.FullName)"
+        }
+        if ($seenVersions.Contains($historyHash) -or $keptVersions -ge 3) {
+            $resolvedHistory = (Resolve-Path -LiteralPath $historyFile.FullName).ProviderPath
+            if ((Split-Path -Parent $resolvedHistory) -ne $backupDirectory) {
+                throw "Unexpected history cleanup path: $resolvedHistory"
+            }
+            Remove-Item -LiteralPath $resolvedHistory -Force
+        } else {
+            if ((Get-FileHash -LiteralPath $historyFile.FullName -Algorithm SHA256).Hash -ne $historyHash) {
+                throw "Historical APK checksum mismatch: $($historyFile.FullName)"
+            }
+            [void]$seenVersions.Add($historyHash)
+            $keptVersions++
+        }
+    }
+}
+Write-Output "Updated single APK: $apkDestination"
 Write-Output "SHA256: $sourceHash"
 Write-Output "Size: $((Get-Item -LiteralPath $apkDestination).Length) bytes"
+Write-Output 'One current APK exported; history limited to three preceding distinct versions.'

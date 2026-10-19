@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../model/card.dart';
 import '../../shared/atomics/card_illustration.dart';
+import '../../shared/atomics/cart_price.dart';
 
 String _price(double value) =>
     '${value.toStringAsFixed(2).replaceAll('.', ',')} €';
@@ -57,17 +58,14 @@ class CardTile extends StatelessWidget {
             Text('${card.expansion} · ${card.number}',
                 style: const TextStyle(color: Color(0xFFA8AABB), fontSize: 12)),
             const SizedBox(height: 12),
-            Text(_price(card.price),
+            CartPrice(
+                price: _price(card.price),
+                onAdd: onAdd,
+                tooltip: 'Aggiungi al carrello demo',
                 style: TextStyle(
                     color: Theme.of(context).colorScheme.primary,
                     fontSize: 20,
                     fontWeight: FontWeight.w800)),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                  onPressed: onAdd, child: const Text('Aggiungi')),
-            ),
           ]),
         ),
       ),

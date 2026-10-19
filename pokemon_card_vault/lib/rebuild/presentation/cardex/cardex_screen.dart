@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../controller/cardex_controller.dart';
+import '../../constants/cardex_album_layout_constants.dart';
 import '../../model/cardex.dart';
 import '../../model/marketplace_home.dart';
 import 'component/card_album.dart';
 import 'component/collection_notice.dart';
+import 'component/card_album_loading.dart';
+import 'atomics/collection_sync_action.dart';
 
 class CardexScreen extends StatelessWidget {
   const CardexScreen(
@@ -23,59 +26,28 @@ class CardexScreen extends StatelessWidget {
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                    Text('Cardex',
-                        style: Theme.of(context).textTheme.headlineLarge),
-                    const Text('Il tuo album, una carta alla volta.'),
-                    CollectionNotice(
-                        status: controller.collection.status,
-                        onRetry: controller.retryCollection),
-                    if (controller.ownershipKnown)
-                      TextButton.icon(
-                          onPressed: controller.retryCollection,
-                          icon: const Icon(Icons.refresh),
-                          label: Text(
-                              'Aggiorna collezione · ${controller.collection.cards.length} carte · ${controller.collection.copies} copie')),
-                    if (controller.loadingExpansions)
-                      const LinearProgressIndicator(),
-                    if (controller.expansionsError)
-                      TextButton(
-                          onPressed: controller.loadExpansions,
-                          child: const Text('Riprova espansioni')),
-                    if (!controller.loadingExpansions &&
-                        !controller.expansionsError &&
-                        controller.expansions.isEmpty)
-                      const Text('Nessuna espansione disponibile.'),
-                    if (controller.expansions.isNotEmpty ||
-                        controller.ownershipKnown)
-                      DropdownButton<String>(
-                          isExpanded: true,
-                          value: controller.viewingCollection
-                              ? '__collection__'
-                              : controller.expansion?.slug,
-                          hint: const Text('Scegli un’espansione'),
-                          items: [
-                            if (controller.ownershipKnown)
-                              const DropdownMenuItem(
-                                  value: '__collection__',
-                                  child: Text(
-                                      'Le mie carte · tutte le espansioni',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis)),
-                            ...controller.expansions.map((expansion) =>
-                                DropdownMenuItem(
-                                    value: expansion.slug,
-                                    child: Text(expansion.name,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis)))
-                          ],
-                          onChanged: (slug) {
-                            if (slug == '__collection__') {
-                              controller.showCollection();
-                            } else if (slug != null) {
-                              controller.selectExpansion(controller.expansions
-                                  .firstWhere((item) => item.slug == slug));
-                            }
-                          }),
+                    Row(children: [
+                      if (!controller.viewingCollection)
+                        Expanded(
+                            child: Text(
+                                controller.expansion?.name ??
+                                    'Scegli un’espansione',
+                                style: Theme.of(context).textTheme.titleLarge))
+                      else
+                        const Spacer(),
+                      CollectionSyncAction(
+                          collection: controller.collection,
+                          onRefresh: controller.retryCollection),
+                    ]),
+                    if (controller.collection.status !=
+                        CollectionStatus.loading)
+                      CollectionNotice(
+                          status: controller.collection.status,
+                          onRetry: controller.retryCollection),
+                    if (!controller.viewingCollection &&
+                        controller.expansion == null)
+                      const Text(
+                          'Apri Espansioni in alto, a destra del carrello.'),
                     if (!controller.viewingCollection &&
                         controller.expansion != null) ...[
                       Text(
@@ -98,26 +70,43 @@ class CardexScreen extends StatelessWidget {
                                   : null),
                       ]),
                     ],
-                    if (controller.viewingCollection)
-                      const Text(
-                          'Le tue carte a colori. Scegli un’espansione per vedere anche le mancanti.'),
                   ]))),
           SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: CardexAlbumLayoutConstants.horizontalMargin),
               sliver: SliverToBoxAdapter(
-                  child: CardAlbum(
-                      key: ValueKey(
-                          '${controller.viewingCollection ? "collection" : controller.expansion?.slug}-${controller.filter.name}'),
-                      cards: visible,
-                      collection: controller.collection,
-                      onOpen: onOpen))),
+                  child: controller.viewingCollection &&
+                          controller.collection.status ==
+                              CollectionStatus.loading &&
+                          visible.isEmpty
+                      ? const CardAlbumLoading()
+                      : CardAlbum(
+                          key: ValueKey(
+                              '${controller.viewingCollection ? "collection" : controller.expansion?.slug}-${controller.filter.name}'),
+                          cards: visible,
+                          sourceCardCount: controller.cards.length,
+                          collection: controller.collection,
+                          ownershipFor: controller.ownershipFor,
+                          onLanguageSelected: controller.selectOwnedLanguage,
+                          onPageVisible: controller.viewingCollection
+                              ? null
+                              : controller.onAlbumPageVisible,
+                          onOpen: onOpen))),
           SliverPadding(
               padding: const EdgeInsets.all(20),
               sliver: SliverToBoxAdapter(
                   child: Column(children: [
                 if (!controller.viewingCollection && controller.loadingPage)
-                  const CircularProgressIndicator(),
-                if (controller.viewingCollection && visible.isEmpty)
+                  Semantics(
+                      liveRegion: true,
+                      child: const Column(children: [
+                        CircularProgressIndicator(),
+                        SizedBox(height: 8),
+                        Text('Caricamento altre carte…'),
+                      ])),
+                if (controller.viewingCollection &&
+                    controller.ownershipKnown &&
+                    visible.isEmpty)
                   const Text('La tua collezione è ancora vuota.'),
                 if (!controller.viewingCollection &&
                     !controller.loadingPage &&
@@ -131,12 +120,11 @@ class CardexScreen extends StatelessWidget {
                   const Text('Impossibile caricare le carte dell’album.'),
                 if (!controller.viewingCollection &&
                     !controller.loadingPage &&
-                    controller.hasMore)
+                    controller.hasMore &&
+                    controller.pageError)
                   OutlinedButton(
                       onPressed: controller.loadMore,
-                      child: Text(controller.pageError
-                          ? 'Riprova carte'
-                          : 'Carica altre carte')),
+                      child: const Text('Riprova carte')),
               ]))),
         ]);
       });

@@ -23,6 +23,22 @@ class MarketplaceCard {
   final int? hp;
   final List<String> types;
 
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'set': expansion,
+        'number': number,
+        'imageUrl': imageUrl,
+        'pricePkn': pricePkn,
+        'rarity': rarity,
+        'artist': artist,
+        'productType': productType,
+        'canonicalPath': canonicalPath,
+        'description': description,
+        'hp': hp,
+        'types': types,
+      };
+
   factory MarketplaceCard.fromJson(Map<String, dynamic> json) {
     String read(List<String> keys) {
       for (final key in keys) {

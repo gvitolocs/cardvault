@@ -4,6 +4,9 @@ import '../../../model/marketplace_home.dart';
 import '../atomics/card_palette_snapshot.dart';
 import 'marketplace_slider.dart';
 import '../../shared/atomics/marketplace_thumbnail.dart';
+import '../../shared/component/quick_add_price.dart';
+import '../../shared/price_format.dart';
+import '../../../controller/cart_controller.dart';
 
 /// Solo presentazione: classifica, richieste e prezzi arrivano dal servizio.
 class TopSellers extends StatelessWidget {
@@ -11,6 +14,7 @@ class TopSellers extends StatelessWidget {
     super.key,
     required this.cards,
     required this.onSelected,
+    this.cart,
     this.onPaletteSelected,
     this.isLoading = false,
     this.hasError = false,
@@ -18,6 +22,7 @@ class TopSellers extends StatelessWidget {
   });
 
   final List<MarketplaceCardPreview> cards;
+  final CartController? cart;
   final ValueChanged<MarketplaceCardPreview> onSelected;
   final void Function(MarketplaceCardPreview card, Color? color)?
       onPaletteSelected;
@@ -36,7 +41,9 @@ class TopSellers extends StatelessWidget {
       height: 196 +
           scale.scale(16) * 2.6 +
           scale.scale(13) * 1.5 +
-          scale.scale(16) * 1.5,
+          (cart == null
+              ? scale.scale(16) * 1.5
+              : (scale.scale(16) * 3).clamp(48, double.infinity)),
       emptyText: hasError
           ? 'I più venduti non sono disponibili al momento.'
           : 'La classifica dei più venduti non è ancora disponibile.',
@@ -88,18 +95,28 @@ class TopSellers extends StatelessWidget {
                                 style:
                                     const TextStyle(fontSize: 13, height: 1.3)),
                             const SizedBox(height: 8),
-                            Text(
-                                card.pricePkn == null
-                                    ? 'Prezzo non disponibile'
-                                    : '${card.pricePkn!.toStringAsFixed(2).replaceAll('.', ',')} PKN',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                    fontSize: 16,
-                                    height: 1.3,
-                                    fontWeight: FontWeight.w800,
-                                    color:
-                                        Theme.of(context).colorScheme.primary)),
+                            if (cart != null)
+                              QuickAddPrice(
+                                  maxLines: 2,
+                                  cardId: card.id,
+                                  cart: cart!,
+                                  price: card.pricePkn == null
+                                      ? 'Prezzo non disponibile'
+                                      : pknPrice(card.pricePkn!))
+                            else
+                              Text(
+                                  card.pricePkn == null
+                                      ? 'Prezzo non disponibile'
+                                      : '${card.pricePkn!.toStringAsFixed(2).replaceAll('.', ',')} PKN',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                      fontSize: 16,
+                                      height: 1.3,
+                                      fontWeight: FontWeight.w800,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .primary)),
                           ],
                         ),
                       ),

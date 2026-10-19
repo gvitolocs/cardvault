@@ -9,11 +9,17 @@ class OwnedCard {
   const OwnedCard(
       {required this.card,
       required this.quantity,
+      this.id = '',
+      this.listingId = '',
+      this.sourceListingId = '',
       this.language = '',
       this.holo = false,
       this.reverse = false});
 
   factory OwnedCard.fromJson(Map<String, dynamic> json) => OwnedCard(
+        id: '${json['id'] ?? ''}'.trim(),
+        listingId: '${json['listingId'] ?? ''}'.trim(),
+        sourceListingId: '${json['sourceListingId'] ?? ''}'.trim(),
         card: MarketplaceCardPreview(
           id: '${json['cardId'] ?? json['blueprintId'] ?? ''}'.trim(),
           name: '${json['cardName'] ?? json['name'] ?? ''}',
@@ -28,6 +34,7 @@ class OwnedCard {
       );
 
   final MarketplaceCardPreview card;
+  final String id, listingId, sourceListingId;
   final int quantity;
   final String language;
   final bool holo, reverse;

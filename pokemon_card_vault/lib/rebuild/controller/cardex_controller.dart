@@ -4,6 +4,11 @@ import '../model/cardex.dart';
 import '../model/marketplace_home.dart';
 import '../service/cardex_service.dart';
 import '../service/collection_service.dart';
+import '../model/expansion_era.dart';
+import '../service/expansion_era_service.dart';
+import '../service/card_ownership_service.dart';
+import '../model/card_ownership.dart';
+import '../constants/cardex_pagination_constants.dart';
 
 class CardexController extends ChangeNotifier {
   CardexController({CardexService? catalog, CollectionService? collection})
@@ -24,10 +29,41 @@ class CardexController extends ChangeNotifier {
   bool loadingExpansions = false, expansionsError = false;
   bool loadingPage = false, pageError = false, hasMore = false;
   int total = 0;
+  final _eras = ExpansionEraService();
+  final _ownership = const CardOwnershipService();
+  final _selectedLanguages = <String, String>{};
+  CardOwnership ownershipFor(String cardId) =>
+      _ownership.describe(collection, cardId,
+          selectedLanguage: _selectedLanguages[cardId]);
+
+  void selectOwnedLanguage(String cardId, String language) {
+    if (_disposed || !ownershipKnown) return;
+    final code = _ownership.normalizeLanguage(language);
+    final view = ownershipFor(cardId);
+    if (!view.languages.any((option) => option.code == code && option.owned) ||
+        view.selectedLanguage == code) {
+      return;
+    }
+    _selectedLanguages[cardId] = code;
+    _notify();
+  }
+
+  List<ExpansionEraGroup> expansionGroups = const [];
+  String expansionQuery = '';
+  List<ExpansionEraGroup> get visibleExpansionGroups =>
+      _eras.filter(expansionGroups, expansionQuery);
+
+  void setExpansionQuery(String value) {
+    if (_disposed || expansionQuery == value) return;
+    expansionQuery = value;
+    _notify();
+  }
 
   bool get ownershipKnown => collection.status == CollectionStatus.ready;
   bool collectionAlbum = true;
-  bool get viewingCollection => collectionAlbum && ownershipKnown;
+  // View intent must not change while private data is still loading or failed.
+  bool get viewingCollection =>
+      collectionAlbum && collection.status != CollectionStatus.guest;
   List<MarketplaceCardPreview> get visibleCards => viewingCollection
       ? collection.cards
       : !ownershipKnown
@@ -54,15 +90,20 @@ class CardexController extends ChangeNotifier {
     if (_disposed) return;
     unawaited(_subscription?.cancel());
     collection = CardCollection(status: CollectionStatus.loading);
+    _selectedLanguages.clear();
     _notify();
     _subscription = _collection.watch().listen((value) {
       if (_disposed) return;
       collection = value;
-      if (!ownershipKnown) filter = CardexFilter.all;
+      if (!ownershipKnown) {
+        filter = CardexFilter.all;
+        _selectedLanguages.clear();
+      }
       _notify();
     }, onError: (Object error, StackTrace stack) {
       if (_disposed) return;
       collection = CardCollection(status: CollectionStatus.unavailable);
+      _selectedLanguages.clear();
       _notify();
     });
   }
@@ -76,6 +117,7 @@ class CardexController extends ChangeNotifier {
       final result = await _catalog.loadExpansions();
       if (_disposed) return;
       expansions = result;
+      expansionGroups = _eras.group(result);
       if (expansion == null && result.isNotEmpty) {
         unawaited(selectExpansion(result.first, showCatalog: false));
       }
@@ -114,7 +156,11 @@ class CardexController extends ChangeNotifier {
     try {
       final page = await _catalog.loadPage(selected.slug, offset: _nextOffset);
       if (_disposed || request != _generation) return;
-      cards = _catalog.mergeCards(cards, page.cards);
+      final merged = _catalog.mergeCards(cards, page.cards);
+      if (page.hasMore && merged.length == cards.length) {
+        throw const FormatException('Catalog pagination made no progress');
+      }
+      cards = merged;
       _nextOffset = page.offset + page.cards.length;
       total = page.total;
       hasMore = page.hasMore;
@@ -125,6 +171,22 @@ class CardexController extends ChangeNotifier {
         loadingPage = false;
         _notify();
       }
+    }
+  }
+
+  /// Album coordinates refer to visible (possibly filtered) cards, not stock.
+  /// Errors require explicit retry; no background retry loop or Guest fallback.
+  void onAlbumPageVisible(int visibleEnd, int capacity) {
+    if (_disposed ||
+        viewingCollection ||
+        pageError ||
+        loadingPage ||
+        !hasMore ||
+        expansion == null ||
+        capacity < 1) return;
+    if (visibleCards.length - visibleEnd <=
+        capacity * CardexPaginationConstants.prefetchRemainingSpreads) {
+      unawaited(loadMore());
     }
   }
 

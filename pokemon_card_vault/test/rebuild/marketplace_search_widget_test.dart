@@ -146,6 +146,9 @@ void main() {
       final response = Completer<http.Response>();
       var metadataRequests = 0;
       final client = MockClient((request) {
+        if (request.url.path.endsWith('marketplace-listings')) {
+          return Future.value(fixtures.response({'listings': []}));
+        }
         metadataRequests++;
         expect(request.url.queryParameters['cardId'], '24');
         return response.future;

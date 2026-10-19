@@ -30,6 +30,11 @@
   and controllers expose the resulting presentation state to the UI.
 - `model/`: data entities and presentation-state snapshots. Models represent
   backend data; they do not perform network or storage access.
+- `constants/`: shared compile-time labels, lookup tables and static metadata,
+  grouped into feature-specific Dart files (for example expansion era titles).
+  Keep these values out of services/controllers; constants must not depend on
+  UI, services or storage. Do not turn this into a single unrelated strings file
+  or move runtime configuration/secrets here.
 - `provider/`: read/write API, Hive, Firestore or other storage through focused
   DAO-style classes. Convert stored/API data into typed models and expose
   asynchronous results via Future/Stream. Providers do not depend on UI,
@@ -68,27 +73,40 @@
 
 ## Local Rebuild phone APK (user workflow)
 
-- User update on 2026-10-07: after changes affecting the Flutter app, Android
-  configuration, dependencies or bundled assets, refresh the Rebuild profile
-  ARM64 phone APK before handing off. This replaces the previous debug x86_64
-  emulator handoff requirement; do not rebuild additional variants by default.
-- On this Windows checkout, run `./scripts/build-emulator-apk.ps1` from
-  `pokemon_card_vault/` with `-Target lib/rebuild/main_mobile_prototype.dart`,
-  `-TargetPlatform android-arm64`, `-BuildMode profile`,
-  `-OutputDirectory 'C:\Users\raffa\Documents\ChatGPT\Cardvault\cardvault-repo\pokemon_card_vault\build\app\outputs\flutter-apk\Rebuild'`
-  and `-ApkFileName 'pokoin-profile-phone-arm64-Rebuild.apk'`.
-  It checks the packaged `arm64-v8a` Flutter engine and copies the APK to
-  `C:\Users\raffa\Documents\ChatGPT\Cardvault\cardvault-repo\pokemon_card_vault\build\app\outputs\flutter-apk\Rebuild\pokoin-profile-phone-arm64-Rebuild.apk`.
-- The script backs up the previous APK under `build/emulator-apk-backups/`.
-  Only replace the APK; do not edit APK Analyzer extracts or Android Studio
-  project files.
-- Request execution/write approval when the sandbox requires it. If the build or
-  copy fails, report the failure and do not claim the destination is updated.
-- This is a local profile artifact, not a release or production deployment. It
-  does not install the APK on a device unless the user asks for installation.
+- Latest user update on 2026-10-17: keep one current handoff APK at
+  `build/app/outputs/flutter-apk/Rebuild/pokoin-profile-phone-arm64-Rebuild.apk`.
+  Keep at most three distinct preceding versions in `build/emulator-apk-backups/`.
+  Do not create extra exported copies or unlimited historical APK backups.
+  This supersedes both the old unlimited history and the earlier no-history policy.
+- After changes affecting the Flutter app, Android configuration, dependencies
+  or bundled assets, refresh the profile ARM64 phone APK before handing off.
+  Do not build additional variants by default.
+- From `pokemon_card_vault/`, run `./scripts/build-emulator-apk.ps1`.
+  Its defaults select `lib/rebuild/main_mobile_prototype.dart`, `android-arm64`,
+  `profile`, and the single final path above. Explicit equivalent parameters
+  remain supported. Other destination directories are rejected.
+- The helper builds, verifies the packaged ARM64 Flutter engine and SHA256,
+  then moves the generated Flutter APK into the final path. A different final
+  APK is replaced only after preserving/verifying the preceding distinct version.
+  After successful promotion, trim this APK's hash-named history to three
+  distinct preceding versions; do not retain a duplicate of the current APK.
+  Build/ABI failures preserve the existing final APK and do not prune history.
+- The user explicitly authorized deleting older generated APK versions and
+  retaining this small history. Only prune this helper's known hash-named APK
+  history; do not bulk-delete unrelated variants or recursively delete build
+  internals, source or configuration files. Keep the current Android Studio
+  debug APK and Flutter/Gradle internal outputs.
+- Do not edit APK Analyzer extracts or Android Studio project files.
+- Request execution/write approval when the sandbox requires it. If the build,
+  promotion or verification fails, report it without claiming an updated APK.
+- This is a local profile artifact, not a release or production deployment.
+  It does not install the APK on a device unless the user asks for installation.
 
 ## Local Obsidian updates (user workflow)
 
+- Keep generated note staging, helper scripts and local backup copies under
+  `build/obsidian/<topic>/` instead of creating separate `build/obsidian-*`
+  directories. This groups working copies only; the actual vault stays below.
 - Update the user's local Obsidian documentation after every project change set,
   before handing off. The existing vault is
   `C:\Users\raffa\Documents\Obsidian\Pokoin Collaborator\Pokoin`.

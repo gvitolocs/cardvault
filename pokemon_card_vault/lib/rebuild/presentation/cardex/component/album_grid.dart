@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../model/cardex.dart';
+import '../../../model/card_ownership.dart';
 import '../../../model/marketplace_home.dart';
 import '../../../style/cardex_style.dart';
 import '../atomics/album_card.dart';
@@ -10,16 +11,19 @@ class AlbumGrid extends StatelessWidget {
       {super.key,
       required this.cards,
       required this.collection,
+      this.ownershipFor,
+      this.onLanguageSelected,
       required this.onOpen});
   final List<MarketplaceCardPreview> cards;
   final CardCollection collection;
+  final CardOwnership Function(String)? ownershipFor;
+  final void Function(String, String)? onLanguageSelected;
   final ValueChanged<MarketplaceCardPreview> onOpen;
 
   @override
   Widget build(BuildContext context) =>
       SliverLayoutBuilder(builder: (context, constraints) {
         final columns = constraints.crossAxisExtent >= 700 ? 4 : 2;
-        final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
         final width =
             (constraints.crossAxisExtent - (columns - 1) * 12) / columns;
         return SliverGrid.builder(
@@ -28,7 +32,7 @@ class AlbumGrid extends StatelessWidget {
                 crossAxisCount: columns,
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
-                mainAxisExtent: (width - 20) * 1.4 + 90 * textScale),
+                mainAxisExtent: (width - 4) / CardexStyle.cardAspectRatio + 4),
             itemBuilder: (context, index) {
               final card = cards[index];
               return DecoratedBox(
@@ -36,6 +40,11 @@ class AlbumGrid extends StatelessWidget {
                   child: AlbumCard(
                       card: card,
                       quantity: collection.quantityFor(card.id),
+                      ownership: ownershipFor?.call(card.id),
+                      onLanguageSelected: onLanguageSelected == null
+                          ? null
+                          : (language) =>
+                              onLanguageSelected!(card.id, language),
                       ownershipKnown:
                           collection.status == CollectionStatus.ready,
                       onOpen: () => onOpen(card)));

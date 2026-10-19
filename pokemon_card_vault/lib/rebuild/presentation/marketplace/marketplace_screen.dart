@@ -5,8 +5,9 @@ import 'component/card_tile.dart';
 import 'component/marketplace_discovery.dart';
 import 'component/marketplace_search.dart';
 import '../shared/component/marketplace_cart_sheet.dart';
+import '../shared/component/expansion_drawer.dart';
 import '../shared/component/utility_bar.dart';
-import '../shared/component/navigation_placeholder.dart';
+import '../scanner/scanner_screen.dart';
 import '../../model/marketplace_home.dart';
 import '../../controller/marketplace_controller.dart';
 import '../card_details/card_details.dart';
@@ -35,6 +36,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     super.initState();
     _syncSearch();
     _controller.addListener(_syncSearch);
+    _controller.account.addListener(_syncScannerUser);
+    _syncScannerUser();
   }
 
   @override
@@ -42,7 +45,10 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.controller != widget.controller) {
       oldWidget.controller.removeListener(_syncSearch);
+      oldWidget.controller.account.removeListener(_syncScannerUser);
       _controller.addListener(_syncSearch);
+      _controller.account.addListener(_syncScannerUser);
+      _syncScannerUser();
       _syncSearch();
     }
   }
@@ -56,9 +62,13 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     );
   }
 
+  void _syncScannerUser() =>
+      _controller.scanner.setUser(_controller.account.session.user?.id);
+
   @override
   void dispose() {
     _controller.removeListener(_syncSearch);
+    _controller.account.removeListener(_syncScannerUser);
     _searchController.dispose();
     super.dispose();
   }
@@ -77,7 +87,6 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   }
 
   void _showExpansionPreview(MarketplaceExpansion expansion) {
-    // Integrazione futura: ricerca paginata per slug/nome espansione.
     _showCatalogPreview(
         expansion.name, '${expansion.cardCount} carte nel catalogo');
   }
@@ -94,6 +103,14 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
 
   void _showCatalogCardPreview(MarketplaceCardPreview card,
       [Color? cardColor]) {
+    _openCard(card, cardColor: cardColor);
+  }
+
+  void _showCollectionCard(MarketplaceCardPreview card) =>
+      _openCard(card, showOwnership: true);
+
+  void _openCard(MarketplaceCardPreview card,
+      {Color? cardColor, bool showOwnership = false}) {
     final detailsController = _controller.createCardDetails(card.id);
     Navigator.of(context).push(MaterialPageRoute<void>(
         builder: (_) => CardDetails(
@@ -101,6 +118,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
               controller: detailsController,
               cart: _controller.cart,
               initialColor: cardColor,
+              ownershipController: showOwnership ? _controller.cardex : null,
             )));
   }
 
@@ -138,11 +156,30 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     return ListenableBuilder(
       listenable: _controller,
       builder: (context, _) => Scaffold(
+        endDrawer: Builder(
+            builder: (drawerContext) => ExpansionDrawer(
+                  controller: _controller.cardex,
+                  onClose: () => Scaffold.of(drawerContext).closeEndDrawer(),
+                  onSelect: (expansion) {
+                    Scaffold.of(drawerContext).closeEndDrawer();
+                    _controller.openCardexExpansion(expansion);
+                  },
+                  onCollection: () {
+                    Scaffold.of(drawerContext).closeEndDrawer();
+                    _controller.selectTab(3);
+                    _controller.cardex.showCollection();
+                  },
+                )),
+        endDrawerEnableOpenDragGesture: false,
         appBar: AppBar(
           title: Row(children: [
             Image.asset('assets/brand/pokoin-96.png', width: 30, height: 30),
             const SizedBox(width: 10),
-            const Text('pokoin', style: TextStyle(fontWeight: FontWeight.w800)),
+            const Flexible(
+                child: Text('pokoin',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontWeight: FontWeight.w800))),
           ]),
           actions: [
             ListenableBuilder(
@@ -163,6 +200,15 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                 );
               },
             ),
+            Builder(
+                builder: (scaffoldContext) => IconButton(
+                      tooltip: 'Espansioni per era',
+                      icon: const Icon(Icons.filter_list_rounded),
+                      onPressed: () {
+                        _controller.cardex.start();
+                        Scaffold.of(scaffoldContext).openEndDrawer();
+                      },
+                    )),
             const SizedBox(width: 8),
           ],
         ),
@@ -170,12 +216,16 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
           top: false,
           child: switch (_controller.selectedTab) {
             0 => _marketplace(),
+            1 => ScannerScreen(
+                controller: _controller.scanner,
+                onLogin: _showLogin,
+                onSaved: () {
+                  _controller.cardex.retryCollection();
+                }),
             2 => PortfolioScreen(
-                controller: _controller.cardex,
-                onOpen: _showCatalogCardPreview),
+                controller: _controller.cardex, onOpen: _showCollectionCard),
             3 => CardexScreen(
-                controller: _controller.cardex,
-                onOpen: _showCatalogCardPreview),
+                controller: _controller.cardex, onOpen: _showCollectionCard),
             4 => ProfileScreen(
                 controller: _controller.profile,
                 onLogin: _showLogin,
@@ -184,10 +234,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                 onOpenCard: (id) => _showCatalogCardPreview(
                     MarketplaceCardPreview(
                         id: id, name: 'Carta #$id', expansion: ''))),
-            _ => NavigationPlaceholder(
-                selectedIndex: _controller.selectedTab,
-                onExploreMarketplace: () => _controller.selectTab(0),
-              ),
+            _ => _marketplace(),
           },
         ),
         bottomNavigationBar: UtilityBar(
@@ -201,12 +248,14 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   Widget _marketplace() {
     if (widget.showDiscovery) {
       return MarketplaceSearch(
+        cart: _controller.cart,
         controller: _controller.search,
         onOpen: _showCatalogCardPreview,
         onPaletteOpen: _showCatalogCardPreview,
         discovery: ValueListenableBuilder(
           valueListenable: _controller.discovery,
           builder: (context, state, _) => MarketplaceDiscovery(
+            cart: _controller.cart,
             state: state,
             onRetry: state.data == null && !state.hasError
                 ? () => _controller.loadDiscovery()
@@ -274,6 +323,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                       child: ValueListenableBuilder(
                         valueListenable: _controller.discovery,
                         builder: (context, state, _) => MarketplaceDiscovery(
+                          cart: _controller.cart,
                           state: state,
                           onRetry: state.data == null && !state.hasError
                               ? () => _controller.loadDiscovery()

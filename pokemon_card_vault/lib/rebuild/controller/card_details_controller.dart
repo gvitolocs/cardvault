@@ -66,6 +66,32 @@ class CardDetailsController {
           sort: sort,
           replaceFilters: true);
 
+  void loadMoreListings(String originId) {
+    if (_disposed) return;
+    final state = listings.value;
+    if (state.loading || state.hasError) return;
+    final matching = state.groups.where((group) => group.origin.id == originId);
+    if (matching.isEmpty || !matching.first.hasMore) return;
+    final group = matching.first;
+    listings.value = state.withGroups(limits: {
+      ...state.groupLimits,
+      originId: group.limit + group.nextCount,
+    });
+  }
+
+  void toggleListingGroup(String originId) {
+    if (_disposed) return;
+    final state = listings.value;
+    if (state.loading ||
+        state.hasError ||
+        !state.groups.any((group) => group.origin.id == originId)) {
+      return;
+    }
+    final collapsed = {...state.collapsedGroups};
+    if (!collapsed.add(originId)) collapsed.remove(originId);
+    listings.value = state.withGroups(collapsed: collapsed);
+  }
+
   void _filter(
       {String? condition,
       String? language,

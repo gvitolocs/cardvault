@@ -1,8 +1,11 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../model/cardex.dart';
+import '../../../model/card_ownership.dart';
 import '../../../model/marketplace_home.dart';
 import '../../../style/cardex_style.dart';
+import '../../../constants/cardex_artwork_constants.dart';
+import '../../../constants/cardex_album_layout_constants.dart';
 import '../atomics/album_card.dart';
 
 /// Sei tasche per foglio; su tablet due fogli affiancati. Si costruisce solo
@@ -12,9 +15,19 @@ class CardAlbum extends StatefulWidget {
       {super.key,
       required this.cards,
       required this.collection,
+      this.ownershipFor,
+      this.onLanguageSelected,
+      this.onPageVisible,
+      this.sourceCardCount,
       required this.onOpen});
   final List<MarketplaceCardPreview> cards;
   final CardCollection collection;
+  final CardOwnership Function(String)? ownershipFor;
+  final void Function(String, String)? onLanguageSelected;
+  final void Function(int visibleEnd, int capacity)? onPageVisible;
+
+  /// Unfiltered source progress also changes when a filter yields no cards.
+  final int? sourceCardCount;
   final ValueChanged<MarketplaceCardPreview> onOpen;
 
   @override
@@ -27,6 +40,22 @@ class _CardAlbumState extends State<CardAlbum> {
   final _pages = PageController(keepPage: false);
   int _page = 0;
   int _capacity = 6;
+  ScrollPosition? _viewportPosition;
+  (int, int, int, int?)? _reportedPosition;
+
+  void _reportPosition() {
+    if (widget.onPageVisible == null) return;
+    final position =
+        (_page, _capacity, widget.cards.length, widget.sourceCardCount);
+    if (_reportedPosition == position) return;
+    _reportedPosition = position;
+    // Never start a controller notification/network load during layout/build.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _reportedPosition != position) return;
+      widget.onPageVisible?.call(
+          math.min(widget.cards.length, (_page + 1) * _capacity), _capacity);
+    });
+  }
 
   @override
   void didUpdateWidget(CardAlbum oldWidget) {
@@ -52,7 +81,13 @@ class _CardAlbumState extends State<CardAlbum> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.cards.isEmpty) return const SizedBox.shrink();
+    if (widget.cards.isEmpty) {
+      // A filter may hide an entire fetched page. Continue until it has useful
+      // cards or the catalog finishes; the controller stops on any error.
+      _reportPosition();
+      return const SizedBox.shrink();
+    }
+    _viewportPosition = Scrollable.maybeOf(context)?.position;
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
     return LayoutBuilder(builder: (context, constraints) {
       final spread = constraints.maxWidth >= 700;
@@ -68,14 +103,33 @@ class _CardAlbumState extends State<CardAlbum> {
       final count = (widget.cards.length / capacity).ceil();
       final leafWidth =
           (constraints.maxWidth - (spread ? 16 : 0)) / (spread ? 2 : 1);
-      final columns = MediaQuery.textScalerOf(context).scale(14) > 20 ? 2 : 3;
+      final columns =
+          leafWidth < 420 || MediaQuery.textScalerOf(context).scale(14) > 20
+              ? 2
+              : 3;
       final rows = 6 ~/ columns;
-      final tileWidth = (leafWidth - 20 - (columns - 1) * 8) / columns;
-      final textHeight = MediaQuery.textScalerOf(context).scale(100);
-      final rowHeight = math.max(120.0, (tileWidth - 20) * 1.4 + textHeight);
+      const leafInset = CardexAlbumLayoutConstants.leafPadding +
+          CardexAlbumLayoutConstants.leafBorder;
+      final tileWidth = (leafWidth -
+              2 * leafInset -
+              (columns - 1) * CardexAlbumLayoutConstants.columnGap) /
+          columns;
+      final minimumHeight = MediaQuery.textScalerOf(context).scale(11) > 14
+          ? CardexArtworkConstants.largeTextMinimumPocketHeight
+          : CardexArtworkConstants.minimumPocketHeight;
+      final rowHeight = math.max(minimumHeight,
+          (tileWidth - 4) / CardexArtworkConstants.pocketAspectRatio + 4);
+      final numberHeight = MediaQuery.textScalerOf(context)
+              .scale(CardexAlbumLayoutConstants.pageNumberFontSize) *
+          CardexAlbumLayoutConstants.pageNumberLineHeight;
+      _reportPosition();
       return Column(children: [
         SizedBox(
-            height: rowHeight * rows + (rows - 1) * 8 + 44,
+            height: rowHeight * rows +
+                (rows - 1) * CardexAlbumLayoutConstants.rowGap +
+                2 * leafInset +
+                CardexAlbumLayoutConstants.pageNumberGap +
+                numberHeight,
             child: PageView.builder(
               controller: _pages,
               itemCount: count,
@@ -135,7 +189,8 @@ class _CardAlbumState extends State<CardAlbum> {
               child: Text(
                   spread
                       ? 'Pagine ${_page * 2 + 1}–${_page * 2 + 2} · ${widget.cards.length} carte'
-                      : 'Pagina ${_page + 1} di $count · ${widget.cards.length} carte',
+                      : 'Pagina ${_page + 1} di $count · ${widget.cards.length} carte'
+                          '${widget.collection.status == CollectionStatus.loading ? " · caricamento…" : ""}',
                   textAlign: TextAlign.center)),
           IconButton(
               tooltip: 'Pagina successiva',
@@ -152,10 +207,12 @@ class _CardAlbumState extends State<CardAlbum> {
 
   Widget _leaf(int start, int number, double rowHeight, int columns) =>
       Container(
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.all(CardexAlbumLayoutConstants.leafPadding),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.white24),
+          border: Border.all(
+              color: Colors.white24,
+              width: CardexAlbumLayoutConstants.leafBorder),
           gradient: const LinearGradient(colors: [
             CardexStyle.pageEdge,
             CardexStyle.page,
@@ -174,8 +231,8 @@ class _CardAlbumState extends State<CardAlbum> {
                   physics: const NeverScrollableScrollPhysics(),
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: columns,
-                      crossAxisSpacing: 8,
-                      mainAxisSpacing: 8,
+                      crossAxisSpacing: CardexAlbumLayoutConstants.columnGap,
+                      mainAxisSpacing: CardexAlbumLayoutConstants.rowGap,
                       mainAxisExtent: rowHeight),
                   itemCount: 6,
                   itemBuilder: (context, slot) {
@@ -192,14 +249,25 @@ class _CardAlbumState extends State<CardAlbum> {
                     return AlbumCard(
                         key: ValueKey(card.id),
                         card: card,
+                        artworkOnly: true,
                         quantity: widget.collection.quantityFor(card.id),
+                        viewportPosition: _viewportPosition,
+                        pageChanges: _pages,
+                        ownership: widget.ownershipFor?.call(card.id),
+                        onLanguageSelected: widget.onLanguageSelected == null
+                            ? null
+                            : (language) =>
+                                widget.onLanguageSelected!(card.id, language),
                         ownershipKnown:
                             widget.collection.status == CollectionStatus.ready,
                         onOpen: () => widget.onOpen(card));
                   })),
-          const SizedBox(height: 4),
+          const SizedBox(height: CardexAlbumLayoutConstants.pageNumberGap),
           Text('$number',
-              style: const TextStyle(color: Colors.white60, fontSize: 12)),
+              style: const TextStyle(
+                  color: Colors.white60,
+                  fontSize: CardexAlbumLayoutConstants.pageNumberFontSize,
+                  height: CardexAlbumLayoutConstants.pageNumberLineHeight)),
         ]),
       );
 

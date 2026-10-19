@@ -2,17 +2,16 @@ import 'package:flutter/material.dart';
 import '../../../controller/cart_controller.dart';
 import '../../../model/card.dart';
 import '../../../model/listing.dart';
+import '../../shared/component/listing_cart_price.dart';
 
 class ListingRow extends StatelessWidget {
   const ListingRow(
       {super.key,
       required this.listing,
-      required this.priceLabel,
       required this.card,
       required this.previewOnly,
       required this.cart});
   final MarketplaceListing listing;
-  final String priceLabel;
   final MarketplaceCard? card;
   final CartController cart;
   final bool previewOnly;
@@ -43,7 +42,11 @@ class ListingRow extends StatelessWidget {
                       _tag(context, attribute),
                   ]),
                   const SizedBox(height: 12),
-                  Text(priceLabel,
+                  ListingCartPrice(
+                      card: card,
+                      listing: listing,
+                      cart: cart,
+                      previewOnly: previewOnly,
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           color: Theme.of(context).colorScheme.primary,
                           fontWeight: FontWeight.w700)),
@@ -58,50 +61,54 @@ class ListingRow extends StatelessWidget {
                     const OutlinedButton(
                         onPressed: null, child: Text('Offerta dimostrativa'))
                   else
-                    ValueListenableBuilder<int>(
-                        valueListenable: cart.quantityFor(listing.id),
-                        builder: (context, quantity, _) => Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  if (quantity == 0)
-                                    FilledButton.icon(
-                                        onPressed: card == null
-                                            ? null
-                                            : () =>
-                                                cart.addListing(card!, listing),
-                                        icon: const Icon(
-                                            Icons.add_shopping_cart_outlined),
-                                        label:
-                                            const Text('Aggiungi al carrello'))
-                                  else ...[
-                                    Row(children: [
-                                      IconButton(
-                                          tooltip: 'Diminuisci quantità',
-                                          onPressed: () =>
-                                              cart.decreaseListing(listing.id),
-                                          icon: const Icon(Icons.remove)),
-                                      Expanded(
-                                          child: Text('$quantity nel carrello',
-                                              textAlign: TextAlign.center)),
-                                      IconButton(
-                                          tooltip: 'Aumenta quantità',
-                                          onPressed:
-                                              quantity >= listing.stock ||
-                                                      card == null
-                                                  ? null
-                                                  : () => cart.addListing(
-                                                      card!, listing),
-                                          icon: const Icon(Icons.add)),
-                                    ]),
-                                    OutlinedButton.icon(
-                                        onPressed: () =>
-                                            cart.removeListing(listing.id),
-                                        icon: const Icon(Icons
-                                            .remove_shopping_cart_outlined),
-                                        label:
-                                            const Text('Rimuovi dal carrello')),
-                                  ],
-                                ])),
+                    ValueListenableBuilder<bool>(
+                        valueListenable: cart.editable,
+                        builder: (context, canEdit, _) =>
+                            ValueListenableBuilder<int>(
+                                valueListenable: cart.quantityFor(listing.id),
+                                builder: (context, quantity, _) => Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          if (quantity > 0) ...[
+                                            Row(children: [
+                                              IconButton(
+                                                  tooltip:
+                                                      'Diminuisci quantità',
+                                                  onPressed: canEdit
+                                                      ? () =>
+                                                          cart.decreaseListing(
+                                                              listing.id)
+                                                      : null,
+                                                  icon:
+                                                      const Icon(Icons.remove)),
+                                              Expanded(
+                                                  child: Text(
+                                                      '$quantity nel carrello',
+                                                      textAlign:
+                                                          TextAlign.center)),
+                                              IconButton(
+                                                  tooltip: 'Aumenta quantità',
+                                                  onPressed: !canEdit ||
+                                                          quantity >=
+                                                              listing.stock ||
+                                                          card == null
+                                                      ? null
+                                                      : () => cart.addListing(
+                                                          card!, listing),
+                                                  icon: const Icon(Icons.add)),
+                                            ]),
+                                            OutlinedButton.icon(
+                                                onPressed: canEdit
+                                                    ? () => cart.removeListing(
+                                                        listing.id)
+                                                    : null,
+                                                icon: const Icon(Icons
+                                                    .remove_shopping_cart_outlined),
+                                                label: const Text(
+                                                    'Rimuovi dal carrello')),
+                                          ],
+                                        ]))),
                 ])),
       );
 

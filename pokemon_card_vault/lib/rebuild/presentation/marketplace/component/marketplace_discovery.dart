@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../model/marketplace_discovery_state.dart';
 import '../../../model/marketplace_home.dart';
+import '../../../controller/cart_controller.dart';
 import 'espansioni.dart';
 import 'top_sellers.dart';
 
@@ -13,10 +14,12 @@ class MarketplaceDiscovery extends StatelessWidget {
     required this.onRetry,
     required this.onExpansionSelected,
     required this.onCardSelected,
+    this.cart,
     this.onCardPaletteSelected,
   });
 
   final MarketplaceDiscoveryState state;
+  final CartController? cart;
   final VoidCallback onRetry;
   final ValueChanged<MarketplaceExpansion> onExpansionSelected;
   final ValueChanged<MarketplaceCardPreview> onCardSelected;
@@ -58,6 +61,7 @@ class MarketplaceDiscovery extends StatelessWidget {
         ),
         const SizedBox(height: 28),
         TopSellers(
+          cart: cart,
           cards: state.topSellers,
           isLoading: state.topSellersLoading,
           hasError: state.topSellersUnavailable,

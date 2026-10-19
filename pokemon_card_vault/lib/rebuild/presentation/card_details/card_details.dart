@@ -6,8 +6,12 @@ import 'component/listing_details.dart';
 import '../shared/component/marketplace_cart_sheet.dart';
 import '../shared/atomics/marketplace_thumbnail.dart';
 import '../shared/atomics/card_illustration.dart';
+import '../shared/component/listing_cart_price.dart';
 import '../shared/marketplace_image_url.dart';
 import '../../controller/card_details_controller.dart';
+import '../../controller/cardex_controller.dart';
+import '../../model/card_ownership.dart';
+import '../shared/component/card_ownership_artwork.dart';
 import '../../controller/cart_controller.dart';
 import '../../model/marketplace_home.dart';
 import '../../model/card.dart';
@@ -22,13 +26,14 @@ import 'component/card_listing_composer.dart';
 import 'component/card_best_deal.dart';
 
 /// La route possiede il controller dettagli; il carrello è condiviso con home.
-/// L'interfaccia di mercato resta dimostrativa finché si collegano i prezzi.
+/// Inserzioni effettive per il catalogo, offerte di esempio solo per DemoCard.
 class CardDetails extends StatefulWidget {
   const CardDetails(
       {super.key,
       required MarketplaceCardPreview this.preview,
       required CardDetailsController this.controller,
       this.initialColor,
+      this.ownershipController,
       required this.cart})
       : demoCard = null;
 
@@ -38,6 +43,7 @@ class CardDetails extends StatefulWidget {
       : demoCard = card,
         preview = null,
         initialColor = null,
+        ownershipController = null,
         controller = null;
 
   final MarketplaceCardPreview? preview;
@@ -45,6 +51,8 @@ class CardDetails extends StatefulWidget {
   final DemoCard? demoCard;
   final CartController cart;
   final Color? initialColor;
+  // Shared read-only collection state; owned by the app, not this route.
+  final CardexController? ownershipController;
   @override
   State<CardDetails> createState() => _CardDetailsState();
 }
@@ -109,7 +117,7 @@ class _CardDetailsState extends State<CardDetails> {
   void initState() {
     super.initState();
     final controller = widget.controller;
-    if (controller != null) unawaited(controller.load(includeListings: false));
+    if (controller != null) unawaited(controller.load());
   }
 
   @override
@@ -152,13 +160,20 @@ class _CardDetailsState extends State<CardDetails> {
                         ],
                       ],
                       const SizedBox(height: 16),
-                      const Text(
-                          'Prezzi, grafico e offerte sono dati di esempio.'),
+                      Text(widget.demoCard != null
+                          ? 'Prezzi, grafico e offerte sono dati di esempio.'
+                          : 'Le inserzioni provengono dal marketplace. Grafico e modulo di vendita sono dimostrativi.'),
                     ]))));
   }
 
   @override
-  Widget build(BuildContext context) => widget.controller == null
+  Widget build(BuildContext context) => widget.ownershipController == null
+      ? _details(context)
+      : ListenableBuilder(
+          listenable: widget.ownershipController!,
+          builder: (context, _) => _details(context));
+
+  Widget _details(BuildContext context) => widget.controller == null
       ? _page(context, const CardInfoState(loading: false))
       : ValueListenableBuilder(
           valueListenable: widget.controller!.info,
@@ -199,17 +214,34 @@ class _CardDetailsState extends State<CardDetails> {
                                   child: _overview(context, info.card,
                                       loading: info.loading,
                                       hasError: info.hasError)),
-                              ListingDetails(
-                                  state: _shop,
-                                  previewOnly: true,
-                                  cart: widget.cart,
-                                  onRetry: () {},
-                                  onFilter: ({condition, language, sort}) =>
-                                      setState(() {
-                                        _condition = condition;
-                                        _language = language;
-                                        _sort = sort ?? _sort;
-                                      })),
+                              if (widget.controller != null)
+                                ValueListenableBuilder<ListingsState>(
+                                  valueListenable: widget.controller!.listings,
+                                  builder: (context, state, _) =>
+                                      ListingDetails(
+                                    state: state,
+                                    card: info.card,
+                                    cart: widget.cart,
+                                    onRetry: widget.controller!.retryListings,
+                                    onFilter: widget.controller!.filter,
+                                    onLoadMore:
+                                        widget.controller!.loadMoreListings,
+                                    onToggleGroup:
+                                        widget.controller!.toggleListingGroup,
+                                  ),
+                                )
+                              else
+                                ListingDetails(
+                                    state: _shop,
+                                    previewOnly: true,
+                                    cart: widget.cart,
+                                    onRetry: () {},
+                                    onFilter: ({condition, language, sort}) =>
+                                        setState(() {
+                                          _condition = condition;
+                                          _language = language;
+                                          _sort = sort ?? _sort;
+                                        })),
                             ],
                           ),
                         ),
@@ -226,7 +258,37 @@ class _CardDetailsState extends State<CardDetails> {
     final expansion =
         card?.expansion ?? widget.preview?.expansion ?? demo!.expansion;
     final number = card?.number ?? widget.preview?.number ?? demo!.number;
+    final ownership = widget.preview == null
+        ? null
+        : widget.ownershipController?.ownershipFor(widget.preview!.id);
+    final selectedPreview = ownership?.selected?.preview;
     final artwork = CardArtworkPanel(
+        purchase: widget.controller == null
+            ? null
+            : ValueListenableBuilder<ListingsState>(
+                valueListenable: widget.controller!.listings,
+                builder: (context, state, _) {
+                  if (state.loading) return const LinearProgressIndicator();
+                  if (state.hasError) {
+                    return TextButton(
+                        onPressed: widget.controller!.retryListings,
+                        child: const Text('Riprova offerte'));
+                  }
+                  final offer = state.bestOffer;
+                  if (offer == null) {
+                    return const Text(
+                        'Nessuna inserzione disponibile per i filtri scelti.');
+                  }
+                  return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                            '${offer.sellerName} · ${offer.condition} · ${offer.language}'),
+                        ListingCartPrice(
+                            card: card, listing: offer, cart: widget.cart),
+                      ]);
+                },
+              ),
         number: number,
         rarity: card?.rarity ?? '',
         demoPrice: demo?.price,
@@ -236,52 +298,79 @@ class _CardDetailsState extends State<CardDetails> {
                 widget.cart.addCard(demo);
                 Navigator.of(context).pop();
               },
-        image: demo != null
-            ? CardIllustration(card: demo)
-            : LayoutBuilder(builder: (context, constraints) {
-                final imageUrl = card?.imageUrl.isNotEmpty == true
-                    ? card!.imageUrl
-                    : widget.preview!.fullImageUrl.isNotEmpty
-                        ? widget.preview!.fullImageUrl
-                        : widget.preview!.imageUrl;
-                final uri = marketplaceImageUri(imageUrl);
-                if (uri == null) {
-                  return MarketplaceThumbnail(
-                      imageUrl: '',
-                      width: constraints.maxWidth,
-                      height: constraints.maxHeight);
-                }
-                if (widget.initialColor != null) {
-                  return MarketplaceThumbnail(
-                      key: ValueKey(widget.preview!.id),
-                      imageUrl: imageUrl,
-                      gaplessPlayback: true,
-                      width: constraints.maxWidth,
-                      height: constraints.maxHeight);
-                }
-                return CardArtworkImage(
-                    key: ValueKey(widget.preview!.id),
-                    image: ResizeImage.resizeIfNeeded(
-                        (constraints.maxWidth *
-                                MediaQuery.devicePixelRatioOf(context))
-                            .round()
-                            .clamp(1, 768),
-                        null,
-                        CachedNetworkImageProvider(uri.toString(),
-                            cacheManager: MarketplaceImageCache.instance)),
-                    onColor: (color) {
-                      if (_artworkColor != color) {
-                        setState(() => _artworkColor = color);
-                      }
-                    });
-              }),
+        image: _ownershipArtwork(
+            demo != null
+                ? CardIllustration(card: demo)
+                : LayoutBuilder(builder: (context, constraints) {
+                    final imageUrl =
+                        selectedPreview?.imageUrl.isNotEmpty == true
+                            ? selectedPreview!.imageUrl
+                            : selectedPreview?.fullImageUrl.isNotEmpty == true
+                                ? selectedPreview!.fullImageUrl
+                                : card?.imageUrl.isNotEmpty == true
+                                    ? card!.imageUrl
+                                    : widget.preview!.fullImageUrl.isNotEmpty
+                                        ? widget.preview!.fullImageUrl
+                                        : widget.preview!.imageUrl;
+                    final uri = marketplaceImageUri(imageUrl);
+                    if (uri == null) {
+                      return MarketplaceThumbnail(
+                          imageUrl: '',
+                          width: constraints.maxWidth,
+                          height: constraints.maxHeight);
+                    }
+                    if (widget.initialColor != null) {
+                      return MarketplaceThumbnail(
+                          key: ValueKey(widget.preview!.id),
+                          imageUrl: imageUrl,
+                          gaplessPlayback: true,
+                          width: constraints.maxWidth,
+                          height: constraints.maxHeight);
+                    }
+                    return CardArtworkImage(
+                        key: ValueKey(widget.preview!.id),
+                        image: ResizeImage.resizeIfNeeded(
+                            (constraints.maxWidth *
+                                    MediaQuery.devicePixelRatioOf(context))
+                                .round()
+                                .clamp(1, 768),
+                            null,
+                            CachedNetworkImageProvider(uri.toString(),
+                                cacheManager: MarketplaceImageCache.instance)),
+                        onColor: (color) {
+                          if (_artworkColor != color) {
+                            setState(() => _artworkColor = color);
+                          }
+                        });
+                  }),
+            ownership,
+            name),
         onVersions: () =>
             _message('Le altre versioni saranno disponibili prossimamente.'));
     final composer = CardListingComposer(
         onPreview: () => _message(
             'Anteprima pronta. La pubblicazione degli annunci non è ancora disponibile.'));
     const history = CardPriceHistory();
-    const bestDeal = CardBestDeal();
+    final bestDeal = widget.controller == null
+        ? CardBestDeal(
+            state: _shop,
+            card: null,
+            cart: widget.cart,
+            previewOnly: true,
+            onFilter: ({condition, language, sort}) => setState(() {
+                  _condition = condition;
+                  _language = language;
+                  _sort = sort ?? _sort;
+                }),
+            onRetry: () {})
+        : ValueListenableBuilder<ListingsState>(
+            valueListenable: widget.controller!.listings,
+            builder: (context, state, _) => CardBestDeal(
+                state: state,
+                card: card,
+                cart: widget.cart,
+                onFilter: widget.controller!.filter,
+                onRetry: widget.controller!.retryListings));
     final center =
         Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       history,
@@ -328,7 +417,7 @@ class _CardDetailsState extends State<CardDetails> {
               const SizedBox(width: 16),
               Expanded(flex: 6, child: center),
               const SizedBox(width: 16),
-              const Expanded(flex: 3, child: bestDeal),
+              Expanded(flex: 3, child: bestDeal),
             ]);
           }
           if (constraints.maxWidth >= 700 && scale <= 1.3) {
@@ -359,4 +448,15 @@ class _CardDetailsState extends State<CardDetails> {
       ]),
     );
   }
+
+  Widget _ownershipArtwork(
+          Widget image, CardOwnership? ownership, String name) =>
+      ownership == null
+          ? image
+          : CardOwnershipArtwork(
+              image: image,
+              cardName: name,
+              ownership: ownership,
+              onLanguageSelected: (language) => widget.ownershipController!
+                  .selectOwnedLanguage(ownership.cardId, language));
 }

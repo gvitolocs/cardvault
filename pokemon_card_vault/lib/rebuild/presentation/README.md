@@ -28,6 +28,16 @@ come il carrello, senza accedere direttamente ai servizi.
 Palette e temi restano in `lib/rebuild/style/`. Le cartelle `controller/`,
 `service/`, `provider/` e `model/` mantengono le responsabilità dei dati e
 dello stato esterne alla presentazione.
+Le etichette statiche condivise e le tabelle di costanti vivono in
+`lib/rebuild/constants/`, organizzate per dominio; il README inglese della
+cartella ne descrive contenuto e convenzioni.
+
+`scanner/scanner_screen.dart` compone il selettore Collezione/Listing, la
+fotocamera e la linguetta espandibile delle carte scansionate. I componenti
+`scanner_camera`, `scanned_cards_sheet` e `scanned_card_editor` gestiscono
+rispettivamente anteprima e lifecycle, revisione del gruppo e campi dei singoli
+articoli. `ScannerController` coordina i dati senza costruire widget; flusso e
+API sono documentati in `docs/rebuild-scanner.md`.
 
 `marketplace/component/marketplace_suggestions.dart` è il widget separato dei
 suggerimenti: riceve stato e callback da `MarketplaceSearch`, senza accedere

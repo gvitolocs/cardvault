@@ -51,6 +51,25 @@ void main() {
       var requests = 0;
       final service = CardService(client: MockClient((request) async {
         requests++;
+        if (request.url.path == '/api/marketplace-listings') {
+          return fixtures.response({
+            'listings': [
+              {
+                ...fixtures.offerJson('live-a', price: 78, condition: 'MP'),
+                'sellerName': 'redshakkio'
+              },
+              {
+                ...fixtures.offerJson('live-b', price: 190),
+                'sellerName': 'Card Garden'
+              },
+              {
+                ...fixtures.offerJson('live-c',
+                    price: 220, condition: 'SP', language: 'EN'),
+                'sellerName': 'TCG Corner'
+              },
+            ]
+          });
+        }
         expect(request.url.path, '/api/marketplace-card-page');
         return fixtures.response({
           'card': {
@@ -134,8 +153,13 @@ void main() {
                     ? 'shop'
                     : 'history');
       }
-      await tester.scrollUntilVisible(find.text('redshakkio'), 300,
-          scrollable: find.byType(Scrollable).first, maxScrolls: 60);
+      await tester.scrollUntilVisible(
+          find.descendant(
+              of: find.byType(ListingDetails),
+              matching: find.text('redshakkio')),
+          300,
+          scrollable: find.byType(Scrollable).first,
+          maxScrolls: 60);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       await snapshot('offer');
@@ -143,10 +167,8 @@ void main() {
           scrollable: find.byType(Scrollable).first, maxScrolls: 60);
       await tester.pumpAndSettle();
       final shop = find.byType(ListingDetails);
-      final languageFilter = find
-          .descendant(
-              of: shop, matching: find.byType(DropdownButtonFormField<String?>))
-          .at(1);
+      final languageFilter =
+          find.descendant(of: shop, matching: find.text('Lingua: tutte'));
       await tester.ensureVisible(languageFilter);
       await tester.pumpAndSettle();
       await tester.tap(languageFilter);
@@ -157,7 +179,7 @@ void main() {
           tester.widget<ListingDetails>(shop).state.visible.single.sellerName,
           'TCG Corner');
       expect(cart.itemCount, 0);
-      expect(requests, 1);
+      expect(requests, 2);
       expect(tester.takeException(), isNull);
 
       // La tastiera e la validazione non devono spingere i controlli fuori pagina.
@@ -229,7 +251,7 @@ void main() {
       expect(tester.widget<FilterChip>(graded).selected, isTrue);
       expect(tester.takeException(), isNull);
       expect(cart.itemCount, 0);
-      expect(requests, 1);
+      expect(requests, 2);
     });
   }
 }

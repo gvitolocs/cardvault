@@ -1,3 +1,4 @@
+import 'fixtures/cart_fixtures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pokoin/rebuild/main_mobile_prototype.dart';
@@ -12,7 +13,9 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(MobileMarketplacePrototypeApp(
-        showDiscovery: false, accountService: guestAccountService()));
+        cartService: memoryCartService(),
+        showDiscovery: false,
+        accountService: guestAccountService()));
     await tester.pumpAndSettle();
     final scroll = tester.state<ScrollableState>(find.byType(Scrollable).first);
     // Warm both rows before measuring: newly entering cards may build once.
@@ -46,9 +49,12 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(MobileMarketplacePrototypeApp(
-        showDiscovery: false, accountService: guestAccountService()));
+        cartService: memoryCartService(),
+        showDiscovery: false,
+        accountService: guestAccountService()));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Aggiungi').first);
+    await tester
+        .ensureVisible(find.byTooltip('Aggiungi al carrello demo').first);
     await tester.pumpAndSettle();
     expect(find.byType(CardIllustration), findsWidgets);
     var rebuilds = 0;
@@ -58,7 +64,7 @@ void main() {
       }
     };
     try {
-      await tester.tap(find.text('Aggiungi').first);
+      await tester.tap(find.byTooltip('Aggiungi al carrello demo').first);
       await tester.pumpAndSettle();
     } finally {
       debugOnRebuildDirtyWidget = null;

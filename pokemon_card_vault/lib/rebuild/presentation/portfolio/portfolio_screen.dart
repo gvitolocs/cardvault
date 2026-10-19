@@ -31,6 +31,10 @@ class PortfolioScreen extends StatelessWidget {
                         CollectionNotice(
                             status: collection.status,
                             onRetry: controller.retryCollection),
+                        if (collection.status == CollectionStatus.loading &&
+                            collection.items.isNotEmpty)
+                          Text(
+                              '${collection.cards.length} carte caricate · sincronizzazione in corso'),
                         if (collection.status == CollectionStatus.ready) ...[
                           TextButton.icon(
                               onPressed: controller.retryCollection,
@@ -51,6 +55,8 @@ class PortfolioScreen extends StatelessWidget {
                   sliver: AlbumGrid(
                       cards: collection.cards,
                       collection: collection,
+                      ownershipFor: controller.ownershipFor,
+                      onLanguageSelected: controller.selectOwnedLanguage,
                       onOpen: onOpen)),
             ]);
       });
