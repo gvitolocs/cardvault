@@ -19,7 +19,22 @@ function requireServerHelper(name) {
 const { getFirebaseAdmin } = requireServerHelper('_firebase');
 const { handleCompletedCheckout } = requireServerHelper('_pkn_purchase');
 
-module.exports = async function handler(req, res) {
+async function readRawBody(req) {
+  if (Buffer.isBuffer(req.rawBody)) {
+    return req.rawBody;
+  }
+  if (typeof req.rawBody === 'string') {
+    return Buffer.from(req.rawBody);
+  }
+
+  const chunks = [];
+  for await (const chunk of req) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
+}
+
+async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return res.status(405).send('Method not allowed');
@@ -38,11 +53,7 @@ module.exports = async function handler(req, res) {
 
   let event;
   try {
-    const chunks = [];
-    for await (const chunk of req) {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-    }
-    const rawBody = Buffer.concat(chunks);
+    const rawBody = await readRawBody(req);
     event = stripe.webhooks.constructEvent(
       rawBody,
       req.headers['stripe-signature'],
@@ -66,4 +77,13 @@ module.exports = async function handler(req, res) {
     return res.status(500).send('Webhook handling failed.');
   }
 };
+
+// Vercel Node serverless: keep the request body as a raw stream so Stripe
+// signature verification can use the exact bytes Stripe signed.
+handler.config = {
+  api: {
+    bodyParser: false,
+  },
+};
+module.exports = handler;
 
