@@ -1,5 +1,46 @@
 # Rebuild account, guest entry and profile
 
+## Optional app appearance
+
+The palette icon beside the email in Profile opens **Tema dell’app**, offering
+**Default** and **Dungeon Crawler**, including for guests beside the guest
+description. The separate theme card is removed; the tooltip names the current
+appearance and retains any unsaved-preference message. Default preserves the existing Rebuild palette and Flutter icons;
+Dungeon Crawler uses the supplied map as the main shell background and the chest
+as the bottom navigation background, with warm brown/cream/gold navigation and
+toolbar colours. Cardex and Portfolio pixel art appear in bottom navigation and
+the Profile shortcuts; remaining icon slots fall back to Flutter. The local PNGs are bundled
+from `assets/images/Dungeon Crawler Themed/`, without network requests or changes
+to card images. Existing panels and pushed detail pages retain their surfaces.
+
+The preference flows through AppAppearanceController -> AppAppearanceService ->
+AppAppearanceProvider (SharedPreferences), independent of account/login and the
+card-image language. Choices update immediately, restore across launches and
+fall back to Default for unknown stored values. Writes are ordered; failures
+retain the session appearance with an unsaved-preference message. Changing
+appearance does not recreate the marketplace/account/cart services, reset the
+selected tab or pushed routes, or request card metadata/images.
+
+`style/default/default_theme.dart` retains the baseline theme;
+`style/dungeon_crawler/` owns the optional theme and extensible icon manifest.
+See its [README](../lib/rebuild/style/dungeon_crawler/README.md) before adding
+marketplace artwork. PNGs remain in assets; the existing assets/icons bundle
+already includes Cardex.png. ThemedIcon uses crisp local pixel art and a Flutter
+fallback for missing slots or failed assets; existing touch targets/labels stay
+on the parent controls.
+
+Historical validation was intentionally limited, per the user's request, to the single
+`test/rebuild/app_appearance_test.dart` initial-app UI test: default appearance,
+guest Profile switch, controller/cart/tab continuity and preserved pushed
+navigation. It passes against current source files using a small direct-import
+runner in the existing `tests/scanner/rebuild-scanner-check-20261019` harness.
+Direct main-project tests are blocked by the existing missing Windows C++
+compiler for the win32 native hook. The other new theme tests and temporary
+full-suite adapters were removed; historical suites and protected cart QA were
+not changed. Following the user's 2026-10-23 preference, no tests are created,
+copied or run for subsequent visual/theme changes, including the palette's
+move beside the email. No phone installation or production deploy is part of this change.
+
 ## Entry and persistence
 
 `lib/rebuild/main_mobile_prototype.dart` now starts an AccountController and
@@ -111,8 +152,42 @@ there; personal balances are not fabricated as guest zeros.
 Wallet shows existing available/reserved PKN balances and a linked address when
 available. Orders and favorites are read-only views of existing account data;
 favorite IDs open the existing real CardDetails. Settings supports the allowed
-display-name edit and Firebase password-reset email. This is not a new transfer,
+display-name edit, shipping-address management and Firebase password-reset email. This is not a new transfer,
 withdrawal, wallet linking or payment implementation.
+
+## Shipping addresses and listing origin (2026-10-21)
+
+Profile → Account settings → Indirizzi di spedizione reads the authenticated
+owner's address book, allows add/edit/delete and selects a default address.
+AccountAddressesProvider uses the live /api/account-addresses contract:
+GET ?reveal=1 for the settings view, POST to add, PUT ?id=... to update/default,
+and DELETE ?id=... to remove. Required fields match the web checkout: fullName,
+addressLine1, postalCode, city, countryCode; label, addressLine2 and phoneNumber
+are optional. The API stores encrypted addresses; the app retains decrypted
+fields only in the active screen/controller memory, never in Hive or logs.
+Logout/account changes clear the controller and reject late responses or editor
+submissions from the previous account. An ambiguous mutation requires a reload
+before another attempt.
+
+Clipboard listing drafts request address metadata without reveal and default
+their shipFromCountry to the default address, or the first address if none is
+marked default. If no address country is available, the existing seller-country
+setting is used; otherwise the user chooses a country explicitly. A manual draft
+selection wins over background prefill. Only the country enters the listing,
+never the full address. Explicit publication saves this country as the seller
+setting before sending the listing. See rebuild-scanner.md for the API failure
+handling and historical HTTP 400 investigation.
+
+Model/provider/service/controller files are shipping_address.dart,
+account_addresses_provider.dart, shipping_addresses_service.dart and
+shipping_addresses_controller.dart; the screen is
+presentation/profile/shipping_addresses_screen.dart. The nine focused cases in
+test/rebuild/shipping_addresses_test.dart cover CRUD contracts, metadata reads,
+required fields, owner changes, persisted country/manual override, fallback,
+publication ordering, redacted 4xx messages and the phone editor. API writes in
+tests use MockClient; no real address or listing was created during validation.
+All 299 Rebuild tests passed in the isolated project after this change, and
+static analysis of the modified address/listing files found no issues.
 
 ## Validation
 

@@ -116,7 +116,7 @@ and the separate host verification of the correction.
 `dart test` and `dart analyze` run within the suggestion package.
 Windows root `flutter test` currently fails in the existing win32 native build
 hook because no C compiler is configured. Rebuild tests run against a copied
-source tree in `Cardvault/rebuild-popup-images-check-20261015/`, with the feature's
+source tree in `Cardvault/tests/marketplace/rebuild-popup-images-check-20261015/`, with the feature's
 minimal dependencies and assets, avoiding that unrelated native hook.
 All 367 package tests and 113 Rebuild harness tests pass, including the
 actual asset/worker/widget path, shared debounce, stale pages, independent local/

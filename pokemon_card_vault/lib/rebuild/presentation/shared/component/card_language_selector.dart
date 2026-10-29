@@ -9,16 +9,23 @@ class CardLanguageSelector extends StatelessWidget {
       {super.key,
       required this.ownership,
       required this.cardName,
+      this.compact = false,
+      this.edgeAccent = true,
       required this.onSelected});
   final CardOwnership ownership;
   final String cardName;
+  final bool compact;
+  final bool edgeAccent;
   final ValueChanged<String> onSelected;
 
   @override
   Widget build(BuildContext context) {
     final selected = ownership.selected;
     final badge = CardLanguageBadge(
-        code: ownership.displayLanguage, owned: ownership.hasConfirmedCopies);
+        code: ownership.displayLanguage,
+        owned: ownership.hasConfirmedCopies,
+        compact: compact,
+        edgeAccent: edgeAccent);
     if (!ownership.known) {
       return Semantics(
           label:

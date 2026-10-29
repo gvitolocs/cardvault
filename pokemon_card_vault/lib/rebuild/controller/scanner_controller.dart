@@ -1,12 +1,21 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import '../model/scanner.dart';
 import '../service/scanner_service.dart';
 
 class ScannerController extends ChangeNotifier {
-  ScannerController({ScannerService? service})
-      : _service = service ?? ScannerService();
+  ScannerController(
+      {ScannerService? service,
+      Future<void> Function(List<ScannedCard>)? storeDrafts})
+      : _service = service ?? ScannerService(),
+        _storeDrafts = storeDrafts;
   final ScannerService _service;
+  final Future<void> Function(List<ScannedCard>)? _storeDrafts;
+  final String _captureSession =
+      '${DateTime.now().microsecondsSinceEpoch}-${Random.secure().nextInt(1 << 32)}';
+  ScanMode mode = ScanMode.batch;
+  String? singleCaptureId;
   String? _uid, _batchId;
   int _epoch = 0, _sequence = 0;
   bool _disposed = false, _recognizing = false;
@@ -48,6 +57,7 @@ class ScannerController extends ChangeNotifier {
     _uid = uid;
     _batchId = null;
     _cards = [];
+    singleCaptureId = null;
     candidates = [];
     busy = false;
     needsReload = false;
@@ -79,6 +89,51 @@ class ScannerController extends ChangeNotifier {
     await prepare();
   }
 
+  void selectMode(ScanMode value) {
+    if (busy || mode == value) return;
+    mode = value;
+    singleCaptureId = null;
+    _resetLatch();
+    _notify();
+  }
+
+  Future<bool> copyToClipboard({String? onlyId}) async {
+    if (busy || _cards.isEmpty || _storeDrafts == null) return false;
+    final epoch = _epoch;
+    busy = true;
+    cameraPaused = true;
+    _notify();
+    try {
+      // Local drafts must remain copyable when indicative-price APIs are offline.
+      await review().timeout(const Duration(seconds: 2), onTimeout: () {});
+      if (!_current(epoch)) return false;
+      final copied =
+          _cards.where((c) => onlyId == null || c.id == onlyId).toList();
+      if (copied.isEmpty) return false;
+      await _storeDrafts(copied);
+      if (!_current(epoch)) return false;
+      final ids = copied.map((c) => c.id).toSet();
+      _cards = _cards.where((c) => !ids.contains(c.id)).toList();
+      _pricedFacets.removeWhere((id, _) => ids.contains(id));
+      singleCaptureId = null;
+      confirmationPending = false;
+      needsReload = false;
+      message = 'Bozze salvate in Clipboard. Puoi continuare a scansionare.';
+      return true;
+    } catch (_) {
+      if (_current(epoch)) {
+        message =
+            'Trasferimento non riuscito. Le carte restano nella linguetta: riprova.';
+      }
+      return false;
+    } finally {
+      if (_current(epoch)) {
+        busy = false;
+        _notify();
+      }
+    }
+  }
+
   void leave() {
     activated = false;
     cameraPaused = true;
@@ -93,6 +148,7 @@ class ScannerController extends ChangeNotifier {
   }
 
   void pauseCamera(bool paused) {
+    if (!paused && mode == ScanMode.single && singleCaptureId != null) return;
     if (cameraPaused == paused) return;
     cameraPaused = paused;
     _notify();
@@ -190,7 +246,7 @@ class ScannerController extends ChangeNotifier {
     _stableHits = _stableId == best.cardId ? _stableHits + 1 : 1;
     _stableId = best.cardId;
     if (_stableHits >= 2) {
-      final id = 'local:${++_sequence}';
+      final id = 'local:$_captureSession:${++_sequence}';
       _cards = [
         ..._cards,
         ScannedCard(
@@ -205,6 +261,10 @@ class ScannerController extends ChangeNotifier {
       _latchedId = best.cardId;
       _lastCaptureId = id;
       message = '${best.name} acquisita · da confermare.';
+      if (mode == ScanMode.single) {
+        singleCaptureId = id;
+        cameraPaused = true;
+      }
     }
     _notify();
   }
@@ -428,6 +488,12 @@ class ScannerController extends ChangeNotifier {
           ? 'Possesso confermato: carte aggiunte alla collezione.'
           : 'Possesso confermato e listing pubblicati.';
       return true;
+    } on ScannerRequestFailure catch (error) {
+      if (_current(epoch)) {
+        message = error.message;
+        needsReload = _uncertainId != null;
+      }
+      return false;
     } on FormatException catch (error) {
       if (_current(epoch)) {
         message = error.message;

@@ -41,6 +41,7 @@ class MarketplaceCardPreview {
     this.fullImageUrl = '',
     this.pricePkn,
     this.canonicalPath = '',
+    this.imageLanguage = '',
   });
 
   factory MarketplaceCardPreview.fromJson(Map<String, dynamic> json) {
@@ -92,6 +93,9 @@ class MarketplaceCardPreview {
   // Valore PKN dell'API, senza conversioni o moltiplicatori nel client.
   final double? pricePkn;
   final String canonicalPath;
+
+  /// Local display hint, not proof of ownership or an API listing filter.
+  final String imageLanguage;
 }
 
 class MarketplaceHomeData {

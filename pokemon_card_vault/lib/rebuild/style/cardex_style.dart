@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../constants/cardex_artwork_constants.dart';
 
 abstract final class CardexStyle {
   static const sleeve = Color(0xFF242C3B);
@@ -6,7 +7,7 @@ abstract final class CardexStyle {
   static const accent = Color(0xFFE9FF72);
   static const page = Color(0xFF3B4B65);
   static const pageEdge = Color(0xFF29364B);
-  static const cardAspectRatio = .716;
+  static const cardAspectRatio = CardexArtworkConstants.portraitAspectRatio;
   static const captionGradient = LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,

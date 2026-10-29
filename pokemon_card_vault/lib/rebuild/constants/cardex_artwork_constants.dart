@@ -7,8 +7,7 @@ abstract final class CardexArtworkConstants {
   static const top = .12;
   static const width = .90;
   static const height = .34;
-  // A taller pocket leaves a separate metadata footer below the illustration.
-  static const pocketAspectRatio = 1.3;
-  static const minimumPocketHeight = 136.0;
-  static const largeTextMinimumPocketHeight = 196.0;
+  static const portraitAspectRatio = .716;
+  // Fit the normalized illustration itself, with no fixed-height letterbox.
+  static const artworkAspectRatio = width * portraitAspectRatio / height;
 }

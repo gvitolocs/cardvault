@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../shared/atomics/themed_icon.dart';
+import '../../../style/app_theme_icons.dart';
 
 import '../../../controller/marketplace_search_controller.dart';
 import '../../../model/marketplace_home.dart';
@@ -119,7 +121,9 @@ class _MarketplaceSearchState extends State<MarketplaceSearch> {
                         decoration: InputDecoration(
                             hintText: 'Cerca carta, set o numero',
                             counterText: '',
-                            prefixIcon: const Icon(Icons.search_rounded),
+                            prefixIcon: const ThemedIcon(
+                                slot: AppThemeIcon.search,
+                                fallback: Icons.search_rounded),
                             suffixIcon: state.query.isEmpty
                                 ? null
                                 : IconButton(

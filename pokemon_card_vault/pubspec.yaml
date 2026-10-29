@@ -2,7 +2,7 @@ name: pokoin
 description: "Pokoin marketplace, wallet, and card reserve app"
 publish_to: 'none'
 
-version: 1.0.0+58
+version: 1.1.0+59
 
 environment:
   sdk: '>=3.6.0 <4.0.0'
@@ -99,6 +99,7 @@ flutter:
     - assets/data/marketplace-expansion-order.json
     - assets/suggest/dictionary.pkd1
     - assets/images/
+    - assets/images/Dungeon Crawler Themed/
     - assets/icons/
     - assets/animations/
     - assets/sounds/

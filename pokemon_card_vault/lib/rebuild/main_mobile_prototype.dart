@@ -15,6 +15,9 @@ import 'service/profile_service.dart';
 import 'service/cart_service.dart';
 import 'provider/cart_local_provider.dart';
 import 'provider/cart_remote_provider.dart';
+import 'controller/app_appearance_controller.dart';
+import 'presentation/shared/component/app_appearance_scope.dart';
+import 'style/app_style.dart';
 
 /// Avvio indipendente: flutter run -t lib/rebuild/main_mobile_prototype.dart
 /// Marketplace, account e carrello persistente locale/remoto.
@@ -51,6 +54,7 @@ class MobileMarketplacePrototypeApp extends StatefulWidget {
 /// Composition root: crea il controller e ne gestisce il ciclo di vita.
 class _MobileMarketplacePrototypeAppState
     extends State<MobileMarketplacePrototypeApp> {
+  final _appearance = AppAppearanceController();
   late MarketplaceController _controller;
   late AccountController _account;
   late CartService _cartService;
@@ -59,6 +63,7 @@ class _MobileMarketplacePrototypeAppState
   @override
   void initState() {
     super.initState();
+    unawaited(_appearance.load());
     _createController();
   }
 
@@ -111,6 +116,7 @@ class _MobileMarketplacePrototypeAppState
 
   @override
   void dispose() {
+    _appearance.dispose();
     _controller.dispose();
     _account.dispose();
     if (_ownsCartService) _cartService.dispose();
@@ -119,42 +125,30 @@ class _MobileMarketplacePrototypeAppState
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Pokoin',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF11121A),
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFE9FF72),
-          brightness: Brightness.dark,
-          primary: const Color(0xFFE9FF72),
-          surface: const Color(0xFF1D1F2C),
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: const Color(0xFF1D1F2C),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(18),
-            borderSide: BorderSide.none,
-          ),
-        ),
-      ),
-      home: MarketplaceScreen(
-          controller: _controller, showDiscovery: widget.showDiscovery),
-      // Il gate avvolge il Navigator: logout rimuove anche eventuali route
-      // private aperte, impedendo di riaprirle con il pulsante Indietro.
-      builder: (context, navigator) => ListenableBuilder(
-          listenable: _account,
-          builder: (context, _) => _account.session.canBrowse
-              ? navigator!
-              : Navigator(
-                  key: ValueKey(_account),
-                  onGenerateRoute: (_) => MaterialPageRoute<void>(
-                    builder: (_) => AccountScreen(controller: _account),
-                  ),
-                )),
-    );
+    return AppAppearanceScope(
+        controller: _appearance,
+        child: ListenableBuilder(
+            listenable: _appearance,
+            builder: (context, _) => MaterialApp(
+                  title: 'Pokoin',
+                  debugShowCheckedModeBanner: false,
+                  theme: AppStyle.forAppearance(_appearance.appearance),
+                  home: MarketplaceScreen(
+                      controller: _controller,
+                      showDiscovery: widget.showDiscovery),
+                  // Il gate avvolge il Navigator: logout rimuove anche eventuali route
+                  // private aperte, impedendo di riaprirle con il pulsante Indietro.
+                  builder: (context, navigator) => ListenableBuilder(
+                      listenable: _account,
+                      builder: (context, _) => _account.session.canBrowse
+                          ? navigator!
+                          : Navigator(
+                              key: ValueKey(_account),
+                              onGenerateRoute: (_) => MaterialPageRoute<void>(
+                                builder: (_) =>
+                                    AccountScreen(controller: _account),
+                              ),
+                            )),
+                )));
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../style/card_details_style.dart';
 import '../atomics/card_details_panel.dart';
+import 'card_details_artwork.dart';
 
 class CardArtworkPanel extends StatelessWidget {
   const CardArtworkPanel({
@@ -12,6 +13,7 @@ class CardArtworkPanel extends StatelessWidget {
     this.demoPrice,
     this.onAddDemo,
     this.purchase,
+    this.imageIsFramed = false,
   });
   final String number, rarity;
   final Widget image;
@@ -19,6 +21,7 @@ class CardArtworkPanel extends StatelessWidget {
   final double? demoPrice;
   final VoidCallback? onAddDemo;
   final Widget? purchase;
+  final bool imageIsFramed;
 
   @override
   Widget build(BuildContext context) => CardDetailsPanel(
@@ -39,8 +42,12 @@ class CardArtworkPanel extends StatelessWidget {
           const SizedBox(height: 16),
           Center(
               child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 266),
-                  child: AspectRatio(aspectRatio: 0.716, child: image))),
+                  constraints: BoxConstraints(
+                      maxWidth:
+                          imageIsFramed ? CardDetailsArtwork.maxWidth : 266),
+                  child: imageIsFramed
+                      ? image
+                      : AspectRatio(aspectRatio: 0.716, child: image))),
           if (rarity.isNotEmpty) ...[
             const SizedBox(height: 14),
             Wrap(alignment: WrapAlignment.center, spacing: 8, children: [

@@ -125,7 +125,7 @@ app data was preserved.
 367 package tests and 113 Rebuild tests pass, including full bundled-worker
 artist routing, independent filters, pagination, incomplete-catalog failure,
 fresh-cache reuse/expiry and explicit refresh. Rebuild tests use the copied
-source harness `Cardvault/rebuild-popup-images-check-20261015` because the root
+source harness `Cardvault/tests/marketplace/rebuild-popup-images-check-20261015` because the root
 Windows native hook still requires an unavailable C compiler. Static analysis
 is clean.
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../controller/profile_controller.dart';
+import '../shipping_addresses_screen.dart';
 
 class AccountSettings extends StatefulWidget {
   const AccountSettings({super.key, required this.controller});
@@ -41,6 +42,17 @@ class _AccountSettingsState extends State<AccountSettings> {
                 child: Text(profile.saving ? 'Salvataggio…' : 'Salva nome')),
             if (profile.feedback != null) Text(profile.feedback!),
             const SizedBox(height: 24),
+            ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.local_shipping_outlined),
+                title: const Text('Indirizzi di spedizione'),
+                subtitle: const Text(
+                    'Gestisci gli indirizzi e scegli quello predefinito'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                    builder: (_) => ShippingAddressesScreen(
+                        controller: profile.addresses)))),
+            const SizedBox(height: 16),
             OutlinedButton(
                 onPressed: account.busy || user.email.isEmpty
                     ? null

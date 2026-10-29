@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
+import '../../model/scanner.dart';
+import '../../model/listing_draft.dart';
+import '../shared/component/scan_clipboard_button.dart';
+import '../shared/component/scan_clipboard_sheet.dart';
 
 import '../../model/card.dart';
 import 'component/card_tile.dart';
@@ -7,6 +12,7 @@ import 'component/marketplace_search.dart';
 import '../shared/component/marketplace_cart_sheet.dart';
 import '../shared/component/expansion_drawer.dart';
 import '../shared/component/utility_bar.dart';
+import '../shared/component/themed_page_background.dart';
 import '../scanner/scanner_screen.dart';
 import '../../model/marketplace_home.dart';
 import '../../controller/marketplace_controller.dart';
@@ -15,6 +21,10 @@ import '../cardex/cardex_screen.dart';
 import '../portfolio/portfolio_screen.dart';
 import '../profile/profile_screen.dart';
 import '../account/account_screen.dart';
+import '../shared/component/collection_language_button.dart';
+import '../shared/component/collection_artwork_scope.dart';
+import '../shared/atomics/themed_icon.dart';
+import '../../style/app_theme_icons.dart';
 
 class MarketplaceScreen extends StatefulWidget {
   const MarketplaceScreen(
@@ -62,8 +72,11 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     );
   }
 
-  void _syncScannerUser() =>
-      _controller.scanner.setUser(_controller.account.session.user?.id);
+  void _syncScannerUser() {
+    final uid = _controller.account.session.user?.id;
+    _controller.scanner.setUser(uid);
+    unawaited(_controller.clipboard.setUser(uid));
+  }
 
   @override
   void dispose() {
@@ -91,14 +104,42 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         expansion.name, '${expansion.cardCount} carte nel catalogo');
   }
 
-  void _showLogin() {
+  Future<void> _showLogin() async {
     _controller.account.clearFeedback();
-    Navigator.of(context).push(MaterialPageRoute<void>(
+    await Navigator.of(context).push(MaterialPageRoute<void>(
         builder: (loginContext) => AccountScreen(
               controller: _controller.account,
               onAuthenticated: () => Navigator.of(loginContext).pop(),
               onGuest: () => Navigator.of(loginContext).pop(),
             )));
+  }
+
+  Future<void> _showClipboard() async {
+    final selected = await showScanClipboardSheet(
+        context: context, controller: _controller.clipboard);
+    if (mounted && selected != null) await _showDraft(selected);
+  }
+
+  Future<void> _showScannedCard(ScannedCard card) async {
+    final draft = _controller.clipboard.find(card.id);
+    if (draft != null) await _showDraft(draft);
+  }
+
+  Future<void> _showDraft(ListingDraft draft) async {
+    if (!mounted) return;
+    await _openCard(draft.preview, draft: draft);
+  }
+
+  Future<void> _loginForDraft(String id) async {
+    final guest = !_controller.clipboard.authenticated
+        ? _controller.clipboard.find(id)
+        : null;
+    await _showLogin();
+    if (!mounted) return;
+    // This one guest draft is carried only after its user explicitly requested login.
+    if (guest != null && _controller.account.session.user != null) {
+      await _controller.clipboard.importDraft(guest);
+    }
   }
 
   void _showCatalogCardPreview(MarketplaceCardPreview card,
@@ -107,18 +148,27 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   }
 
   void _showCollectionCard(MarketplaceCardPreview card) =>
-      _openCard(card, showOwnership: true);
+      _openCard(_controller.cardex.artworkPreview(card), showOwnership: true);
 
-  void _openCard(MarketplaceCardPreview card,
-      {Color? cardColor, bool showOwnership = false}) {
+  Future<void> _openCard(MarketplaceCardPreview card,
+      {Color? cardColor,
+      bool showOwnership = false,
+      ListingDraft? draft}) async {
     final detailsController = _controller.createCardDetails(card.id);
-    Navigator.of(context).push(MaterialPageRoute<void>(
+    await Navigator.of(context).push(MaterialPageRoute<void>(
         builder: (_) => CardDetails(
               preview: card,
               controller: detailsController,
               cart: _controller.cart,
               initialColor: cardColor,
               ownershipController: showOwnership ? _controller.cardex : null,
+              clipboard: _controller.clipboard,
+              draftId: draft?.id,
+              onOpenClipboard: _showClipboard,
+              onDraftLogin:
+                  draft == null ? _showLogin : () => _loginForDraft(draft.id),
+              sellerName: _controller.account.session.user?.displayName ??
+                  'Pokoin seller',
             )));
   }
 
@@ -172,16 +222,26 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                 )),
         endDrawerEnableOpenDragGesture: false,
         appBar: AppBar(
-          title: Row(children: [
-            Image.asset('assets/brand/pokoin-96.png', width: 30, height: 30),
-            const SizedBox(width: 10),
-            const Flexible(
-                child: Text('pokoin',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontWeight: FontWeight.w800))),
-          ]),
+          title: LayoutBuilder(builder: (context, constraints) {
+            if (constraints.maxWidth < 64) {
+              return Image.asset('assets/brand/pokoin-96.png',
+                  width: 30, height: 30, semanticLabel: 'pokoin');
+            }
+            return Row(children: [
+              Image.asset('assets/brand/pokoin-96.png', width: 30, height: 30),
+              const SizedBox(width: 10),
+              const Flexible(
+                  child: Text('pokoin',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontWeight: FontWeight.w800))),
+            ]);
+          }),
           actions: [
+            if (_controller.selectedTab == 2 || _controller.selectedTab == 3)
+              CollectionLanguageButton(
+                  controller: _controller.cardex.artwork,
+                  onSelected: _controller.cardex.setArtworkLanguage),
             ListenableBuilder(
               listenable: _controller.cart,
               builder: (context, _) {
@@ -195,7 +255,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                   icon: Badge(
                     isLabelVisible: cartCount > 0,
                     label: Text('$cartCount'),
-                    child: const Icon(Icons.shopping_bag_outlined),
+                    child: const ThemedIcon(
+                        slot: AppThemeIcon.cart,
+                        fallback: Icons.shopping_bag_outlined),
                   ),
                 );
               },
@@ -203,39 +265,51 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
             Builder(
                 builder: (scaffoldContext) => IconButton(
                       tooltip: 'Espansioni per era',
-                      icon: const Icon(Icons.filter_list_rounded),
+                      icon: const ThemedIcon(
+                          slot: AppThemeIcon.filters,
+                          fallback: Icons.filter_list_rounded),
                       onPressed: () {
                         _controller.cardex.start();
                         Scaffold.of(scaffoldContext).openEndDrawer();
                       },
                     )),
+            ScanClipboardButton(
+                controller: _controller.clipboard, onPressed: _showClipboard),
             const SizedBox(width: 8),
           ],
         ),
-        body: SafeArea(
-          top: false,
-          child: switch (_controller.selectedTab) {
-            0 => _marketplace(),
-            1 => ScannerScreen(
-                controller: _controller.scanner,
-                onLogin: _showLogin,
-                onSaved: () {
-                  _controller.cardex.retryCollection();
+        body: ThemedPageBackground(
+          child: SafeArea(
+            top: false,
+            child: CollectionArtworkScope(
+                controller: _controller.cardex.artwork,
+                languageFor: _controller.cardex.artworkLanguageFor,
+                child: switch (_controller.selectedTab) {
+                  0 => _marketplace(),
+                  1 => ScannerScreen(
+                      controller: _controller.scanner,
+                      onOpenCard: _showScannedCard,
+                      onLogin: _showLogin,
+                      onSaved: () {
+                        _controller.cardex.retryCollection();
+                      }),
+                  2 => PortfolioScreen(
+                      controller: _controller.cardex,
+                      onOpen: _showCollectionCard),
+                  3 => CardexScreen(
+                      controller: _controller.cardex,
+                      onOpen: _showCollectionCard),
+                  4 => ProfileScreen(
+                      controller: _controller.profile,
+                      onLogin: _showLogin,
+                      onPortfolio: () => _controller.selectTab(2),
+                      onCardex: () => _controller.selectTab(3),
+                      onOpenCard: (id) => _showCatalogCardPreview(
+                          MarketplaceCardPreview(
+                              id: id, name: 'Carta #$id', expansion: ''))),
+                  _ => _marketplace(),
                 }),
-            2 => PortfolioScreen(
-                controller: _controller.cardex, onOpen: _showCollectionCard),
-            3 => CardexScreen(
-                controller: _controller.cardex, onOpen: _showCollectionCard),
-            4 => ProfileScreen(
-                controller: _controller.profile,
-                onLogin: _showLogin,
-                onPortfolio: () => _controller.selectTab(2),
-                onCardex: () => _controller.selectTab(3),
-                onOpenCard: (id) => _showCatalogCardPreview(
-                    MarketplaceCardPreview(
-                        id: id, name: 'Carta #$id', expansion: ''))),
-            _ => _marketplace(),
-          },
+          ),
         ),
         bottomNavigationBar: UtilityBar(
           selectedIndex: _controller.selectedTab,
@@ -305,7 +379,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                     onChanged: _controller.setSearchQuery,
                     decoration: InputDecoration(
                       hintText: 'Cerca carta, set o numero',
-                      prefixIcon: const Icon(Icons.search_rounded),
+                      prefixIcon: const ThemedIcon(
+                          slot: AppThemeIcon.search,
+                          fallback: Icons.search_rounded),
                       suffixIcon: _searchController.text.isEmpty
                           ? null
                           : IconButton(

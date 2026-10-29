@@ -4,6 +4,8 @@ import '../../../model/card_ownership.dart';
 import '../../../model/marketplace_home.dart';
 import '../../../style/cardex_style.dart';
 import '../atomics/album_card.dart';
+import '../atomics/album_card_caption.dart';
+import '../../shared/component/card_ownership_edge_controls.dart';
 
 /// Due colonne come le pagine di un album; costruisce solo le tasche visibili.
 class AlbumGrid extends StatelessWidget {
@@ -32,7 +34,10 @@ class AlbumGrid extends StatelessWidget {
                 crossAxisCount: columns,
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
-                mainAxisExtent: (width - 4) / CardexStyle.cardAspectRatio + 4),
+                mainAxisExtent: (width - 6) / CardexStyle.cardAspectRatio +
+                    6 +
+                    CardOwnershipEdgeControls.railHeight(context) +
+                    AlbumCardCaption.footerHeight(context)),
             itemBuilder: (context, index) {
               final card = cards[index];
               return DecoratedBox(

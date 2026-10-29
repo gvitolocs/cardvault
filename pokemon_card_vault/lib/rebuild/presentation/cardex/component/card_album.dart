@@ -6,6 +6,7 @@ import '../../../model/marketplace_home.dart';
 import '../../../style/cardex_style.dart';
 import '../../../constants/cardex_artwork_constants.dart';
 import '../../../constants/cardex_album_layout_constants.dart';
+import '../../shared/component/card_ownership_edge_controls.dart';
 import '../atomics/album_card.dart';
 
 /// Sei tasche per foglio; su tablet due fogli affiancati. Si costruisce solo
@@ -114,11 +115,12 @@ class _CardAlbumState extends State<CardAlbum> {
               2 * leafInset -
               (columns - 1) * CardexAlbumLayoutConstants.columnGap) /
           columns;
-      final minimumHeight = MediaQuery.textScalerOf(context).scale(11) > 14
-          ? CardexArtworkConstants.largeTextMinimumPocketHeight
-          : CardexArtworkConstants.minimumPocketHeight;
-      final rowHeight = math.max(minimumHeight,
-          (tileWidth - 4) / CardexArtworkConstants.pocketAspectRatio + 4);
+      // Exactly the art window plus its 1px outline and external controls.
+      // A fixed minimum/portrait pocket would reintroduce dark letterboxing.
+      final rowHeight =
+          (tileWidth - 2) / CardexArtworkConstants.artworkAspectRatio +
+              2 +
+              CardOwnershipEdgeControls.railHeight(context);
       final numberHeight = MediaQuery.textScalerOf(context)
               .scale(CardexAlbumLayoutConstants.pageNumberFontSize) *
           CardexAlbumLayoutConstants.pageNumberLineHeight;

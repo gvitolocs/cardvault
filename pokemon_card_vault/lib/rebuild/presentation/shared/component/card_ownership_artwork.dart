@@ -11,29 +11,28 @@ class CardOwnershipArtwork extends StatelessWidget {
       required this.cardName,
       required this.ownership,
       this.caption,
-      this.captionBelowImage = false,
+      this.showControls = true,
       this.onLanguageSelected});
   final Widget image;
   final String cardName;
   final CardOwnership ownership;
   final Widget? caption;
-  final bool captionBelowImage;
+  final bool showControls;
   final ValueChanged<String>? onLanguageSelected;
 
   @override
   Widget build(BuildContext context) => Stack(fit: StackFit.expand, children: [
-        Column(children: [
-          Expanded(
-              child: ownership.known && ownership.total == 0
-                  ? ColorFiltered(
-                      colorFilter: CardOwnershipStyle.grayscale,
-                      child: Opacity(opacity: .55, child: image))
-                  : image),
-          if (captionBelowImage && caption != null) caption!,
-        ]),
-        if (!captionBelowImage && caption != null)
+        ownership.known && ownership.total == 0
+            ? ColorFiltered(
+                colorFilter: CardOwnershipStyle.grayscale,
+                child: Opacity(opacity: .55, child: image))
+            : image,
+        if (caption != null)
           Positioned(bottom: 0, left: 0, right: 0, child: caption!),
-        if (caption == null && ownership.known && ownership.total > 0)
+        if (showControls &&
+            caption == null &&
+            ownership.known &&
+            ownership.total > 0)
           Positioned(
               bottom: 3,
               left: 3,
@@ -41,7 +40,8 @@ class CardOwnershipArtwork extends StatelessWidget {
               child: Align(
                   alignment: Alignment.bottomRight,
                   child: CollectionQuantityBadge(quantity: ownership.total))),
-        if ((ownership.known || ownership.hasConfirmedCopies) &&
+        if (showControls &&
+            (ownership.known || ownership.hasConfirmedCopies) &&
             onLanguageSelected != null)
           Positioned(
               top: 0,

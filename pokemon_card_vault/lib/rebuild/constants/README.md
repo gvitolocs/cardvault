@@ -6,12 +6,15 @@ metadata that do not belong inside services or controllers.
 
 ## Current files
 
+- `app_appearance_constants.dart`: names and short descriptions for optional
+  app appearances; icon manifests and visual styling stay in `style/`.
 - `cardex_album_layout_constants.dart`: Cardex margins, leaf insets, tight
   pocket gaps and page-number metrics; no effect on Portfolio grid geometry.
 - `cardex_pagination_constants.dart`: catalog prefetch distance measured in
   album spreads; separate from private inventory request sizes and image loads.
-- `cardex_artwork_constants.dart`: normalized scan window and landscape pocket
-  proportions for the artwork-only Cardex. No URLs, generated images or
+- `cardex_artwork_constants.dart`: normalized scan window, shared portrait
+  proportions and derived illustration ratio for the artwork-only Cardex;
+  pockets fit that ratio instead of a fixed minimum/letterbox. No URLs, generated images or
   per-card crop detection; Portfolio keeps full-card presentation.
 - `card_language_constants.dart`: collection language labels, flag symbols and
   API spelling/locale aliases. These are display options, not a per-card printing

@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import 'card_language_artwork.dart';
 
 /// Carta reale: conserva ID e prezzi Pokoin restituiti dal backend.
 class MarketplaceCard {
@@ -14,11 +15,15 @@ class MarketplaceCard {
       this.productType = '',
       this.canonicalPath = '',
       this.description = '',
+      this.languageScans = '',
       this.hp,
       this.types = const []});
 
   final String id, name, expansion, number, imageUrl;
   final String rarity, artist, productType, canonicalPath, description;
+  final String languageScans;
+  Map<String, String> get languageImageUrls =>
+      CardLanguageArtwork.parse(languageScans);
   final double? pricePkn;
   final int? hp;
   final List<String> types;
@@ -35,6 +40,7 @@ class MarketplaceCard {
         'productType': productType,
         'canonicalPath': canonicalPath,
         'description': description,
+        'langScans': languageScans,
         'hp': hp,
         'types': types,
       };
@@ -65,6 +71,7 @@ class MarketplaceCard {
       productType: read(['productType', 'card_type']),
       canonicalPath: read(['canonicalPath', 'canonical_path']),
       description: read(['description']),
+      languageScans: read(['langScans']),
       hp: int.tryParse(read(['hp'])),
       types: List.unmodifiable(
           rawTypes is List ? rawTypes.map((e) => '$e') : <String>[]),

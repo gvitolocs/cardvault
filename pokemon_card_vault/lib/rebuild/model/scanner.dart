@@ -32,6 +32,31 @@ class ScannerMarketSnapshot {
 
 enum ScanDestination { collection, listing }
 
+enum ScanMode { single, batch }
+
+/// Only the operation and HTTP status are exposed, never private response data.
+class ScannerRequestFailure implements Exception {
+  const ScannerRequestFailure(this.action, this.statusCode);
+  final String action;
+  final int statusCode;
+
+  String get message {
+    final phase = switch (action) {
+      'item' => 'Aggiornamento della carta',
+      'submit' => 'Conferma del salvataggio',
+      'ownership' => 'Verifica del possesso',
+      'add' => 'Aggiunta della carta',
+      _ => 'Richiesta scanner',
+    };
+    return '$phase: errore HTTP $statusCode. '
+        'Le scansioni restano nella linguetta. Riprova la conferma; '
+        'se richiesto, premi prima Ricarica.';
+  }
+
+  @override
+  String toString() => 'ScannerRequestFailure($action, HTTP $statusCode)';
+}
+
 class ScannerCandidate {
   const ScannerCandidate(
       {required this.cardId,
@@ -125,14 +150,65 @@ class ScannedCard {
       foilState: '${json['foilState'] ?? 'standard'}');
   Map<String, dynamic> get patch => {
         'condition': condition,
+        // A cardId patch already sets reviewed=true in the deployed store.
+        // confirm=true as well would assign the SQL column reviewed twice.
         'cardId': cardId,
         'language': language,
         'quantity': quantity,
         'pricePkn': price.trim().isEmpty ? null : pricePkn,
         'priceSuggested': priceSuggested,
-        'foilState': foilState,
-        'confirm': true
+        'foilState': foilState
       };
+
+  Map<String, dynamic> toJson() => {
+        ...patch,
+        'pricePkn': validPrice ? pricePkn : null,
+        'id': id,
+        'name': name,
+        'setName': setName,
+        'collectorNumber': number,
+        'imageUrl': imageUrl,
+        'priceText': price,
+        'suggestedPrice': suggestedPrice,
+        'alternatives': [
+          for (final c in alternatives)
+            {
+              'cardId': c.cardId,
+              'name': c.name,
+              'setName': c.setName,
+              'number': c.number,
+              'score': c.score
+            }
+        ],
+      };
+
+  factory ScannedCard.fromStored(Map<String, dynamic> json) {
+    final card = ScannedCard.fromJson(json);
+    return ScannedCard(
+        id: card.id,
+        cardId: card.cardId,
+        name: card.name,
+        setName: card.setName,
+        number: card.number,
+        imageUrl: card.imageUrl,
+        condition: card.condition,
+        language: card.language,
+        quantity: card.quantity,
+        price: '${json['priceText'] ?? card.price}',
+        foilState: card.foilState,
+        priceSuggested: card.priceSuggested,
+        suggestedPrice: (json['suggestedPrice'] as num?)?.toDouble(),
+        alternatives: [
+          for (final raw in (json['alternatives'] as List? ?? []))
+            if (raw is Map)
+              ScannerCandidate(
+                  cardId: '${raw['cardId']}',
+                  name: '${raw['name'] ?? ''}',
+                  setName: '${raw['setName'] ?? ''}',
+                  number: '${raw['number'] ?? ''}',
+                  score: (raw['score'] as num).toDouble())
+        ]);
+  }
 }
 
 class ScannerBatch {

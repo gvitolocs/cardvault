@@ -32,7 +32,100 @@ button remains available even if the current filtered page is empty.
 
 ## Data flow
 
+### Artwork flush to the Cardex frame, without dark bands (2026-10-20)
+
+The extra inner header and fixed/minimum pocket height produced a dark strip
+above the illustration. Cardex now sizes each pocket to the natural ratio of
+its existing normalized artwork window, plus a 1px outline and the external
+control rail. The image viewport and actual cropped illustration touch the
+inside of the frame on every side: no inner header, vertical letterboxing,
+stretching or extra cover-zoom. Two phone columns, six cards per leaf, 2px
+outer margins, 1px leaf/row/column gaps and the same artwork source window remain.
+
+The compact yellow quantity/language capsules touch the top outline from
+outside rather than using space inside the frame. The flag retains its 48px
+target; ready-only totals/menu and positive-evidence safeguards are unchanged.
+Large-text Cardex captions use one metadata line plus status, with the complete
+card/set information still in accessibility semantics. The neutral loading
+sleeves use the same natural illustration ratio. Portfolio's half-inner header,
+full scans, external metadata and grid geometry are unchanged.
+
+No new image assets, network requests, pixel-processing jobs, decode/cache
+policies or data changes are introduced. The shared portrait ratio remains
+exactly .716; the derived artwork ratio replaces obsolete 1.3 pocket/minimum
+height constants. All **264 Rebuild tests** pass and changed-file analysis is
+clean. Geometry tests assert the actual scan window, not merely its viewport,
+touches the frame at phone/tablet sizes and 2x text; existing four-corner pixel,
+loading, language-menu and Portfolio tests remain green. All **227 source/test
+files** match the isolated harness. The profile ARM64 APK was ABI/hash verified
+(`9AE87C7ED47F1F33794FA420C18A114BC1AE4E69D0D3892B3D922744E2FF4C1F`) and
+installed successfully with ADB `--no-streaming -r`, preserving login and
+**14 prints / 15 copies**. The final RMX3760 screenshot confirms artwork flush
+to the frame with no internal dark strip or letterbox, retaining two columns,
+captions and yellow controls. Pockets stay 351 physical pixels wide and are now
+about 235px tall, rather than 272px with unused inner space. Evidence:
+`build/qa/cardex-flush-artwork-20261020/cardex.png`. ADB went offline after that
+capture, so the optional device menu/Portfolio checks were not completed;
+their regression tests pass. Three previous APKs are retained; only the oldest
+generated `F5ED2B19` build was pruned. No account data/cache was cleared and no
+production state was changed.
+
+### Non-obscuring collection controls and box-free captions (2026-10-20)
+
+The Cardex inner-header geometry in this earlier iteration is superseded above;
+the Portfolio layout described here remains current.
+
+Cardex and Portfolio now share `CardOwnershipEdgeControls`: compact final
+quantity/language capsules straddle the top outline and use the same yellow
+fill for confirmed ownership (dark quantity text); missing-language capsules
+stay neutral/grey. A text-scaled 24px-minimum rail is split half outside the
+frame and half inside its header, so painted controls do not overlap the scan,
+including with 2x text scaling. The small flag retains a fully hit-testable
+48x48 target inside the pocket; taps during partial reconciliation are still
+swallowed and do not open the card/menu. Ready selection still disables grey
+unowned languages and never invents localized image URLs.
+
+Cardex metadata is directly over the lower artwork, with text shadows only:
+no opaque footer, rectangular box or gradient. This intentionally supersedes
+the separate Cardex footer introduced on 2026-10-19. Artwork still contains
+the same standard normalized region; flags/quantities are no longer on top of
+it. Portfolio preserves the full portrait scan and places metadata underneath,
+outside the image, so neither trainer names nor printed descriptions are
+covered. Its grid reserves the control rail and scaled metadata height in
+addition to the portrait scan height. Detail-page default controls remain
+unchanged; only AlbumCard opts into the external collection layout.
+
+There are no new graphic assets, requests, crop jobs, cache rules or provider/
+controller changes. Immediate positive-evidence frame/flag and final-only
+quantity rules are preserved. All **264 Rebuild tests** passed, including six
+new Cardex/Portfolio geometry/menu cases on phone, narrow 2x-text phone and
+tablet; the repeat run has no missed-hit warnings. All **227 source/test
+files** match the isolated harness. Its existing lean dependencies were
+aligned with the app's already-added camera/url_launcher imports; production
+dependencies were not edited. Direct app Dart analysis has no errors/warnings,
+but reports one existing style info in `cardex_controller.dart:186` outside
+this change set. The user's follow-up keeps two phone columns and reduces
+outer margins from 8px to **2px**, leaf padding from 4px to **1px**, column
+gaps from 2px to **1px** and the Cardex-only frame inset from 2px to **0px**;
+row gaps stay 1px and Portfolio's inset stays 2px. At a 360px viewport, usable
+artwork width grows from 160px to 173.5px (about 8%) without changing source
+crop bounds, scan aspect or cover-zooming. Analysis of the changed UI/tests is
+clean. The final profile ARM64 APK was ABI/hash verified (SHA256
+`71F56BE5317B21BD22C3F27F7141646370BF0296C8F0EA65EF66B7F82A9830AD`)
+and installed successfully with ADB `--no-streaming -r`. The RMX3760 retained
+**14 prints / 15 copies** and its login; final screenshots of both screens
+show yellow capsules integrated in the outline, box-free Cardex metadata and
+unobstructed Portfolio trainer names/printed rules. Cardex pockets measured
+351px wide on the 720px physical display, with 2px physical row/column gaps.
+The language menu is covered by widget tests; ADB disconnected again after
+the two final screenshots, before the optional device menu check. Captures
+are under `build/qa/collection-overlays-20261020/`; no account data/cache was
+cleared or production state deployed. Three preceding APKs remain; only older
+generated `4955FC0B` and `7B2A078A` builds were pruned during the two iterations.
+
 ### Larger close-packed album with contained artwork (2026-10-19)
+
+Historical metadata layout: superseded by the 2026-10-20 section above.
 
 This layout supersedes the earlier pocket geometry below. Cardex uses 8px
 outer horizontal margins, 4px leaf padding, 2px column gaps and **1 logical
@@ -444,7 +537,7 @@ requests, no dropdown in Cardex, and 320px layouts at 100%/200% text.
 ## Initial Cardex validation on 2026-10-15
 
 - All 120 `test/rebuild` tests passed in the isolated
-  `rebuild-cardex-check-20261015` project with identical Rebuild/test sources and
+  `tests/cardex/rebuild-cardex-check-20261015` project with identical Rebuild/test sources and
   cached dependencies (image/cache packages pinned to 3.4.0 there only).
 - The full checkout's host tests stop before execution because `win32 6.0.1`
   needs a Windows native C++ compiler. No source dependency overrides were added.
@@ -482,3 +575,13 @@ of this helper's hash-named history. The current IDE debug APK is preserved.
 Earlier validation records describe the previous backup policy; the user's
 2026-10-17 single-copy request supersedes it. Flutter/Gradle internal build
 outputs are retained, and normal IDE runs can recreate their temporary APKs.
+
+## Image language preference (2026-10-21)
+
+Cardex and Portfolio now have a saved image-language menu to the left of the
+cart. Italian is the initial preference; this does not filter stock or change
+quantities. Visible sleeves resolve explicitly advertised translated scans
+with two public metadata requests at most, retaining existing lazy image
+creation and caches. CardDetails keeps its owned-language menu, with route-
+local selection independent of the toolbar. See
+[image-language behavior and verification](rebuild-collection-image-language.md).

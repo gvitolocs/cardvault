@@ -17,10 +17,13 @@ import 'cardex_controller.dart';
 import 'account_controller.dart';
 import 'profile_controller.dart';
 import 'scanner_controller.dart';
+import 'scan_clipboard_controller.dart';
 import '../provider/collection_provider.dart';
 import '../provider/inventory_provider.dart';
 import '../service/collection_service.dart';
 import '../service/profile_service.dart';
+import 'collection_artwork_controller.dart';
+import '../service/collection_artwork_service.dart';
 
 /// Coordina i service e lo stato del marketplace senza dipendere dalla UI.
 /// Notifica separatamente catalogo, carrello e filtri/preferiti/navigazione.
@@ -60,12 +63,17 @@ class MarketplaceController extends ChangeNotifier {
       ProfileController(account: account, service: _profileService);
   late final CardexController cardex = _injectedCardex ??
       CardexController(
+          artwork: CollectionArtworkController(
+              service: CollectionArtworkService(
+                  cards: _cardService ??= CardService())),
           collection: CollectionService(
               inventory: InventoryProvider(),
               provider: CollectionProvider(userIds: account.watchUserId)));
   final bool _ownsCardex;
   final MarketplaceSearchController search;
-  final ScannerController scanner = ScannerController();
+  final ScanClipboardController clipboard = ScanClipboardController();
+  late final ScannerController scanner =
+      ScannerController(storeDrafts: clipboard.storeScans);
   CardService? _cardService;
   final bool _ownsCardService;
   CardDetailsController createCardDetails(String id) => CardDetailsController(
@@ -177,6 +185,7 @@ class MarketplaceController extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     scanner.dispose();
+    clipboard.dispose();
     if (_ownsHomeService) _homeService?.dispose();
     cart.dispose();
     if (_ownsCardService) _cardService?.dispose();

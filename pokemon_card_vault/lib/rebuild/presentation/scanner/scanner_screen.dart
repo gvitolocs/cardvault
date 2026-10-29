@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../controller/scanner_controller.dart';
 import '../../model/scanner.dart';
@@ -11,23 +12,76 @@ class ScannerScreen extends StatefulWidget {
       required this.controller,
       required this.onLogin,
       required this.onSaved,
+      this.onOpenCard,
       this.cameraBuilder});
   final ScannerController controller;
   final VoidCallback onLogin, onSaved;
   final WidgetBuilder? cameraBuilder;
+  final Future<void> Function(ScannedCard)? onOpenCard;
   @override
   State<ScannerScreen> createState() => _ScannerScreenState();
 }
 
 class _ScannerScreenState extends State<ScannerScreen> {
+  bool _openingSingle = false;
+  String? _openedSingleId;
   @override
   void initState() {
     super.initState();
     widget.controller.leave();
+    widget.controller.addListener(_watchSingle);
+  }
+
+  @override
+  void didUpdateWidget(ScannerScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeListener(_watchSingle);
+      widget.controller.addListener(_watchSingle);
+      _openedSingleId = null;
+    }
+  }
+
+  void _watchSingle() {
+    final id = widget.controller.singleCaptureId;
+    if (id == null ||
+        id == _openedSingleId ||
+        _openingSingle ||
+        widget.onOpenCard == null) {
+      return;
+    }
+    _openedSingleId = id;
+    _openingSingle = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        if (!mounted) return;
+        final card =
+            widget.controller.cards.where((c) => c.id == id).firstOrNull;
+        if (card != null) await _openCard(card);
+      } finally {
+        _openingSingle = false;
+      }
+    });
+  }
+
+  Future<void> _openCard(ScannedCard card) async {
+    final controller = widget.controller;
+    controller.leave();
+    await controller
+        .review()
+        .timeout(const Duration(seconds: 2), onTimeout: () {});
+    if (!mounted) return;
+    final reviewed = controller.cards.where((c) => c.id == card.id).firstOrNull;
+    if (reviewed != null &&
+        await controller.copyToClipboard(onlyId: card.id) &&
+        mounted) {
+      await widget.onOpenCard?.call(reviewed);
+    }
   }
 
   @override
   void dispose() {
+    widget.controller.removeListener(_watchSingle);
     widget.controller.leave();
     super.dispose();
   }
@@ -42,25 +96,23 @@ class _ScannerScreenState extends State<ScannerScreen> {
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
               child: SizedBox(
                   width: double.infinity,
-                  child: SegmentedButton<ScanDestination>(
+                  child: SegmentedButton<ScanMode>(
                       segments: const [
                         ButtonSegment(
-                            value: ScanDestination.collection,
-                            icon: Icon(Icons.collections_bookmark_outlined),
-                            label: Text('Collezione')),
+                            value: ScanMode.single,
+                            icon: Icon(Icons.crop_portrait),
+                            label: Text('Single')),
                         ButtonSegment(
-                            value: ScanDestination.listing,
-                            icon: Icon(Icons.sell_outlined),
-                            label: Text('Listing')),
+                            value: ScanMode.batch,
+                            icon: Icon(Icons.layers_outlined),
+                            label: Text('Batch')),
                       ],
                       selected: {
-                        controller.destination
+                        controller.mode
                       },
-                      onSelectionChanged: controller.busy ||
-                              controller.confirmationPending
+                      onSelectionChanged: controller.busy
                           ? null
-                          : (values) =>
-                              controller.selectDestination(values.single)))),
+                          : (values) => controller.selectMode(values.single)))),
           Expanded(
               child: Stack(children: [
             Positioned.fill(
@@ -88,8 +140,10 @@ class _ScannerScreenState extends State<ScannerScreen> {
                                                   .headlineSmall,
                                               textAlign: TextAlign.center),
                                           const SizedBox(height: 12),
-                                          const Text(
-                                              'Inquadra le carte una dopo l’altra. Apri la linguetta per scegliere i risultati e confermare il salvataggio.',
+                                          Text(
+                                              controller.mode == ScanMode.single
+                                                  ? 'Riconosci una carta e apri subito prezzo e listing. La scansione si ferma: riparti tu con Ready.'
+                                                  : 'Inquadra le carte una dopo l’altra. Controllale nella linguetta e trasferiscile in Clipboard per listarle più tardi.',
                                               textAlign: TextAlign.center),
                                           const SizedBox(height: 24),
                                           FilledButton.icon(
@@ -114,11 +168,11 @@ class _ScannerScreenState extends State<ScannerScreen> {
                               child: Text(
                                   controller.preparing
                                       ? 'Preparazione riconoscimento…'
-                                      : controller.confirmationPending
-                                          ? 'Verifica il salvataggio nella linguetta'
-                                          : controller.cameraPaused
-                                              ? 'Scansione in pausa · revisione carte'
-                                              : 'Scansiona · cambia carta dopo il riconoscimento',
+                                      : controller.cameraPaused
+                                          ? 'Scansione in pausa · revisione carte'
+                                          : controller.mode == ScanMode.single
+                                              ? 'Single · inquadra una carta'
+                                              : 'Batch · cambia carta dopo il riconoscimento',
                                   textAlign: TextAlign.center,
                                   style: const TextStyle(fontSize: 12)))))),
             if (controller.cameraError != null && controller.activated)
@@ -147,6 +201,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
                 child: ScannedCardsSheet(
                     controller: controller,
                     onSaved: widget.onSaved,
+                    onOpenCard: widget.onOpenCard == null ? null : _openCard,
                     onLogin: widget.onLogin)),
           ])),
         ]);

@@ -4,6 +4,9 @@ import '../shared/price_format.dart';
 import 'component/account_activity.dart';
 import 'component/account_settings.dart';
 import 'component/wallet_overview.dart';
+import 'component/appearance_settings.dart';
+import '../shared/atomics/themed_icon.dart';
+import '../../style/app_theme_icons.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen(
@@ -42,15 +45,22 @@ class ProfileScreen extends StatelessWidget {
                       : user.displayName.isNotEmpty
                           ? user.displayName
                           : 'Account Pokoin'),
-              subtitle:
-                  Text(user?.email ?? 'Esplora e testa Pokoin senza account.')),
+              subtitle: Row(children: [
+                Flexible(
+                    child: Text(user?.email ??
+                        'Esplora e testa Pokoin senza account.')),
+                const SizedBox(width: 4),
+                const AppearanceSettings(),
+              ])),
           if (user == null)
             FilledButton(
                 onPressed: onLogin, child: const Text('Accedi al tuo account')),
           const SizedBox(height: 16),
           Card(
               child: ListTile(
-                  leading: const Icon(Icons.account_balance_wallet_outlined),
+                  leading: const ThemedIcon(
+                      slot: AppThemeIcon.wallet,
+                      fallback: Icons.account_balance_wallet_outlined),
                   title: const Text('Wallet'),
                   subtitle: Text(user == null
                       ? 'Accedi per vedere il tuo saldo'
@@ -66,12 +76,16 @@ class ProfileScreen extends StatelessWidget {
                       WalletOverview(
                           controller: controller, onLogin: onLogin)))),
           ListTile(
-              leading: const Icon(Icons.collections_bookmark_outlined),
+              leading: const ThemedIcon(
+                  slot: AppThemeIcon.portfolio,
+                  fallback: Icons.collections_bookmark_outlined),
               title: const Text('La mia collezione'),
               trailing: const Icon(Icons.chevron_right),
               onTap: onPortfolio),
           ListTile(
-              leading: const Icon(Icons.menu_book_outlined),
+              leading: const ThemedIcon(
+                  slot: AppThemeIcon.cardex,
+                  fallback: Icons.menu_book_outlined),
               title: const Text('Il mio Cardex'),
               trailing: const Icon(Icons.chevron_right),
               onTap: onCardex),

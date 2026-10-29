@@ -9,9 +9,11 @@ class ScannedCardsSheet extends StatefulWidget {
       {super.key,
       required this.controller,
       required this.onSaved,
-      required this.onLogin});
+      required this.onLogin,
+      this.onOpenCard});
   final ScannerController controller;
   final VoidCallback onSaved, onLogin;
+  final Future<void> Function(ScannedCard)? onOpenCard;
   @override
   State<ScannedCardsSheet> createState() => _ScannedCardsSheetState();
 }
@@ -19,8 +21,6 @@ class ScannedCardsSheet extends StatefulWidget {
 class _ScannedCardsSheetState extends State<ScannedCardsSheet> {
   final _sheet = DraggableScrollableController();
   ScannerController get controller => widget.controller;
-  VoidCallback get onSaved => widget.onSaved;
-  VoidCallback get onLogin => widget.onLogin;
   @override
   void dispose() {
     _sheet.dispose();
@@ -72,19 +72,12 @@ class _ScannedCardsSheetState extends State<ScannedCardsSheet> {
                                     style: const TextStyle(
                                         fontWeight: FontWeight.w700))),
                             IconButton(
-                                tooltip: 'Ricarica scansioni',
-                                onPressed:
-                                    controller.busy || !controller.authenticated
-                                        ? null
-                                        : controller.reload,
-                                icon: const Icon(Icons.refresh)),
-                            IconButton(
                                 tooltip: 'Apri o chiudi carte scansionate',
                                 onPressed: _toggle,
                                 icon: const Icon(Icons.unfold_more)),
-                            const SizedBox(width: 8),
                           ]),
-                          const Text('Apri e conferma per salvare il possesso',
+                          const Text(
+                              'Controlla le carte e trasferiscile in Clipboard',
                               style: TextStyle(
                                   fontSize: 12, color: ScannerStyle.muted)),
                         ]))),
@@ -96,67 +89,53 @@ class _ScannedCardsSheetState extends State<ScannedCardsSheet> {
                       if (controller.message != null)
                         Padding(
                             padding: const EdgeInsets.all(8),
-                            child: Text(controller.message!,
-                                semanticsLabel: controller.message)),
-                      if (controller.needsReload)
-                        FilledButton.tonal(
-                            onPressed:
-                                controller.busy ? null : controller.reload,
-                            child: const Text('Ricarica e verifica scansioni')),
+                            child: Text(controller.message!)),
                       if (controller.pricing)
                         const Padding(
                             padding: EdgeInsets.all(8),
                             child: Text(
                                 'Caricamento immagini e prezzi indicativi…')),
-                      if (controller.cards.isNotEmpty &&
-                          controller.authenticated)
+                      if (controller.cards.isNotEmpty) ...[
+                        const Tooltip(
+                            message:
+                                'Salvataggio diretto temporaneamente indisponibile',
+                            child: OutlinedButton(
+                                onPressed: null, child: Text('Save'))),
                         FilledButton.icon(
-                            onPressed: controller.busy || controller.needsReload
+                            onPressed: controller.busy
                                 ? null
                                 : () async {
                                     FocusScope.of(context).unfocus();
-                                    if (await controller.save() && mounted) {
-                                      onSaved();
-                                    }
+                                    await controller.copyToClipboard();
                                   },
-                            icon: const Icon(Icons.check_circle_outline),
-                            label: Text(controller.destination ==
-                                    ScanDestination.collection
-                                ? 'Conferma ${controller.quantity} ${controller.quantity == 1 ? 'carta' : 'carte'} in collezione'
-                                : 'Conferma e pubblica ${controller.quantity} carte')),
-                      if (!controller.authenticated) ...[
-                        const Padding(
-                            padding: EdgeInsets.all(16),
-                            child: Text(
-                                'Accedi per aggiungere le carte alla collezione o ai listing.')),
-                        FilledButton(
-                            onPressed: onLogin, child: const Text('Accedi')),
-                      ] else if (controller.cards.isEmpty)
+                            icon: const Icon(Icons.content_paste_outlined),
+                            label: const Text('Copy to Clipboard')),
+                        const SizedBox(height: 12),
+                      ] else
                         const Padding(
                             padding: EdgeInsets.all(24),
                             child: Text(
-                                'Premi Ready e inquadra le carte: i risultati vengono raccolti automaticamente qui.',
+                                'Premi Ready e inquadra le carte: i risultati vengono raccolti qui.',
                                 textAlign: TextAlign.center)),
                       for (final card in controller.cards)
                         ScannedCardEditor(
                             key: ValueKey(card.id),
                             card: card,
-                            canRemove: card.isLocal && !controller.busy,
-                            enabled: !controller.busy &&
-                                !controller.needsReload &&
-                                !controller.confirmationPending,
-                            requirePrice: controller.destination ==
-                                ScanDestination.listing,
+                            canRemove: !controller.busy,
+                            enabled: !controller.busy,
+                            requirePrice: false,
+                            onOpen: widget.onOpenCard == null || controller.busy
+                                ? null
+                                : () => widget.onOpenCard!(card),
                             onCandidate: (candidate) =>
                                 controller.chooseCandidate(card.id, candidate),
                             onChanged: controller.edit,
                             onRemove: () => controller.remove(card.id)),
-                      if (controller.cards.isNotEmpty) ...[
+                      if (controller.cards.isNotEmpty)
                         const Padding(
                             padding: EdgeInsets.all(8),
                             child: Text(
-                                'Verifica carta, lingua e finitura prima di confermare.')),
-                      ],
+                                'Le bozze in Clipboard restano disponibili dopo la chiusura dell’app. Nessuna pubblicazione automatica.')),
                     ])),
               ]))));
 }

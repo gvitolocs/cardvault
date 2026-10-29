@@ -9,12 +9,60 @@ import '../service/expansion_era_service.dart';
 import '../service/card_ownership_service.dart';
 import '../model/card_ownership.dart';
 import '../constants/cardex_pagination_constants.dart';
+import 'collection_artwork_controller.dart';
 
 class CardexController extends ChangeNotifier {
-  CardexController({CardexService? catalog, CollectionService? collection})
+  CardexController(
+      {CardexService? catalog,
+      CollectionService? collection,
+      CollectionArtworkController? artwork})
       : _catalog = catalog ?? CardexService(),
         _ownsCatalog = catalog == null,
-        _collection = collection ?? CollectionService();
+        _collection = collection ?? CollectionService(),
+        artwork = artwork ?? CollectionArtworkController() {
+    this.artwork.addListener(_artworkPreferenceChanged);
+  }
+  final CollectionArtworkController artwork;
+  String _observedArtworkLanguage = 'IT';
+  void _artworkPreferenceChanged() {
+    if (_observedArtworkLanguage == artwork.language) return;
+    _observedArtworkLanguage = artwork.language;
+    _selectedLanguages.clear();
+    _notify();
+  }
+
+  void setArtworkLanguage(String language) {
+    _selectedLanguages.clear();
+    artwork.selectLanguage(language);
+    _notify();
+  }
+
+  String artworkLanguageFor(String cardId) =>
+      _selectedLanguages[cardId] ?? artwork.language;
+
+  CardOwnership detailsOwnershipFor(String cardId,
+          {String? selectedLanguage}) =>
+      _ownership.describe(collection, cardId,
+          selectedLanguage: selectedLanguage ?? artworkLanguageFor(cardId));
+
+  MarketplaceCardPreview artworkPreview(MarketplaceCardPreview preview) {
+    final code = artworkLanguageFor(preview.id);
+    final localized = code == 'EN'
+        ? null
+        : artwork.metadataFor(preview.id)?.languageImageUrls[code];
+    if (localized == null) return preview;
+    return MarketplaceCardPreview(
+        id: preview.id,
+        name: preview.name,
+        expansion: preview.expansion,
+        number: preview.number,
+        imageUrl: localized,
+        fullImageUrl: localized,
+        imageLanguage: code,
+        pricePkn: preview.pricePkn,
+        canonicalPath: preview.canonicalPath);
+  }
+
   final CardexService _catalog;
   final bool _ownsCatalog;
   final CollectionService _collection;
@@ -34,14 +82,14 @@ class CardexController extends ChangeNotifier {
   final _selectedLanguages = <String, String>{};
   CardOwnership ownershipFor(String cardId) =>
       _ownership.describe(collection, cardId,
-          selectedLanguage: _selectedLanguages[cardId]);
+          selectedLanguage: artworkLanguageFor(cardId));
 
   void selectOwnedLanguage(String cardId, String language) {
     if (_disposed || !ownershipKnown) return;
     final code = _ownership.normalizeLanguage(language);
     final view = ownershipFor(cardId);
     if (!view.languages.any((option) => option.code == code && option.owned) ||
-        view.selectedLanguage == code) {
+        _selectedLanguages[cardId] == code) {
       return;
     }
     _selectedLanguages[cardId] = code;
@@ -76,6 +124,7 @@ class CardexController extends ChangeNotifier {
 
   void start({bool loadCatalog = true}) {
     if (_disposed) return;
+    unawaited(artwork.start());
     if (!_started) {
       _started = true;
       retryCollection();
@@ -183,7 +232,9 @@ class CardexController extends ChangeNotifier {
         loadingPage ||
         !hasMore ||
         expansion == null ||
-        capacity < 1) return;
+        capacity < 1) {
+      return;
+    }
     if (visibleCards.length - visibleEnd <=
         capacity * CardexPaginationConstants.prefetchRemainingSpreads) {
       unawaited(loadMore());
@@ -210,6 +261,8 @@ class CardexController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    artwork.removeListener(_artworkPreferenceChanged);
+    artwork.dispose();
     unawaited(_subscription?.cancel());
     if (_ownsCatalog) _catalog.dispose();
     super.dispose();

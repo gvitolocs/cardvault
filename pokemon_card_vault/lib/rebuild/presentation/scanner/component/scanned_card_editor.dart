@@ -11,6 +11,7 @@ class ScannedCardEditor extends StatefulWidget {
       required this.requirePrice,
       required this.onChanged,
       this.onCandidate,
+      this.onOpen,
       this.canRemove = false,
       required this.onRemove});
   final ScannedCard card;
@@ -19,6 +20,7 @@ class ScannedCardEditor extends StatefulWidget {
   final ValueChanged<ScannedCard> onChanged;
   final ValueChanged<ScannerCandidate>? onCandidate;
   final VoidCallback onRemove;
+  final VoidCallback? onOpen;
   @override
   State<ScannedCardEditor> createState() => _ScannedCardEditorState();
 }
@@ -69,17 +71,20 @@ class _ScannedCardEditorState extends State<ScannedCardEditor> {
                     imageUrl: card.imageUrl, width: 48, height: 68),
                 const SizedBox(width: 12),
                 Expanded(
-                    child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                      Text(card.name,
-                          style: const TextStyle(fontWeight: FontWeight.w700)),
-                      Text(
-                          [card.number, card.setName]
-                              .where((s) => s.isNotEmpty)
-                              .join(' · '),
-                          style: Theme.of(context).textTheme.bodySmall),
-                    ])),
+                    child: InkWell(
+                        onTap: widget.onOpen,
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(card.name,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w700)),
+                              Text(
+                                  [card.number, card.setName]
+                                      .where((s) => s.isNotEmpty)
+                                      .join(' · '),
+                                  style: Theme.of(context).textTheme.bodySmall),
+                            ]))),
                 IconButton(
                     tooltip: 'Rimuovi ${card.name}',
                     onPressed: widget.enabled || widget.canRemove

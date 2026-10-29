@@ -3,12 +3,19 @@ import 'package:flutter/foundation.dart';
 import '../model/account.dart';
 import '../service/profile_service.dart';
 import 'account_controller.dart';
+import 'shipping_addresses_controller.dart';
 
 class ProfileController extends ChangeNotifier {
-  ProfileController({required this.account, ProfileService? service})
-      : _service = service ?? ProfileService() {
+  ProfileController(
+      {required this.account,
+      ProfileService? service,
+      ShippingAddressesController? addressesController})
+      : _service = service ?? ProfileService(),
+        addresses = addressesController ?? ShippingAddressesController() {
     account.addListener(_sessionChanged);
+    addresses.setUser(account.session.user?.id);
   }
+  final ShippingAddressesController addresses;
   final AccountController account;
   final ProfileService _service;
   final List<StreamSubscription<dynamic>> _subscriptions = [];
@@ -29,6 +36,7 @@ class ProfileController extends ChangeNotifier {
 
   void _sessionChanged() {
     final uid = account.session.user?.id;
+    addresses.setUser(uid);
     if (!_started || uid == _uid) return;
     _uid = uid;
     _bind();
@@ -102,6 +110,7 @@ class ProfileController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    addresses.dispose();
     account.removeListener(_sessionChanged);
     for (final subscription in _subscriptions) {
       unawaited(subscription.cancel());

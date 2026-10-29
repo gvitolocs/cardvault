@@ -10,8 +10,7 @@ import '../shared/component/listing_cart_price.dart';
 import '../shared/marketplace_image_url.dart';
 import '../../controller/card_details_controller.dart';
 import '../../controller/cardex_controller.dart';
-import '../../model/card_ownership.dart';
-import '../shared/component/card_ownership_artwork.dart';
+import 'component/card_details_artwork.dart';
 import '../../controller/cart_controller.dart';
 import '../../model/marketplace_home.dart';
 import '../../model/card.dart';
@@ -24,6 +23,9 @@ import 'atomics/card_details_panel.dart';
 import 'component/card_price_history.dart';
 import 'component/card_listing_composer.dart';
 import 'component/card_best_deal.dart';
+import '../../controller/scan_clipboard_controller.dart';
+import '../shared/component/scan_clipboard_button.dart';
+import 'component/draft_listing_composer.dart';
 
 /// La route possiede il controller dettagli; il carrello è condiviso con home.
 /// Inserzioni effettive per il catalogo, offerte di esempio solo per DemoCard.
@@ -34,6 +36,11 @@ class CardDetails extends StatefulWidget {
       required CardDetailsController this.controller,
       this.initialColor,
       this.ownershipController,
+      this.clipboard,
+      this.draftId,
+      this.onOpenClipboard,
+      this.onDraftLogin,
+      this.sellerName = 'Pokoin seller',
       required this.cart})
       : demoCard = null;
 
@@ -44,6 +51,11 @@ class CardDetails extends StatefulWidget {
         preview = null,
         initialColor = null,
         ownershipController = null,
+        clipboard = null,
+        draftId = null,
+        onOpenClipboard = null,
+        onDraftLogin = null,
+        sellerName = 'Pokoin seller',
         controller = null;
 
   final MarketplaceCardPreview? preview;
@@ -53,6 +65,10 @@ class CardDetails extends StatefulWidget {
   final Color? initialColor;
   // Shared read-only collection state; owned by the app, not this route.
   final CardexController? ownershipController;
+  final ScanClipboardController? clipboard;
+  final String? draftId;
+  final VoidCallback? onOpenClipboard, onDraftLogin;
+  final String sellerName;
   @override
   State<CardDetails> createState() => _CardDetailsState();
 }
@@ -61,6 +77,7 @@ class _CardDetailsState extends State<CardDetails> {
   Color? _artworkColor;
   bool _favorite = false;
   String? _condition, _language;
+  String? _artworkLanguage;
   ListingSort _sort = ListingSort.lowestPrice;
 
   // Identità locali separate dal catalogo: le offerte demo non sono acquistabili.
@@ -116,6 +133,11 @@ class _CardDetailsState extends State<CardDetails> {
   @override
   void initState() {
     super.initState();
+    final id = widget.preview?.id;
+    if (id != null) {
+      _artworkLanguage =
+          widget.ownershipController?.detailsOwnershipFor(id).selectedLanguage;
+    }
     final controller = widget.controller;
     if (controller != null) unawaited(controller.load());
   }
@@ -162,7 +184,9 @@ class _CardDetailsState extends State<CardDetails> {
                       const SizedBox(height: 16),
                       Text(widget.demoCard != null
                           ? 'Prezzi, grafico e offerte sono dati di esempio.'
-                          : 'Le inserzioni provengono dal marketplace. Grafico e modulo di vendita sono dimostrativi.'),
+                          : widget.draftId != null
+                              ? 'Le inserzioni provengono dal marketplace. Puoi pubblicare questa bozza con il pulsante nel modulo.'
+                              : 'Le inserzioni provengono dal marketplace. Grafico e modulo di vendita sono dimostrativi.'),
                     ]))));
   }
 
@@ -199,6 +223,11 @@ class _CardDetailsState extends State<CardDetails> {
                                 label: Text('${widget.cart.itemCount}'),
                                 child:
                                     const Icon(Icons.shopping_bag_outlined)))),
+                    if (widget.clipboard != null &&
+                        widget.onOpenClipboard != null)
+                      ScanClipboardButton(
+                          controller: widget.clipboard!,
+                          onPressed: widget.onOpenClipboard!),
                   ]),
                   body: SafeArea(
                     child: LayoutBuilder(builder: (context, constraints) {
@@ -260,9 +289,28 @@ class _CardDetailsState extends State<CardDetails> {
     final number = card?.number ?? widget.preview?.number ?? demo!.number;
     final ownership = widget.preview == null
         ? null
-        : widget.ownershipController?.ownershipFor(widget.preview!.id);
+        : widget.ownershipController?.detailsOwnershipFor(widget.preview!.id,
+            selectedLanguage: _artworkLanguage);
     final selectedPreview = ownership?.selected?.preview;
+    final fallbackUrl = widget.preview?.imageLanguage.isNotEmpty == true &&
+            widget.preview?.imageLanguage == ownership?.selectedLanguage
+        ? widget.preview!.fullImageUrl
+        : ownership?.selectedLanguage == 'EN' &&
+                card?.imageUrl.isNotEmpty == true
+            ? card!.imageUrl
+            : card == null && widget.preview?.fullImageUrl.isNotEmpty == true
+                ? widget.preview!.fullImageUrl
+                : selectedPreview?.imageUrl.isNotEmpty == true
+                    ? selectedPreview!.imageUrl
+                    : selectedPreview?.fullImageUrl.isNotEmpty == true
+                        ? selectedPreview!.fullImageUrl
+                        : card?.imageUrl.isNotEmpty == true
+                            ? card!.imageUrl
+                            : widget.preview?.fullImageUrl.isNotEmpty == true
+                                ? widget.preview!.fullImageUrl
+                                : widget.preview?.imageUrl ?? '';
     final artwork = CardArtworkPanel(
+        imageIsFramed: demo == null,
         purchase: widget.controller == null
             ? null
             : ValueListenableBuilder<ListingsState>(
@@ -298,58 +346,62 @@ class _CardDetailsState extends State<CardDetails> {
                 widget.cart.addCard(demo);
                 Navigator.of(context).pop();
               },
-        image: _ownershipArtwork(
-            demo != null
-                ? CardIllustration(card: demo)
-                : LayoutBuilder(builder: (context, constraints) {
-                    final imageUrl =
-                        selectedPreview?.imageUrl.isNotEmpty == true
-                            ? selectedPreview!.imageUrl
-                            : selectedPreview?.fullImageUrl.isNotEmpty == true
-                                ? selectedPreview!.fullImageUrl
-                                : card?.imageUrl.isNotEmpty == true
-                                    ? card!.imageUrl
-                                    : widget.preview!.fullImageUrl.isNotEmpty
-                                        ? widget.preview!.fullImageUrl
-                                        : widget.preview!.imageUrl;
-                    final uri = marketplaceImageUri(imageUrl);
-                    if (uri == null) {
-                      return MarketplaceThumbnail(
-                          imageUrl: '',
-                          width: constraints.maxWidth,
-                          height: constraints.maxHeight);
-                    }
-                    if (widget.initialColor != null) {
-                      return MarketplaceThumbnail(
+        image: demo != null
+            ? CardIllustration(card: demo)
+            : CardDetailsArtwork(
+                key: ValueKey(widget.preview!.id),
+                cardName: name,
+                cardId: widget.preview!.id,
+                fallbackUrl: fallbackUrl,
+                languageImages: card?.languageImageUrls ?? const {},
+                ownership: ownership,
+                onLanguageSelected: (language) =>
+                    setState(() => _artworkLanguage = language),
+                imageBuilder: (imageUrl) =>
+                    LayoutBuilder(builder: (context, constraints) {
+                      final uri = marketplaceImageUri(imageUrl);
+                      if (uri == null) {
+                        return MarketplaceThumbnail(
+                            imageUrl: '',
+                            width: constraints.maxWidth,
+                            height: constraints.maxHeight);
+                      }
+                      if (widget.initialColor != null) {
+                        return MarketplaceThumbnail(
+                            key: ValueKey(widget.preview!.id),
+                            imageUrl: imageUrl,
+                            gaplessPlayback: true,
+                            width: constraints.maxWidth,
+                            height: constraints.maxHeight);
+                      }
+                      return CardArtworkImage(
                           key: ValueKey(widget.preview!.id),
-                          imageUrl: imageUrl,
-                          gaplessPlayback: true,
-                          width: constraints.maxWidth,
-                          height: constraints.maxHeight);
-                    }
-                    return CardArtworkImage(
-                        key: ValueKey(widget.preview!.id),
-                        image: ResizeImage.resizeIfNeeded(
-                            (constraints.maxWidth *
-                                    MediaQuery.devicePixelRatioOf(context))
-                                .round()
-                                .clamp(1, 768),
-                            null,
-                            CachedNetworkImageProvider(uri.toString(),
-                                cacheManager: MarketplaceImageCache.instance)),
-                        onColor: (color) {
-                          if (_artworkColor != color) {
-                            setState(() => _artworkColor = color);
-                          }
-                        });
-                  }),
-            ownership,
-            name),
+                          image: ResizeImage.resizeIfNeeded(
+                              (constraints.maxWidth *
+                                      MediaQuery.devicePixelRatioOf(context))
+                                  .round()
+                                  .clamp(1, 768),
+                              null,
+                              CachedNetworkImageProvider(uri.toString(),
+                                  cacheManager:
+                                      MarketplaceImageCache.instance)),
+                          onColor: (color) {
+                            if (_artworkColor != color) {
+                              setState(() => _artworkColor = color);
+                            }
+                          });
+                    })),
         onVersions: () =>
             _message('Le altre versioni saranno disponibili prossimamente.'));
-    final composer = CardListingComposer(
-        onPreview: () => _message(
-            'Anteprima pronta. La pubblicazione degli annunci non è ancora disponibile.'));
+    final Widget composer = widget.draftId != null && widget.clipboard != null
+        ? DraftListingComposer(
+            controller: widget.clipboard!,
+            draftId: widget.draftId!,
+            sellerName: widget.sellerName,
+            onLogin: widget.onDraftLogin ?? () {})
+        : CardListingComposer(
+            onPreview: () => _message(
+                'Anteprima pronta. La pubblicazione degli annunci non è ancora disponibile.'));
     const history = CardPriceHistory();
     final bestDeal = widget.controller == null
         ? CardBestDeal(
@@ -373,9 +425,10 @@ class _CardDetailsState extends State<CardDetails> {
                 onRetry: widget.controller!.retryListings));
     final center =
         Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      if (widget.draftId != null) composer,
       history,
       const SizedBox(height: 16),
-      composer,
+      if (widget.draftId == null) composer,
     ]);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
@@ -436,11 +489,15 @@ class _CardDetailsState extends State<CardDetails> {
           return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (widget.draftId != null) ...[
+                  composer,
+                  const SizedBox(height: 16)
+                ],
                 artwork,
                 const SizedBox(height: 16),
                 history,
                 const SizedBox(height: 16),
-                composer,
+                if (widget.draftId == null) composer,
                 const SizedBox(height: 16),
                 bestDeal,
               ]);
@@ -448,15 +505,4 @@ class _CardDetailsState extends State<CardDetails> {
       ]),
     );
   }
-
-  Widget _ownershipArtwork(
-          Widget image, CardOwnership? ownership, String name) =>
-      ownership == null
-          ? image
-          : CardOwnershipArtwork(
-              image: image,
-              cardName: name,
-              ownership: ownership,
-              onLanguageSelected: (language) => widget.ownershipController!
-                  .selectOwnedLanguage(ownership.cardId, language));
 }

@@ -14,7 +14,7 @@ class CardAlbumLoading extends StatelessWidget {
             const SizedBox(width: CardexAlbumLayoutConstants.columnGap),
           Expanded(
               child: AspectRatio(
-                  aspectRatio: CardexArtworkConstants.pocketAspectRatio,
+                  aspectRatio: CardexArtworkConstants.artworkAspectRatio,
                   child: DecoratedBox(
                       decoration: BoxDecoration(
                           color: CardexStyle.sleeve,

@@ -5,9 +5,10 @@ import '../../../style/card_ownership_style.dart';
 /// Ownership must come from confirmed account evidence, never a catalog guess.
 class CardOwnershipFrame extends StatelessWidget {
   const CardOwnershipFrame(
-      {super.key, required this.owned, required this.child});
+      {super.key, required this.owned, required this.child, this.inset = 2});
   final bool owned;
   final Widget child;
+  final double inset;
   static const radius = BorderRadius.all(Radius.circular(12));
   static const _owned = BoxDecoration(
       color: CardOwnershipStyle.sleeve,
@@ -21,7 +22,7 @@ class CardOwnershipFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-      padding: const EdgeInsets.all(2),
+      padding: EdgeInsets.all(inset),
       clipBehavior: Clip.antiAlias,
       decoration: owned ? _owned : _neutral,
       child: child);

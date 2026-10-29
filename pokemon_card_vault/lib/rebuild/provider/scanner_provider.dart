@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import '../model/scanner.dart';
+import 'scanner/scan_debug_log.dart';
 
 /// Uses the existing Scan Connect transaction and ownership reconciliation.
 /// Mutations never retry automatically: after an uncertain add the caller reads
@@ -35,8 +36,14 @@ class ScannerProvider {
               ? client.get(uri, headers: headers)
               : client.post(uri, headers: headers, body: jsonEncode(body)))
           .timeout(const Duration(seconds: 30));
+      final action = query?['action'] ??
+          (path == '/api/marketplace-collection' ? 'ownership' : 'read');
+      // Fixed operation names and status only: no tokens, IDs or response bodies.
+      ScanDebugLog.i(
+          'scan request action=$action status=${response.statusCode}');
+      await ScanDebugLog.flush();
       if (response.statusCode != 200) {
-        throw StateError('Scan request failed (${response.statusCode})');
+        throw ScannerRequestFailure(action, response.statusCode);
       }
       final data = jsonDecode(utf8.decode(response.bodyBytes));
       if (data is! Map<String, dynamic>) {
@@ -152,5 +159,7 @@ class ScannerProvider {
       throw const FormatException(
           'Salvataggio ricevuto, ma il possesso non è ancora visibile. Premi nuovamente Conferma per verificare senza duplicare le carte.');
     }
+    ScanDebugLog.i('scan ownership verified rows=${cards.length}');
+    await ScanDebugLog.flush();
   }
 }

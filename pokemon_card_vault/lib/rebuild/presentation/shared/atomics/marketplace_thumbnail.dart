@@ -13,6 +13,7 @@ class MarketplaceThumbnail extends StatelessWidget {
     this.fallbackIcon = Icons.style_outlined,
     this.gaplessPlayback = false,
     this.decodeLogicalWidth,
+    this.onError,
   });
 
   final String imageUrl;
@@ -20,6 +21,7 @@ class MarketplaceThumbnail extends StatelessWidget {
   final double height;
   final IconData fallbackIcon;
   final bool gaplessPlayback;
+  final VoidCallback? onError;
 
   /// Keep the pocket's decoding budget when its scan overflows for a UI crop.
   /// Logical pixels, multiplied by DPR below and still capped at 768 pixels.
@@ -47,7 +49,10 @@ class MarketplaceThumbnail extends StatelessWidget {
               gaplessPlayback: gaplessPlayback,
               frameBuilder: (_, child, frame, synchronous) =>
                   synchronous || frame != null ? child : placeholder,
-              errorBuilder: (_, __, ___) => placeholder,
+              errorBuilder: (_, __, ___) {
+                onError?.call();
+                return placeholder;
+              },
             ),
     );
   }
